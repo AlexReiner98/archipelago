@@ -37,6 +37,7 @@ const host = await startBrowser({
     { id: "page", pack: "packs/page/view.ts" },
     { id: "reflex", pack: "packs/reflex/index.ts" },
     { id: "map", pack: "packs/map/index.ts" },
+    { id: "legend", pack: "packs/legend/index.ts" },
     { id: "item", pack: "packs/item/index.ts" },
     { id: "style-view", pack: "packs/style/view.ts" },
   ],

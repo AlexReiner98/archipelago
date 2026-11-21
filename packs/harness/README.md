@@ -1,8 +1,10 @@
 # harness
 
 The harness view: what the map says to an agent, what the agent does, and
-whether each thing said works. Fills the region `center` with three panes, linked
-through `here`.
+whether each thing said works. Three panes, each a fill, linked through
+`here`: the tree in `left`, the run in `center` (the view "Harness"), and
+the node in `right`. The tree and the node show only while the run does
+(`when: { "here.view": "harness/view" }`).
 
 | Pane | Shows |
 |---|---|

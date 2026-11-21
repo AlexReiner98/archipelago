@@ -4,7 +4,8 @@
  * the center, over floats above all. A region with no fills takes no room.
  * Center shows one fill at a time: the one `here.view` names, else the
  * first, and the frame sets `here.view` to what it shows. Left and right
- * stack their fills, each under its title. Widths are style tokens.
+ * stack their fills, sharing the height, each under its title when there
+ * are two or more. Widths are style tokens.
  */
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
@@ -27,9 +28,11 @@ html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:
 .fr-top { grid-area:top; display:flex; align-items:baseline; gap:var(--space-5); padding:var(--space-3) var(--space-4) 0; border-bottom:1px solid var(--line); white-space:nowrap; }
 .fr-top > * { min-width:0; }
 .fr-bottom { grid-area:bottom; display:flex; align-items:center; gap:var(--space-5); padding:var(--space-2) var(--space-4); border-top:1px solid var(--line); color:var(--dim); font-size:var(--text-s); }
-.fr-left, .fr-right { min-height:0; overflow:auto; display:flex; flex-direction:column; background:var(--panel); }
+.fr-left, .fr-right { min-height:0; overflow:hidden; display:flex; flex-direction:column; background:var(--panel); }
 .fr-left { grid-area:left; width:var(--frame-left); border-right:1px solid var(--line); }
 .fr-right { grid-area:right; width:var(--frame-right); border-left:1px solid var(--line); }
+.fr-part { flex:1 1 0; min-height:0; overflow:auto; display:flex; flex-direction:column; }
+.fr-part > :last-child { flex:1; min-height:0; }
 .fr-part + .fr-part { border-top:1px solid var(--line); }
 .fr-head { padding:var(--space-3) var(--space-4) 0; color:var(--dim); font-size:var(--text-s); }
 .fr-center { grid-area:center; min-height:0; min-width:0; display:flex; }
@@ -61,7 +64,7 @@ const frame: Pack = {
       const fills = read.fills(region);
       if (!fills.length) return null;
       return html`<div class=${`fr-${region}`}>
-        ${fills.map((f) => html`<div class="fr-part" key=${fillKey(f)}>${f.title && html`<div class="fr-head">${f.title}</div>`}<${f.view} /></div>`)}
+        ${fills.map((f) => html`<div class="fr-part" key=${fillKey(f)}>${fills.length > 1 && f.title && html`<div class="fr-head">${f.title}</div>`}<${f.view} /></div>`)}
       </div>`;
     };
 

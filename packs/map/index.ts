@@ -24,7 +24,7 @@ import htm from "htm";
 import type { Id, Json } from "../../spec/common.ts";
 import type { HereRead, HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
-import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
+import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import type { LinkInfo, TypeInfo } from "../../spec/types.ts";
 import { layout, SIZE, type Out } from "./layout.ts";
@@ -59,15 +59,10 @@ interface FindIndex {
 const QUERY = "find.query";
 
 const STYLE = sheet(`
-.mp { display:grid; grid-template-rows:auto 1fr; height:100%; min-height:0; }
-.mp-bar { display:flex; gap:var(--space-3); align-items:center; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; }
-.mp-bar select, .mp-bar button { font:inherit; background:var(--control); color:var(--control-fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:0 var(--space-3); cursor:pointer; }
-.mp-bar .dim { color:var(--dim); }
-.mp-body { display:flex; min-height:0; }
+.mp { display:flex; height:100%; min-height:0; }
 .mp-canvas { flex:1; min-width:0; position:relative; overflow:hidden; cursor:grab; user-select:none; }
 .mp-canvas.panning { cursor:grabbing; }
 .mp-canvas svg { width:100%; height:100%; display:block; }
-.mp-side { width:min(380px, 40%); flex:none; border-left:1px solid var(--line); overflow:auto; }
 .mp-card rect { fill:var(--panel); stroke:var(--line); }
 .mp-card { cursor:pointer; }
 .mp-card text { font:var(--text-m) var(--font); fill:var(--fg); dominant-baseline:central; }
@@ -84,16 +79,6 @@ const STYLE = sheet(`
 .mp-wire.waits_on { stroke-dasharray:7 3 1.5 3; }
 .mp-wire.about { stroke:var(--line); }
 .mp-wire.lit { stroke:var(--pick); stroke-width:2.2; }
-.mp-key { position:absolute; left:8px; bottom:6px; color:var(--dim); font-size:var(--text-s); background:color-mix(in srgb, var(--bg) 88%, transparent); padding:var(--space-2) var(--space-3); border-radius:var(--radius); border:1px solid var(--line); display:grid; grid-template-columns:auto 1fr; column-gap:10px; row-gap:1px; pointer-events:none; }
-.mp-key .b { color:var(--fg); }
-.mp-key .row { display:flex; gap:10px; white-space:nowrap; align-items:center; }
-.mp-key .row > span { display:inline-flex; align-items:center; gap:3px; }
-.mp-key .m { display:inline-block; width:1.1em; text-align:center; }
-.mp-key .m.s-fresh { color:var(--mark-fresh); } .mp-key .m.s-moving { color:var(--mark-moving); } .mp-key .m.s-done { color:var(--mark-done); } .mp-key .m.s-gone { color:var(--mark-gone); }
-.mp-key svg { width:22px; height:8px; vertical-align:middle; }
-.mp-key .sw { display:inline-block; width:16px; height:9px; border-radius:2px; border:1px solid var(--line); background:var(--panel); }
-.mp-key .sw.pick { border:2px solid var(--pick); width:14px; height:7px; }
-.mp-key .sw.near { background:var(--lit); }
 .mp-card.hover rect { stroke:var(--pick); }
 .mp-wire.hot { stroke:var(--pick); stroke-width:2.2; }
 .mp-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); }
@@ -103,15 +88,11 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
 
 const map: Pack = {
   id: "map",
-  inject: ["find.index", "here.read", "here.set", "slot.declare", "slot.fill", "slot.read"],
+  inject: ["find.index", "here.read", "here.set", "slot.fill"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
-    const slots = ctx.get<SlotRead>("slot.read");
-    const declare = ctx.get<SlotDeclare>("slot.declare");
-    declare.declare({ name: "map.bar", merge: "many", doc: "The map's top line: find goes here." });
-    declare.declare({ name: "map.side", merge: "one", doc: "Beside the canvas: the item page goes here." });
 
     const useHere = <T extends Json>(key: string): T | undefined => {
       const [v, setV] = useState<T | undefined>(here.get<T>(key));
@@ -122,40 +103,6 @@ const map: Pack = {
       const [, tick] = useState(0);
       useEffect(() => index.watch(() => tick((x) => x + 1)) as () => void, []);
       return index;
-    };
-    const Slot = slots.Slot;
-
-    /** Every mark the canvas draws: each base with each of its statuses, then each kind of link. */
-    const Key = () => {
-      const all = index.types();
-      const bases = all.filter((t) => t.base === t.name);
-      const names = bases.map((t) => t.name);
-      const known = new Set(["depends_on", "part_of", "waits_on", "bears_on", "about"]);
-      const kinds = index.links().map((l) => l.name);
-      return html`
-        <div class="mp-key">
-          ${bases.map(
-            (t) => html`
-              <span class="b">${t.name}</span>
-              <span class="row">
-                ${[...t.statuses.open, ...t.statuses.closed].map(
-                  (st) => html`<span><span class=${`m s-${side(t, st)}`}>${mark(names, t, st)}</span>${st}</span>`,
-                )}
-              </span>
-            `,
-          )}
-          <span class="b">lit</span>
-          <span class="row">
-            <span><span class="sw pick"></span> hovered or open</span>
-            <span><span class="sw near"></span> linked to it</span>
-            <span><svg viewBox="0 0 22 8"><path class="mp-wire lit" d="M0 4H22" /></svg> its links</span>
-          </span>
-          <span class="b">links</span>
-          <span class="row">
-            ${kinds.map((k) => html`<span><svg viewBox="0 0 22 8"><path class=${`mp-wire ${known.has(k) ? k : ""}`} d="M0 4H22" /></svg> ${k}</span>`)}
-          </span>
-        </div>
-      `;
     };
 
     const Canvas = ({ result, drawn }: { result: Result; drawn: Out }) => {
@@ -250,7 +197,6 @@ const map: Pack = {
             })}
           </g></svg>
           ${!result.items.length && html`<div class="mp-empty">${index.ready() ? "Nothing matches." : "Reading the map…"}</div>`}
-          <${Key} />
         </div>
       `;
     };
@@ -258,7 +204,6 @@ const map: Pack = {
     const View = () => {
       const idx = useIndex();
       const q = useHere<string>(QUERY) ?? "";
-      const picked = useHere<string>(KEYS.item);
       const result = idx.run(q);
       const [, restyle] = useState(0);
       useEffect(() => onStyle(() => restyle((n) => n + 1)), []);
@@ -270,13 +215,7 @@ const map: Pack = {
       }, []);
       return html`
         <div class="mp">
-          <div class="mp-bar">
-            <${Slot} name="map.bar" />
-          </div>
-          <div class="mp-body">
-            <${Canvas} result=${result} drawn=${drawn} />
-            ${picked && html`<div class="mp-side"><${Slot} name="map.side" /></div>`}
-          </div>
+          <${Canvas} result=${result} drawn=${drawn} />
         </div>
       `;
     };
