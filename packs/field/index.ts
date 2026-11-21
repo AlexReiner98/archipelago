@@ -63,6 +63,8 @@ const QUERY = "find.query";
 const REMEMBER = "archipelago.field.dials";
 const HIDE = "field.hide";
 const REMEMBER_HIDE = "archipelago.field.hide";
+/** What the legend hides until someone says otherwise: closed items, so Field opens on the work still open. */
+export const HIDE_START: Hide = { closed: true };
 
 /** Field's view in `center`, as the frame names it in `here.view`. */
 export const VIEW = "field/field";
@@ -110,10 +112,11 @@ const fieldPack: Pack = {
     const set = ctx.get<HereSet>("here.set");
     const declare = ctx.get<HereDeclare>("here.declare");
     declare.declare({ key: DIALS, scope: "page", doc: "The field's dials that differ from where they start, by key." });
-    declare.declare({ key: HIDE, scope: "page", doc: "What the field's legend hides: types, type:status, type:kind, open, closed, links, lone. The layout is what is left." });
+    declare.declare({ key: HIDE, scope: "page", doc: "What the field's legend hides: types, type:status, type:kind, open, closed, links, lone. The layout is what is left. Absent: closed items ({ closed: true }); {} hides nothing." });
     for (const [key, kept] of [[DIALS, REMEMBER], [HIDE, REMEMBER_HIDE]] as const) {
       const v = here.get(key) === undefined ? recall(kept) : undefined;
-      if (v && Object.keys(v).length) set.set(key, v);
+      // A kept {} for what is hidden still says something: show everything, not the start.
+      if (v && (Object.keys(v).length || key === HIDE)) set.set(key, v);
     }
 
 
@@ -199,7 +202,7 @@ const fieldPack: Pack = {
       const input = useMemo<FieldIn>(() => inputOf(result), [shape]);
 
       // What the legend hides is left out of the layout: a change to it settles the graph again with what is left.
-      const hide = (useHere<Json>(HIDE) ?? {}) as Hide;
+      const hide = (useHere<Json>(HIDE) ?? HIDE_START) as Hide;
       const hideKey = JSON.stringify(hide);
       const [styled, restyle] = useState(0);
       useEffect(() => onStyle(() => restyle((n) => n + 1)), []);
@@ -215,8 +218,9 @@ const fieldPack: Pack = {
         if (!levels) return visible;
         return { items: visible.items.filter((it) => levels.has(it.id)), links: visible.links.filter((l) => levels.has(l.from) && levels.has(l.to)), types: visible.types };
       }, [visible, levels]);
+      // Kept as it is, {} included (show everything); only the start is absent.
       const setHide = (next: Hide | undefined) => {
-        const v = next && Object.keys(next).length ? (next as Json) : undefined;
+        const v = (next ?? {}) as Json;
         remember(REMEMBER_HIDE, v);
         set.set(HIDE, v);
       };

@@ -3,7 +3,8 @@
 Page side: the map as particles, the view "Field" in the frame's `center`
 (home). Each item is a particle in its type's colour and its base's shape,
 and links are faint lines with arrows. It lays out the whole map, open and
-closed, up to `field_limit` items, less what the legend hides; while the
+closed, up to `field_limit` items, less what the legend hides (closed
+items, to start with); while the
 find line has words, only what it finds and what lies near it.
 
 - **No groups.** The map has no islands, and Field knows none: clusters
@@ -63,7 +64,9 @@ find line has words, only what it finds and what lies near it.
   and kinds, open and closed, items with no links, and each link type as a
   switch, with how many the map has and how many show. What is hidden is
   left out of the layout and the graph settles again with what is shown.
-  What is hidden is `field.hide` (page scope). `dials` opens the run line
+  What is hidden is `field.hide` (page scope); it starts with closed items
+  hidden, so Field opens on the work still open, and `show all` shows
+  everything (kept as `{}`). `dials` opens the run line
   and every dial, in the same box, the same size.
 - **Titles** ([labels.ts](labels.ts)). Placed in order: the particle
   pointed at and its neighbours, what the find line finds, what was named
