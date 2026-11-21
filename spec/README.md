@@ -101,8 +101,8 @@ The spec has editions: 1, 2, 3… Packs don't declare versions of anything.
 - Each capability says the edition it arrived in (`since`) and, if
   retired, the edition and what replaces it. The list is the spec's
   history.
-- Until edition 1 is accepted, its capabilities can still be edited:
-  nothing has been built on them yet.
+- Edition 1 is accepted (Alex, 20 Nov 2026): its capabilities' meanings
+  are fixed.
 
 Cordis links by key alone and leaves versioning open (§6.6). It names two
 problems: drift (a key's interface changing under a consumer) and
