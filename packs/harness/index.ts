@@ -261,6 +261,13 @@ const harness: Pack = {
       // Trees for the agent in focus and the three last active besides; a line each for the rest.
       const focus = hk.useHere<string>(FOCUS);
       const setFocus = (r: string) => set.set(FOCUS, r);
+      // Focus is pinned: it moves when you pick another or its run ends, never because another agent acted.
+      useEffect(() => {
+        if (!live) return;
+        const ids = lives.map((r) => r.run);
+        const keep = focusOf(ids, focus);
+        if (keep && keep !== focus) set.set(FOCUS, keep);
+      }, [live, lives, focus]);
       const split = useMemo(() => {
         const ids = lives.map((r) => r.run);
         return treesAndRows(ids, focusOf(ids, focus));

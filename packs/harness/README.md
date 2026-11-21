@@ -68,7 +68,8 @@ the big place while the old one shrinks into the column (a view
 transition of the tree drawings, or a line's dot, only, each named by
 its colour slot; headers and text change in place; `switch_s` seconds, at once under
 reduced motion). Focus starts on the last active agent and stays
-where it is put while that agent is live. Trees go to the agent in focus
+where it is put while that agent is live: it is pinned in
+`harness.focus`, so another agent acting never moves it. Trees go to the agent in focus
 and the three last active besides, as previews; every other live agent is
 one line under the previews (its colour, name and profile), a click from
 focus, and its tree grows out of its coloured dot, so a run that stopped without ending costs a
@@ -145,7 +146,9 @@ a step at a time, "● live" (or "■ end") follows the end again.
 
 ## The run ([events.ts](events.ts))
 
-The line at the playhead is picked; those after it are faint. A click
+The line at the playhead is picked; those after it are faint. New lines
+keep the list at its foot only while it is at its foot (`atFoot`):
+scrolled up to read, it stays where it is. A click
 picks its node for the node pane: its own, or for an act the node it
 failed, else the node told just before it (`nodeOf`, replay.ts); and it
 opens the line in place ([expand.ts](expand.ts)): for the map to the agent,

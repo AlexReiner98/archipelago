@@ -547,3 +547,10 @@ test("shouldFit: every tree fits once and then only when asked", () => {
   assert.equal(at({ manual: true }), false);
   assert.equal(at({ fitted: true, manual: true, asked: true }), true, "a double-click");
 });
+
+test("atFoot: new lines keep the list at its foot only when it is already there", async () => {
+  const { atFoot } = await import("../packs/harness/events.ts");
+  assert.equal(atFoot(1000, 600, 400), true);
+  assert.equal(atFoot(1000, 590, 400), true, "within a little slack");
+  assert.equal(atFoot(1000, 300, 400), false, "scrolled up to read: it stays put");
+});

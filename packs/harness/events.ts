@@ -98,20 +98,33 @@ export interface EventsProps {
   onPick(e: ExchangeEvent): void;
 }
 
+/** Whether a list is scrolled to its foot, within `slack` px: new lines then keep it there. */
+export function atFoot(scrollHeight: number, scrollTop: number, clientHeight: number, slack = 24): boolean {
+  return scrollHeight - scrollTop - clientHeight <= slack;
+}
+
 export const Events = ({ info, events, index, end, verdicts, titles, node, profiles, onPick }: EventsProps) => {
   const body = useRef<HTMLDivElement>(null);
   const [opened, setOpened] = useState<Set<string>>(new Set());
-  useEffect(() => setOpened(new Set()), [info?.run]);
+  const stick = useRef(true);
+  // Another run: nothing open, and it starts at its foot.
+  useEffect(() => {
+    setOpened(new Set());
+    stick.current = true;
+  }, [info?.run]);
   const verdictOf = useMemo(() => new Map(verdicts.map((x) => [x.node, x])), [verdicts]);
   const broke = useMemo(() => new Set(node ? (verdictOf.get(node)?.failed_by ?? []) : []), [node, verdictOf]);
   const at = events[index];
-  // Keep the playhead in sight: at the end while following, else on its line.
+  // New events keep the list at its foot only while you are at its foot: scrolled up to read, it stays put.
   useEffect(() => {
     const el = body.current;
-    if (!el) return;
-    if (end) el.scrollTop = el.scrollHeight;
-    else if (at) el.querySelector(`[data-ev="${CSS.escape(at.id)}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [at?.id, end, events.length]);
+    if (el && end && stick.current) el.scrollTop = el.scrollHeight;
+  }, [end, events.length]);
+  // The playhead moved (a pick, a step): its line comes into sight.
+  useEffect(() => {
+    const el = body.current;
+    if (el && !end && at) el.querySelector(`[data-ev="${CSS.escape(at.id)}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [at?.id]);
   const facts = info?.facts ?? {};
   return html`
     <div class="hv-pane">
@@ -125,7 +138,10 @@ export const Events = ({ info, events, index, end, verdicts, titles, node, profi
         ${profiles && !profiles.length && html`<span class="part" title="In no profile: it hears every node">no profile</span>`}
         ${(profiles ?? []).map((p) => html`<span class=${p.by === "part" ? "part" : ""} title=${`${p.holding ? "holds" : "shadow: only records"}${p.by === "part" ? ", as a part" : ""}`}>${p.holding ? "●" : "◌"} ${p.title}</span>`)}
       </div>`}
-      <div class="hv-body" ref=${body}>
+      <div class="hv-body" ref=${body} onScroll=${(ev: Event) => {
+        const el = ev.currentTarget as HTMLElement;
+        stick.current = atFoot(el.scrollHeight, el.scrollTop, el.clientHeight);
+      }}>
         ${!info && html`<div class="hv-empty">No run yet.</div>`}
         ${events.map((e, i) => {
           const isOpen = opened.has(e.id);
