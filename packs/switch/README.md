@@ -31,3 +31,13 @@ switch ─▶ switch.set ─▶ page item (as page.set writes it) ─▶ page fo
   off here would stop the way back. An agent can still call `switch.set`.
 - **Undo is flipping it back.** Each flip is its own change set in
   activity, where `history.undo` takes any of them back too.
+
+## The way back is locked
+
+The switch never turns off the server packs that turning things back on
+needs: `graph`, `action`, `types`, `page`, `switch`, `history`, `bridge`,
+`docs`, `docs-tool` and `mcp` (`LOCKED` in server.ts). `switch.set` refuses
+the whole call if it asks for one, and at start an item that says one is
+off is not followed. A host adds its own in the switch's config,
+`locked: [...]` (its sign-in and gateway), since the off state is kept on
+the graph and would come back at every start.

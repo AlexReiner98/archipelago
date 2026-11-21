@@ -32,7 +32,7 @@ const STYLE = sheet(`
 
 const command: Pack = {
   id: "command",
-  about: "Ctrl+K: the find line over the page, to jump to an item by name.",
+  about: "Ctrl+K: the find line over the page, to go to a view or an item by name.",
   inject: ["find.line", "here.declare", "here.read", "here.set", "slot.fill"],
   apply(ctx: Context) {
     const line = ctx.get<FindLine>("find.line");

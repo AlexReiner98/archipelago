@@ -48,8 +48,10 @@ own.
   are (Alex, 21 Nov 2026).
 - **The list** in `over`: home first, then views tagged `pinned`, then the kinds, then
   a section for each item views are `part_of`, by its title. Typing
-  filters by title and section. **Ctrl+K** opens it; arrows move, Enter
-  picks, Esc closes.
+  filters by title and section; arrows move, Enter picks, Esc closes.
+- **Ctrl+K** is the command line's: the views are offered there through
+  find's `find.offer`, beside the items, so one key goes to either (Alex,
+  21 Nov 2026).
 - **The hash** names the view shown (`#map`, `#i_…`), so a link opens it.
   An older `#map/map` link opens that kind.
 - **`here.view`** set by something else (an agent, a panel) shows the

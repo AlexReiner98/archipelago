@@ -33,6 +33,31 @@ export const SERVER: FlavourDef = {
   fields: { packs: { kind: "json", doc: "Entry id to its change: { off }." } },
 };
 
+/**
+ * Server packs the switch never turns off: the way back. Off, any of these
+ * would leave nothing to turn it on again (the store, the write path and
+ * its types, the switch, undo, the bridge the page talks through, the
+ * Packs view's reads, the agents' way in), and the off state is kept on
+ * the graph, so it would come back at every start. A host adds its own
+ * (`locked` in config: its sign-in and gateway).
+ */
+export const LOCKED = ["graph", "action", "types", "page", "switch", "history", "bridge", "docs", "docs-tool", "mcp"];
+
+export interface SwitchConfig {
+  /** More server entry ids the switch never turns off. */
+  locked?: string[];
+}
+
+/** The ids of `asked` that are locked, given the host's own. */
+export const refused = (asked: string[], more: string[] = []) => asked.filter((id) => LOCKED.includes(id) || more.includes(id));
+
+/** Changes with every locked entry's "off" dropped: an old or hand-made item can't turn one off at start. */
+export function unlocked(changes: Changes, more: string[] = []): Changes {
+  const out: Changes = {};
+  for (const [id, c] of Object.entries(changes)) if (!refused([id], more).length || !(c as { off?: boolean }).off) out[id] = c;
+  return out;
+}
+
 /** What `switch.set` takes. */
 export interface SwitchInput {
   /** Entry ids of the page's tree (app/boot.ts). */
@@ -44,11 +69,12 @@ export interface SwitchInput {
   [key: string]: Json | undefined;
 }
 
-const sw: Pack = {
+const sw: Pack<SwitchConfig> = {
   id: "switch",
   about: "Turns a pack on or off, on the page and the server, as a change that can be undone.",
   inject: ["types.define", "graph.read", "graph.watch", "action.register", "loader.tree"],
-  apply(ctx: Context) {
+  apply(ctx: Context, config: SwitchConfig = {}) {
+    const more = config.locked ?? [];
     ctx.get<TypesDefine>("types.define").flavour(SERVER);
     const graph = ctx.get<GraphRead>("graph.read");
     const loader = ctx.get<LoaderTree>("loader.tree");
@@ -69,6 +95,8 @@ const sw: Pack = {
       async run(input: SwitchInput, call: ActionContext) {
         const page = input.page ?? [];
         const server = input.server ?? [];
+        const no = input.on === false ? refused(server, more) : [];
+        if (no.length) throw new Error(`These server packs are the way back and can't be turned off: ${no.join(", ")}.`);
         const as = (ids: string[]): SetInput[] => ids.map((pack) => ({ pack, on: input.on }));
         const out: { [k: string]: Json } = {};
         if (page.length) out.page = (await record(graph, call, PAGE_TYPE, "The page's packs", as(page))).packs as unknown as Json;
@@ -81,7 +109,7 @@ const sw: Pack = {
     let last = "";
     const follow = async () => {
       const [item] = (await graph.of(TYPE, { limit: 1 })).items;
-      const changes = (item?.fields.packs ?? {}) as unknown as Changes;
+      const changes = unlocked((item?.fields.packs ?? {}) as unknown as Changes, more);
       const key = JSON.stringify(changes);
       if (key === last) return;
       last = key;

@@ -18,7 +18,26 @@ export type Kind = "key" | "side" | "type" | "status" | "item";
 
 export type Suggestion =
   | { kind: "term"; of: Kind; term: string; line: string; hint?: string }
-  | { kind: "item"; id: Id; title: string; type: string; status: string };
+  | { kind: "item"; id: Id; title: string; type: string; status: string }
+  | { kind: "offer"; key: string; of: string; title: string; hint?: string; run: () => void };
+
+/**
+ * What another pack offers the command line (`find.offer`): rows for the
+ * words typed, each run when picked. Views offer themselves here, so Ctrl+K
+ * opens a view as it jumps to an item.
+ */
+export interface Offer {
+  /** A word or two for the kind of row, shown at its left, e.g. `view`. */
+  of: string;
+  /** The rows for these words, at most `limit`. */
+  list(words: string[], limit: number): { key: string; title: string; hint?: string; run: () => void }[];
+}
+
+/** Every offer's rows for `line`, as suggestions. */
+export function offered(offers: Iterable<Offer>, line: string, limit = 4): Suggestion[] {
+  const words = parse(line).words;
+  return [...offers].flatMap((o) => o.list(words, limit).map((r) => ({ kind: "offer" as const, of: o.of, ...r })));
+}
 
 const KEYS = ["is", "status", "type", "in", "near", "id"] as const;
 const KEY_HINT: Record<(typeof KEYS)[number], string> = {
@@ -94,7 +113,7 @@ export function suggest(index: Index, line: string, limit = 6): Suggestion[] {
 function dedupe(s: Suggestion[]): Suggestion[] {
   const seen = new Set<string>();
   return s.filter((x) => {
-    const k = x.kind === "term" ? x.term : x.id;
+    const k = x.kind === "term" ? x.term : x.kind === "offer" ? x.key : x.id;
     return !seen.has(k) && (seen.add(k), true);
   });
 }

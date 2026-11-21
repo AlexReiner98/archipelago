@@ -11,6 +11,8 @@
  *   included. As you type, the line suggests terms and items (suggest.ts).
  * - Provides `find.line`: the line, for the command line to draw, and
  *   `jump(id)`: looks at an item and shows it in the view.
+ * - Provides `find.offer`: another pack puts rows in the command line (the
+ *   views pack offers its views), each gone when that pack is.
  *
  * It never writes: changes go through actions.
  */
@@ -23,12 +25,12 @@ import type { LinkInfo, TypeInfo, TypesRead } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { KEYS } from "../../spec/here.ts";
 import { closed, run, type Index, type Result, type Row, type Wire } from "./query.ts";
-import { jumpQuery } from "./suggest.ts";
+import { jumpQuery, type Offer } from "./suggest.ts";
 import { makeLine, STYLE, type LineProps } from "./line.ts";
 
 export { parse, run, closed } from "./query.ts";
 export type { Result, Row, Wire } from "./query.ts";
-export { suggest, jumpQuery, complete, type Suggestion } from "./suggest.ts";
+export { suggest, jumpQuery, complete, offered, type Suggestion, type Offer } from "./suggest.ts";
 export type { LineProps } from "./line.ts";
 
 export const QUERY = "find.query";
@@ -58,6 +60,11 @@ export interface FindLine {
   Line: (props: LineProps) => unknown;
   /** Looks at an item (`here.item`) and shows it in the view: the query becomes `near:<id>` unless it draws it already. */
   jump(id: Id): void;
+}
+
+/** `find.offer`: rows a pack puts in the command line, such as the views to open. */
+export interface FindOffer {
+  offer(o: Offer): Dispose;
 }
 
 const find: Pack = {
@@ -178,8 +185,17 @@ const find: Pack = {
       set.set(KEYS.item, id);
       if (!DRAWS.includes(here.get<string>(KEYS.view) ?? "")) set.set(KEYS.view, DRAWS[0]);
     };
-    const Line = makeLine({ index, types: () => [...byType.values()], watchers, here, set, query: QUERY, jump });
+    const offers = new Set<Offer>();
+    const Line = makeLine({ index, types: () => [...byType.values()], watchers, here, set, query: QUERY, jump, offers });
     ctx.provide<FindLine>("find.line", () => ({ Line, jump }));
+    // Rows another pack offers the command line; each is gone when its pack is.
+    ctx.provide<FindOffer>("find.offer", (_caller, from) => ({
+      offer: (o) =>
+        from.effect(() => {
+          offers.add(o);
+          return () => offers.delete(o);
+        }),
+    }));
 
     ctx.effect(() => {
       const style = document.createElement("style");

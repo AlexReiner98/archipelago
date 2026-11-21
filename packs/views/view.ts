@@ -5,8 +5,11 @@
  *
  * - in `top`: the page's name and one picker, the view shown, which opens
  *   the list. No tabs: the bar stays the same however many views there are;
- * - in `over`: the list, sections by part_of, typed to filter. Ctrl+K
- *   opens it too; Enter picks the first, Esc closes.
+ * - in `over`: the list, sections by part_of, typed to filter; Enter picks
+ *   the first, Esc closes.
+ *
+ * Ctrl+K is the command line's (the command pack): the views are offered
+ * there through `find.offer`, so one key goes to a view or an item.
  *
  * The URL's hash names the view shown, so a link opens it. Home opens when
  * the hash names none. When something else sets `here.view` (an agent, a
@@ -21,7 +24,7 @@ import { KEYS } from "../../spec/here.ts";
 import type { SlotArrange, SlotFill, SlotRead } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet } from "../../spec/style.ts";
-import type { FindIndex } from "../find/index.ts";
+import type { FindIndex, FindOffer } from "../find/index.ts";
 import { SHOWN, shower } from "./apply.ts";
 import { byHash, search, sections, TYPE, views, type Config, type View } from "./pick.ts";
 
@@ -51,7 +54,7 @@ const STYLE = sheet(`
 const views_: Pack<Config> = {
   id: "views",
   about: "Views: pick one, and the whole page changes to it. Home opens first.",
-  inject: ["slot.fill", "slot.read", "slot.arrange", "here.declare", "here.read", "here.set", "find.index"],
+  inject: ["slot.fill", "slot.read", "slot.arrange", "here.declare", "here.read", "here.set", "find.index", "find.offer"],
   apply(ctx: Context, config: Config = {}) {
     const read = ctx.get<SlotRead>("slot.read");
     const here = ctx.get<HereRead>("here.read");
@@ -141,7 +144,7 @@ const views_: Pack<Config> = {
       useList();
       const now = show.shown();
       return html`<button class="vw-pick" onClick=${() => setOpen(!open)} title="Every view, by section">
-        <span>${now?.title ?? "Views"}</span><span class="c">▾</span><kbd>Ctrl K</kbd>
+        <span>${now?.title ?? "Views"}</span><span class="c">▾</span>
       </button>`;
     };
 
@@ -192,22 +195,25 @@ const views_: Pack<Config> = {
       </div>`;
     };
 
-    const ctrlK = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setOpen(!open);
-      }
-    };
+    // Ctrl+K is the command line's: the views are offered there, beside the items.
+    ctx.get<FindOffer>("find.offer").offer({
+      of: "view",
+      list: (words, limit) =>
+        (words.length ? search(list(), words.join(" ")) : list()).slice(0, limit).map((v) => ({
+          key: `view:${v.id}`,
+          title: v.title,
+          hint: v.home ? "home" : v.section?.title,
+          run: () => pick(v),
+        })),
+    });
     ctx.effect(() => {
       const style = document.createElement("style");
       style.textContent = STYLE;
       document.head.append(style);
       addEventListener("hashchange", fromHash);
-      addEventListener("keydown", ctrlK);
       return () => {
         style.remove();
         removeEventListener("hashchange", fromHash);
-        removeEventListener("keydown", ctrlK);
       };
     });
     const fill = ctx.get<SlotFill>("slot.fill");

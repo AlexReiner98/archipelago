@@ -15,7 +15,7 @@ import type { HereRead, HereSet } from "../../spec/here.ts";
 import { glyph, read, shape, side, sheet } from "../../spec/style.ts";
 import type { TypeInfo } from "../../spec/types.ts";
 import { run, type Index, type Result } from "./query.ts";
-import { suggest, type Suggestion } from "./suggest.ts";
+import { offered, suggest, type Offer, type Suggestion } from "./suggest.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -51,6 +51,14 @@ export interface LineDeps {
   set: HereSet;
   query: string;
   jump: (id: Id) => void;
+  /** What other packs offer the command line (`find.offer`). */
+  offers: Set<Offer>;
+}
+
+/** The command line's rows: terms, then what packs offer (views), then items. */
+export function commandList(list: Suggestion[], offers: Suggestion[]): Suggestion[] {
+  const at = list.findIndex((s) => s.kind === "item");
+  return at < 0 ? [...list, ...offers] : [...list.slice(0, at), ...offers, ...list.slice(at)];
 }
 
 export function makeLine(d: LineDeps) {
@@ -73,9 +81,9 @@ export function makeLine(d: LineDeps) {
       return () => void d.watchers.delete(count);
     }, [q]);
 
-    const list = open ? suggest(d.index, q) : [];
-    // The command line starts on the first item, so Enter jumps.
-    useEffect(() => setSel(command ? list.findIndex((s) => s.kind === "item") : -1), [q, open]);
+    const list = !open ? [] : command ? commandList(suggest(d.index, q), offered(d.offers, q)) : suggest(d.index, q);
+    // The command line starts on the first thing to go to (a view or an item), so Enter goes there.
+    useEffect(() => setSel(command ? list.findIndex((s) => s.kind !== "term") : -1), [q, open]);
 
     const setQuery = (v: string, now = false) => {
       clearTimeout(timer.current);
@@ -92,6 +100,12 @@ export function makeLine(d: LineDeps) {
         setQ(s.line);
         if (!command) setQuery(s.line, true);
         input.current?.focus();
+        return;
+      }
+      if (s.kind === "offer") {
+        s.run();
+        setOpen(false);
+        done?.();
         return;
       }
       clearTimeout(timer.current);
@@ -135,12 +149,16 @@ export function makeLine(d: LineDeps) {
         return html`<div class=${`fd-row${on}`} key=${s.term} onMouseDown=${hold} onClick=${() => pick(s)} onMouseEnter=${() => setSel(i)} title=${s.hint ?? ""}>
           <span class="k">${s.of}</span><span class="t">${s.term}</span>
         </div>`;
+      if (s.kind === "offer")
+        return html`<div class=${`fd-row${on}`} key=${s.key} onMouseDown=${hold} onClick=${() => pick(s)} onMouseEnter=${() => setSel(i)} title=${s.hint ?? ""}>
+          <span class="k">${s.of}</span><span class="t">${s.title}</span>${s.hint && html`<span class="hn">${s.hint}</span>`}
+        </div>`;
       const t = d.index.type(s.type);
       return html`<div class=${`fd-row${on}`} key=${s.id} onMouseDown=${hold} onClick=${() => pick(s)} onMouseEnter=${() => setSel(i)} title=${s.id}>
         <span class=${`mk s-${side(t, s.status)}`}>${read(glyph(shape(bases, t), side(t, s.status)))}</span><span class="t">${s.title}</span><span class="hn">${s.type} · ${s.status}</span>
       </div>`;
     };
-    const firstItem = list.findIndex((s) => s.kind === "item");
+    const firstItem = list.findIndex((s) => s.kind !== "term");
 
     return html`
       <div class=${`fd${command ? " cmd" : ""}`}>
@@ -148,7 +166,7 @@ export function makeLine(d: LineDeps) {
           ref=${input}
           autoFocus=${!!command}
           value=${q}
-          placeholder=${command ? "Jump to an item, or find: words, is:open, type:…" : "find: words, is:open, type:question, in:<id>"}
+          placeholder=${command ? "Go to a view or an item, or find: words, is:open, type:…" : "find: words, is:open, type:question, in:<id>"}
           title="words match titles · is:open is:closed · status:x · type:x · in:<id> · near:<id> · Ctrl+K jumps"
           onInput=${(e: Event) => type((e.target as HTMLInputElement).value)}
           onFocus=${() => setOpen(true)}

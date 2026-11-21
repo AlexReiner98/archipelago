@@ -13,7 +13,7 @@ import types from "../packs/types/index.ts";
 import { TYPE as PAGE_TYPE } from "../packs/page/overlay.ts";
 import { byFolder } from "../packs/docs/cards.ts";
 import { reference, type PackDoc } from "../packs/docs/read.ts";
-import sw, { SET, TYPE } from "../packs/switch/server.ts";
+import sw, { refused, SET, TYPE, unlocked } from "../packs/switch/server.ts";
 import { needed, plan, standsOn, stops } from "../packs/switch/ties.ts";
 
 const doc = (id: string, more: Partial<PackDoc> = {}): PackDoc => ({
@@ -137,4 +137,21 @@ test("switch.set: on null puts a pack back as the template has it", async () => 
   await until(() => state("low") === "off");
   await call(SET, { server: ["low"], on: null });
   await until(() => state("low") === "active");
+});
+
+test("switch.set: the way back can't be turned off, and a host adds its own locks", async () => {
+  const { call, state } = await boot();
+  const out = await call(SET, { server: ["history", "low"], on: false });
+  assert.equal(out.ok, false, "refused, nothing changed");
+  assert.match(JSON.stringify(out.ok ? {} : out.refused), /history/);
+  assert.equal(state("history"), "active");
+  assert.equal(state("low"), "active", "refused whole: nothing else in the same call goes off");
+  assert.deepEqual(refused(["gateway", "low", "graph"], ["gateway"]), ["gateway", "graph"]);
+});
+
+test("switch: an item that says a locked pack is off is never followed at start", () => {
+  assert.deepEqual(unlocked({ graph: { off: true }, low: { off: true }, gateway: { off: true }, bridge: { off: false } }, ["gateway"]), {
+    low: { off: true },
+    bridge: { off: false },
+  });
 });

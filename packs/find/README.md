@@ -10,6 +10,9 @@ it.
   the region `top` while Map or Field shows, sets it; anything else may too.
 - Provides `find.line`: the line, to draw anywhere (the
   [command line](../command/README.md) draws it on Ctrl+K), and `jump(id)`.
+- Provides `find.offer`: another pack puts rows in the command line, between
+  the terms and the items, each run when picked and gone with its pack. The
+  views pack offers its views there.
 
 ## Suggestions
 

@@ -9,7 +9,8 @@ import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
 import here from "../packs/here/index.ts";
 import find, { DRAWS, QUERY, type FindLine } from "../packs/find/index.ts";
-import { complete, jumpQuery, suggest, type Suggestion } from "../packs/find/suggest.ts";
+import { complete, jumpQuery, offered, suggest, type Offer, type Suggestion } from "../packs/find/suggest.ts";
+import { commandList } from "../packs/find/line.ts";
 import type { Row, Wire } from "../packs/find/query.ts";
 
 const base = (name: string, open: string[], closed: string[]): TypeInfo => ({ name, base: name, statuses: { open, closed }, fields: COMMON, trial: false, pack: name });
@@ -128,4 +129,25 @@ test("find.line jumps: the item is looked at, shown in the view, and the line si
   assert.equal(read.get("here.item"), "a");
   assert.equal(read.get(QUERY), "near:a", "a closed item, among its neighbours");
   assert.equal(read.get("here.view"), "field/field", "Field draws the query: it stays");
+});
+
+test("the command line puts what packs offer (views) between the terms and the items, filtered by the words", () => {
+  const ran: string[] = [];
+  const views: Offer = {
+    of: "view",
+    list: (words, limit) =>
+      ["Map", "Field", "Roadmap"]
+        .filter((t) => words.every((w) => t.toLowerCase().includes(w)))
+        .slice(0, limit)
+        .map((t) => ({ key: `view:${t}`, title: t, run: () => ran.push(t) })),
+  };
+  const rows = offered([views], "map");
+  assert.deepEqual(rows.map((r) => (r.kind === "offer" ? r.title : "")), ["Map", "Roadmap"]);
+  const term: Suggestion = { kind: "term", of: "key", term: "type:", line: "type:" };
+  const item: Suggestion = { kind: "item", id: "i1", title: "Map the map", type: "work", status: "todo" };
+  assert.deepEqual(commandList([term, item], rows).map((s) => s.kind), ["term", "offer", "offer", "item"]);
+  assert.deepEqual(commandList([term], rows).map((s) => s.kind), ["term", "offer", "offer"]);
+  const first = rows[0]!;
+  if (first.kind === "offer") first.run();
+  assert.deepEqual(ran, ["Map"]);
 });
