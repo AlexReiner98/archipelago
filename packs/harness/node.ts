@@ -1,5 +1,5 @@
 /**
- * The Agents view's left pane: the node looked at (`here.node`). Its
+ * The Sensory interface's left pane: the node looked at (`here.node`). Its
  * words, edited through `words.set` when made from a map item; a trial's
  * miss and its retiring (`words.retire`); its standing by the keep pack;
  * a written file's rule (`written.rule`); its places, pack and kind; its
@@ -58,7 +58,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
         const out = await invoke.invoke({
           action: EDIT,
           input: { node: info.source!, words: text },
-          authority: { of: "human", basis: "edited in the Agents view" },
+          authority: { of: "human", basis: "edited in the sensory interface" },
           reason: `Changed what ${info.title} says`,
         });
         if (out.ok) {
@@ -97,7 +97,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
       const out = await invoke.invoke({
         action: RETIRE,
         input: { node: info.source! },
-        authority: { of: "human", basis: "retired in the Agents view" },
+        authority: { of: "human", basis: "retired in the sensory interface" },
         reason: `Retired the trial node ${info.title}`,
       });
       setStatus(out.ok ? "retired" : `refused: ${out.refused.message}`);
@@ -125,8 +125,8 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
       setStatus("…");
       const out = await invoke.invoke({
         action: RULE,
-        input: held ? { node: info.source!, refine: "open" } : { node: info.source!, refine: "held", why: "Held as written in the Agents view." },
-        authority: { of: "human", basis: "set in the Agents view" },
+        input: held ? { node: info.source!, refine: "open" } : { node: info.source!, refine: "held", why: "Held as written in the sensory interface." },
+        authority: { of: "human", basis: "set in the sensory interface" },
         reason: held ? `Opened ${info.title} to refinement inside the map` : `Held ${info.title} as written`,
       });
       setStatus(out.ok ? "" : `refused: ${out.refused.message}`);

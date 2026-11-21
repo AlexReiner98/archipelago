@@ -1,8 +1,8 @@
 /**
- * The Agents view: one view of every run, live or replayed, and every
+ * The Sensory interface: one view of every run, live or replayed, and every
  * profile. Three fills, linked through `here`:
  *
- * - Center (the view "Agents"): the tree of places and nodes (canvas.ts),
+ * - Center (the view "Sensory interface"): the tree of places and nodes (canvas.ts),
  *   lit by what the run looked at heard, refused and did up to the
  *   playhead, with the timeline under it (timeline.ts). The bar (bar.ts)
  *   picks every live run at once (`harness.live`, live.ts: where the view
@@ -122,7 +122,7 @@ const clock = (t?: string) => (t ? new Date(t).toLocaleString([], { month: "shor
 
 const harness: Pack = {
   id: "harness",
-  about: "The Agents view: every run, live or replayed, on the tree of what the map tells agents; and every profile.",
+  about: "The Sensory interface: every run, live or replayed, on the tree of what the map tells agents; and every profile.",
   inject: ["slot.fill", "here.read", "here.set", "here.declare", "agent.tree", "exchange.read", "exchange.watch", "verdict.read", "action.list", "action.invoke", "graph.read", "graph.watch", "profile.read"],
   apply(ctx: Context) {
     const here = ctx.get<HereRead>("here.read");
@@ -134,10 +134,10 @@ const harness: Pack = {
     const graphLive = ctx.get<GraphWatch>("graph.watch");
     const profiles = ctx.get<ProfileRead>("profile.read");
     const declare = ctx.get<HereDeclare>("here.declare");
-    ctx.effect(() => declare.declare({ key: PROFILE, scope: "page", doc: "The profile the Agents view shows: its holds over the tree." }));
-    ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the Agents view looks at every run, with all-time totals, not one run." }));
-    ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The Agents view's dials: how each agent's tree is coloured by what it is told, those moved from where they start." }));
-    ctx.effect(() => declare.declare({ key: LIVE, scope: "page", doc: "True: the Agents view looks at every live run at once, a colour each." }));
+    ctx.effect(() => declare.declare({ key: PROFILE, scope: "page", doc: "The profile the sensory interface shows: its holds over the tree." }));
+    ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the sensory interface looks at every run, with all-time totals, not one run." }));
+    ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The Sensory interface's dials: how each agent's tree is coloured by what it is told, those moved from where they start." }));
+    ctx.effect(() => declare.declare({ key: LIVE, scope: "page", doc: "True: the sensory interface looks at every live run at once, a colour each." }));
     // The node pane is open while a node is picked, from anywhere, and folds to its rail when none is (a click on the background).
     ctx.effect(() =>
       here.watch(KEYS.node, (c) => {
@@ -291,7 +291,7 @@ const harness: Pack = {
         const who = lives.find((x) => x.run === r)?.title ?? r.slice(0, 8);
         const to = profileList.find((p) => p.id === profile)?.title ?? profile;
         void invoke
-          .invoke({ action: "profile.place", input: { run: r, profile }, authority: { of: "human", basis: "moved in the Agents view" }, reason: `Move ${who} into ${to}` })
+          .invoke({ action: "profile.place", input: { run: r, profile }, authority: { of: "human", basis: "moved in the sensory interface" }, reason: `Move ${who} into ${to}` })
           .then((out) => (out.ok ? setMenu(undefined) : setMenu((m) => m && { ...m, error: out.refused.message })));
       };
 
@@ -453,7 +453,7 @@ const harness: Pack = {
     const fill = ctx.get<SlotFill>("slot.fill");
     const whileShown = { "here.view": "harness/view" };
     fill.fill({ slot: "left", name: "node", title: "Node", when: whileShown, view: NodeFill });
-    fill.fill({ slot: "center", name: "view", title: "Agents", view: Center });
+    fill.fill({ slot: "center", name: "view", title: "Sensory interface", view: Center });
     fill.fill({ slot: "right", name: "run", title: "Run", when: whileShown, view: RunFill });
   },
 };

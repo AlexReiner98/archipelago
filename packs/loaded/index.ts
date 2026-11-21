@@ -2,7 +2,7 @@
  * The loaded pack: what a harness loads into a run, as nodes. A skill's text
  * or a memory file (a CLAUDE.md, a MEMORY.md) shapes the run as much as
  * anything the map says, so each is a node said at its place and judged per
- * run like any node, and shows in the Agents view's tree.
+ * run like any node, and shows in the sensory interface's tree.
  *
  * - Places: `skill:<name>` when a skill's text loads, `memory:<scope>/<path>`
  *   when a memory file does (scope: project, local, user, auto, managed).

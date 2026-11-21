@@ -45,7 +45,7 @@ Decided (20 Nov 2026, all five):
 `profile.place {run, profile}` puts a run in one profile: it begins the
 run again with `profiles` naming it and `profiles_drop` every other
 profile the run matches now (earlier drops kept), as the `run` tool's
-`profiles` and `drop` would. The Agents view calls it from an agent's
+`profiles` and `drop` would. The Sensory interface calls it from an agent's
 profile. A run's facts are on the exchange, not the graph, so it writes no
 change set: to undo, place the run back (its output gives `was`).
 

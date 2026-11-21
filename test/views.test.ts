@@ -18,7 +18,7 @@ import { SHOWN, shower } from "../packs/views/apply.ts";
 import { byHash, search, sections, views as list, type Kind, type Row } from "../packs/views/pick.ts";
 
 const KINDS: Kind[] = [
-  { pack: "harness", name: "view", title: "Agents" },
+  { pack: "harness", name: "view", title: "Sensory interface" },
   { pack: "map", name: "map", title: "Map" },
   { pack: "field", name: "field", title: "Field" },
   { pack: "docs", name: "view", title: "Packs" },
@@ -33,7 +33,7 @@ test("each kind of center fill is a view; a pack with two is named pack/name; ho
   const all = list(KINDS, [], none, { home: "map", pinned: ["field"] });
   assert.deepEqual(
     all.map((v) => v.id),
-    ["map", "field", "two/a", "harness", "two/b", "docs"], "home, the pinned, then by title",
+    ["map", "field", "two/a", "two/b", "docs", "harness"], "home, the pinned, then by title",
   );
   assert.equal(all[0]!.home, true);
   assert.equal(all[0]!.center, "map/map");

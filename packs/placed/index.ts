@@ -13,7 +13,7 @@
  * - Nothing moves while no run is denied the skill: a profile in shadow
  *   denies nothing, so a skill stays home until a profile holding it is on.
  * - A run in no profile hears every node (fail open), but a file can't
- *   follow a run: such a folder gets no copy. The Agents view shows it.
+ *   follow a run: such a folder gets no copy. The Sensory interface shows it.
  * - Each copy is kept out of git through the repository's own
  *   `info/exclude`, never its tracked .gitignore.
  *

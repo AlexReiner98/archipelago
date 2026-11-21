@@ -8,7 +8,7 @@
  * the action pack marks `undoes`. The graph refuses it with
  * `graph.conflict` if a field has moved since; nothing is merged silently.
  * Reads are actions too (`history.list`, `history.get`,
- * `history.snapshots`), so the Agents view and agents reach them the same
+ * `history.snapshots`), so the sensory interface and agents reach them the same
  * way. The graph is the truth: nothing is rebuilt from the journal.
  * Node only.
  */

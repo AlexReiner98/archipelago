@@ -18,7 +18,7 @@ start.
 | `keep` | 200 | A person's change sets held to tell |
 | `lines` | 8 | Lines said at most; the rest are counted |
 
-The node is a reflex like any other: the Agents view shows it, and the
+The node is a reflex like any other: the sensory interface shows it, and the
 verdicts judge it.
 
 Its wording is on the map: a `node` item whose `voice` is `since/heard`,

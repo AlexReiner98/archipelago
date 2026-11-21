@@ -12,7 +12,7 @@
  *   `decided` field with the rule, why and the record), as one change set
  *   that `history.undo` takes back. After an undo it doesn't decide that node
  *   again until its record has another run. A person keeps or retires one
- *   the same way, from the Agents view.
+ *   the same way, from the sensory interface.
  * - Gate (`agent.gate`): a node whose map item is held in the schema pack's
  *   quarantine, doesn't fit its type now, or whose words fail their check
  *   (empty, too long, a home folder, a secret) is held back from every run.
@@ -22,7 +22,7 @@
  *   retiring what it was told.
  *
  * `keep.review` answers every trial node's record, standing and checks, and
- * the nodes this pack or a person decided: what the Agents view shows.
+ * the nodes this pack or a person decided: what the sensory interface shows.
  *
  * Injects verdict.read, agent.tree, agent.gate, graph.read, graph.watch,
  * graph.stage, action.register, action.invoke and action.list.

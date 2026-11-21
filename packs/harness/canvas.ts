@@ -1,5 +1,5 @@
 /**
- * The Agents view's tree, drawn: every node as one circular tree grown
+ * The Sensory interface's tree, drawn: every node as one circular tree grown
  * from its root (layout.ts), lit by the run up to the event looked at.
  *
  * - A node the run said is lit blue, one it refused with red; one a profile
