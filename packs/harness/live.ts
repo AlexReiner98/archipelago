@@ -4,23 +4,15 @@
  * as tokens. A run keeps its colour while it stays live; a new one takes
  * the first colour free.
  *
- * - `liveRuns`: the runs that are live, last active first, as many as there
- *   are colours.
+ * - `liveRuns`: the runs that are live, last active first, the last 50.
+ * - `colourOf`: a colour slot's colour, from the style's hues and past them.
  * - `colours`: each live run's colour, kept from before where it can be.
- * - `keepLast`: an event added to the interleaved list, the last few kept.
+ * - `keepLast`: an event added to the live events, the last few kept.
  * - The runs themselves are agents, each with a tree of its own (trees.ts).
- * - `LiveEvents`: the right pane: their events as they come, interleaved,
- *   each marked with its run's colour.
  */
-import { h } from "preact";
-import { useEffect, useRef } from "preact/hooks";
-import htm from "htm";
 import type { RunInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { HUES, v, type Token } from "../../spec/style.ts";
-import { EventMark, short, what } from "./events.ts";
-
-const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
 /** How many live runs the view shows at most: the page of runs it reads. */
 export const LIVE_MOST = 50;
@@ -70,41 +62,3 @@ export function keepLast(list: ExchangeEvent[], e: ExchangeEvent, max: number): 
 
 
 const title = (r: RunInfo) => r.title ?? r.run.slice(0, 8);
-
-export interface LiveEventsProps {
-  runs: RunInfo[];
-  events: ExchangeEvent[];
-  /** Each run's colour, as CSS. */
-  colour: Map<string, string>;
-  titles: Map<string, string>;
-  onPick(e: ExchangeEvent): void;
-}
-
-/** The live runs' events, newest at the foot, kept in sight. A click looks at that run alone, at that event. */
-export const LiveEvents = ({ runs, events, colour, titles, onPick }: LiveEventsProps) => {
-  const body = useRef<HTMLDivElement>(null);
-  const byRun = new Map(runs.map((r) => [r.run, r]));
-  useEffect(() => {
-    if (body.current) body.current.scrollTop = body.current.scrollHeight;
-  }, [events.length]);
-  return html`
-    <div class="hv-pane">
-      <div class="hv-head"><span class="t">Live</span><span class="hv-dim">${runs.length} runs</span></div>
-      <div class="hv-body" ref=${body}>
-        ${!events.length && html`<div class="hv-empty">${runs.length ? "Their events show here as they come." : "No run is live."}</div>`}
-        ${events.map((e) => {
-          const r = byRun.get(e.run);
-          const c = colour.get(e.run) ?? v("dim");
-          return html`<div class="hv-ev" style=${`box-shadow:inset 3px 0 0 ${c}`} onClick=${() => onPick(e)}>
-            <div class="hv-line" title=${`${r ? title(r) : e.run} #${e.seq} ${e.kind}${e.place ? ` @${e.place}` : ""}\n${e.text ?? ""}`}>
-              <span class="s" style=${`color:${c}`}>${e.seq}</span>
-              <span class="hv-dir">${e.direction === "to_agent" ? "→" : "←"}</span>
-              <${EventMark} e=${e} />
-              ${e.place && html`<span class="p">${e.place}</span>`}
-              <span class="x">${what(e, titles, r?.cwd)}</span>
-            </div>
-          </div>`;
-        })}
-      </div>
-    </div>`;
-};

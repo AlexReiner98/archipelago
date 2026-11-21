@@ -12,7 +12,8 @@
  *   (trees.ts), its profile over it and a click from changing (agents.ts);
  *   what it is told runs a light along its tree, in its colour.
  * - Right: the run's events, one line each (events.ts): the wider side,
- *   as an opened line needs the room. Live: every live run's, interleaved.
+ *   as an opened line needs the room. Live: the agent in focus's
+ *   (`harness.focus`), opening in place as one run's do.
  *   Every run: the runs, or a profile's runs.
  * - Left: the node looked at (node.ts). The dials (dials.ts) are in the
  *   bar's ⋯ menu.
@@ -36,8 +37,8 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
 import { Events, short } from "./events.ts";
-import { ALL, foldForNode, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
-import { colourOf, colours, liveRuns, LiveEvents } from "./live.ts";
+import { ALL, FOCUS, foldForNode, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
+import { colourOf, colours, liveRuns } from "./live.ts";
 import { AGENTS_STYLE, placementOf, ProfileMenu } from "./agents.ts";
 import { focusOf, switchFocus, Trees, TREES_STYLE, treesAndRows } from "./trees.ts";
 import { DIALS_KEY, DIALS_STYLE, DialsPane, useDials } from "./dials.ts";
@@ -137,6 +138,7 @@ const harness: Pack = {
     ctx.effect(() => declare.declare({ key: PROFILE, scope: "page", doc: "The profile the sensory interface shows: its holds over the tree." }));
     ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the sensory interface looks at every run, with all-time totals, not one run." }));
     ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The Sensory interface's dials, those moved from where they start." }));
+    ctx.effect(() => declare.declare({ key: FOCUS, scope: "page", doc: "Live: the run whose tree is big; the run pane shows its events." }));
     ctx.effect(() => declare.declare({ key: LIVE, scope: "page", doc: "True: the sensory interface looks at every live run at once, a colour each." }));
     // The node pane is open while a node is picked, from anywhere, and folds to its rail when none is (a click on the background).
     ctx.effect(() =>
@@ -257,7 +259,8 @@ const harness: Pack = {
       const dials = useDials(here);
       const acting = useMemo(() => new Set(liveEvents.map((e) => e.run)), [liveEvents]);
       // Trees for the agent in focus and the three last active besides; a line each for the rest.
-      const [focus, setFocus] = useState<string>();
+      const focus = hk.useHere<string>(FOCUS);
+      const setFocus = (r: string) => set.set(FOCUS, r);
       const split = useMemo(() => {
         const ids = lives.map((r) => r.run);
         return treesAndRows(ids, focusOf(ids, focus));
@@ -397,25 +400,21 @@ const harness: Pack = {
       const profile = hk.useHere<string>(PROFILE);
       const inProfile = hk.useRunsIn(runs, all ? profile : undefined);
       const profileTitle = hk.useProfileList().find((p) => p.id === profile)?.title;
+      // Live: the agent in focus (its tree is big), its events as one run's, each line opening in place.
       const lives = useMemo(() => (live ? liveRuns(runs) : []), [live, runs]);
-      const colour = useLiveColours(lives);
-      const liveEvents = hk.useLiveEvents(lives.map((r) => r.run), live);
-      const events = hk.useEvents(run);
+      const focusKey = hk.useHere<string>(FOCUS);
+      const focused = live ? focusOf(lives.map((r) => r.run), focusKey) : undefined;
+      const shown = live ? focused : run;
+      const shownInfo = live ? lives.find((r) => r.run === focused) : info;
+      const events = hk.useEvents(shown);
       const event = hk.useHere<string>(KEYS.event);
       const picked = hk.useHere<string>(KEYS.node);
       const index = playhead(events, event);
-      const verdictsOfRun = hk.useVerdictsOfRun(run);
+      const verdictsOfRun = hk.useVerdictsOfRun(shown);
       const titles = useMemo(() => new Map(nodes.map((n) => [n.id, n.title])), [nodes]);
-      const inProfiles = hk.useRunProfiles(info);
-      if (live)
-        return html`<${LiveEvents} runs=${lives} events=${liveEvents} colour=${new Map([...colour].map(([r, i]) => [r, colourOf(i)]))} titles=${titles} onPick=${(e: ExchangeEvent) => {
-          set.set(LIVE, undefined);
-          set.set(KEYS.run, e.run);
-          set.set(KEYS.event, e.id);
-          set.set(KEYS.node, e.node);
-        }} />`;
+      const inProfiles = hk.useRunProfiles(shownInfo);
       if (all) return html`<${Runs} runs=${inProfile} of=${profile ? (profileTitle ?? profile) : undefined} />`;
-      return html`<${Events} info=${info} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} node=${picked} profiles=${inProfiles} onPick=${(e: ExchangeEvent) => {
+      return html`<${Events} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} node=${picked} profiles=${inProfiles} onPick=${(e: ExchangeEvent) => {
         set.set(KEYS.event, e.id);
         // The node pane follows: the event's node, or for an act the node it failed or was told just before.
         set.set(KEYS.node, nodeOf(events, events.indexOf(e), verdictsOfRun));

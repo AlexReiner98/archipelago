@@ -540,11 +540,10 @@ test("quadsOverlap: turned outlines, not boxes; crowded: a wire name that hits a
   assert.deepEqual(crowded(names, [box(32, 1, 2, 2)]), [false, true, true], "the second hits the first, kept; the third hits a dot");
 });
 
-test("shouldFit: the big tree fits once and then only when asked; a preview keeps fitting unless moved by hand", () => {
-  const at = (o: Partial<{ small: boolean; fitted: boolean; manual: boolean; asked: boolean }>) => shouldFit({ small: false, fitted: false, manual: false, asked: false, ...o });
+test("shouldFit: every tree fits once and then only when asked", () => {
+  const at = (o: Partial<{ fitted: boolean; manual: boolean; asked: boolean }>) => shouldFit({ fitted: false, manual: false, asked: false, ...o });
   assert.equal(at({}), true, "the first time");
   assert.equal(at({ fitted: true }), false, "the map changed: the camera stays");
-  assert.equal(at({ fitted: true, asked: true }), true, "a double-click");
-  assert.equal(at({ small: true, fitted: true }), true, "a preview follows its tree");
-  assert.equal(at({ small: true, fitted: true, manual: true }), false);
+  assert.equal(at({ manual: true }), false);
+  assert.equal(at({ fitted: true, manual: true, asked: true }), true, "a double-click");
 });

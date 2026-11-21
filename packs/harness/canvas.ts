@@ -18,8 +18,7 @@
  *
  * Drag to move, wheel to zoom, double-click to fit. The camera fits once,
  * when first laid out, and then only on a double-click (`shouldFit`): the
- * map changing under it never moves it. A small preview keeps fitting its
- * tree as it changes (`fitKey`). A click picks a node,
+ * map changing under it never moves it. A click picks a node,
  */
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -245,14 +244,9 @@ export function fitKey(count: number, b: Placed["box"]): string {
   return `${count}|${[b.x, b.y, b.width, b.height].map((n) => Math.round(n)).join(",")}`;
 }
 
-/**
- * Whether the camera fits now: when asked (a double-click), always; a
- * small preview, unless moved by hand; any other, only its first time.
- */
-export function shouldFit(s: { small: boolean; fitted: boolean; manual: boolean; asked: boolean }): boolean {
-  if (s.asked) return true;
-  if (s.manual) return false;
-  return s.small || !s.fitted;
+/** Whether the camera fits now: when asked (a double-click), always; else only its first time, if not moved by hand. */
+export function shouldFit(s: { fitted: boolean; manual: boolean; asked: boolean }): boolean {
+  return s.asked || (!s.manual && !s.fitted);
 }
 
 export interface CanvasProps {
@@ -286,7 +280,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   // Fit the dots, not the names: a long name never shrinks or shifts the picture.
   const bounds = dotsBox(placed, small ? 40 : 60);
   // The camera fits once, when the canvas is first laid out, and then only when asked (a double-click):
-  // the map changing under it never moves it. A small preview, never steered, keeps fitting its tree.
+  // the map changing under it never moves it.
   const manual = useRef(false);
   const fitted = useRef(false);
   const ask = useRef(false);
@@ -296,7 +290,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     const W = box.current?.clientWidth ?? 0;
     const H = box.current?.clientHeight ?? 0;
     if (!W || !H) return;
-    if (!shouldFit({ small: !!small, fitted: fitted.current, manual: manual.current, asked: ask.current })) return;
+    if (!shouldFit({ fitted: fitted.current, manual: manual.current, asked: ask.current })) return;
     ask.current = false;
     fitted.current = true;
     const k = Math.min(3, Math.max(0.1, Math.min(W / bounds.width, H / bounds.height)));

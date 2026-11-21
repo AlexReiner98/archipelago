@@ -19,7 +19,7 @@ background, picking none, folds it.
 |---|---|---|
 | Sensory interface (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline |
 | Node (`harness/node`, "Node") | `left` | Its words, standing, places, pack, kind, record, and its verdict per run |
-| Run (`harness/run`, "Run") | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: every live run's events, interleaved. All runs: the runs, or a profile's |
+| Run (`harness/run`, "Run") | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: the events of the agent in focus, opening in place as one run's do. All runs: the runs, or a profile's |
 
 ## The bar ([bar.ts](bar.ts))
 
@@ -45,9 +45,9 @@ come.
   not ended, of the last 50 active, each in its own colour
   ([live.ts](live.ts)): the style's six hues, then round again mixed toward
   the text colour, then toward the page, so there is no limit and every
-  colour is made of tokens. A run keeps its colour while it stays live. Each is an agent with a tree of its own (below). The right pane interleaves their events as they
-  come (the last 300, nothing from before), each edged in its run's
-  colour; a click looks at that run at that event.
+  colour is made of tokens. A run keeps its colour while it stays live. Each is an agent with a tree of its own (below). The right pane shows the
+  events of the agent in focus (`harness.focus`, this pack's own page
+  key), the whole run, each line opening in place as in one run.
 - **All runs, or a profile:** `harness.all` (this pack's own page key). The
   counts and the tally are all time; the right pane lists the runs. A
   profile picked (`harness.profile`) is looked at this way, lists only the
@@ -127,9 +127,9 @@ whose it is, after a dot (`nameOf`, `placeName`): its project's folder,
 and the file when it isn't the usual CLAUDE.md or MEMORY.md, so
 "project memory · archipelago-next", "auto memory · Aperture". The whole
 title is in the tooltip. The camera fits the dots, not the names, so a long name never shrinks the
-picture. The big tree fits once, when first laid out, and then only on a
-double-click: the map changing under it never moves it (`shouldFit`). A
-small preview keeps fitting its tree as it changes (`fitKey`).
+picture. Every tree, big or a preview, fits once, when first laid out,
+and then only on a double-click: the map changing under it never moves
+it (`shouldFit`).
 
 The names on the wires (a bough's, along its branch) grow and shrink with
 the zoom, and give way ([labels.ts](labels.ts)): after each draw, one that

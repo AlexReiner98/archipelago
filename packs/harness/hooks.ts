@@ -59,6 +59,8 @@ export const PROFILE = "harness.profile";
 export const ALL = "harness.all";
 /** The page key set when every live run is looked at at once (the harness pack's own). */
 export const LIVE = "harness.live";
+/** The page key holding the agent in focus, live (the harness pack's own). */
+export const FOCUS = "harness.focus";
 /** How many events the live view keeps, newest last. */
 export const LIVE_KEEP = 300;
 
