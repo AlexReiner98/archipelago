@@ -429,13 +429,20 @@ test("the command forwarder prints the adapter's answer, and nothing when it is 
       res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ echoed: got.hook_event_name, ...(got.git_remote ? { remote: got.git_remote } : {}) }));
     });
   });
+  // A folder whose origin carries credentials: only host/owner/name may leave. Made before the server
+  // listens, and only where git is (the image that tests a deploy has none): the forwarder's own logic
+  // is tested without git below.
+  const { execFileSync, spawn } = await import("node:child_process");
+  let repo: string | undefined = await mkdtemp(join(tmpdir(), "hook-repo-"));
+  try {
+    execFileSync("git", ["init", "-q", repo], { stdio: "ignore" });
+    execFileSync("git", ["-C", repo, "remote", "add", "origin", "https://user:secret@GitHub.com/a/b.git"], { stdio: "ignore" });
+  } catch {
+    await rm(repo, { recursive: true, force: true });
+    repo = undefined;
+  }
   await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
   const port = (server.address() as { port: number }).port;
-  // A folder whose origin carries credentials: only host/owner/name may leave.
-  const repo = await mkdtemp(join(tmpdir(), "hook-repo-"));
-  const { execFileSync, spawn } = await import("node:child_process");
-  execFileSync("git", ["init", "-q", repo]);
-  execFileSync("git", ["-C", repo, "remote", "add", "origin", "https://user:secret@GitHub.com/a/b.git"]);
   const forward = async (url: string, cwd?: string) => {
     const child = spawn(process.execPath, ["packs/claude-code/hook.ts", url]);
     let out = "";
@@ -446,10 +453,10 @@ test("the command forwarder prints the adapter's answer, and nothing when it is 
   };
   try {
     assert.deepEqual(await forward(`http://127.0.0.1:${port}/hook`), { code: 0, out: '{"echoed":"SessionStart"}' });
-    assert.deepEqual(await forward(`http://127.0.0.1:${port}/hook`, repo), { code: 0, out: '{"echoed":"SessionStart","remote":"github.com/a/b"}' });
+    if (repo) assert.deepEqual(await forward(`http://127.0.0.1:${port}/hook`, repo), { code: 0, out: '{"echoed":"SessionStart","remote":"github.com/a/b"}' });
   } finally {
     await new Promise((ok) => server.close(ok));
-    await rm(repo, { recursive: true, force: true });
+    if (repo) await rm(repo, { recursive: true, force: true });
   }
   assert.deepEqual(await forward(`http://127.0.0.1:${port}/hook`), { code: 0, out: "" });
 });
