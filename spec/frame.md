@@ -1,6 +1,6 @@
 # frame
 
-The page around the canvas. Edition 7. It is built from [slots](slot.md),
+The page around the canvas. Edition 8. It is built from [slots](slot.md),
 and the spec owns only two things: the names of six regions, and what a
 fill carries. The frame itself is a pack, and anyone can write one. Types:
 [slot.ts](slot.ts).
@@ -45,3 +45,8 @@ Where a fill shows is config, not code. The slot broker's config holds
 and `"off"` hides it. Order stays the config tree's. So a person or an
 agent rearranges the page by changing config, which can be undone like
 any change.
+
+A pack may lay another arrange over the config while it holds it
+(`slot.arrange`, edition 8): later layers win for a key, and disposing one
+takes it back with no reload. A view uses it to say where every fill goes
+while it shows ([views](../packs/views/README.md)).

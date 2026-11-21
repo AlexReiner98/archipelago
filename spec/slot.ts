@@ -107,14 +107,26 @@ export interface SlotRead {
   watch(slot: string, on: () => void): Dispose;
 }
 
+/**
+ * `slot.arrange` (edition 8): an `Arrange` laid over the broker's config
+ * while the caller holds it, so a view can move fills without the page
+ * reloading. Layers stack in the order they were laid; a later one wins
+ * for a key. Disposing it takes it back, and every slot it touched redraws.
+ */
+export interface SlotArrange {
+  lay(arrange: Arrange): Dispose;
+}
+
 export interface Capabilities {
   "slot.declare": SlotDeclare;
   "slot.fill": SlotFill;
   "slot.read": SlotRead;
+  "slot.arrange": SlotArrange;
 }
 
 export const capabilities: Capability[] = [
   { key: "slot.declare", since: 1, doc: "Declares a place in the UI that packs can fill." },
   { key: "slot.fill", since: 1, doc: "Puts a component in a slot." },
   { key: "slot.read", since: 1, doc: "What fills each slot now, in order, and when that changes; the shared Slot." },
+  { key: "slot.arrange", since: 8, doc: "Lays an arrange over the broker's config while held: fills move without a reload." },
 ];

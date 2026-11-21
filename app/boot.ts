@@ -1,6 +1,6 @@
 /**
  * The app, page side: the browser runtime and its config tree. The bridge
- * provides the server's capabilities here; the style, renderer, here, frame, tabs,
+ * provides the server's capabilities here; the style, renderer, here, frame, views (the picker),
  * harness, reflex, find, map, field, item and docs (the Packs view) packs make the page. The bridge is two ports above the page
  * (5180 serves the page and 5182 the bridge, 5280 and 5282 for dev), or at
  * `/bridge/` on the page's own origin when a host in front serves both. `host` is on window, so a pack can be turned
@@ -31,7 +31,7 @@ const host = await startBrowser({
     { id: "style", pack: "packs/style/index.ts" },
     { id: "renderer", pack: "packs/renderer/index.ts", config: { mount: "#app" } },
     { id: "frame", pack: "packs/frame/index.ts" },
-    { id: "tabs", pack: "packs/tabs/index.ts" },
+    { id: "views", pack: "packs/views/view.ts", config: { home: "map", pinned: ["field", "harness", "docs"] } },
     { id: "harness", pack: "packs/harness/index.ts" },
     { id: "find", pack: "packs/find/index.ts" },
     { id: "page", pack: "packs/page/view.ts" },

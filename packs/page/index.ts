@@ -28,7 +28,7 @@ const page: Pack = {
     ctx.get<ActionRegister>("action.register").register({
       name: SET,
       title: "Change the page's packs: on, off, config, order",
-      doc: "pack is an entry id of the page's tree (renderer, frame, tabs, map, item…). on turns it on or off (null: as the template has it); config lays keys over its config (null clears); after places it after a sibling (\"\" first, null back). The renderer's config.arrange moves fills: { \"item/page\": \"left\" } or \"off\".",
+      doc: "pack is an entry id of the page's tree (renderer, frame, views, map, item…). on turns it on or off (null: as the template has it); config lays keys over its config (null clears); after places it after a sibling (\"\" first, null back). The renderer's config.arrange moves fills: { \"item/page\": \"left\" } or \"off\".",
       input: {
         type: "object",
         properties: {

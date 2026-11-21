@@ -31,7 +31,7 @@ export type Changes = Record<string, Change>;
 
 /** What `page.set` takes. */
 export interface SetInput {
-  /** The entry's id in the page's tree (`renderer`, `tabs`). */
+  /** The entry's id in the page's tree (`renderer`, `views`). */
   pack: string;
   /** On or off; `null` back to what the template says. */
   on?: boolean | null;

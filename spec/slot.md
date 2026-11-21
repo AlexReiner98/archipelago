@@ -12,6 +12,7 @@ too ([frame](frame.md)). Types: [slot.ts](slot.ts).
 | `slot.declare` | Declare a slot |
 | `slot.fill` | Fill one |
 | `slot.read` | What fills each slot, for the renderer |
+| `slot.arrange` | Lay an arrange over the broker's config while held (edition 8) |
 
 ## Slots and fills
 
@@ -28,7 +29,7 @@ too ([frame](frame.md)). Types: [slot.ts](slot.ts).
   provider, and it means load order never matters.
 - A fill may carry `when`: it shows only while `here` matches. The
   broker's `arrange` config may move it to another slot or hide it
-  ([frame](frame.md)).
+  ([frame](frame.md)), and so may a layer laid with `slot.arrange`.
 - Both return disposers. When a pack unloads, its slots and fills go, and
   so does everything mounted in them.
 

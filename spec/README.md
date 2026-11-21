@@ -5,7 +5,7 @@ be changed silently. Each contract is a TypeScript module (the types) and a
 short doc.
 
 <!-- contracts: written by scripts/contracts.ts from the spec -->
-This is **edition 7**. A capability that came after edition 1 shows the edition it came in.
+This is **edition 8**. A capability that came after edition 1 shows the edition it came in.
 
 | Contract | Capabilities | What it is |
 |---|---|---|
@@ -13,7 +13,7 @@ This is **edition 7**. A capability that came after edition 1 shows the edition 
 | [action](action.md) | `action.register` `action.list` `action.invoke` | Every change goes through a declared action, whether a person or an agent makes it. |
 | [agent](agent.md) | `agent.node` `agent.tree` `agent.run` `agent.facts` (5) `agent.gate` (5) | Everything the map says to an agent and everything the agent does passes through one service. |
 | [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event for each thing that passes between the map and an agent. |
-| [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` | How the UI is put together out of packs. |
+| [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` `slot.arrange` (8) | How the UI is put together out of packs. |
 | [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | How large graphs are drawn. |
 | [here](here.md) | `here.declare` `here.read` `here.set` | What is being looked at, now. |
 | [types](types.md) | `types.define` `types.read` | What kinds of item and link the map holds. |
@@ -34,7 +34,9 @@ surface, and the spec owns the six places of edition 1 and edition 2's
 Edition 3 adds the place `compact` and the person's acts, `decision` and
 `notice` ([agent](agent.md)). Edition 4 says a node's same words once per
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
-([agent](agent.md)), and the read side of profiles ([profile](profile.md)).
+([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 8 adds `slot.arrange`, an arrange laid over the
+page's while a pack holds it, so a view moves fills without a reload
+([slot](slot.md)).
 
 ## Packs ask for capabilities
 

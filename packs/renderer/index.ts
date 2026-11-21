@@ -1,7 +1,7 @@
 /**
  * The renderer pack: the one copy of Preact every pack's components run on,
- * and the slot broker (spec/slot.md). Provides slot.declare, slot.fill and
- * slot.read, declares `root` and the six regions (spec/frame.md), and mounts
+ * and the slot broker (spec/slot.md). Provides slot.declare, slot.fill,
+ * slot.read and slot.arrange (a layer over `config.arrange`), declares `root` and the six regions (spec/frame.md), and mounts
  * the fill of `root` into the page. A fill's `when` is read from `here`;
  * `config.arrange` moves or hides fills. Unloading it unmounts everything.
  *
@@ -13,7 +13,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { Caller, Dispose, Json } from "../../spec/common.ts";
 import { Refused, byPosition } from "../../spec/common.ts";
 import type { HereRead } from "../../spec/here.ts";
-import type { Arrange, FillDef, FillInfo, SlotDeclare, SlotDef, SlotFill, SlotRead } from "../../spec/slot.ts";
+import type { Arrange, FillDef, FillInfo, SlotArrange, SlotDeclare, SlotDef, SlotFill, SlotRead } from "../../spec/slot.ts";
 import { REGIONS, ROOT, fillKey } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 
@@ -30,7 +30,13 @@ const renderer: Pack<RendererConfig> = {
   inject: ["here.read"],
   apply(ctx: Context, config: RendererConfig = {}) {
     const here = ctx.get<HereRead>("here.read");
-    const arrange = config.arrange ?? {};
+    /** The config's arrange, then each layer laid through `slot.arrange`, later over earlier. */
+    const layers: Arrange[] = [];
+    let arrange: Arrange = { ...config.arrange };
+    const relayer = () => {
+      arrange = Object.assign({ ...config.arrange }, ...layers);
+      for (const slot of slots.keys()) changed(slot);
+    };
     const slots = new Map<string, { def: SlotDef; pack: string }>();
     const fills: { def: FillDef<any>; caller: Caller; n: number }[] = [];
     const watchers = new Map<string, Set<() => void>>();
@@ -116,6 +122,21 @@ const renderer: Pack<RendererConfig> = {
             const i = fills.indexOf(f);
             if (i >= 0) fills.splice(i, 1);
             if (at) changed(at);
+          };
+        });
+      },
+    }));
+
+    ctx.provide<SlotArrange>("slot.arrange", (_caller, from) => ({
+      lay(layer): Dispose {
+        return from.effect(() => {
+          const mine = { ...layer };
+          layers.push(mine);
+          relayer();
+          return () => {
+            const i = layers.indexOf(mine);
+            if (i >= 0) layers.splice(i, 1);
+            relayer();
           };
         });
       },

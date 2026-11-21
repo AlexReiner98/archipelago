@@ -15,7 +15,7 @@ regions and nothing in them. Any pack that fills `root` can take its place.
   `title` when there are two or more. Widths are the
   tokens `frame-left` and `frame-right`, at most 28% and 32% of the window.
 - **Center:** one fill at a time, the one `here.view` names, else the first.
-  The frame sets `here.view` to what it shows. The [tabs](../tabs/README.md)
+  The frame sets `here.view` to what it shows. The [views](../views/README.md)
   pick it.
 - **Over:** a layer above the page. Only its fills take the pointer.
 
