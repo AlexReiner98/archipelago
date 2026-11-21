@@ -1,35 +1,77 @@
 # harness
 
-The harness view: what the map says to an agent, what the agent does, and
-whether each thing said works. Three panes, each a fill, linked through
-`here`: the tree in `left`, the run in `center` (the view "Harness"), and
-the node in `right`. The tree and the node show only while the run does
+The harness view: one view of every run, live or replayed, and every
+profile. What the map says to an agent is a tree of places and nodes; the
+run looked at lights it, step by step. Three fills, linked through `here`;
+the two beside show while the view does
 (`when: { "here.view": "harness/view" }`).
 
-| Pane | Shows |
+| Fill | Region | Shows |
+|---|---|---|
+| Harness (`harness/view`) | `center` | The bar (run, profile, grouping), the tree, the timeline |
+| Run (`harness/run`) | `left` | The run's profiles, then one line per event, → to the agent, ← from it |
+| Node (`harness/node`) | `right` | Its words, standing, places, pack, kind, record, and its verdict per run |
+
+## Picking
+
+- **Run:** `here.run`, else the newest. ● not ended, ○ ended.
+- **Profile:** `harness.profile` (this pack's own page key), else the run's
+  own. A profile picked shows over the tree what a run in only that
+  profile would not hear (`profile.read.hears`), whatever run is shown.
+- **Playhead:** `here.event`. Unset, the view follows the run's end live.
+
+## The tree ([layout.ts](layout.ts), [canvas.ts](canvas.ts))
+
+Every node in `agent.tree` hangs under one root at its first place: tool,
+then the MCP server, then the tool; file, then its glob's top folders;
+memory, then its scope; skill, then each part of its name. "pack" hangs it
+from its pack and kind, "profile" from the profile it is in. Nodes said
+nowhere show on "never said". Nodes kept or retired by the keep pack hang
+from one "decided" bough as well, retired ones struck.
+
+| Mark | Means |
 |---|---|
-| Tree | Every node in `agent.tree`, by place or by pack; its mark in the run looked at, and how often it was said |
-| Run | One run live: map → agent on the left, agent → map on the right, one line per event |
-| Node | Its words, places, pack, kind, record, and its verdict per run |
+| name blue | the run said it, by the playhead |
+| name red | the run refused with it |
+| faint, struck | a profile held it back (a `gated` event; or the profile picked) |
+| dashed dot | only a shadow profile would have |
+| ring | its verdict in the run (blue held, red failed, dashed quiet), once looked at to the end |
+| dot hue | its pack: the map's words purple, what grow learned gold |
+| hollow dot | its item is a trial |
+| dot size, number | how often it was said, across runs |
+| ↑ ↓ ⊝ | the keep pack's standing: promote, retire, held back by a check |
 
-Marks (the style's verdict glyphs, spec/style.md): ✓ held, ✕ failed,
-○ quiet, · not said; ⊘ a refusal, ● an act, ✕ an
-act that didn't work. A red edge on an event: it failed the node picked.
+A step of the playhead runs a light from the root to its node (red for a
+refusal), or sparks on the bough of an act's place (amber, red when it
+failed). Under reduced motion only the names light. Drag to move, wheel to
+zoom, double-click to fit; "key" shows the marks.
 
-- A click on a run's row opens it in place ([expand.ts](expand.ts)), and
-  again closes it. It shows everything the exchange holds for the event,
-  in its own column: for the map to the agent, the node, place, pack and
-  what was said or refused, whole; for the agent to the map, the act's
-  kind and who did it, its input and output field by field (a tool call's
-  arguments, a `tell`'s words, a prompt or reply in full; an MCP result as
-  its text, JSON indented), and whether it worked. Each part folds past a
-  dozen lines.
-- A click on a node sets `here.node`; the run lights its firings. A click on
-  an event sets `here.event` and `here.node`; the tree lights its node. The
-  run is `here.run`, or the newest.
-- A node made from a map item (`source`) has its words edited here, through
-  `words.set`, when something provides it; the next say uses them. Any other
-  node shows what it last said.
-- Injects `slot.fill`, `here.*`, `agent.tree`, `exchange.read`,
-  `exchange.watch`, `verdict.read`, `action.list`, `action.invoke`,
-  `graph.read`, `graph.watch`. Unloading it removes the view and its styles.
+## The timeline ([timeline.ts](timeline.ts), [replay.ts](replay.ts))
+
+One tick per event, in order: blue a say, red a refusal or a failed act,
+amber an act, grey a hold, white the run's own. The map's ticks sit high,
+the agent's low. Click or drag to move the playhead; ⏮ the start, ▶ plays
+a step at a time, "● live" (or "■ end") follows the end again.
+
+## The run ([events.ts](events.ts))
+
+The line at the playhead is picked; those after it are faint. A click
+opens a line in place ([expand.ts](expand.ts)): for the map to the agent,
+the node, place, pack and what was said, whole; for the agent to the map,
+the act's input and output field by field. Each part folds past a dozen
+lines. A red edge: the event failed the node picked.
+
+## The node ([node.ts](node.ts), [keep.ts](keep.ts))
+
+Words made from a map item are edited through `words.set`, and the next
+say uses them; any other node shows what it last said. A trial shows the
+miss it came from and can be retired (`words.retire`). With the keep pack:
+its record against the thresholds, its checks, Keep and Retire
+(`keep.apply`). A node the map writes a file from shows the file and its
+rule (`written.rule`).
+
+Injects `slot.fill`, `here.*`, `agent.tree`, `exchange.read`,
+`exchange.watch`, `verdict.read`, `action.list`, `action.invoke`,
+`graph.read`, `graph.watch`, `profile.read`. Unloading it removes the three
+fills, its page key and its styles. The pure parts are tested in
+`test/harness.test.ts`.

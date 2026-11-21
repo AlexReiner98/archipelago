@@ -67,7 +67,7 @@ export function sections(Link: LinkView): [string, (p: Props) => unknown][] {
       <table class="dk-table">
         ${pack.places.map((p) => html`<tr key=${p.place}><td><code>${p.place}</code></td><td class="num">${p.nodes}</td></tr>`)}
       </table>
-      <p><${Link} to=${{ title: "See them on the Reflex tree", view: "reflex" }} /></p>
+      <p><${Link} to=${{ title: "See them in the Harness view", view: "harness" }} /></p>
     <//>`;
 
   const Run = ({ pack }: Props) =>

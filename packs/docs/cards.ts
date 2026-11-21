@@ -97,7 +97,7 @@ export function countsOf(doc: PackDoc, all: PackDoc[] = []): Count[] {
   if (a.links.length) out.push({ key: "links", label: n(a.links.length, "kind of link", "kinds of link"), items: a.links.map((t) => ({ title: t.name })) });
   if (doc.actions.length) out.push({ key: "actions", label: n(doc.actions.length, "action"), items: doc.actions.map((x) => ({ title: x.title })) });
   const nodes = doc.places.reduce((s, p) => s + p.nodes, 0);
-  if (nodes) out.push({ key: "says", label: `${n(nodes, "node")} for agents`, to: { title: "Reflex tree", view: "reflex" } });
+  if (nodes) out.push({ key: "says", label: `${n(nodes, "node")} for agents`, to: { title: "Harness", view: "harness" } });
   const act = doc.activity;
   if (act && act.said + act.refused + act.acted) {
     const parts = [act.said ? `said ${n(act.said, "time")}` : "", act.refused ? `refused ${act.refused}` : "", act.acted ? n(act.acted, "act") : ""].filter(Boolean);

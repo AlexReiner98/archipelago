@@ -1,5 +1,5 @@
 /**
- * The reflex tree's shape, as pure functions: no page, no capabilities.
+ * The harness tree's shape, as pure functions: no page, no capabilities.
  *
  * - `treeOf`: every node from `agent.tree` hung under one root. By place,
  *   each node hangs from boughs named for its first place, the general
@@ -34,6 +34,8 @@ export interface TreeNode {
   kids: TreeNode[];
   /** Set on a leaf: the node it draws. */
   node?: NodeInfo;
+  /** Set on a leaf of the "decided" bough: the node kept (`up`) or retired. */
+  decided?: { node: string; up: boolean };
 }
 
 export interface Tree {
@@ -57,9 +59,13 @@ export interface TreeOptions {
   unsaid?: boolean;
   /** By profile: the profiles each node comes from, nearest first; its first is its bough. */
   profiles?: Map<string, string[]>;
+  /** Nodes kept or retired (the keep pack's), each a leaf of one "decided" bough; retired ones are loaded no more. */
+  decided?: { node: string; title: string; up: boolean }[];
 }
 
 export const ROOT = "~root";
+/** The bough of nodes kept or retired. */
+export const DECIDED = "~decided";
 const NEVER: Bough = { key: "never", title: "never said" };
 const GLOB = /[*?[{]/;
 const words = (s: string) => s.replaceAll("_", " ");
@@ -102,7 +108,7 @@ function boughsFor(n: NodeInfo, o: Required<TreeOptions>): Bough[] | undefined {
 
 /** Every node under one root. The same nodes make the same tree, whatever order they come in. */
 export function treeOf(nodes: NodeInfo[], options: TreeOptions = {}): Tree {
-  const o: Required<TreeOptions> = { by: "place", fileDepth: 2, placeDepth: 4, unsaid: false, profiles: new Map(), ...options };
+  const o: Required<TreeOptions> = { by: "place", fileDepth: 2, placeDepth: 4, unsaid: false, profiles: new Map(), decided: [], ...options };
   const root: TreeNode = { id: ROOT, title: "agent", depth: 0, kids: [] };
   const byId = new Map<string, TreeNode>([[ROOT, root]]);
   let hidden = 0;
@@ -128,6 +134,18 @@ export function treeOf(nodes: NodeInfo[], options: TreeOptions = {}): Tree {
     byId.set(n.id, leaf);
     parent.kids.push(leaf);
   }
+  if (o.decided.length) {
+    const bough: TreeNode = { id: DECIDED, title: "decided", depth: 1, parent: root, kids: [] };
+    byId.set(DECIDED, bough);
+    root.kids.push(bough);
+    for (const d of o.decided) {
+      const id = `~d:${d.node}`;
+      if (byId.has(id)) continue;
+      const leaf: TreeNode = { id, title: d.title, depth: 2, parent: bough, kids: [], decided: { node: d.node, up: d.up } };
+      byId.set(id, leaf);
+      bough.kids.push(leaf);
+    }
+  }
   // A bough below the first level that holds one thing only says its name twice: its kid takes its place.
   const fold = (t: TreeNode) => {
     t.kids = t.kids.map((k) => {
@@ -146,7 +164,7 @@ export function treeOf(nodes: NodeInfo[], options: TreeOptions = {}): Tree {
   const order: TreeNode[] = [];
   const walk = (t: TreeNode) => {
     t.depth = t.parent ? t.parent.depth + 1 : 0;
-    t.kids.sort((a, b) => Number(!!a.node) - Number(!!b.node) || a.title.localeCompare(b.title) || (a.id < b.id ? -1 : 1));
+    t.kids.sort((a, b) => Number(!!(a.node ?? a.decided)) - Number(!!(b.node ?? b.decided)) || a.title.localeCompare(b.title) || (a.id < b.id ? -1 : 1));
     order.push(t);
     t.kids.forEach(walk);
   };
