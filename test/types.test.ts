@@ -28,7 +28,7 @@ async function setup(tree = TREE) {
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length, -3)] }) });
   await loader.apply(tree);
   await rt.settle();
-  const ctx = () => loader.fiber("probe")!.ctx.intercept({ actor: { id: "person:alex", kind: "person" } });
+  const ctx = () => loader.fiber("probe")!.ctx.intercept({ actor: { id: "person:owner", kind: "person" } });
   const p = {
     define: () => ctx().get<TypesDefine>("types.define"),
     read: () => ctx().get<TypesRead>("types.read"),
@@ -133,10 +133,10 @@ test("items.link checks the ends' bases; items.unlink takes the link away whole"
     return (r.ok && (r.output as { id: string }).id) as string;
   };
   const task = await mk("work", "Ship it");
-  const alex = await mk("actor", "Alex");
+  const owner = await mk("actor", "Owner");
   const q = await mk("question", "Ready?");
 
-  const waits = await p.invoke("items.link", { type: "waits_on", from: task, to: alex, fields: { for: "a look" } });
+  const waits = await p.invoke("items.link", { type: "waits_on", from: task, to: owner, fields: { for: "a look" } });
   assert.ok(waits.ok);
   const wrong = await p.invoke("items.link", { type: "waits_on", from: task, to: q });
   assert.ok(!wrong.ok && wrong.refused.code === "items.link_end");

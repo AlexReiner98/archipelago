@@ -34,7 +34,7 @@ too ([frame](frame.md)). Types: [slot.ts](slot.ts).
 
 ## The renderer
 
-Decided by Alex: **panels are Preact** function components, written with
+Decided: **panels are Preact** function components, written with
 htm so there's no build step. The renderer pack provides the one copy
 every pack uses, and fills `root` with nothing but a mount point for the
 frame. Web Components are out, because a `customElements.define` can't be

@@ -23,7 +23,7 @@ keys: all.
 
 ## Rules
 
-Decided with Alex (20 Nov 2026, all five):
+Decided (20 Nov 2026, all five):
 
 - A run is in a profile when one of its fact values is an item `uses`
   links to it (the git pack's `repo`, the hub pack's `hub`), or the

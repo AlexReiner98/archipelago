@@ -364,8 +364,8 @@ test("a gate holds a node back before it is asked, recorded once per run; a tria
   await loader.apply([
     { id: "exchange", pack: "exchange.ts" },
     { id: "agent", pack: "agent.ts" },
-    { id: "gate", pack: "extras.ts", config: { hold: [{ node: "nodes/aperture", why: "For Aperture runs." }, { node: "nodes/watched", why: "Would hold.", trial: true }] } },
-    { id: "a", pack: "nodes.ts", config: { nodes: [say("aperture", ["tool:Bash"], "Rhino."), say("watched", ["tool:Bash"], "Watched."), say("plain", ["tool:Bash"], "Plain.")] } },
+    { id: "gate", pack: "extras.ts", config: { hold: [{ node: "nodes/studio", why: "For Studio runs." }, { node: "nodes/watched", why: "Would hold.", trial: true }] } },
+    { id: "a", pack: "nodes.ts", config: { nodes: [say("studio", ["tool:Bash"], "Rhino."), say("watched", ["tool:Bash"], "Watched."), say("plain", ["tool:Bash"], "Plain.")] } },
     { id: "probe", pack: "probe.ts" },
   ]);
   const { run, read } = as();
@@ -377,7 +377,7 @@ test("a gate holds a node back before it is asked, recorded once per run; a tria
   assert.deepEqual(
     gated.map((e) => [e.node, e.text, e.detail]),
     [
-      ["nodes/aperture", "For Aperture runs.", { gate: "extras/g" }],
+      ["nodes/studio", "For Studio runs.", { gate: "extras/g" }],
       ["nodes/watched", "Would hold.", { gate: "extras/g", trial: true }],
     ],
   );
@@ -385,10 +385,10 @@ test("a gate holds a node back before it is asked, recorded once per run; a tria
   await loader.apply([
     { id: "exchange", pack: "exchange.ts" },
     { id: "agent", pack: "agent.ts" },
-    { id: "a", pack: "nodes.ts", config: { nodes: [say("aperture", ["tool:Bash"], "Rhino.")] } },
+    { id: "a", pack: "nodes.ts", config: { nodes: [say("studio", ["tool:Bash"], "Rhino.")] } },
     { id: "probe", pack: "probe.ts" },
   ]);
   const after = await as().run.reach({ ...moment(["tool:Bash"]), again: true });
-  assert.deepEqual(after.said.map((s) => s.node), ["nodes/aperture"]);
+  assert.deepEqual(after.said.map((s) => s.node), ["nodes/studio"]);
   assert.deepEqual(errors, []);
 });

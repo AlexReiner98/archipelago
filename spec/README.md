@@ -2,7 +2,7 @@
 
 The interfaces packs talk through. Any pack can be replaced; these can't
 be changed silently. Each contract is a TypeScript module (the types) and a
-short doc. This is **edition 1, in draft**, while Alex shapes it.
+short doc. This is **edition 1, in draft**, while its owner shapes it.
 
 | Contract | Capabilities | What it is |
 |---|---|---|
@@ -23,7 +23,7 @@ short doc. This is **edition 1, in draft**, while Alex shapes it.
 [common.ts](common.ts) holds the shared words; [index.ts](index.ts) puts
 every capability's key and type in one map for a runtime to declare.
 
-Decided with Alex: panels are Preact, the graph is one WebGL2 scene
+Decided: panels are Preact, the graph is one WebGL2 scene
 surface, and the spec owns the six places of edition 1 and edition 2's
 `skill:` and `memory:`, where the map speaks through the files it writes.
 Edition 3 adds the place `compact` and the person's acts, `decision` and
