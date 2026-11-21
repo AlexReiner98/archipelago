@@ -9,6 +9,9 @@
  * by itself only after a network error, and closes for good on an answer
  * that isn't the stream, such as a proxy's 502 while the server restarts
  * behind it. The page would then stay on its old copy of the map.
+ *
+ * `bridge.link` says whether the stream is up now: `state()` is `open` or
+ * `down`, and `watch(on)` calls `on` when it changes.
  */
 import type { Dispose } from "../../spec/common.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
@@ -18,6 +21,13 @@ export interface BridgeClientConfig {
   url?: string;
   /** Milliseconds before a closed stream is opened again, doubling to 30 s. Default 1000. */
   retry?: number;
+}
+
+/** `bridge.link`: whether the page reaches the server now. */
+export interface BridgeLink {
+  state(): "open" | "down";
+  /** When it changes; returns the disposer. */
+  watch(on: (state: "open" | "down") => void): Dispose;
 }
 
 interface Watch {
@@ -59,10 +69,18 @@ const client: Pack<BridgeClientConfig> = {
     const ready = new Promise<void>((ok) => (opened = ok));
     let events: EventSource | undefined;
     let wait = config.retry ?? 1000;
+    let link: "open" | "down" = "down";
+    const linkOn = new Set<(s: "open" | "down") => void>();
+    const setLink = (s: "open" | "down") => {
+      if (s === link) return;
+      link = s;
+      for (const on of [...linkOn]) on(s);
+    };
     const onmessage = (e: MessageEvent) => {
       wait = config.retry ?? 1000;
       const m = JSON.parse(e.data);
       if (m.stream) {
+        setLink("open");
         const again = stream !== undefined;
         stream = m.stream;
         for (const [id, w] of watches) void subscribe(id, w);
@@ -88,6 +106,7 @@ const client: Pack<BridgeClientConfig> = {
       events = es;
       es.onmessage = onmessage;
       es.onerror = () => {
+        setLink("down");
         if (es.readyState !== EventSource.CLOSED || done || reopen) return;
         reopen = setTimeout(open, wait);
         wait = Math.min(wait * 2, 30000);
@@ -109,6 +128,15 @@ const client: Pack<BridgeClientConfig> = {
       void subscribe(id, watches.get(id)!);
       await refresh(key);
     }
+
+    ctx.provide("bridge.link", (_caller, from): BridgeLink => ({
+      state: () => link,
+      watch: (on) =>
+        from.effect(() => {
+          linkOn.add(on);
+          return () => void linkOn.delete(on);
+        }),
+    }));
 
     for (const key of caps.keys) {
       ctx.provide(key, (_caller, from) => {
