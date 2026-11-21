@@ -1,13 +1,15 @@
 /**
  * Every live agent with a tree of its own: the nodes its profile lets it
- * hear (`profile.read.hears`), hung as the big tree is. A grid of them,
- * each under its agent's name in its colour and its profile. What an agent
+ * hear (`profile.read.hears`), hung as the big tree is. One agent is in
+ * focus, its tree big with every name; the others are small previews in a
+ * column beside it, and a click on one brings it into focus. Each is under
+ * its agent's name in its colour and its profile. What an agent
  * is told colours that node and its branch in its colour, then fades
  * (tint.ts); nothing moves. Small, a tree names only what is lit, what the
  * agent was told, and what is picked.
  *
- * A click on an agent's name looks at it alone; on its profile, lists the
- * profiles to move it into one (`profile.place`, agents.ts).
+ * In focus, a click on the agent's name looks at it alone; on its profile,
+ * lists the profiles to move it into one (`profile.place`, agents.ts).
  */
 import { h } from "preact";
 import { useMemo } from "preact/hooks";
@@ -23,9 +25,9 @@ import type { Dials } from "./tint.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
-/** How many columns a grid of `n` trees takes: one, two side by side, then three. */
-export function columnsFor(n: number): number {
-  return n <= 1 ? 1 : n <= 4 ? 2 : 3;
+/** The agent in focus: the one picked while it is live, else the first (the last active). */
+export function focusOf(runs: string[], picked: string | undefined): string | undefined {
+  return picked && runs.includes(picked) ? picked : runs[0];
 }
 
 /** The nodes an agent hears; all of them while that isn't known yet. */
@@ -34,7 +36,14 @@ export function heardBy(nodes: NodeInfo[], hears: ReadonlySet<string> | undefine
 }
 
 export const TREES_STYLE = sheet(`
-.hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-auto-rows:minmax(0,1fr); }
+.hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-template-columns:minmax(0,1fr); }
+.hv-trees.many { grid-template-columns:minmax(0,1fr) minmax(180px,22%); }
+.hv-tree.big { grid-column:1; grid-row:1 / -1; }
+.hv-tree.peek { grid-column:2; cursor:pointer; border-left:1px solid var(--line); }
+.hv-tree.peek:hover { background:color-mix(in srgb, var(--line) 35%, transparent); }
+.hv-tree.peek .rx-canvas { pointer-events:none; }
+.hv-tree.peek .who, .hv-tree.peek .prof { cursor:pointer; }
+.hv-tree.big .hd { padding:var(--space-3) var(--space-4); }
 .hv-tree { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; min-width:0; overflow:hidden; border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
 .hv-tree .hd { display:flex; gap:var(--space-3); align-items:baseline; padding:var(--space-2) var(--space-4); white-space:nowrap; min-width:0; }
 .hv-tree .d { flex:none; }
@@ -72,27 +81,34 @@ export interface TreesProps {
   onPick(node: string | undefined): void;
   onOpen(run: string): void;
   onProfile(run: string, at: MouseEvent): void;
+  /** The agent in focus; the others are previews. */
+  focus?: string;
+  onFocus(run: string): void;
 }
 
-const One = ({ a, p }: { a: AgentTree; p: TreesProps }) => {
+const One = ({ a, p, big, row }: { a: AgentTree; p: TreesProps; big: boolean; row: number }) => {
   const nodes = useMemo(() => heardBy(p.nodes, a.hears), [p.nodes, a.hears]);
   const tree = useMemo(() => treeOf(nodes, { by: p.by }), [nodes, p.by]);
   const placed = useMemo(() => radial(tree), [tree]);
   const mine = useMemo(() => p.events.filter((e) => e.run === a.run.run), [p.events, a.run.run]);
   const state = useMemo(() => stateAt(mine, mine.length - 1), [mine]);
   const title = a.run.title ?? a.run.run.slice(0, 8);
-  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""}`}>
+  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}`} style=${big ? "" : `grid-row:${row}`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
     <div class="hd">
       <span class="d" style=${`color:${a.colour}`}>●</span>
-      <span class="who" title=${`${title}\nLook at it alone`} onClick=${() => p.onOpen(a.run.run)}>${title}</span>
-      ${a.placement && html`<span class="prof" title=${`${placementTip(a.placement)}${p.canPlace ? "\nMove it to another profile" : ""}`} onClick=${(e: MouseEvent) => p.canPlace && p.onProfile(a.run.run, e)}>${placementText(a.placement)}${p.canPlace ? " ▾" : ""}</span>`}
-      <span class="n" title="The nodes it hears, of all">${a.hears ? `${nodes.length} / ${p.nodes.length}` : ""}</span>
+      <span class="who" title=${big ? `${title}\nLook at it alone` : `${title}\nBring it into focus`} onClick=${big ? () => p.onOpen(a.run.run) : undefined}>${title}</span>
+      ${a.placement && html`<span class="prof" title=${`${placementTip(a.placement)}${big && p.canPlace ? "\nMove it to another profile" : ""}`} onClick=${big ? (e: MouseEvent) => p.canPlace && p.onProfile(a.run.run, e) : undefined}>${placementText(a.placement)}${big && p.canPlace ? " ▾" : ""}</span>`}
+      <span class="n" title="The nodes it hears, of all">${a.hears ? (big ? `${nodes.length} / ${p.nodes.length}` : nodes.length) : ""}</span>
     </div>
-    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${false} dials=${p.dials} small=${true} />
+    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${false} dials=${p.dials} small=${!big} />
   </div>`;
 };
 
-export const Trees = (p: TreesProps) => html`
-  <div class="hv-trees" style=${`grid-template-columns:repeat(${columnsFor(p.agents.length)}, minmax(0,1fr))`}>
-    ${p.agents.map((a) => html`<${One} key=${a.run.run} a=${a} p=${p} />`)}
+export const Trees = (p: TreesProps) => {
+  const focus = focusOf(p.agents.map((a) => a.run.run), p.focus);
+  const rest = p.agents.filter((a) => a.run.run !== focus);
+  // Every tree keeps its component when focus moves (keyed by run), so its colours carry over; only its place changes.
+  return html`<div class="hv-trees${rest.length ? " many" : ""}" style=${rest.length ? `grid-template-rows:repeat(${rest.length}, minmax(0,1fr))` : "grid-template-rows:minmax(0,1fr)"}>
+    ${p.agents.map((a) => html`<${One} key=${a.run.run} a=${a} p=${p} big=${a.run.run === focus} row=${rest.indexOf(a) + 1} />`)}
   </div>`;
+};

@@ -55,14 +55,17 @@ come.
 ## The agents ([trees.ts](trees.ts), [tint.ts](tint.ts), [agents.ts](agents.ts))
 
 Live mode and the agents are one idea: each live run is an agent, in the
-colour live mode gives it, with a tree of its own in a grid (one, two, then
-three across), in the order of their colours so a tree keeps its place. Its
+colour live mode gives it, with a tree of its own. One is in focus, big,
+with every name; the others are small previews in a column beside it, in
+the order of their colours so each keeps its place, and a click on one
+brings it into focus. Focus starts on the last active agent and stays
+where it is put while that agent is live. Its
 tree holds only the nodes it hears (`profile.read.hears`), hung as the big
 tree is, with how many of all it hears. Small, a tree fits its dots to fill its cell
 (`dotsBox`), and names only what is lit, what the agent was told, and
 what is picked. Faint until it does
 something while watched (one that stopped without ending stays live). A
-click on its name looks at it alone.
+click on the focused agent's name looks at it alone.
 
 What an agent is told colours that node and its branch from the root in
 the agent's colour, and they fade back. Nothing travels.

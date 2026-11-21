@@ -15,7 +15,7 @@ import { DECIDED, dotsBox, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf,
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 import { placementOf, placementText } from "../packs/harness/agents.ts";
 import { DIALS, dialsOf, tintOf, wayOf } from "../packs/harness/tint.ts";
-import { columnsFor, heardBy } from "../packs/harness/trees.ts";
+import { focusOf, heardBy } from "../packs/harness/trees.ts";
 import { landsLive } from "../packs/harness/hooks.ts";
 
 const base = { id: "e1", run: "r", seq: 3, time: "2026-11-21T09:00:00Z" };
@@ -449,10 +449,13 @@ test("wayOf: the branches from the root to a node, root side first", () => {
   assert.deepEqual(wayOf(tree, "nope"), []);
 });
 
-test("each agent's own tree: the nodes it hears, all while that isn't known; grids of one, two, then three across", () => {
+test("each agent's own tree: the nodes it hears, all while that isn't known; the one picked in focus while it is live, else the last active", () => {
   assert.deepEqual(heardBy(NODES, new Set(["words/bash", "loaded/docs"])).map((n) => n.id), ["words/bash", "loaded/docs"]);
   assert.equal(heardBy(NODES, undefined).length, NODES.length);
-  assert.deepEqual([1, 2, 3, 4, 5, 6].map(columnsFor), [1, 2, 2, 2, 3, 3]);
+  assert.equal(focusOf(["r1", "r2", "r3"], "r2"), "r2");
+  assert.equal(focusOf(["r1", "r2"], "gone"), "r1", "a picked run that ended gives way to the last active");
+  assert.equal(focusOf(["r1"], undefined), "r1");
+  assert.equal(focusOf([], "r1"), undefined);
 });
 
 test("placementOf: matched, the fallback, or none; a run that named the fallback itself is matched", () => {

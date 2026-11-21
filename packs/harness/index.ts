@@ -266,6 +266,7 @@ const harness: Pack = {
         if (!box) return;
         setMenu({ run: r, x: Math.max(4, Math.min(ev.clientX - box.left - 20, box.width - 290)), y: ev.clientY - box.top + 14 });
       };
+      const [focus, setFocus] = useState<string>();
       const onOpen = (r: string) => {
         set.set(KEYS.event, undefined);
         set.set(KEYS.run, r);
@@ -353,7 +354,7 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} dials=${dials} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} />`
+              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} dials=${dials} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} focus=${focus} onFocus=${setFocus} />`
               : html`<${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
             ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${lives.find((r) => r.run === menu.run)?.title ?? menu.run.slice(0, 8)} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}
