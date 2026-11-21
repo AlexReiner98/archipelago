@@ -1,6 +1,6 @@
 /**
  * The app, page side: the browser runtime and its config tree. The bridge
- * provides the server's capabilities here; the renderer, here, shell,
+ * provides the server's capabilities here; the style, renderer, here, shell,
  * harness, reflex, find, map and item packs make the page. The bridge is two ports above the page
  * (5180 serves the page and 5182 the bridge, 5280 and 5282 for dev), or at
  * `/bridge/` on the page's own origin when a host in front serves both. `host` is on window, so a pack can be turned
@@ -28,6 +28,7 @@ const host = await startBrowser({
   tree: [
     { id: "bridge", pack: "packs/bridge/client.ts", config: { url: await bridgeUrl() } },
     { id: "here", pack: "packs/here/index.ts" },
+    { id: "style", pack: "packs/style/index.ts" },
     { id: "renderer", pack: "packs/renderer/index.ts", config: { mount: "#app" } },
     { id: "shell", pack: "packs/shell/index.ts" },
     { id: "harness", pack: "packs/harness/index.ts" },
@@ -35,6 +36,7 @@ const host = await startBrowser({
     { id: "reflex", pack: "packs/reflex/index.ts" },
     { id: "map", pack: "packs/map/index.ts" },
     { id: "item", pack: "packs/item/index.ts" },
+    { id: "style-view", pack: "packs/style/view.ts" },
   ],
 });
 host.runtime.onError = (fiber, error) => console.error(`[${fiber.pack.id}]`, error);

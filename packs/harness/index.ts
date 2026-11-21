@@ -38,6 +38,7 @@ import { KEEP_STYLE, keepParts, type Review } from "./keep.ts";
 import { KEYS } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
+import { onStyle, read, sheet, v, verdictGlyph } from "../../spec/style.ts";
 
 // htm ships CommonJS types; in the page its module export is the function itself.
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
@@ -77,53 +78,54 @@ const RETIRE = "words.retire";
 /** The action that opens a written node to refinement or holds it (packs/written). */
 const RULE = "written.rule";
 
-const MARK: Record<Verdict | "none", string> = { held: "✓", failed: "✕", quiet: "○", none: "·" };
+/** A verdict's glyph, as the style draws it now. */
+const mark = (v: Verdict | "none") => read(verdictGlyph(v));
 
-const STYLE = `
+const STYLE = sheet(`
 .hv { display:grid; grid-template-columns:minmax(220px,26%) 1fr minmax(260px,28%); height:100%; }
 .hv-pane { display:flex; flex-direction:column; min-width:0; min-height:0; border-right:1px solid var(--line); }
 .hv-pane:last-child { border-right:0; }
-.hv-head { display:flex; gap:8px; align-items:center; padding:6px 10px; border-bottom:1px solid var(--line); white-space:nowrap; min-height:20px; }
-.hv-head .t { font-weight:600; }
+.hv-head { display:flex; gap:var(--space-3); align-items:center; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; min-height:20px; }
+.hv-head .t { font-weight:var(--bold); }
 .hv-head .sp { flex:1; }
 .hv-body { flex:1; overflow:auto; min-height:0; }
-.hv-row { display:flex; gap:6px; align-items:baseline; padding:1px 10px; white-space:nowrap; cursor:pointer; }
+.hv-row { display:flex; gap:var(--space-3); align-items:baseline; padding:1px var(--space-4); white-space:nowrap; cursor:pointer; }
 .hv-row:hover { background:color-mix(in srgb, var(--line) 50%, transparent); }
 .hv-row .x { overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0; }
 .hv-row .n { color:var(--dim); font-variant-numeric:tabular-nums; }
-.hv-group { padding:6px 10px 1px; color:var(--dim); font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hv-group { padding:var(--space-3) var(--space-4) 1px; color:var(--dim); font-size:var(--text-s); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .hv-lit { background:var(--lit) !important; }
 .hv-pick { box-shadow:inset 3px 0 0 var(--pick); }
 .hv-m { width:1em; text-align:center; flex:none; }
 .m-held { color:var(--held); } .m-failed { color:var(--failed); } .m-quiet, .m-none { color:var(--quiet); }
-.hv-tabs button, .hv-btn { font:inherit; background:none; border:1px solid var(--line); color:var(--dim); padding:0 6px; border-radius:3px; cursor:pointer; }
+.hv-tabs button, .hv-btn { font:inherit; background:var(--control); border:1px solid var(--control-line); color:var(--dim); padding:0 var(--space-3); border-radius:var(--radius); cursor:pointer; }
 .hv-tabs button.on { color:var(--fg); border-color:var(--dim); }
-.hv-select { font:inherit; background:var(--panel); color:var(--fg); border:1px solid var(--line); max-width:240px; }
-.hv-cols { display:grid; grid-template-columns:1fr 1fr; position:sticky; top:0; background:var(--bg); color:var(--dim); font-size:11px; border-bottom:1px solid var(--line); }
-.hv-cols div { padding:2px 10px; }
+.hv-select { font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); max-width:240px; }
+.hv-cols { display:grid; grid-template-columns:1fr 1fr; position:sticky; top:0; background:var(--bg); color:var(--dim); font-size:var(--text-s); border-bottom:1px solid var(--line); }
+.hv-cols div { padding:var(--space-1) var(--space-4); }
 .hv-ev { display:grid; grid-template-columns:1fr 1fr; cursor:pointer; }
-.hv-ev > div { display:flex; gap:6px; align-items:baseline; padding:1px 10px; white-space:nowrap; min-width:0; }
+.hv-ev > div { display:flex; gap:var(--space-3); align-items:baseline; padding:1px var(--space-4); white-space:nowrap; min-width:0; }
 .hv-ev:hover { background:color-mix(in srgb, var(--line) 50%, transparent); }
 .hv-ev .x { overflow:hidden; text-overflow:ellipsis; min-width:0; }
 .hv-ev .p { color:var(--dim); flex:none; max-width:40%; overflow:hidden; text-overflow:ellipsis; }
 .hv-ev .s { color:var(--dim); flex:none; font-variant-numeric:tabular-nums; width:2.5em; text-align:right; }
 .hv-ev.broke { box-shadow:inset -3px 0 0 var(--failed); }
-.hv-kv { display:flex; gap:8px; padding:1px 10px; white-space:nowrap; }
+.hv-kv { display:flex; gap:var(--space-3); padding:1px var(--space-4); white-space:nowrap; }
 .hv-kv .k { color:var(--dim); width:4.5em; flex:none; }
 .hv-kv .v { overflow:hidden; text-overflow:ellipsis; }
-.hv-words { margin:6px 10px; }
-.hv-words textarea { width:100%; box-sizing:border-box; min-height:84px; font:inherit; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:4px 6px; resize:vertical; }
-.hv-words .ro { white-space:pre-wrap; padding:4px 6px; border:1px dashed var(--line); border-radius:3px; }
-.hv-words .bar { display:flex; gap:8px; align-items:center; margin-top:4px; color:var(--dim); white-space:nowrap; }
-.hv-empty { padding:10px; color:var(--dim); }
+.hv-words { margin:var(--space-3) var(--space-4); }
+.hv-words textarea { width:100%; box-sizing:border-box; min-height:84px; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-2) var(--space-3); resize:vertical; }
+.hv-words .ro { white-space:pre-wrap; padding:var(--space-2) var(--space-3); border:1px dashed var(--line); border-radius:var(--radius); }
+.hv-words .bar { display:flex; gap:var(--space-3); align-items:center; margin-top:var(--space-2); color:var(--dim); white-space:nowrap; }
+.hv-empty { padding:var(--space-4); color:var(--dim); }
 .hv-trial .x { font-style:italic; }
-.hv-tag { flex:none; font-size:10px; padding:0 4px; border-radius:3px; border:1px dashed var(--pick); color:var(--pick); }
-.hv-prof { display:flex; gap:10px; padding:2px 10px; border-bottom:1px solid var(--line); white-space:nowrap; overflow:hidden; }
+.hv-tag { flex:none; font-size:var(--text-xs); padding:0 var(--space-2); border-radius:var(--radius); border:1px dashed var(--pick); color:var(--pick); }
+.hv-prof { display:flex; gap:var(--space-4); padding:var(--space-1) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; overflow:hidden; }
 .hv-prof .k { color:var(--dim); }
 .hv-prof .part { color:var(--dim); }
 .hv-prof .sp { flex:1; }
-.hv-miss { margin:2px 10px 6px; padding:4px 6px; border-left:3px solid var(--failed); white-space:pre-wrap; color:var(--dim); }
-${KEEP_STYLE}`;
+.hv-miss { margin:var(--space-1) var(--space-4) var(--space-3); padding:var(--space-2) var(--space-3); border-left:3px solid var(--failed); white-space:pre-wrap; color:var(--dim); }
+${KEEP_STYLE}`);
 
 const short = (v: unknown, n = 120): string => {
   const s = typeof v === "string" ? v : v === undefined ? "" : JSON.stringify(v);
@@ -342,7 +344,7 @@ const harness: Pack = {
 
     // ---------- the panes ----------
 
-    const Mark = ({ v }: { v?: Verdict }) => html`<span class=${`hv-m m-${v ?? "none"}`} title=${v ?? "not said"}>${MARK[v ?? "none"]}</span>`;
+    const Mark = ({ v }: { v?: Verdict }) => html`<span class=${`hv-m m-${v ?? "none"}`} title=${v ?? "not said"}>${mark(v ?? "none")}</span>`;
 
     const TreePane = ({ nodes, byNode, counts, statuses, review }: { nodes: NodeInfo[]; byNode: Map<string, RunVerdict>; counts: Map<string, number>; statuses: Map<string, string>; review?: Review }) => {
       const reviewed = useMemo(() => new Map((review?.nodes ?? []).map((r) => [r.item, r])), [review]);
@@ -359,7 +361,7 @@ const harness: Pack = {
       return html`
         <div class="hv-pane">
           <div class="hv-head">
-            <span class="t">Tree</span><span class="n" style="color:var(--dim)">${nodes.length}</span><span class="sp"></span>
+            <span class="t">Tree</span><span class="n" style=${`color:${v("dim")}`}>${nodes.length}</span><span class="sp"></span>
             <span class="hv-tabs">
               <button class=${by === "place" ? "on" : ""} onClick=${() => setBy("place")}>place</button>
               <button class=${by === "pack" ? "on" : ""} onClick=${() => setBy("pack")}>pack</button>
@@ -423,9 +425,9 @@ const harness: Pack = {
               <option value="">newest${runs[0] ? ` (${runs[0].run.slice(0, 8)})` : ""}</option>
               ${runs.map((r) => html`<option value=${r.run}>${r.run.slice(0, 8)} ${clock(r.started)}${r.ended ? "" : " ●"} ${short(r.title ?? r.cwd ?? "", 30)}</option>`)}
             </select>
-            ${info && !info.ended && html`<span style="color:var(--held)" title="live">● live</span>`}
+            ${info && !info.ended && html`<span style=${`color:${v("held")}`} title="live">● live</span>`}
             <span class="sp"></span>
-            <span><span class="m-held">${MARK.held} ${sum.held}</span> <span class="m-failed">${MARK.failed} ${sum.failed}</span> <span class="m-quiet">${MARK.quiet} ${sum.quiet}</span></span>
+            <span><span class="m-held">${mark("held")} ${sum.held}</span> <span class="m-failed">${mark("failed")} ${sum.failed}</span> <span class="m-quiet">${mark("quiet")} ${sum.quiet}</span></span>
           </div>
           ${info && html`<div class="hv-prof" title=${Object.entries(facts).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join("\n")}>
             <span class="k">profiles</span>
@@ -598,7 +600,7 @@ const harness: Pack = {
             <div class="hv-kv"><span class="k">id</span><span class="v" title=${id}>${id}</span></div>
             <div class="hv-kv"><span class="k">record</span><span class="v">
               ${record
-                ? html`said ${record.said} in ${record.runs} run${record.runs === 1 ? "" : "s"} · <span class="m-held">${MARK.held} ${record.held}</span> <span class="m-failed">${MARK.failed} ${record.failed}</span> <span class="m-quiet">${MARK.quiet} ${record.quiet}</span>`
+                ? html`said ${record.said} in ${record.runs} run${record.runs === 1 ? "" : "s"} · <span class="m-held">${mark("held")} ${record.held}</span> <span class="m-failed">${mark("failed")} ${record.failed}</span> <span class="m-quiet">${mark("quiet")} ${record.quiet}</span>`
                 : "never said"}
             </span></div>
             <div class="hv-kv"><span class="k">last</span><span class="v">${record?.last ? new Date(record.last).toLocaleString() : "—"}</span></div>

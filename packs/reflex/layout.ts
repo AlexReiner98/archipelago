@@ -18,6 +18,7 @@
  */
 import type { NodeInfo, Place } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
+import { HUES, v } from "../../spec/style.ts";
 
 export interface Bough {
   key: string;
@@ -241,8 +242,9 @@ export const STYLE = {
   sparkLife: 0.9,
   glow: 0.25,
   linger: 1.5,
-  colors: { write: "#e8912d", say: "#2f6fe4", fail: "#d9534f", fire: "#3fb27f", owner: "#c58af9", learned: "#e8b04a", schema: "#8c9bb0" },
-  hues: ["#5aa9e6", "#e07a5f", "#81b29a", "#f2cc8f", "#9d79bc", "#4ecdc4"],
+  /** Colours are the style's tokens (spec/style.md), each with its plain fallback. */
+  colors: { write: v("write"), say: v("say"), fail: v("failed"), fire: v("fire"), owner: v("owner"), learned: v("learned"), schema: v("schema") },
+  hues: HUES.map(v),
 };
 
 /** A text cut to `most` letters, the cut marked. */

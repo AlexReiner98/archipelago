@@ -10,10 +10,11 @@ plane; the query (`find.query`) is the whole surface.
 - Wires never share a stretch of line or run through a card: a wire that
   spans columns takes a thin row of its own in each column it passes, each
   card side spreads its wire ends, and each wire turns on its own lane.
-- Marks (marks.ts) come from the base and the status's side, never the
-  type's name: shape by base, hollow for the first open status, half and
-  blue for a later open one, full and green for the first closed, full and
-  grey (its title struck) for a later closed. The legend shows every mark:
+- Marks (marks.ts) follow the spec's rule (spec/style.md): shape by base,
+  side by where the status sits, never the type's name. The glyphs and
+  their colours are the style's tokens: hollow for the first open status,
+  half and blue for a later open one, full and green for the first closed,
+  full and grey (its title struck) for a later closed. The legend shows every mark:
   each base with each of its statuses, and each kind of link.
 - Hovering or opening an item lights it: a blue outline, its links blue
   over the rest, the items linked to it yellow. The legend's "lit" line

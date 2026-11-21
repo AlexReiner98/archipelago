@@ -10,7 +10,8 @@ through `here`.
 | Run | One run live: map → agent on the left, agent → map on the right, one line per event |
 | Node | Its words, places, pack, kind, record, and its verdict per run |
 
-Marks: ✓ held, ✕ failed, ○ quiet, · not said; ⊘ a refusal, ● an act, ✕ an
+Marks (the style's verdict glyphs, spec/style.md): ✓ held, ✕ failed,
+○ quiet, · not said; ⊘ a refusal, ● an act, ✕ an
 act that didn't work. A red edge on an event: it failed the node picked.
 
 - A click on a node sets `here.node`; the run lights its firings. A click on
