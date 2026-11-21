@@ -4,8 +4,8 @@ The harness view: the hub to watch every agent at once, and every run,
 live or replayed, and every profile. What the map says to an agent is a
 tree of places and nodes. It lands on every live run: each agent sits on an
 orbit round the tree in its own colour, with its profile under it, and what
-passes between them moves as particles. Three fills, linked through `here`;
-the two beside show while the view does
+passes between them is a curve drawn on from the tree's own. Four fills,
+linked through `here`; the three beside show while the view does
 (`when: { "here.view": "harness/view" }`), and start folded to rails (the
 frame's `folded` config in `app/boot.ts`), so the landing is the tree and
 the agents only. Picking a node opens the node pane.
@@ -14,6 +14,7 @@ the agents only. Picking a node opens the node pane.
 |---|---|---|
 | Harness (`harness/view`) | `center` | The bar, the tree with its agents, the timeline |
 | Node (`harness/node`, "Node") | `left` | Its words, standing, places, pack, kind, record, and its verdict per run |
+| Dials (`harness/dials`, "Dials") | `left` | Every number of the curves to the agents ([dials.ts](dials.ts)), ↺ to put one back |
 | Run (`harness/run`, "Run") | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: every live run's events, interleaved. All runs: the runs, or a profile's |
 
 ## The bar ([bar.ts](bar.ts))
@@ -50,23 +51,37 @@ come.
 - **Playhead:** `here.event`, in one run. Unset, the view follows the run's
   end live.
 
-## The agents ([agents.ts](agents.ts))
+## The agents ([agents.ts](agents.ts), [reach.ts](reach.ts))
 
-Live, each run is an agent on an orbit outside the tree and its names, at
-the seat of its colour (six seats, the first at the top), so it stays put
+Live mode and the agents are one idea: each live run is an agent, in the
+colour live mode gives it, on an orbit outside the tree and its names, at
+the seat of that colour (six seats, the first at the top), so it stays put
 while live. Faint until it does something while watched (one that stopped
 without ending stays live). A click on it looks at it alone.
 
-| Event | Moves |
+What reaches between the tree and an agent is a curve, drawn on from the
+tree's own: it leaves its node along its branch's tangent, runs on past
+the names, and comes into the agent. An agent near the node takes it
+straight in, as one bezier. One further round takes it on its own lane, an
+ellipse between the tree and the agents, one per seat, so no two agents'
+curves share a stretch and none crosses the tree. The curve sweeps from
+its start to its end, then fades; nothing else moves.
+
+| Event | Drawn |
 |---|---|
-| say | a dot from its node out to the orbit and round to the agent, in the run's colour; the name lights as it leaves |
-| refusal | the same, red |
-| hold (`gated`) | a hollow dot that leaves its node and fades before it gets there |
-| act | from the agent round and in to the bough of its place (red when it failed) |
+| say | from its node to the agent, in the run's colour; the name lights as it leaves |
+| refusal | the same, in `failed` |
+| hold (`gated`) | from its node, in `quiet`, stopping part way |
+| act | from the agent to the bough of its place (`failed` when it failed) |
 | begin, end | the agent's halo pulses |
 
-Out of the tree first and then round it, so traffic never crosses it.
-Under reduced motion only the names and the agents light.
+Every number is a dial, in the Dials panel: how far out the agents sit,
+how far a curve runs on along its branch and how straight it comes in, how
+far round before it takes its lane, its width and ink, its sweep and
+linger, how far a hold gets. Their values are `harness.dials` (page
+scope), so an agent can set them; the browser remembers them. Colours are
+style tokens only. Under reduced motion only the names and the agents
+light.
 
 Under each agent, its profile from `profile.read.of`: ● the one it
 matches, ○ the workspace's fallback (nothing else placed it), – none. A

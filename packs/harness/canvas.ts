@@ -15,7 +15,8 @@
  *
  * - With agents (every live run at once, agents.ts): each sits on an orbit
  *   round the tree in its colour, its profile under its name, and `fire`
- *   moves the event as a particle between its node and its agent instead.
+ *   draws the curve between the event's node and its agent instead
+ *   (reach.ts): it sweeps from start to end, then fades.
  *
  * Drag to move, wheel to zoom, double-click to fit. A click picks a node,
  * or looks at an agent alone; a click on its profile opens the profiles.
@@ -27,7 +28,8 @@ import type { NodeInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { branchAt, lightOf, pointAt, route, STYLE, type Placed, type Tree } from "./layout.ts";
-import { flightOf, orbitBox, placementText, placementTip, type Orbit, type Placement, type Seat } from "./agents.ts";
+import { placementText, placementTip, type Placement } from "./agents.ts";
+import { dialsOf, lengthOf, orbitBox, reachOf, type Dials, type Orbit, type Seat } from "./reach.ts";
 import type { Verdict } from "./hooks.ts";
 import type { Heard, Hold } from "./replay.ts";
 
@@ -77,7 +79,7 @@ export const CANVAS_STYLE = sheet(`
 
 /**
  * Runs a light for an event; with a colour (a run's, when many are shown), in it rather than the event's tone.
- * When the event's run is an agent on the orbit, it moves as a particle between its node and the agent.
+ * When the event's run is an agent on the orbit, the curve between its node and the agent is drawn.
  */
 export type Fire = (e: Pick<ExchangeEvent, "kind" | "node" | "place" | "act"> & { run?: string }, color?: string) => void;
 
@@ -87,6 +89,8 @@ export interface AgentMark {
   title: string;
   /** Its colour, as CSS. */
   colour: string;
+  /** Its colour's slot: its seat and its lane. */
+  slot: number;
   seat: Seat;
   /** Nothing from it since the view opened. */
   quiet: boolean;
@@ -94,7 +98,7 @@ export interface AgentMark {
 }
 
 /** Runs the lights and sparks in a group of the svg, a frame at a time, outside Preact. */
-function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree; placed: Placed; k: number; orbit?: Orbit; agents?: AgentMark[] }) {
+function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree; placed: Placed; k: number; orbit?: Orbit; agents?: AgentMark[]; dials: Dials }) {
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   type Fx = { start: number; els: SVGElement[]; step: (age: number, k: number) => boolean };
   const fx: Fx[] = [];
@@ -154,53 +158,43 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
     void (a as SVGGraphicsElement).getBBox?.();
     a.classList.add("ping");
   };
-  /** A particle along a flight, between a node and an agent. False: the run has no agent on the orbit. */
+  /** The curve between a node and an agent, drawn from its start to its end, then faded. False: the run has no agent on the orbit. */
   const fly = (run: string, e: Parameters<Fire>[0], color?: string): boolean => {
-    const { tree, placed, orbit, agents } = get();
+    const { tree, placed, orbit, agents, dials: d } = get();
     const agent = agents?.find((a) => a.run === run);
     if (!orbit || !agent) return false;
-    const f = flightOf(tree, placed, orbit, agent.seat, e);
-    if (!f) return true;
-    const failed = f.tone === "fail";
-    const ink = failed ? C.fail : (color ?? C.say);
+    const r = reachOf(tree, placed, orbit, agent.slot, e, d);
+    if (!r) return true;
+    const failed = r.tone === "fail";
+    const ink = failed ? C.fail : r.tone === "hold" ? v("quiet") : (color ?? C.say);
     const lightAt = (at: string) => light(at, failed ? "fail" : "say", failed ? undefined : color);
-    if (f.way === "pulse" || still) {
-      if (f.at && f.way !== "hold") lightAt(f.at);
+    if (r.way === "pulse" || still) {
+      if (r.at && r.way !== "hold") lightAt(r.at);
       ping(run);
       return true;
     }
-    if (f.way === "out") lightAt(f.at!);
-    const hollow = f.way === "hold";
-    const trail = el("path", { class: "rx-flight", fill: "none" });
-    const head = el("circle", { class: "rx-mote", r: S.head * 1.3 });
-    trail.style.stroke = ink;
-    if (hollow) (head.style.fill = "none"), (head.style.stroke = ink), head.setAttribute("stroke-width", "1.2");
-    else head.style.fill = ink;
-    const life = Math.min(1.8, Math.max(0.7, f.points.length * 0.022));
+    if (r.way === "out") lightAt(r.at!);
+    const curve = el("path", { class: "rx-reach", d: `M${r.points.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" L")}` });
+    curve.style.stroke = ink;
+    const len = lengthOf(r.points);
+    curve.setAttribute("stroke-dasharray", `${len.toFixed(1)} ${len.toFixed(1)}`);
+    const sweep = d.reach_sweep!, linger = Math.max(0.05, d.reach_linger!);
     let done = false;
     fx.push({
       start: performance.now(),
-      els: [trail, head],
+      els: [curve],
       step: (age, k) => {
-        const u = Math.min(1, age / life);
-        const fade = u < 1 ? 1 : 1 - (age - life) / S.flashTime;
+        const u = Math.min(1, age / sweep);
         if (u >= 1 && !done) {
           done = true;
-          if (f.way === "out") ping(run);
-          if (f.way === "in" && f.at) lightAt(f.at);
+          if (r.way === "out") ping(run);
+          if (r.way === "in" && r.at) lightAt(r.at);
         }
+        const fade = u < 1 ? 1 : 1 - (age - sweep) / linger;
         if (fade <= 0) return false;
-        const [hx, hy] = pointAt(f.points, u);
-        const at = u * (f.points.length - 1);
-        const from = Math.max(0, Math.floor(at) - 8);
-        const tail = [...f.points.slice(from, Math.floor(at) + 1), [hx, hy] as [number, number]];
-        trail.setAttribute("d", `M${tail.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" L")}`);
-        trail.setAttribute("stroke-width", String(2 / Math.sqrt(k)));
-        trail.setAttribute("opacity", ((hollow ? 0.35 * (1 - u * 0.6) : 0.6) * fade).toFixed(2));
-        head.setAttribute("cx", hx.toFixed(1));
-        head.setAttribute("cy", hy.toFixed(1));
-        head.setAttribute("r", ((S.head * 1.3) / Math.sqrt(k)).toFixed(2));
-        head.setAttribute("opacity", (hollow ? fade * (1 - u * 0.7) : fade).toFixed(2));
+        curve.setAttribute("stroke-dashoffset", (len * (1 - u)).toFixed(1));
+        curve.setAttribute("stroke-width", (d.reach_width! / Math.sqrt(k)).toFixed(2));
+        curve.setAttribute("opacity", (d.reach_ink! * fade * (r.way === "hold" ? 0.7 : 1)).toFixed(2));
         return true;
       },
     });
@@ -317,22 +311,23 @@ export interface CanvasProps {
   fires: { current?: Fire };
   onPick(node: string | undefined): void;
   showKey: boolean;
-  /** Every live run at once: the orbit and the agents on it. */
+  /** Every live run at once: the orbit and the agents on it, and the dials of the curves between. */
   orbit?: Orbit;
+  dials?: Dials;
   agents?: AgentMark[];
   /** A click on an agent: its dot or name looks at it alone, its profile opens the profiles (at, in the canvas's pixels). */
   onAgent?(run: string, part: "open" | "profile", at: { x: number; y: number }): void;
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, orbit, agents, onAgent }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, orbit, agents, onAgent, dials }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const fxGroup = useRef<SVGGElement>(null);
   const [view, setView] = useState({ x: placed.box.x, y: placed.box.y, k: 1 });
   const [panning, setPanning] = useState(false);
   const [fits, refit] = useState(0);
-  const now = useRef({ tree, placed, k: view.k, orbit, agents });
-  now.current = { tree, placed, k: view.k, orbit, agents };
+  const now = useRef({ tree, placed, k: view.k, orbit, agents, dials: dials ?? dialsOf({}) });
+  now.current = { tree, placed, k: view.k, orbit, agents, dials: dials ?? dialsOf({}) };
   const bounds = orbit ? orbitBox(orbit) : placed.box;
 
   useEffect(() => {
@@ -340,7 +335,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     const H = box.current?.clientHeight || 700;
     const k = Math.min(3, Math.max(0.1, Math.min(W / bounds.width, H / bounds.height)));
     setView({ k, x: bounds.x - (W / k - bounds.width) / 2, y: bounds.y - (H / k - bounds.height) / 2 });
-  }, [placed, fits, !!orbit]);
+  }, [placed, fits, !!orbit, orbit?.rx]);
   // Fit again when the canvas changes size: it is first measured before the page has laid it out.
   useEffect(() => {
     let last = "";

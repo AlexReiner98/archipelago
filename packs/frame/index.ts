@@ -37,7 +37,10 @@ html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:
 .fr-part { flex:1 1 0; min-height:0; overflow:auto; display:flex; flex-direction:column; }
 .fr-part > :last-child { flex:1; min-height:0; }
 .fr-part + .fr-part { border-top:1px solid var(--line); }
-.fr-head { padding:var(--space-3) var(--space-4) 0; color:var(--dim); font-size:var(--text-s); }
+.fr-head { padding:var(--space-3) var(--space-4) 0; color:var(--dim); font-size:var(--text-s); cursor:pointer; }
+.fr-head:hover, .fr-shut:hover { color:var(--fg); }
+.fr-shut { flex:none; padding:var(--space-2) var(--space-4); color:var(--dim); font-size:var(--text-s); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fr-part + .fr-shut, .fr-shut + .fr-shut, .fr-shut + .fr-part { border-top:1px solid var(--line); }
 .fr-center { grid-area:center; min-height:0; min-width:0; display:flex; }
 .fr-center > * { flex:1; min-width:0; }
 .fr-fold { position:absolute; top:50%; z-index:3; width:14px; height:40px; margin-top:-20px; padding:0; font:inherit; font-size:var(--text-xs); line-height:1; color:var(--dim); background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); cursor:pointer; opacity:.55; }
@@ -45,6 +48,7 @@ html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:
 .fr-left > .fr-fold { right:-8px; } .fr-right > .fr-fold { left:-8px; }
 .fr-rail { width:26px !important; cursor:pointer; align-items:center; padding-top:var(--space-3); gap:var(--space-3); color:var(--dim); font-size:var(--text-s); }
 .fr-rail:hover { color:var(--fg); }
+.fr-rail .t:hover { color:var(--pick); }
 .fr-rail .t { writing-mode:vertical-rl; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-height:40vh; }
 .fr-left.fr-rail .t { transform:rotate(180deg); }
 .fr-over { position:fixed; inset:0; pointer-events:none; }
@@ -79,22 +83,30 @@ const frame: Pack = {
       return v;
     };
 
-    /** Left or right: every fill, stacked, each under its title; or, all folded, a rail that opens them. */
+    /**
+     * Left or right: every fill, stacked, each under its title (a click on it
+     * shuts it to that one line); or, all folded, a rail whose titles open one
+     * each, and the rest of it all.
+     */
     const Side = ({ region }: { region: Region }) => {
       const fills = read.fills(region);
       const folded = useFolded();
       if (!fills.length) return null;
       const keys = fills.map(fillKey);
-      const fold = (on: boolean) => set.set(FOLDED, foldRegion(folded, keys, on));
+      const fold = (which: string[], on: boolean) => set.set(FOLDED, foldRegion(folded, which, on));
       const name = (f: (typeof fills)[number]) => f.title ?? fillKey(f).split("/").pop();
       if (isRail(keys, folded))
-        return html`<div class=${`fr-${region} fr-rail`} title=${`Open ${fills.map(name).join(", ")}`} onClick=${() => fold(false)}>
+        return html`<div class=${`fr-${region} fr-rail`} title=${`Open ${fills.map(name).join(", ")}`} onClick=${() => fold(keys, false)}>
           <span>${region === "left" ? "›" : "‹"}</span>
-          ${fills.map((f) => html`<span class="t" key=${fillKey(f)}>${name(f)}</span>`)}
+          ${fills.map((f) => html`<span class="t" key=${fillKey(f)} title=${`Open ${name(f)}`} onClick=${(e: Event) => (e.stopPropagation(), fold([fillKey(f)], false))}>${name(f)}</span>`)}
         </div>`;
       return html`<div class=${`fr-${region}`}>
-        ${fills.map((f) => html`<div class="fr-part" key=${fillKey(f)}>${fills.length > 1 && f.title && html`<div class="fr-head">${f.title}</div>`}<${f.view} /></div>`)}
-        <button class="fr-fold" title="Fold to the side" onClick=${() => fold(true)}>${region === "left" ? "‹" : "›"}</button>
+        ${fills.map((f) => {
+          const k = fillKey(f);
+          if (folded.includes(k)) return html`<div class="fr-shut" key=${k} title=${`Open ${name(f)}`} onClick=${() => fold([k], false)}>▸ ${name(f)}</div>`;
+          return html`<div class="fr-part" key=${k}>${fills.length > 1 && html`<div class="fr-head" title=${`Shut ${name(f)}`} onClick=${() => fold([k], true)}>▾ ${name(f)}</div>`}<${f.view} /></div>`;
+        })}
+        <button class="fr-fold" title="Fold to the side" onClick=${() => fold(keys, true)}>${region === "left" ? "‹" : "›"}</button>
       </div>`;
     };
 

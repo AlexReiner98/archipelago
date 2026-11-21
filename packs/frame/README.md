@@ -15,12 +15,14 @@ regions and nothing in them. Any pack that fills `root` can take its place.
   `title` when there are two or more. Widths are the
   tokens `frame-left` and `frame-right`, at most 28% and 32% of the window.
 - **Folding:** a side folds to a thin rail with its fills' titles, from a
-  tab on its inner edge, and a click on the rail opens it ([fold.ts](fold.ts)).
+  tab on its inner edge ([fold.ts](fold.ts)). A title on the rail opens
+  that fill; the rest of the rail opens them all. In an open side, a fill's
+  title shuts it to one line, and a click on that line opens it again.
   The folded fills are the page key `frame.folded` (fill keys,
   `pack/name`); a side is a rail when every fill it shows is folded. The
   page starts with the config's `folded`, so the harness view lands with
-  its node and run panes folded, and any pack opens one by taking its fill
-  out of the list.
+  its node, dials and run panes folded, and any pack opens one by taking
+  its fill out of the list.
 - **Center:** one fill at a time, the one `here.view` names, else the first.
   The frame sets `here.view` to what it shows. The [views](../views/README.md)
   pick it.

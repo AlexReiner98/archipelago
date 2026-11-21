@@ -13,7 +13,8 @@ import { HUES } from "../spec/style.ts";
 import { colours, keepLast, liveRuns } from "../packs/harness/live.ts";
 import { DECIDED, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
-import { flight, flightOf, orbitBox, orbitOf, placementOf, placementText, seatOf } from "../packs/harness/agents.ts";
+import { placementOf, placementText } from "../packs/harness/agents.ts";
+import { DIALS, dialsOf, laneOf, lengthOf, orbitBox, orbitOf, partOf, reach, reachOf, seatOf, tangentOf } from "../packs/harness/reach.ts";
 import { landsLive } from "../packs/harness/hooks.ts";
 
 const base = { id: "e1", run: "r", seq: 3, time: "2026-11-21T09:00:00Z" };
@@ -420,50 +421,84 @@ test("the interleaved list keeps each event once, the last few", () => {
 
 test("orbitOf and seatOf: the orbit clears the tree; seats are fixed by colour, the first at the top", () => {
   const o = orbitOf({ x: -300, y: -200, width: 500, height: 450 }, 70);
-  assert.deepEqual(o, { rx: 370, ry: 320 });
+  assert.deepEqual(o, { rx: 370, ry: 320, rim: { rx: 300, ry: 250 } });
   const top = seatOf(o, 0);
   assert.ok(Math.abs(top.x) < 1e-9 && Math.abs(top.y + 320) < 1e-9);
-  const third = seatOf(o, 3);
-  assert.ok(Math.abs(third.y - 320) < 1e-9, "slot 3 of 6 sits at the bottom");
+  assert.ok(Math.abs(seatOf(o, 3).y - 320) < 1e-9, "slot 3 of 6 sits at the bottom");
   const box = orbitBox(o);
   assert.ok(box.x < -o.rx && box.y < -o.ry && box.x + box.width > o.rx && box.y + box.height > o.ry);
 });
 
-test("flight: out of the tree to the orbit, then round it the short way to the seat", () => {
-  const o = { rx: 100, ry: 100 };
-  const pts = flight(o, { x: 50, y: 0 }, seatOf(o, 0));
-  assert.deepEqual(pts[0], [50, 0]);
-  const last = pts[pts.length - 1]!;
-  assert.ok(Math.abs(last[0]) < 1e-6 && Math.abs(last[1] + 100) < 1e-6, "ends on the seat");
-  // Never back inside the tree once out: every point past the first leg is on the orbit.
-  const rim = pts.findIndex(([x, y]) => Math.hypot(x, y) >= 99.999);
-  assert.ok(pts.slice(rim).every(([x, y]) => Math.abs(Math.hypot(x, y) - 100) < 1e-6));
-  assert.ok(pts.slice(rim).every(([x]) => x >= -1e-6), "the short way: through the right, not round the left");
+test("laneOf: each seat its own lane between the tree's rim and the orbit, none shared", () => {
+  const o = orbitOf({ x: -300, y: -200, width: 600, height: 400 }, 140);
+  const lanes = [0, 1, 2, 3, 4, 5].map((i) => laneOf(o, i));
+  for (const l of lanes) assert.ok(l.rx > o.rim.rx && l.rx < o.rx && l.ry > o.rim.ry && l.ry < o.ry);
+  assert.equal(new Set(lanes.map((l) => l.rx)).size, 6);
 });
 
-test("flightOf: a say goes out to its agent, an act comes in to its bough, a hold stops short, a begin pulses", () => {
+test("dialsOf: given values kept within range, the rest where they start", () => {
+  const d = dialsOf({ reach_out: 9999, reach_in: 12, nope: 3 });
+  assert.equal(d.reach_out, DIALS.find((x) => x.key === "reach_out")!.max);
+  assert.equal(d.reach_in, 12);
+  assert.equal(d.reach_sweep, DIALS.find((x) => x.key === "reach_sweep")!.value);
+  assert.ok(!("nope" in d));
+  assert.deepEqual(dialsOf(undefined), dialsOf({}));
+});
+
+test("reach: leaves along the branch's tangent and comes into the agent; straight when near, by its lane when far", () => {
+  const d = dialsOf({});
+  const o = orbitOf({ x: -100, y: -100, width: 200, height: 200 }, 120);
+  const seat = seatOf(o, 0);
+  const lane = laneOf(o, 0);
+  // A node at the top, its branch heading up: near the top seat.
+  const near = reach([0, -90], [0, -1], seat, lane, d);
+  assert.deepEqual(near[0], [0, -90]);
+  const end = near[near.length - 1]!;
+  assert.ok(Math.abs(end[0] - seat.x) < 1e-9 && Math.abs(end[1] - seat.y) < 1e-9);
+  assert.ok(near[1]![1] < near[0]![1] && Math.abs(near[1]![0]) < 1e-6, "it leaves along its tangent");
+  // A node at the bottom: the far side. It never cuts back through the tree.
+  const far = reach([0, 90], [0, 1], seat, lane, d);
+  const past = far.findIndex(([x, y]) => Math.hypot(x / o.rim.rx, y / o.rim.ry) > 1);
+  assert.ok(past > 0);
+  assert.ok(far.slice(past).every(([x, y]) => Math.hypot(x / o.rim.rx, y / o.rim.ry) > 0.999), "once out, it stays out of the tree");
+  const other = reach([0, 90], [0, 1], seatOf(o, 1), laneOf(o, 1), d);
+  const shared = far.filter(([x, y]) => other.some(([p, q]) => Math.hypot(p - x, q - y) < 2)).length;
+  assert.ok(shared < far.length * 0.15, "two agents' curves don't share a stretch");
+});
+
+test("tangentOf: the last step of a node's branch, outward", () => {
+  const tree = treeOf(NODES);
+  const placed = radial(tree);
+  const [dx, dy] = tangentOf(placed, "words/bash");
+  const p = placed.xy.get("words/bash")!;
+  assert.ok(Math.abs(Math.hypot(dx, dy) - 1) < 1e-9);
+  assert.ok(dx * p.x + dy * p.y > 0, "it points away from the root");
+});
+
+test("reachOf: a say draws from the node to its agent, an act from the agent to its bough, a hold stops part way, a begin pulses", () => {
   const tree = treeOf(NODES);
   const placed = radial(tree);
   const o = orbitOf(placed.box);
+  const d = dialsOf({});
   const seat = seatOf(o, 1);
-  const say = flightOf(tree, placed, o, seat, { kind: "say", node: "words/bash", place: "tool:Bash" })!;
+  const say = reachOf(tree, placed, o, 1, { kind: "say", node: "words/bash", place: "tool:Bash" }, d)!;
   assert.equal(say.way, "out");
   assert.equal(say.at, "words/bash");
   const from = placed.xy.get("words/bash")!;
   assert.deepEqual(say.points[0], [from.x, from.y]);
   const end = say.points[say.points.length - 1]!;
   assert.ok(Math.abs(end[0] - seat.x) < 1e-6 && Math.abs(end[1] - seat.y) < 1e-6);
-  assert.equal(flightOf(tree, placed, o, seat, { kind: "refuse", node: "words/bash" })!.tone, "fail");
-  const act = flightOf(tree, placed, o, seat, { kind: "act", place: "tool:Bash", act: { kind: "tool", by: "agent", ok: false } })!;
+  assert.equal(reachOf(tree, placed, o, 1, { kind: "refuse", node: "words/bash" }, d)!.tone, "fail");
+  const act = reachOf(tree, placed, o, 1, { kind: "act", place: "tool:Bash", act: { kind: "tool", by: "agent", ok: false } }, d)!;
   assert.equal(act.way, "in");
   assert.equal(act.tone, "fail");
   assert.ok(Math.abs(act.points[0]![0] - seat.x) < 1e-6, "an act starts at the agent");
-  const hold = flightOf(tree, placed, o, seat, { kind: "gated", node: "words/bash" })!;
+  const hold = reachOf(tree, placed, o, 1, { kind: "gated", node: "words/bash" }, d)!;
   assert.equal(hold.way, "hold");
-  const hEnd = hold.points[hold.points.length - 1]!;
-  assert.ok(Math.hypot(hEnd[0] - seat.x, hEnd[1] - seat.y) > 1, "a hold never reaches the agent");
-  assert.equal(flightOf(tree, placed, o, seat, { kind: "begin" })!.way, "pulse");
-  assert.equal(flightOf(tree, placed, o, seat, { kind: "compact" }), undefined);
+  assert.ok(Math.abs(lengthOf(hold.points) - lengthOf(say.points) * d.reach_hold!) < 1, "a hold gets as far as its dial says");
+  assert.equal(reachOf(tree, placed, o, 1, { kind: "begin" }, d)!.way, "pulse");
+  assert.equal(reachOf(tree, placed, o, 1, { kind: "compact" }, d), undefined);
+  assert.deepEqual(partOf([[0, 0], [10, 0]], 0.5), [[0, 0], [5, 0]]);
 });
 
 test("placementOf: matched, the fallback, or none; a run that named the fallback itself is matched", () => {
