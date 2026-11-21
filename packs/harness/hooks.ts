@@ -62,6 +62,19 @@ export const LIVE = "harness.live";
 /** How many events the live view keeps, newest last. */
 export const LIVE_KEEP = 300;
 
+/** Whether the view watches every live run: asked for, or nothing else picked (no run, not every run, not turned off). */
+export function landsLive(live: boolean | undefined, pinned: string | undefined, every: boolean): boolean {
+  return live === true || (live === undefined && !pinned && !every);
+}
+
+export interface ProfileRow {
+  id: string;
+  title: string;
+  status: string;
+  /** The workspace's default: a run nothing else places is in it. */
+  fallback?: boolean;
+}
+
 export function hooks(c: Caps) {
   const useHere = <T extends Json>(key: string): T | undefined => {
     const [v, setV] = useState<T | undefined>(c.here.get<T>(key));
@@ -102,13 +115,16 @@ export function hooks(c: Caps) {
 
   /**
    * The run looked at: none when every live run is (`harness.live`) or every
-   * run (`harness.all`), else the one pinned in `here.run`, else the last active.
+   * run (`harness.all`), else the one pinned in `here.run`, else the last
+   * active (`harness.live` false). With nothing picked, every live run is:
+   * the view lands on them.
    */
   const useRun = () => {
     const runs = useRuns();
     const pinned = useHere<string>("here.run");
-    const live = useHere<boolean>(LIVE) === true;
+    const said = useHere<boolean>(LIVE);
     const every = useHere<boolean>(ALL) === true;
+    const live = landsLive(said, pinned, every);
     const all = !live && every;
     const run = all || live ? undefined : (pinned ?? runs[0]?.run);
     return { runs, run, pinned, all, live, info: runs.find((r) => r.run === run) };
@@ -261,14 +277,14 @@ export function hooks(c: Caps) {
   };
 
   /** The profiles on the map, by title, kept live. */
-  const useProfileList = (): { id: string; title: string; status: string }[] => {
-    const [list, setList] = useState<{ id: string; title: string; status: string }[]>([]);
+  const useProfileList = (): ProfileRow[] => {
+    const [list, setList] = useState<ProfileRow[]>([]);
     useEffect(() => {
       let gone = false;
       const load = async () => {
-        const out: { id: string; title: string; status: string }[] = [];
+        const out: ProfileRow[] = [];
         for (let p = await c.graph.of("profile", { limit: 500 }); ; p = await c.graph.of("profile", { limit: 500, after: p.next })) {
-          for (const i of p.items) out.push({ id: i.id, title: String(i.fields.title ?? i.id), status: String(i.fields.status ?? "shadow") });
+          for (const i of p.items) out.push({ id: i.id, title: String(i.fields.title ?? i.id), status: String(i.fields.status ?? "shadow"), ...(i.fields.fallback === true ? { fallback: true } : {}) });
           if (!p.next) break;
         }
         if (!gone) setList(out.sort((a, b) => a.title.localeCompare(b.title)));
@@ -302,6 +318,23 @@ export function hooks(c: Caps) {
     return ps;
   };
 
+  /** The profiles each of the runs given is in, by run, kept live: what each agent shows. */
+  const usePlacements = (runs: RunInfo[]): Map<string, ProfileInfo[]> => {
+    const [m, setM] = useState<Map<string, ProfileInfo[]>>(new Map());
+    const key = runs.map((r) => `${r.run}\n${JSON.stringify(r.facts ?? {})}`).join("\n\n");
+    useEffect(() => {
+      let gone = false;
+      const load = () => void Promise.all(runs.map(async (r) => [r.run, await c.profiles.of(r)] as const)).then((all) => !gone && setM(new Map(all)));
+      load();
+      const stop = c.profiles.watch(load);
+      return () => {
+        gone = true;
+        void stop();
+      };
+    }, [key]);
+    return m;
+  };
+
   /**
    * Whether a run in one profile hears each node (`profile.read.hears` for a
    * run whose only fact is the profile), kept live. Nothing when none is picked.
@@ -326,7 +359,7 @@ export function hooks(c: Caps) {
     return hearing;
   };
 
-  return { useHere, useNodes, useRun, useRunsIn, useLiveEvents, useEvents, useVerdictData, useVerdictsOfRun, useRecords, useItem, useStatuses, useHas, useProfileList, useRunProfiles, useHearing };
+  return { useHere, useNodes, useRun, useRunsIn, useLiveEvents, useEvents, useVerdictData, useVerdictsOfRun, useRecords, useItem, useStatuses, useHas, useProfileList, useRunProfiles, usePlacements, useHearing };
 }
 
 export type Hooks = ReturnType<typeof hooks>;

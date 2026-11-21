@@ -31,5 +31,6 @@ with a profile.
   run that doesn't hear it.
 - The written pack writes a profile's skill or memory files into the
   folders of the runs that hear them, not the home folder.
-- The harness view shows the profiles a run is in, and over its tree
-  what any one profile holds back (`hears` for a run in only that profile).
+- The harness view shows the profiles a run is in, each live agent's
+  profile under it, and over its tree what any one profile holds back
+  (`hears` for a run in only that profile).

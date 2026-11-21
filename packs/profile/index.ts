@@ -15,26 +15,32 @@
  * - A miss in a run where a held node listens is told on its profiles
  *   (`profile.missed`): a record about the profiles and the node, once per
  *   run and node, so a wrong cut shows on the map.
+ * - `profile.place {run, profile}` moves a run into one profile: it begins
+ *   the run again with `profiles` and `profiles_drop`, as the run tool
+ *   does. A run's facts are on the exchange, not the graph, so it writes
+ *   nothing; to undo, place the run back (its output says where it was).
  *
  * The pack never knows what other packs do with a profile.
  */
 import type { ActionContext, ActionInvoke, ActionRegister } from "../../spec/action.ts";
-import type { AgentGate, AgentTree, NodeInfo, RunInfo } from "../../spec/agent.ts";
+import type { AgentGate, AgentRun, AgentTree, NodeInfo, RunInfo } from "../../spec/agent.ts";
 import type { Dispose, Id, Json } from "../../spec/common.ts";
-import type { ExchangeWatch } from "../../spec/exchange.ts";
+import { Refused } from "../../spec/common.ts";
+import type { ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch, Link } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { ProfileRead } from "../../spec/profile.ts";
 import type { BaseDef, LinkDef, TypesDefine } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { placeMatches } from "../agent/index.ts";
-import { type Model, type Profile, hearing, matchNode, nodeProfiles, runProfiles } from "./model.ts";
+import { type Model, type Profile, hearing, matchNode, nodeProfiles, placing, runProfiles } from "./model.ts";
 
 export const TYPE = "profile";
 export const IN = "in_profile";
 export const OUT = "out_of_profile";
 export const USES = "uses";
 export const MISSED = "profile.missed";
+export const PLACE = "profile.place";
 
 export const PROFILE: BaseDef = {
   name: TYPE,
@@ -66,7 +72,7 @@ async function allPages<T>(read: (after?: string) => Promise<{ items: T[]; next?
 const profile: Pack = {
   id: "profile",
   about: "Profiles: which agent sessions each node is meant for.",
-  inject: ["graph.read", "graph.watch", "types.define", "agent.tree", "agent.gate", "exchange.watch", "action.register", "action.invoke"],
+  inject: ["graph.read", "graph.watch", "types.define", "agent.tree", "agent.gate", "agent.run", "exchange.read", "exchange.watch", "action.register", "action.invoke"],
   async apply(ctx: Context) {
     const graph = ctx.get<GraphRead>("graph.read");
     const tree = ctx.get<AgentTree>("agent.tree");
@@ -198,6 +204,38 @@ const profile: Pack = {
         }
         call.write(facts as never);
         return { record: id };
+      },
+    });
+
+    // Moving a run into one profile: begun again with the facts that put it there and nowhere else.
+    const exchange = ctx.get<ExchangeRead>("exchange.read");
+    const agentRun = ctx.get<AgentRun>("agent.run");
+    ctx.get<ActionRegister>("action.register").register({
+      name: PLACE,
+      title: "Move a run into one profile",
+      doc: "Begins the run again with `profiles` naming the profile and `profiles_drop` the others it matched, as the run tool's profiles and drop. Writes nothing to the graph: place it back to undo.",
+      input: {
+        type: "object",
+        properties: {
+          run: { type: "string", description: "The run's id" },
+          profile: { type: "string", description: "The profile it is to be in" },
+        },
+        required: ["run", "profile"],
+      },
+      async run(input: { run: string; profile: Id }) {
+        const m = await current();
+        if (!m.profiles.has(input.profile)) throw new Refused({ code: "profile.not_found", message: `There is no profile ${input.profile}.`, by: { pack: "profile" } });
+        let info: RunInfo | undefined;
+        for (let p = await exchange.runs({ limit: LIMIT_MAX }); !info; p = await exchange.runs({ limit: LIMIT_MAX, after: p.next })) {
+          info = p.items.find((r) => r.run === input.run);
+          if (!p.next) break;
+        }
+        if (!info) throw new Refused({ code: "profile.no_run", message: `There is no run ${input.run}.`, by: { pack: "profile" } });
+        const was = runProfiles(m, factsOf(info)).filter((p) => p.by === "match").map((p) => p.id);
+        const facts = placing(m, factsOf(info), input.profile);
+        const { started: _s, ended: _e, facts: _f, ...start } = info;
+        const begun = await agentRun.begin({ ...start, facts });
+        return { run: input.run, was, now: runProfiles(m, factsOf(begun)).map((p) => p.id) };
       },
     });
 

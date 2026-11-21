@@ -4,10 +4,12 @@
  *
  * - Center (the view "Harness"): the tree of places and nodes (canvas.ts),
  *   lit by what the run looked at heard, refused and did up to the
- *   playhead, with the timeline under it (timeline.ts). The bar picks the
- *   run (`here.run`, else the last active), or every live run at once
- *   (`harness.live`, live.ts), or every run (`harness.all`), or a profile
- *   (`harness.profile`): counts are the run's, or all time.
+ *   playhead, with the timeline under it (timeline.ts). The bar (bar.ts)
+ *   picks every live run at once (`harness.live`, live.ts: where the view
+ *   lands), or one run (`here.run`, else the last active), or every run
+ *   (`harness.all`), or a profile (`harness.profile`). Live, each run is an
+ *   agent on an orbit round the tree, its traffic moving as particles, its
+ *   profile under it and a click from changing (agents.ts).
  * - Right: the run's events, one line each (events.ts): the wider side,
  *   as an opened line needs the room. Live: every live run's, interleaved.
  *   Every run: the runs, or a profile's runs.
@@ -29,11 +31,13 @@ import type { ProfileRead } from "../../spec/profile.ts";
 import { KEYS } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { read as token, sheet, v, verdictGlyph, type Token } from "../../spec/style.ts";
+import { HUES, sheet, v, type Token } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
 import { Events, short } from "./events.ts";
 import { ALL, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
-import { colours, Legend, LIVE_STYLE, liveRuns, LiveEvents } from "./live.ts";
+import { colours, liveRuns, LiveEvents } from "./live.ts";
+import { AGENTS_STYLE, orbitOf, placementOf, ProfileMenu, seatOf } from "./agents.ts";
+import { Bar, BAR_STYLE } from "./bar.ts";
 import { KEEP_STYLE, keepParts } from "./keep.ts";
 import { packHues, radial, treeOf, type Grouping } from "./layout.ts";
 import { nodePane } from "./node.ts";
@@ -41,6 +45,9 @@ import { holdsOf, nodeOf, playhead, stateAt } from "./replay.ts";
 import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
+
+/** The frame's page key for its folded fills (packs/frame/fold.ts): picking a node opens the node pane. */
+const FOLDED = "frame.folded";
 
 /** How long a step lasts when the run plays, in ms. */
 const STEP = 260;
@@ -66,7 +73,6 @@ const STYLE = sheet(`
 .hv-bar button { font:inherit; background:none; border:0; color:var(--dim); padding:0; cursor:pointer; flex:none; }
 .hv-bar button:hover { color:var(--fg); }
 .hv-bar button.on { color:var(--fg); text-decoration:underline; text-underline-offset:4px; }
-.hv-by { display:flex; gap:var(--space-2); align-items:baseline; color:var(--dim); flex:none; }
 .hv-select { font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); max-width:220px; min-width:0; }
 .hv-select option { background:var(--panel); color:var(--fg); }
 .hv-ev { cursor:pointer; }
@@ -95,13 +101,16 @@ const STYLE = sheet(`
 .hv-prof .part { color:var(--dim); }
 .hv-miss { margin:var(--space-1) var(--space-4) var(--space-3); padding:var(--space-2) var(--space-3); border-left:3px solid var(--failed); white-space:pre-wrap; color:var(--dim); max-height:8em; overflow:auto; }
 .hv-view { display:grid; grid-template-rows:auto 1fr auto; height:100%; min-height:0; }
-.hv-bar { display:flex; gap:var(--space-3); align-items:center; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; overflow:hidden; }
+.hv-bar { display:flex; gap:var(--space-3); align-items:center; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; position:relative; z-index:2; }
 .hv-bar .live { color:var(--say); flex:none; }
 .hv-n { font-variant-numeric:tabular-nums; flex:none; }
 ${KEEP_STYLE}
-${LIVE_STYLE}
+${AGENTS_STYLE}
+${BAR_STYLE}
 ${CANVAS_STYLE}
 ${TIMELINE_STYLE}`);
+
+const values = (v: string | string[] | undefined) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
 const clock = (t?: string) => (t ? new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
@@ -207,6 +216,10 @@ const harness: Pack = {
       const [unsaid, setUnsaid] = useState(false);
       const [showKey, setShowKey] = useState(false);
       const [playing, setPlaying] = useState(false);
+      const [menu, setMenu] = useState<{ run: string; x: number; y: number; error?: string }>();
+      const canPlace = hk.useHas("profile.place");
+      const placements = hk.usePlacements(lives);
+      const stage = useRef<HTMLDivElement>(null);
 
       const standing = useMemo(() => {
         const m = new Map<string, Standing>();
@@ -226,6 +239,32 @@ const harness: Pack = {
       const tree = useMemo(() => treeOf(nodes, { by, unsaid, profiles: membership, decided }), [nodes, by, unsaid, membership, decided]);
       const placed = useMemo(() => radial(tree), [tree]);
       const hues = useMemo(() => packHues(nodes.map((n) => n.pack)), [nodes]);
+      // Live: each run an agent on the orbit, at the seat of its colour, its profile under it.
+      const orbit = useMemo(() => (live ? orbitOf(placed.box) : undefined), [live, placed]);
+      const acting = useMemo(() => new Set(liveEvents.map((e) => e.run)), [liveEvents]);
+      const fallbacks = useMemo(() => new Set(profileList.filter((p) => p.fallback).map((p) => p.id)), [profileList]);
+      const agents = useMemo(
+        () =>
+          orbit &&
+          lives.map((r) => {
+            const tok = colour.get(r.run) ?? HUES[0];
+            const ps = placements.get(r.run);
+            return { run: r.run, title: r.title ?? r.run.slice(0, 8), colour: v(tok), seat: seatOf(orbit, Math.max(0, (HUES as readonly Token[]).indexOf(tok))), quiet: !acting.has(r.run), ...(ps ? { placement: placementOf(ps, fallbacks, values(r.facts?.profiles)) } : {}) };
+          }),
+        [orbit, lives, colour, placements, fallbacks, acting],
+      );
+      const onAgent = (r: string, part: "open" | "profile", at: { x: number; y: number }) => {
+        if (part === "profile" && canPlace) return setMenu({ run: r, x: Math.max(4, Math.min(at.x - 20, (stage.current?.clientWidth ?? 600) - 290)), y: at.y + 12 });
+        set.set(KEYS.event, undefined);
+        set.set(KEYS.run, r);
+      };
+      const place = (r: string, profile: string) => {
+        const who = lives.find((x) => x.run === r)?.title ?? r.slice(0, 8);
+        const to = profileList.find((p) => p.id === profile)?.title ?? profile;
+        void invoke
+          .invoke({ action: "profile.place", input: { run: r, profile }, authority: { of: "human", basis: "moved in the harness view" }, reason: `Move ${who} into ${to}` })
+          .then((out) => (out.ok ? setMenu(undefined) : setMenu((m) => m && { ...m, error: out.refused.message })));
+      };
 
       // Lights fire once the tree is drawn, so a name a light is on its way to stays unlit until it gets there.
       // Following: each event that comes after the first read. Else a step of the playhead lights its event;
@@ -265,54 +304,45 @@ const harness: Pack = {
       }, [playing, run]);
       useEffect(() => setPlaying(false), [run]);
 
-      const pick = (id: string | undefined) => set.set(KEYS.node, id);
+      const pick = (id: string | undefined) => {
+        set.set(KEYS.node, id);
+        // Picking a node opens the node pane if the frame folded it.
+        const folded = here.get<string[]>(FOLDED);
+        if (id && Array.isArray(folded) && folded.includes("harness/node")) set.set(FOLDED, folded.filter((k) => k !== "harness/node"));
+      };
       const sum = { held: 0, failed: 0, quiet: 0 };
       if (all) for (const r of records) (sum.held += r.held), (sum.failed += r.failed), (sum.quiet += r.quiet);
       else for (const x of verdictsOfRun) sum[x.verdict]++;
       return html`
         <div class="hv-view">
-          <div class="hv-bar">
-            <select class="hv-select" value=${live ? "live" : all ? "*" : (pinned ?? "")} title="The run shown, every live run at once, or every run" onChange=${(e: Event) => {
-              const val = (e.target as HTMLSelectElement).value;
+          <${Bar}
+            runs=${runs} live=${live} all=${all} pinned=${pinned} info=${info} sum=${sum} profile=${profile} profiles=${profileList}
+            by=${by} hidden=${tree.hidden} unsaid=${unsaid} showKey=${showKey}
+            onBy=${setBy} onUnsaid=${setUnsaid} onKey=${setShowKey}
+            onRun=${(val: string) => {
               set.set(KEYS.event, undefined);
               set.set(PROFILE, undefined);
-              set.set(LIVE, val === "live" ? true : undefined);
-              if (val === "live") return;
-              if (val === "*") return set.set(ALL, true);
-              set.set(KEYS.run, val || undefined);
+              if (val === "live" || val === "*") {
+                set.set(KEYS.run, undefined);
+                set.set(LIVE, val === "live" ? true : undefined);
+                set.set(ALL, val === "*" ? true : undefined);
+                return;
+              }
               set.set(ALL, undefined);
-            }}>
-              <option value="live">live · ${liveRuns(runs).length} at once</option>
-              <option value="*">all runs</option>
-              <option value="">last active${runs[0] ? ` · ${short(runs[0].title ?? runs[0].run.slice(0, 8), 40)}` : ""}</option>
-              ${runs.map((r) => html`<option value=${r.run}>${r.ended ? "○" : "●"} ${short(r.title ?? r.run.slice(0, 8), 40)} · ${clock(r.started)}</option>`)}
-            </select>
-            ${info && !info.ended && html`<span class="live" title="The run hasn't ended">●</span>`}
-            ${!live && html`<span class="hv-n" title=${all ? "Every run's verdicts, node by run: held, failed, quiet" : "This run's verdicts: held, failed, quiet"}><span class="m-held">${token(verdictGlyph("held"))} ${sum.held}</span> <span class="m-failed">${token(verdictGlyph("failed"))} ${sum.failed}</span> <span class="m-quiet">${token(verdictGlyph("quiet"))} ${sum.quiet}</span></span>`}
-            <select class="hv-select" value=${profile ?? ""} title="A profile: what it holds back, over every run's totals" onChange=${(e: Event) => {
-              const val = (e.target as HTMLSelectElement).value;
+              set.set(KEYS.run, val || undefined);
+              set.set(LIVE, false);
+            }}
+            onProfile=${(val: string | undefined) => {
               set.set(KEYS.event, undefined);
-              set.set(PROFILE, val || undefined);
+              set.set(PROFILE, val);
               set.set(ALL, val ? true : undefined);
               if (val) set.set(LIVE, undefined);
-            }}>
-              <option value="">${all ? "no profile" : "the run's profiles"}</option>
-              ${profileList.map((p) => html`<option value=${p.id}>${p.status === "on" ? "●" : p.status === "off" ? "○" : "◌"} ${p.title}</option>`)}
-            </select>
-            <span class="hv-by" title="How the tree hangs its nodes">
-              ${(["place", "pack", ...(profileList.length ? ["profile"] : [])] as Grouping[]).map((g, i) => html`${i > 0 && html`<span>·</span>`}<button class=${by === g ? "on" : ""} onClick=${() => setBy(g)}>${g}</button>`)}
-            </span>
-            ${by === "place" && (tree.hidden > 0 || unsaid) && html`<button class=${unsaid ? "on" : ""} onClick=${() => setUnsaid(!unsaid)} title="Nodes with no place: kept, never said">${unsaid ? "" : `+${tree.hidden} `}never said</button>`}
-            <span class="sp"></span>
-            <button class=${showKey ? "on" : ""} onClick=${() => setShowKey(!showKey)} title="What the marks mean">key</button>
-          </div>
-          <div style="position:relative;min-height:0;display:grid">
-            ${live && html`<${Legend} runs=${lives} colour=${colour} acting=${new Set(liveEvents.map((e) => e.run))} onOpen=${(r: string) => {
-              set.set(LIVE, undefined);
-              set.set(KEYS.event, undefined);
-              set.set(KEYS.run, r);
-            }} />`}
-            <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />
+            }}
+          />
+          <div style="position:relative;min-height:0;display:grid" ref=${stage}>
+            <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} orbit=${orbit} agents=${agents} onAgent=${onAgent} />
+            ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
+            ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${lives.find((r) => r.run === menu.run)?.title ?? menu.run.slice(0, 8)} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}
           </div>
           ${run && html`<${Timeline}
             events=${events}
@@ -395,9 +425,9 @@ const harness: Pack = {
     // The run takes the right, the wider side: an opened line needs the room.
     const fill = ctx.get<SlotFill>("slot.fill");
     const whileShown = { "here.view": "harness/view" };
-    fill.fill({ slot: "left", name: "node", when: whileShown, view: NodeFill });
+    fill.fill({ slot: "left", name: "node", title: "Node", when: whileShown, view: NodeFill });
     fill.fill({ slot: "center", name: "view", title: "Harness", view: Center });
-    fill.fill({ slot: "right", name: "run", when: whileShown, view: RunFill });
+    fill.fill({ slot: "right", name: "run", title: "Run", when: whileShown, view: RunFill });
   },
 };
 

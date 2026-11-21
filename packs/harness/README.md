@@ -1,34 +1,44 @@
 # harness
 
-The harness view: one view of every run, live or replayed, and every
-profile. What the map says to an agent is a tree of places and nodes; the
-run looked at lights it, step by step. Three fills, linked through `here`;
+The harness view: the hub to watch every agent at once, and every run,
+live or replayed, and every profile. What the map says to an agent is a
+tree of places and nodes. It lands on every live run: each agent sits on an
+orbit round the tree in its own colour, with its profile under it, and what
+passes between them moves as particles. Three fills, linked through `here`;
 the two beside show while the view does
-(`when: { "here.view": "harness/view" }`).
+(`when: { "here.view": "harness/view" }`), and start folded to rails (the
+frame's `folded` config in `app/boot.ts`), so the landing is the tree and
+the agents only. Picking a node opens the node pane.
 
 | Fill | Region | Shows |
 |---|---|---|
-| Harness (`harness/view`) | `center` | The bar (run and its verdicts ✓ ✕ ○, profile, grouping), the tree, the timeline |
-| Node (`harness/node`) | `left` | Its words, standing, places, pack, kind, record, and its verdict per run |
-| Run (`harness/run`) | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: every live run's events, interleaved. All runs: the runs, or a profile's |
+| Harness (`harness/view`) | `center` | The bar, the tree with its agents, the timeline |
+| Node (`harness/node`, "Node") | `left` | Its words, standing, places, pack, kind, record, and its verdict per run |
+| Run (`harness/run`, "Run") | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: every live run's events, interleaved. All runs: the runs, or a profile's |
+
+## The bar ([bar.ts](bar.ts))
+
+Kept quiet: the run picker, the live dot and the ✓ ✕ ○ tally. The profile
+looked at, how the tree hangs (place, pack, profile), nodes never said and
+the key are in one ⋯ menu.
 
 ## Picking
 
-One run, every live run at once, or every run. The counts and the ✓ ✕ ○
-tally follow the choice. Runs come last active first (`exchange.read.runs`),
+Every live run at once (where it lands), one run, or every run. The counts
+and the ✓ ✕ ○ tally follow the choice. Runs come last active first (`exchange.read.runs`),
 so a long run acting now is at the top, and the list reads again as events
 come.
 
-- **A run:** `here.run`, else the last active. ● not ended, ○ ended. The counts
+- **A run:** `here.run`, or the last active ("last active" sets
+  `harness.live` to false). ● not ended, ○ ended. The counts
   are what that run said, up to the playhead; the tally, its verdicts; its
   holds, its own `gated` events. Picking a run anywhere (the node's runs,
   Activity) looks at it alone.
 - **Live:** `harness.live` (this pack's own page key), "live" in the run
-  picker. Every run not ended, as many as the style has hues, each lit in
-  its own colour (`hue-1`…, tokens: [live.ts](live.ts)). A run keeps its
-  colour while it stays live. A legend over the tree names them, faint
-  until a run does something while watched (one that stopped without
-  ending stays live); a click looks at one alone. The right pane interleaves their events as they
+  picker, and what the view shows while nothing else is picked. Every run
+  not ended, as many as the style has hues, each in its own colour
+  (`hue-1`…, tokens: [live.ts](live.ts)). A run keeps its colour while it
+  stays live. Each is an agent round the tree (below). The right pane interleaves their events as they
   come (the last 300, nothing from before), each edged in its run's
   colour; a click looks at that run at that event.
 - **All runs, or a profile:** `harness.all` (this pack's own page key). The
@@ -39,6 +49,29 @@ come.
   (`profile.read.hears`).
 - **Playhead:** `here.event`, in one run. Unset, the view follows the run's
   end live.
+
+## The agents ([agents.ts](agents.ts))
+
+Live, each run is an agent on an orbit outside the tree and its names, at
+the seat of its colour (six seats, the first at the top), so it stays put
+while live. Faint until it does something while watched (one that stopped
+without ending stays live). A click on it looks at it alone.
+
+| Event | Moves |
+|---|---|
+| say | a dot from its node out to the orbit and round to the agent, in the run's colour; the name lights as it leaves |
+| refusal | the same, red |
+| hold (`gated`) | a hollow dot that leaves its node and fades before it gets there |
+| act | from the agent round and in to the bough of its place (red when it failed) |
+| begin, end | the agent's halo pulses |
+
+Out of the tree first and then round it, so traffic never crosses it.
+Under reduced motion only the names and the agents light.
+
+Under each agent, its profile from `profile.read.of`: ● the one it
+matches, ○ the workspace's fallback (nothing else placed it), – none. A
+click on it lists the profiles, and picking one moves the agent there
+through the profile pack's `profile.place`; the page never writes itself.
 
 ## The tree ([layout.ts](layout.ts), [canvas.ts](canvas.ts))
 
@@ -91,6 +124,9 @@ miss it came from and can be retired (`words.retire`). With the keep pack:
 its record against the thresholds, its checks, Keep and Retire
 (`keep.apply`). A node the map writes a file from shows the file and its
 rule (`written.rule`).
+
+Picking a node takes `harness/node` out of the frame's page key
+`frame.folded`, if the frame folded it.
 
 Injects `slot.fill`, `here.*`, `agent.tree`, `exchange.read`,
 `exchange.watch`, `verdict.read`, `action.list`, `action.invoke`,

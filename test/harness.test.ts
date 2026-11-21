@@ -1,7 +1,8 @@
 /**
  * The harness view, its pure parts: rows opened in place (expand.ts), the
- * tree of places and nodes (layout.ts) and a run played to a point
- * (replay.ts). Input in, what each answers out.
+ * tree of places and nodes (layout.ts), a run played to a point
+ * (replay.ts), and the agents round the tree with their traffic and
+ * profiles (agents.ts). Input in, what each answers out.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -12,6 +13,8 @@ import { HUES } from "../spec/style.ts";
 import { colours, keepLast, liveRuns } from "../packs/harness/live.ts";
 import { DECIDED, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
+import { flight, flightOf, orbitBox, orbitOf, placementOf, placementText, seatOf } from "../packs/harness/agents.ts";
+import { landsLive } from "../packs/harness/hooks.ts";
 
 const base = { id: "e1", run: "r", seq: 3, time: "2026-11-21T09:00:00Z" };
 const labels = (e: ExchangeEvent) => expand(e).map((p) => p.label);
@@ -411,4 +414,73 @@ test("the interleaved list keeps each event once, the last few", () => {
   let list: ExchangeEvent[] = [];
   for (const x of [e("a", 1), e("b", 1), e("a", 2), e("a", 2), e("b", 2)]) list = keepLast(list, x, 3);
   assert.deepEqual(list.map((x) => x.id), ["b:1", "a:2", "b:2"]);
+});
+
+// --- The home hub: agents round the tree, their traffic, their profiles ---
+
+test("orbitOf and seatOf: the orbit clears the tree; seats are fixed by colour, the first at the top", () => {
+  const o = orbitOf({ x: -300, y: -200, width: 500, height: 450 }, 70);
+  assert.deepEqual(o, { rx: 370, ry: 320 });
+  const top = seatOf(o, 0);
+  assert.ok(Math.abs(top.x) < 1e-9 && Math.abs(top.y + 320) < 1e-9);
+  const third = seatOf(o, 3);
+  assert.ok(Math.abs(third.y - 320) < 1e-9, "slot 3 of 6 sits at the bottom");
+  const box = orbitBox(o);
+  assert.ok(box.x < -o.rx && box.y < -o.ry && box.x + box.width > o.rx && box.y + box.height > o.ry);
+});
+
+test("flight: out of the tree to the orbit, then round it the short way to the seat", () => {
+  const o = { rx: 100, ry: 100 };
+  const pts = flight(o, { x: 50, y: 0 }, seatOf(o, 0));
+  assert.deepEqual(pts[0], [50, 0]);
+  const last = pts[pts.length - 1]!;
+  assert.ok(Math.abs(last[0]) < 1e-6 && Math.abs(last[1] + 100) < 1e-6, "ends on the seat");
+  // Never back inside the tree once out: every point past the first leg is on the orbit.
+  const rim = pts.findIndex(([x, y]) => Math.hypot(x, y) >= 99.999);
+  assert.ok(pts.slice(rim).every(([x, y]) => Math.abs(Math.hypot(x, y) - 100) < 1e-6));
+  assert.ok(pts.slice(rim).every(([x]) => x >= -1e-6), "the short way: through the right, not round the left");
+});
+
+test("flightOf: a say goes out to its agent, an act comes in to its bough, a hold stops short, a begin pulses", () => {
+  const tree = treeOf(NODES);
+  const placed = radial(tree);
+  const o = orbitOf(placed.box);
+  const seat = seatOf(o, 1);
+  const say = flightOf(tree, placed, o, seat, { kind: "say", node: "words/bash", place: "tool:Bash" })!;
+  assert.equal(say.way, "out");
+  assert.equal(say.at, "words/bash");
+  const from = placed.xy.get("words/bash")!;
+  assert.deepEqual(say.points[0], [from.x, from.y]);
+  const end = say.points[say.points.length - 1]!;
+  assert.ok(Math.abs(end[0] - seat.x) < 1e-6 && Math.abs(end[1] - seat.y) < 1e-6);
+  assert.equal(flightOf(tree, placed, o, seat, { kind: "refuse", node: "words/bash" })!.tone, "fail");
+  const act = flightOf(tree, placed, o, seat, { kind: "act", place: "tool:Bash", act: { kind: "tool", by: "agent", ok: false } })!;
+  assert.equal(act.way, "in");
+  assert.equal(act.tone, "fail");
+  assert.ok(Math.abs(act.points[0]![0] - seat.x) < 1e-6, "an act starts at the agent");
+  const hold = flightOf(tree, placed, o, seat, { kind: "gated", node: "words/bash" })!;
+  assert.equal(hold.way, "hold");
+  const hEnd = hold.points[hold.points.length - 1]!;
+  assert.ok(Math.hypot(hEnd[0] - seat.x, hEnd[1] - seat.y) > 1, "a hold never reaches the agent");
+  assert.equal(flightOf(tree, placed, o, seat, { kind: "begin" })!.way, "pulse");
+  assert.equal(flightOf(tree, placed, o, seat, { kind: "compact" }), undefined);
+});
+
+test("placementOf: matched, the fallback, or none; a run that named the fallback itself is matched", () => {
+  const p = (id: string, by: "match" | "part" = "match") => ({ id, title: id[0]!.toUpperCase() + id.slice(1), by, holding: true });
+  const fallbacks = new Set(["arch"]);
+  assert.deepEqual(placementOf([p("aperture"), p("everyone", "part")], fallbacks), { kind: "matched", title: "Aperture", ids: ["aperture", "everyone"] });
+  assert.equal(placementOf([p("arch"), p("everyone", "part")], fallbacks).kind, "fallback");
+  assert.equal(placementOf([p("arch")], fallbacks, ["arch"]).kind, "matched");
+  assert.deepEqual(placementOf([], fallbacks), { kind: "none", title: "", ids: [] });
+  assert.equal(placementText(placementOf([p("arch")], fallbacks)), "○ Arch");
+  assert.equal(placementText(placementOf([], fallbacks)), "– no profile");
+});
+
+test("landsLive: nothing picked watches every live run; a run, every run or live turned off doesn't", () => {
+  assert.equal(landsLive(undefined, undefined, false), true);
+  assert.equal(landsLive(true, "r1", false), true);
+  assert.equal(landsLive(undefined, "r1", false), false);
+  assert.equal(landsLive(undefined, undefined, true), false);
+  assert.equal(landsLive(false, undefined, false), false, "the last active, asked for");
 });

@@ -40,5 +40,15 @@ Decided (20 Nov 2026, all five):
 - A miss in a run, at a place a held node listens at, is told on the
   profiles (`profile.missed`: a finding about them and the node).
 
+## Moving a run
+
+`profile.place {run, profile}` puts a run in one profile: it begins the
+run again with `profiles` naming it and `profiles_drop` every other
+profile the run matches now (earlier drops kept), as the `run` tool's
+`profiles` and `drop` would. The harness view calls it from an agent's
+profile. A run's facts are on the exchange, not the graph, so it writes no
+change set: to undo, place the run back (its output gives `was`).
+
 Injects `graph.read`, `graph.watch`, `types.define`, `agent.tree`,
-`agent.gate`, `exchange.watch`, `action.register`, `action.invoke`.
+`agent.gate`, `agent.run`, `exchange.read`, `exchange.watch`,
+`action.register`, `action.invoke`.

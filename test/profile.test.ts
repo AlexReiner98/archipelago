@@ -17,7 +17,7 @@ import links from "../packs/links/index.ts";
 import items from "../packs/items/index.ts";
 import words from "../packs/words/index.ts";
 import profile from "../packs/profile/index.ts";
-import { hearing, matchFacts, matchNode, runProfiles, type Model, type Profile } from "../packs/profile/model.ts";
+import { hearing, matchFacts, matchNode, placing, runProfiles, type Model, type Profile } from "../packs/profile/model.ts";
 
 const T = "2026-11-20T14:00:00.000Z";
 
@@ -90,6 +90,15 @@ test("hearing: a node in no profile, or a run in no profile, hears; an exclusion
   assert.deepEqual(hearing(m, { repo: "r_ap" }, pills), { hears: true }, "out of Archipelago is no profile's for Studio: global there");
   assert.deepEqual(hearing(m, inArch, pills), { hears: false, why: "Taken out of Archipelago." });
   assert.deepEqual(hearing(m, inArch, art), { hears: true, shadow: "For Business; this run is in Archipelago." });
+});
+
+test("placing a run in one profile names it and drops every other it matches, earlier drops kept", () => {
+  const m = modelOf(prof({ id: "public" }), prof({ id: "arch", fallback: true, parts: ["public"] }), prof({ id: "studio", places: ["r_studio"], parts: ["public"] }), prof({ id: "biz" }));
+  assert.deepEqual(placing(m, { repo: "r_studio", profiles_drop: "biz" }, "arch"), { profiles: ["arch"], profiles_drop: ["biz", "studio"] });
+  assert.deepEqual(placing(m, { cwd: "C:/x" }, "studio"), { profiles: ["studio"], profiles_drop: ["arch"] }, "out of the fallback");
+  assert.deepEqual(placing(m, { profiles_drop: ["arch"] }, "arch"), { profiles: ["arch"], profiles_drop: [] }, "a drop of the target is let go");
+  const placed = { repo: "r_studio", ...placing(m, { repo: "r_studio" }, "biz") };
+  assert.deepEqual(runProfiles(m, placed).map((p) => p.id), ["biz"]);
 });
 
 // --- On the map, through the agent ---
@@ -165,5 +174,25 @@ test("profiles on the map hold a node back from runs outside them; shadow record
 
   assert.deepEqual((await read.nodes(studio)).in, [`words/${rhino}`]);
   assert.ok(tree.nodes().some((n) => n.source === plain));
+  assert.deepEqual(errors, []);
+});
+
+test("profile.place moves a live run into one profile: begun again, out of the one it matched", async () => {
+  const { errors, ctx, act, read } = await setup();
+  const repo = (await act("items.create", { type: "record", title: "Studio repo" })).id;
+  const studio = (await act("items.create", { type: "profile", title: "Studio" })).id;
+  const biz = (await act("items.create", { type: "profile", title: "Business" })).id;
+  await act("items.link", { type: "uses", from: repo, to: studio });
+  const run = ctx("r9").get<AgentRun>("agent.run");
+  await run.begin({ ...start("r9", { repo }), title: "A session" });
+  const out = (await act("profile.place", { run: "r9", profile: biz })) as unknown as { was: string[]; now: string[] };
+  assert.deepEqual(out.was, [studio]);
+  assert.deepEqual(out.now, [biz]);
+  const exchange = ctx("r9").get<ExchangeRead>("exchange.read");
+  const info = (await exchange.runs({ limit: 10 })).items.find((r) => r.run === "r9")!;
+  assert.equal(info.title, "A session", "the run keeps what it was");
+  assert.deepEqual((await read.of(info)).map((p) => p.title), ["Business"]);
+  const refused = await ctx("r9").get<ActionInvoke>("action.invoke").invoke({ action: "profile.place", input: { run: "nope", profile: biz }, authority: { of: "human", basis: "test" }, reason: "test" });
+  assert.ok(!refused.ok && refused.refused.code === "profile.no_run");
   assert.deepEqual(errors, []);
 });

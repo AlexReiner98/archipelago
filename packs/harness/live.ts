@@ -8,9 +8,7 @@
  *   are colours.
  * - `colours`: each live run's colour, kept from before where it can be.
  * - `keepLast`: an event added to the interleaved list, the last few kept.
- * - `Legend`: the live runs over the tree, each a click from being looked
- *   at alone; faint until it does something while watched (a run that
- *   stopped without ending stays live, but quiet).
+ * - The runs themselves are agents on an orbit round the tree (agents.ts).
  * - `LiveEvents`: the right pane: their events as they come, interleaved,
  *   each marked with its run's colour.
  */
@@ -19,7 +17,7 @@ import { useEffect, useRef } from "preact/hooks";
 import htm from "htm";
 import type { RunInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
-import { HUES, sheet, v, type Token } from "../../spec/style.ts";
+import { HUES, v, type Token } from "../../spec/style.ts";
 import { EventMark, short, what } from "./events.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
@@ -51,25 +49,8 @@ export function keepLast(list: ExchangeEvent[], e: ExchangeEvent, max: number): 
   return next.length > max ? next.slice(next.length - max) : next;
 }
 
-export const LIVE_STYLE = sheet(`
-.hv-legend { position:absolute; left:10px; top:10px; display:grid; gap:1px; padding:var(--space-2) var(--space-3); background:color-mix(in srgb, var(--bg) 88%, transparent); border:1px solid var(--line); border-radius:var(--radius); font-size:var(--text-s); max-width:260px; z-index:1; }
-.hv-legend .r { display:flex; gap:var(--space-2); align-items:baseline; cursor:pointer; white-space:nowrap; min-width:0; }
-.hv-legend .r:hover .x { color:var(--pick); }
-.hv-legend .x { overflow:hidden; text-overflow:ellipsis; min-width:0; }
-.hv-legend .d { flex:none; }
-.hv-legend .none { color:var(--dim); }
-.hv-legend .quiet .x { color:var(--dim); }
-`);
 
 const title = (r: RunInfo) => r.title ?? r.run.slice(0, 8);
-
-export const Legend = ({ runs, colour, acting, onOpen }: { runs: RunInfo[]; colour: Map<string, Token>; acting: Set<string>; onOpen(run: string): void }) => html`
-  <div class="hv-legend">
-    ${!runs.length && html`<span class="none">No run is live.</span>`}
-    ${runs.map((r) => html`<div class=${`r ${acting.has(r.run) ? "" : "quiet"}`} title=${`${r.title ?? r.run}\n${acting.has(r.run) ? "" : "Nothing since live opened · "}Look at it alone`} onClick=${() => onOpen(r.run)}>
-      <span class="d" style=${`color:${v(colour.get(r.run) ?? "fg")}`}>●</span><span class="x">${short(title(r), 40)}</span>
-    </div>`)}
-  </div>`;
 
 export interface LiveEventsProps {
   runs: RunInfo[];

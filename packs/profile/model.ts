@@ -142,6 +142,19 @@ export function runProfiles(model: Model, facts: Facts): (ProfileInfo & { state:
   return [...out.values()];
 }
 
+/**
+ * The facts that move a run into `target`: `profiles` names it, and
+ * `profiles_drop` takes out every other profile the run matches now (its
+ * earlier drops kept, the target's own let go). What `profile.place` gives
+ * at begin, as the `run` tool's `profiles` and `drop` would.
+ */
+export function placing(model: Model, facts: Facts, target: Id): { profiles: Id[]; profiles_drop: Id[] } {
+  const others = runProfiles(model, facts).filter((p) => p.by === "match" && p.id !== target).map((p) => p.id);
+  const drops = new Set([...values(facts.profiles_drop), ...others]);
+  drops.delete(target);
+  return { profiles: [target], profiles_drop: [...drops] };
+}
+
 /** The profiles that hold a node (by link or by members) and those that take it out. Off profiles don't. */
 export function nodeProfiles(model: Model, node: NodeInfo): { in: Profile[]; out: Profile[] } {
   const res = { in: [] as Profile[], out: [] as Profile[] };
