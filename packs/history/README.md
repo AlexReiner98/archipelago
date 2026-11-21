@@ -9,7 +9,7 @@ change that failed. Kept in SQLite (`config.db`), or in memory without one.
 | Action | Does |
 |---|---|
 | `history.undo` `{ change }` | Writes the inverse of a committed set as a new one, marked `undoes` |
-| `history.list` `{ run?, limit?, after? }` | Entries newest first; writes nothing |
+| `history.list` `{ item?, run?, limit?, after? }` | Entries newest first; `item` narrows to the sets touching one item (its fields, or a link to or from it), else `run` to one run's. Writes nothing |
 | `history.get` `{ change }` | One entry; writes nothing |
 | `history.snapshots` `{ limit?, after? }` | What older entries folded into; writes nothing |
 

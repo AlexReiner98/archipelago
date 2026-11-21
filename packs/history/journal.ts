@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS entries (
   undone_by TEXT
 );
 CREATE INDEX IF NOT EXISTS entries_run ON entries (run, seq);
+CREATE TABLE IF NOT EXISTS touches (id TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY (id, seq)) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS touches_seq ON touches (seq);
 CREATE TABLE IF NOT EXISTS snapshots (
   n INTEGER PRIMARY KEY AUTOINCREMENT,
   first INTEGER NOT NULL,
@@ -99,6 +101,19 @@ CREATE TABLE IF NOT EXISTS snapshots (
 `;
 
 const LAYOUT = "1";
+
+/**
+ * The items a set's facts touch: each fact's id, and the items a link's
+ * `from` and `to` name, so a link made or cut shows on both its ends.
+ */
+export function touched(facts: readonly Fact[]): string[] {
+  const out = new Set<string>();
+  for (const [, id, field, value] of facts) {
+    out.add(id);
+    if ((field === "from" || field === "to") && typeof value === "string") out.add(value);
+  }
+  return [...out];
+}
 
 type Row = { seq: number; id: string; committed: string; header: string; facts: string; inverse: string; undone_by: string | null };
 
@@ -134,6 +149,9 @@ export class Journal {
       undone: p("UPDATE entries SET undone_by = ? WHERE id = ?"),
       newest: p("SELECT * FROM entries WHERE seq < ? ORDER BY seq DESC LIMIT ?"),
       newestRun: p("SELECT * FROM entries WHERE run = ? AND seq < ? ORDER BY seq DESC LIMIT ?"),
+      newestItem: p("SELECT e.* FROM touches t JOIN entries e ON e.seq = t.seq WHERE t.id = ? AND t.seq < ? ORDER BY t.seq DESC LIMIT ?"),
+      touch: p("INSERT OR IGNORE INTO touches (id, seq) VALUES (?, ?)"),
+      untouch: p("DELETE FROM touches WHERE seq <= ?"),
       count: p("SELECT count(*) AS n FROM entries"),
       oldest: p("SELECT * FROM entries ORDER BY seq LIMIT ?"),
       drop: p("DELETE FROM entries WHERE seq <= ?"),
@@ -141,6 +159,20 @@ export class Journal {
       snaps: p("SELECT n, body FROM snapshots WHERE n < ? ORDER BY n DESC LIMIT ?"),
       covering: p("SELECT n FROM snapshots WHERE first <= ? AND last >= ? LIMIT 1"),
     };
+    // A journal written before `touches` was kept is indexed once, on open.
+    if (!this.db.prepare("SELECT value FROM meta WHERE key = 'touches'").get()) {
+      this.db.exec("BEGIN IMMEDIATE");
+      try {
+        for (const r of this.db.prepare("SELECT seq, facts FROM entries").iterate() as Iterable<{ seq: number; facts: string }>) {
+          for (const id of touched(JSON.parse(r.facts) as Fact[])) this.q.touch!.run(id, r.seq);
+        }
+        this.db.prepare("INSERT INTO meta (key, value) VALUES ('touches', '1')").run();
+        this.db.exec("COMMIT");
+      } catch (err) {
+        this.db.exec("ROLLBACK");
+        throw err;
+      }
+    }
   }
 
   close(): void {
@@ -156,6 +188,7 @@ export class Journal {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       this.q.add!.run(c.seq, c.id, c.header.run ?? null, c.committed, JSON.stringify(c.header), JSON.stringify(c.facts), JSON.stringify(inverse(c.facts)));
+      for (const id of touched(c.facts)) this.q.touch!.run(id, c.seq);
       if (c.header.undoes) {
         const undone = this.get(c.header.undoes);
         this.q.undone!.run(c.id, c.header.undoes);
@@ -178,11 +211,17 @@ export class Journal {
     return (this.q.covering!.get(seq, seq) as { n: number } | undefined)?.n;
   }
 
-  /** Entries newest first, a page at a time; `run` narrows to one run's. */
-  entries(opts: { run?: string } = {}, page?: PageRequest): Page<Entry> {
+  /** Entries newest first, a page at a time; `item` narrows to those touching one item, else `run` to one run's. */
+  entries(opts: { run?: string; item?: string } = {}, page?: PageRequest): Page<Entry> {
     const limit = Math.max(1, Math.min(page?.limit ?? 50, LIMIT_MAX));
     const before = page?.after ? Number(page.after) : Number.MAX_SAFE_INTEGER;
-    const rows = (opts.run ? this.q.newestRun!.all(opts.run, before, limit + 1) : this.q.newest!.all(before, limit + 1)) as Row[];
+    const rows = (
+      opts.item
+        ? this.q.newestItem!.all(opts.item, before, limit + 1)
+        : opts.run
+          ? this.q.newestRun!.all(opts.run, before, limit + 1)
+          : this.q.newest!.all(before, limit + 1)
+    ) as Row[];
     const items = rows.slice(0, limit).map(entryOf);
     return rows.length > limit ? { items, next: String(items.at(-1)!.seq) } : { items };
   }
@@ -222,6 +261,7 @@ export class Journal {
       };
       const { lastInsertRowid } = this.q.snap!.run(body.first, body.last, JSON.stringify(body));
       this.q.drop!.run(body.last);
+      this.q.untouch!.run(body.last);
       this.db.exec("COMMIT");
       return { n: Number(lastInsertRowid), ...body };
     } catch (err) {

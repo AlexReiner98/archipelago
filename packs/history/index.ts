@@ -98,10 +98,11 @@ const history: Pack<HistoryConfig> = {
     register.register({
       name: "history.list",
       title: "The journal, newest first",
-      doc: "Committed change sets in full (header, facts, inverse, undone by), newest first. `run` narrows to one run's. Writes nothing.",
-      input: { type: "object", properties: { run: { type: "string" }, ...pageInput } },
-      async run(input: { run?: string; limit?: number; after?: string }) {
-        return journal.entries(input.run ? { run: input.run } : {}, { limit: input.limit, after: input.after }) as unknown as Json;
+      doc: "Committed change sets in full (header, facts, inverse, undone by), newest first. `item` narrows to the sets touching one item (its fields, or a link to or from it); else `run` to one run's. Writes nothing.",
+      input: { type: "object", properties: { run: { type: "string" }, item: { type: "string", description: "An item's id: the sets that touch it" }, ...pageInput } },
+      async run(input: { run?: string; item?: string; limit?: number; after?: string }) {
+        const only = input.item ? { item: input.item } : input.run ? { run: input.run } : {};
+        return journal.entries(only, { limit: input.limit, after: input.after }) as unknown as Json;
       },
     });
 

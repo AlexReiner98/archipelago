@@ -12,7 +12,7 @@ import { Loader, type Entry as TreeEntry } from "../runtime/loader.ts";
 import action from "../packs/action/index.ts";
 import graph from "../packs/graph/index.ts";
 import history, { netFacts } from "../packs/history/index.ts";
-import type { Entry, Snapshot } from "../packs/history/journal.ts";
+import { Journal, type Entry, type Snapshot } from "../packs/history/journal.ts";
 
 const BASE = "mem:/packs/";
 
@@ -183,6 +183,44 @@ test("the journal is kept on disk; unloading the pack takes its stage and action
     assert.equal(!out.ok && out.refused.code, "action.unknown");
     await h.ok(h.write(["+", "e2", "type", "task"]));
     await h.stop();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("history.list item: the sets touching one item, a link's included, a page at a time", async () => {
+  const h = await setup();
+  try {
+    const a = await h.ok(h.write(["+", "e1", "type", "task"], ["+", "e1", "status", "todo"]));
+    await h.ok(h.write(["+", "e2", "type", "task"]));
+    const l = await h.ok(h.write(["+", "l1", "type", "depends_on"], ["+", "l1", "from", "e2"], ["+", "l1", "to", "e1"]));
+    const b = await h.ok(h.write(["-", "e1", "status", "todo"], ["+", "e1", "status", "doing"]));
+    const list = async (input: Json) => ((await h.ok(h.call<Json>("history.list", input))).output as unknown as Page<Entry>);
+    assert.deepEqual((await list({ item: "e1" })).items.map((e) => e.id), [b.change, l.change, a.change]);
+    assert.deepEqual((await list({ item: "e2" })).items.length, 2);
+    const first = await list({ item: "e1", limit: 2 });
+    assert.deepEqual(first.items.map((e) => e.id), [b.change, l.change]);
+    const rest = await list({ item: "e1", limit: 2, after: first.next! });
+    assert.deepEqual(rest.items.map((e) => e.id), [a.change]);
+    assert.equal(rest.next, undefined);
+    const u = await h.ok(h.call("history.undo", { change: b.change! }));
+    assert.equal((await list({ item: "e1" })).items[0]!.id, u.change, "the undo touches it too");
+  } finally {
+    await h.stop();
+  }
+});
+
+test("a journal kept before items were indexed is indexed when it opens", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "history-"));
+  try {
+    const db = join(dir, "history.sqlite");
+    let j = new Journal(db);
+    j.record({ id: "c1", seq: 1, committed: "t", header: { actor: { id: "a", kind: "agent" }, authority: { of: "agent", basis: "t" }, pack: { id: "p" }, action: "x", reason: "r", time: "t" }, facts: [["+", "e1", "type", "task"]] });
+    j.db.exec("DELETE FROM touches; DELETE FROM meta WHERE key = 'touches'");
+    j.close();
+    j = new Journal(db);
+    assert.deepEqual(j.entries({ item: "e1" }).items.map((e) => e.id), ["c1"]);
+    j.close();
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
