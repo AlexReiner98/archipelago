@@ -25,6 +25,22 @@ import type { Dials } from "./tint.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
+/** How many of the most recently active agents get a tree, besides any acting while watched. */
+export const TREES_MOST = 6;
+
+/**
+ * Which live agents get a tree and which a one-line row. A tree: the one in
+ * focus, the `most` last active of those that acted while watched, and the
+ * `most` last active. The rest,
+ * however many (a run that stopped without ending stays live), are rows.
+ * `runs` is last active first; each list keeps that order.
+ */
+export function treesAndRows(runs: string[], acting: ReadonlySet<string>, focus: string | undefined, most: number = TREES_MOST): { trees: string[]; rows: string[] } {
+  // At most twice `most` trees, however many act: the last active of those acting first.
+  const tree = new Set([...(focus ? [focus] : []), ...runs.filter((r) => acting.has(r)).slice(0, most), ...runs.slice(0, most)]);
+  return { trees: runs.filter((r) => tree.has(r)), rows: runs.filter((r) => !tree.has(r)) };
+}
+
 /** The agent in focus: the one picked while it is live, else the first (the last active). */
 export function focusOf(runs: string[], picked: string | undefined): string | undefined {
   return picked && runs.includes(picked) ? picked : runs[0];
@@ -36,10 +52,17 @@ export function heardBy(nodes: NodeInfo[], hears: ReadonlySet<string> | undefine
 }
 
 export const TREES_STYLE = sheet(`
-.hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-template-columns:minmax(0,1fr); }
+.hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); }
 .hv-trees.many { grid-template-columns:minmax(0,1fr) minmax(180px,22%); }
-.hv-tree.big { grid-column:1; grid-row:1 / -1; }
-.hv-tree.peek { grid-column:2; cursor:pointer; border-left:1px solid var(--line); }
+.hv-peeks { min-height:0; overflow-y:auto; border-left:1px solid var(--line); scrollbar-width:thin; }
+.hv-peeks > .hv-tree { height:var(--peek, 140px); }
+.hv-tree.peek { cursor:pointer; }
+.hv-rows { border-top:1px solid var(--line); padding:var(--space-1) 0; }
+.hv-rows .h { padding:var(--space-1) var(--space-4); color:var(--dim); font-size:var(--text-s); }
+.hv-rows .r { display:flex; gap:var(--space-3); align-items:baseline; padding:1px var(--space-4); white-space:nowrap; cursor:pointer; min-width:0; }
+.hv-rows .r:hover { background:color-mix(in srgb, var(--line) 35%, transparent); }
+.hv-rows .r .x { overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; color:var(--dim); }
+.hv-rows .r .p { color:var(--dim); flex:none; font-size:var(--text-s); max-width:45%; overflow:hidden; text-overflow:ellipsis; }
 .hv-tree.peek:hover { background:color-mix(in srgb, var(--line) 35%, transparent); }
 .hv-tree.peek .rx-canvas { pointer-events:none; }
 .hv-tree.peek .who, .hv-tree.peek .prof { cursor:pointer; }
@@ -83,17 +106,19 @@ export interface TreesProps {
   onProfile(run: string, at: MouseEvent): void;
   /** The agent in focus; the others are previews. */
   focus?: string;
+  /** Live agents shown as one line each, not as trees. */
+  rows?: AgentTree[];
   onFocus(run: string): void;
 }
 
-const One = ({ a, p, big, row }: { a: AgentTree; p: TreesProps; big: boolean; row: number }) => {
+const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
   const nodes = useMemo(() => heardBy(p.nodes, a.hears), [p.nodes, a.hears]);
   const tree = useMemo(() => treeOf(nodes, { by: p.by }), [nodes, p.by]);
   const placed = useMemo(() => radial(tree), [tree]);
   const mine = useMemo(() => p.events.filter((e) => e.run === a.run.run), [p.events, a.run.run]);
   const state = useMemo(() => stateAt(mine, mine.length - 1), [mine]);
   const title = a.run.title ?? a.run.run.slice(0, 8);
-  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}`} style=${big ? "" : `grid-row:${row}`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
+  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
     <div class="hd">
       <span class="d" style=${`color:${a.colour}`}>●</span>
       <span class="who" title=${big ? `${title}\nLook at it alone` : `${title}\nBring it into focus`} onClick=${big ? () => p.onOpen(a.run.run) : undefined}>${title}</span>
@@ -107,8 +132,18 @@ const One = ({ a, p, big, row }: { a: AgentTree; p: TreesProps; big: boolean; ro
 export const Trees = (p: TreesProps) => {
   const focus = focusOf(p.agents.map((a) => a.run.run), p.focus);
   const rest = p.agents.filter((a) => a.run.run !== focus);
-  // Every tree keeps its component when focus moves (keyed by run), so its colours carry over; only its place changes.
-  return html`<div class="hv-trees${rest.length ? " many" : ""}" style=${rest.length ? `grid-template-rows:repeat(${rest.length}, minmax(0,1fr))` : "grid-template-rows:minmax(0,1fr)"}>
-    ${p.agents.map((a) => html`<${One} key=${a.run.run} a=${a} p=${p} big=${a.run.run === focus} row=${rest.indexOf(a) + 1} />`)}
+  const big = p.agents.find((a) => a.run.run === focus);
+  // The previews stand at a fixed height and scroll, however many agents are live.
+  return html`<div class="hv-trees${rest.length || p.rows?.length ? " many" : ""}">
+    ${big && html`<${One} key=${big.run.run} a=${big} p=${p} big=${true} />`}
+    ${(rest.length > 0 || p.rows?.length) && html`<div class="hv-peeks">
+      ${rest.map((a) => html`<${One} key=${a.run.run} a=${a} p=${p} big=${false} />`)}
+      ${p.rows?.length ? html`<div class="hv-rows">
+        <div class="h" title="Live, but not among the last active: a run that stopped without ending stays live">${p.rows.length} more live</div>
+        ${p.rows.map((a) => html`<div class="r" key=${a.run.run} title=${`${a.run.title ?? a.run.run}\nBring it into focus`} onClick=${() => p.onFocus(a.run.run)}>
+          <span style=${`color:${a.colour}`}>●</span><span class="x">${a.run.title ?? a.run.run.slice(0, 8)}</span>${a.placement && html`<span class="p">${placementText(a.placement)}</span>`}
+        </div>`)}
+      </div>` : ""}
+    </div>`}
   </div>`;
 };

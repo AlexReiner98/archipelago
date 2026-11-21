@@ -75,6 +75,20 @@ export interface ProfileRow {
   fallback?: boolean;
 }
 
+/**
+ * Runs grouped by the profiles they are in (ids, sorted): a group hears the
+ * same nodes. A run whose profiles aren't known yet is a group of its own.
+ */
+export function groupsOf(runs: RunInfo[], placements: Map<string, ProfileInfo[]>): Map<string, RunInfo[]> {
+  const out = new Map<string, RunInfo[]>();
+  for (const r of runs) {
+    const ps = placements.get(r.run);
+    const g = ps ? `p:${ps.map((p) => p.id).sort().join(",")}` : `r:${r.run}`;
+    out.set(g, [...(out.get(g) ?? []), r]);
+  }
+  return out;
+}
+
 export function hooks(c: Caps) {
   const useHere = <T extends Json>(key: string): T | undefined => {
     const [v, setV] = useState<T | undefined>(c.here.get<T>(key));
@@ -335,19 +349,25 @@ export function hooks(c: Caps) {
     return m;
   };
 
-  /** The nodes each of the runs given hears (`profile.read.hears`), by run, kept live: each agent's own tree. */
-  const useHears = (runs: RunInfo[], nodes: NodeInfo[]): Map<string, Set<string>> => {
+  /**
+   * The nodes each of the runs given hears (`profile.read.hears`), by run,
+   * kept live: each agent's own tree. Runs in the same profiles hear the
+   * same nodes, so it is asked once per set of profiles, not once per run.
+   */
+  const useHears = (runs: RunInfo[], nodes: NodeInfo[], placements: Map<string, ProfileInfo[]>): Map<string, Set<string>> => {
     const [m, setM] = useState<Map<string, Set<string>>>(new Map());
-    const key = `${runs.map((r) => `${r.run}\n${JSON.stringify(r.facts ?? {})}`).join("\n\n")}|${nodes.map((n) => n.id).join(",")}`;
+    const groups = groupsOf(runs, placements);
+    const key = `${[...groups].map(([g, rs]) => `${g}:${rs.map((r) => r.run).join(",")}`).join("\n")}|${nodes.map((n) => n.id).join(",")}`;
     useEffect(() => {
       let gone = false;
       const load = () =>
         void Promise.all(
-          runs.map(async (r) => {
-            const hs = await Promise.all(nodes.map(async (n) => [n.id, (await c.profiles.hears(r, n)).hears] as const));
-            return [r.run, new Set(hs.filter(([, yes]) => yes).map(([id]) => id))] as const;
+          [...groups.values()].map(async (rs) => {
+            const hs = await Promise.all(nodes.map(async (n) => [n.id, (await c.profiles.hears(rs[0]!, n)).hears] as const));
+            const heard = new Set(hs.filter(([, yes]) => yes).map(([id]) => id));
+            return rs.map((r) => [r.run, heard] as const);
           }),
-        ).then((all) => !gone && setM(new Map(all)));
+        ).then((all) => !gone && setM(new Map(all.flat())));
       load();
       const stop = c.profiles.watch(load);
       return () => {

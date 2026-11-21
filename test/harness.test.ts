@@ -10,12 +10,13 @@ import type { ExchangeEvent } from "../spec/exchange.ts";
 import { asText, expand, fold, pretty } from "../packs/harness/expand.ts";
 import type { NodeInfo, RunInfo } from "../spec/agent.ts";
 import { HUES } from "../spec/style.ts";
-import { colours, keepLast, liveRuns } from "../packs/harness/live.ts";
+import { colourOf, colours, keepLast, liveRuns, LIVE_MOST } from "../packs/harness/live.ts";
+import { groupsOf } from "../packs/harness/hooks.ts";
 import { DECIDED, dotsBox, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 import { placementOf, placementText } from "../packs/harness/agents.ts";
 import { DIALS, dialsOf, tintOf, wayOf } from "../packs/harness/tint.ts";
-import { focusOf, heardBy } from "../packs/harness/trees.ts";
+import { focusOf, heardBy, treesAndRows } from "../packs/harness/trees.ts";
 import { landsLive } from "../packs/harness/hooks.ts";
 
 const base = { id: "e1", run: "r", seq: 3, time: "2026-11-21T09:00:00Z" };
@@ -391,24 +392,42 @@ test("nodeOf: an event's own node; an act's failed node, else the one told just 
 
 const runInfo = (run: string, ended?: string) => ({ run, agent: { kind: "agent", id: "a" }, harness: "test", reaches: [], started: "2026-11-21T09:00:00Z", ...(ended ? { ended } : {}) }) as unknown as RunInfo;
 
-test("the live runs: those not ended, in the order given, as many as there are colours", () => {
+test("the live runs: those not ended, in the order given, more than there are hues, up to the page", () => {
   const runs = [runInfo("a"), runInfo("b", "2026-11-21T10:00:00Z"), runInfo("c"), runInfo("d")];
   assert.deepEqual(liveRuns(runs).map((r) => r.run), ["a", "c", "d"]);
   assert.deepEqual(liveRuns(runs, 2).map((r) => r.run), ["a", "c"]);
-  assert.equal(liveRuns(Array.from({ length: 10 }, (_, i) => runInfo(`r${i}`))).length, HUES.length);
+  assert.equal(liveRuns(Array.from({ length: 10 }, (_, i) => runInfo(`r${i}`))).length, 10);
+  assert.equal(liveRuns(Array.from({ length: 80 }, (_, i) => runInfo(`r${i}`))).length, LIVE_MOST);
 });
 
-test("a live run keeps its colour while it stays; a new one takes the first free", () => {
+test("a live run keeps its colour slot while it stays; a new one takes the lowest free, past six too", () => {
   const one = colours(["a", "b", "c"]);
-  assert.deepEqual([...one], [["a", "hue-1"], ["b", "hue-2"], ["c", "hue-3"]]);
+  assert.deepEqual([...one], [["a", 0], ["b", 1], ["c", 2]]);
   // b ends, d begins, and a moves to the back by acting last: no one else's colour changes.
   const two = colours(["c", "d", "a"], one);
-  assert.equal(two.get("a"), "hue-1");
-  assert.equal(two.get("c"), "hue-3");
-  assert.equal(two.get("d"), "hue-2");
+  assert.equal(two.get("a"), 0);
+  assert.equal(two.get("c"), 2);
+  assert.equal(two.get("d"), 1);
   assert.equal(two.has("b"), false);
-  // The colours are the style's tokens, never values.
-  for (const t of two.values()) assert.ok((HUES as readonly string[]).includes(t));
+  const many = colours(Array.from({ length: 9 }, (_, i) => `r${i}`));
+  assert.deepEqual([...many.values()], [0, 1, 2, 3, 4, 5, 6, 7, 8]);
+});
+
+test("colourOf: the six hues, then round again mixed toward the text, then the page; tokens only", () => {
+  assert.equal(colourOf(0), "var(--hue-1, CanvasText)");
+  assert.equal(colourOf(5), "var(--hue-6, CanvasText)");
+  assert.match(colourOf(6), /^color-mix\(in srgb, var\(--hue-1, [^)]*\) \d+%, var\(--fg, [^)]*\)\)$/);
+  assert.match(colourOf(13), /var\(--hue-2, .*var\(--bg, /);
+  const twenty = Array.from({ length: 24 }, (_, i) => colourOf(i));
+  assert.equal(new Set(twenty).size, 24, "no two of the first 24 alike");
+  for (const c of twenty) assert.ok(!/#|rgb\(/.test(c), "never a value of its own");
+});
+
+test("groupsOf: runs in the same profiles are one group, asked once; one not placed yet stands alone", () => {
+  const p = (id: string) => ({ id, title: id, by: "match" as const, holding: true });
+  const placements = new Map([["a", [p("x"), p("y")]], ["b", [p("y"), p("x")]], ["c", [p("z")]]]);
+  const g = groupsOf([runInfo("a"), runInfo("b"), runInfo("c"), runInfo("d")], placements);
+  assert.deepEqual([...g.values()].map((rs) => rs.map((r) => r.run)), [["a", "b"], ["c"], ["d"]]);
 });
 
 test("the interleaved list keeps each event once, the last few", () => {
@@ -482,4 +501,13 @@ test("dotsBox: a small tree fits its dots, tighter than its bounds with names", 
   const d = dotsBox(placed, 10);
   for (const p of placed.xy.values()) assert.ok(p.x >= d.x && p.x <= d.x + d.width && p.y >= d.y && p.y <= d.y + d.height);
   assert.ok(d.width * d.height < placed.box.width * placed.box.height);
+});
+
+test("treesAndRows: a tree for the one in focus, those acting and the last active; a line for each of the rest", () => {
+  const runs = Array.from({ length: 40 }, (_, i) => `r${i}`);
+  const { trees, rows } = treesAndRows(runs, new Set(["r30"]), "r25", 3);
+  assert.deepEqual(trees, ["r0", "r1", "r2", "r25", "r30"]);
+  assert.equal(rows.length, 35);
+  assert.ok(!rows.includes("r25") && !rows.includes("r30"));
+  assert.deepEqual(treesAndRows(["a", "b"], new Set(), undefined), { trees: ["a", "b"], rows: [] });
 });

@@ -32,13 +32,13 @@ import type { ProfileRead } from "../../spec/profile.ts";
 import { KEYS } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { HUES, sheet, v, type Token } from "../../spec/style.ts";
+import { sheet, v } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
 import { Events, short } from "./events.ts";
 import { ALL, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
-import { colours, liveRuns, LiveEvents } from "./live.ts";
+import { colourOf, colours, liveRuns, LiveEvents } from "./live.ts";
 import { AGENTS_STYLE, placementOf, ProfileMenu } from "./agents.ts";
-import { Trees, TREES_STYLE } from "./trees.ts";
+import { focusOf, Trees, TREES_STYLE, treesAndRows } from "./trees.ts";
 import { DIALS_KEY, DIALS_STYLE, DialsPane, useDials } from "./dials.ts";
 import { Bar, BAR_STYLE } from "./bar.ts";
 import { KEEP_STYLE, keepParts } from "./keep.ts";
@@ -247,26 +247,34 @@ const harness: Pack = {
       const hues = useMemo(() => packHues(nodes.map((n) => n.pack)), [nodes]);
       // Live: each run an agent with a tree of its own (what it hears), in its colour, its profile over it.
       const dials = useDials(here);
-      const hears = hk.useHears(lives, nodes);
       const acting = useMemo(() => new Set(liveEvents.map((e) => e.run)), [liveEvents]);
+      // Trees for the agent in focus, those acting and the last active; a line each for the rest.
+      const [focus, setFocus] = useState<string>();
+      const split = useMemo(() => {
+        const ids = lives.map((r) => r.run);
+        return treesAndRows(ids, acting, focusOf(ids, focus));
+      }, [lives, acting, focus]);
+      const treed = useMemo(() => lives.filter((r) => split.trees.includes(r.run)), [lives, split]);
+      const hears = hk.useHears(treed, nodes, placements);
       const fallbacks = useMemo(() => new Set(profileList.filter((p) => p.fallback).map((p) => p.id)), [profileList]);
       const treeFires = useRef(new Map<string, { current?: Fire }>());
       const firesOf = (r: string) => treeFires.current.get(r) ?? (treeFires.current.set(r, {}), treeFires.current.get(r)!);
-      const agents = useMemo(
+      const everyAgent = useMemo(
         () =>
           // In the order of their colours, so a tree keeps its place while its agent is live.
-          [...lives].sort((a, b) => (HUES as readonly Token[]).indexOf(colour.get(a.run) ?? HUES[0]) - (HUES as readonly Token[]).indexOf(colour.get(b.run) ?? HUES[0])).map((r) => {
+          [...lives].sort((a, b) => (colour.get(a.run) ?? 0) - (colour.get(b.run) ?? 0)).map((r) => {
             const ps = placements.get(r.run);
-            return { run: r, colour: v(colour.get(r.run) ?? HUES[0]), hears: hears.get(r.run), quiet: !acting.has(r.run), fires: firesOf(r.run), ...(ps ? { placement: placementOf(ps, fallbacks, values(r.facts?.profiles)) } : {}) };
+            return { run: r, colour: colourOf(colour.get(r.run) ?? 0), hears: hears.get(r.run), quiet: !acting.has(r.run), fires: firesOf(r.run), ...(ps ? { placement: placementOf(ps, fallbacks, values(r.facts?.profiles)) } : {}) };
           }),
         [lives, colour, placements, fallbacks, acting, hears],
       );
+      const agents = useMemo(() => everyAgent.filter((a) => split.trees.includes(a.run.run)), [everyAgent, split]);
+      const rows = useMemo(() => everyAgent.filter((a) => split.rows.includes(a.run.run)), [everyAgent, split]);
       const onProfile = (r: string, ev: MouseEvent) => {
         const box = stage.current?.getBoundingClientRect();
         if (!box) return;
         setMenu({ run: r, x: Math.max(4, Math.min(ev.clientX - box.left - 20, box.width - 290)), y: ev.clientY - box.top + 14 });
       };
-      const [focus, setFocus] = useState<string>();
       const onOpen = (r: string) => {
         set.set(KEYS.event, undefined);
         set.set(KEYS.run, r);
@@ -299,7 +307,7 @@ const harness: Pack = {
       useLayoutEffect(() => {
         const was = lit.current;
         lit.current = new Set(liveEvents.map((e) => e.id));
-        for (const e of liveEvents) if (!was.has(e.id)) firesOf(e.run).current?.(e, v(colour.get(e.run) ?? "say"));
+        for (const e of liveEvents) if (!was.has(e.id)) firesOf(e.run).current?.(e, colour.has(e.run) ? colourOf(colour.get(e.run)!) : v("say"));
       }, [liveEvents]);
       // Playing: a step every STEP ms, from the start when at the end.
       useEffect(() => {
@@ -354,7 +362,7 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} dials=${dials} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} focus=${focus} onFocus=${setFocus} />`
+              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} dials=${dials} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} focus=${focus} onFocus=${setFocus} rows=${rows} />`
               : html`<${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
             ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${lives.find((r) => r.run === menu.run)?.title ?? menu.run.slice(0, 8)} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}
@@ -396,7 +404,7 @@ const harness: Pack = {
       const titles = useMemo(() => new Map(nodes.map((n) => [n.id, n.title])), [nodes]);
       const inProfiles = hk.useRunProfiles(info);
       if (live)
-        return html`<${LiveEvents} runs=${lives} events=${liveEvents} colour=${colour} titles=${titles} onPick=${(e: ExchangeEvent) => {
+        return html`<${LiveEvents} runs=${lives} events=${liveEvents} colour=${new Map([...colour].map(([r, i]) => [r, colourOf(i)]))} titles=${titles} onPick=${(e: ExchangeEvent) => {
           set.set(LIVE, undefined);
           set.set(KEYS.run, e.run);
           set.set(KEYS.event, e.id);
@@ -423,8 +431,8 @@ const harness: Pack = {
       </div>`;
 
     /** Each live run's colour, kept while it stays live. */
-    const useLiveColours = (lives: RunInfo[]): Map<string, Token> => {
-      const had = useRef(new Map<string, Token>());
+    const useLiveColours = (lives: RunInfo[]): Map<string, number> => {
+      const had = useRef(new Map<string, number>());
       return useMemo(() => (had.current = colours(lives.map((r) => r.run), had.current)), [lives.map((r) => r.run).join(",")]);
     };
 

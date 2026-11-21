@@ -38,9 +38,10 @@ come.
   Activity) looks at it alone.
 - **Live:** `harness.live` (this pack's own page key), "live" in the run
   picker, and what the view shows while nothing else is picked. Every run
-  not ended, as many as the style has hues, each in its own colour
-  (`hue-1`…, tokens: [live.ts](live.ts)). A run keeps its colour while it
-  stays live. Each is an agent with a tree of its own (below). The right pane interleaves their events as they
+  not ended, of the last 50 active, each in its own colour
+  ([live.ts](live.ts)): the style's six hues, then round again mixed toward
+  the text colour, then toward the page, so there is no limit and every
+  colour is made of tokens. A run keeps its colour while it stays live. Each is an agent with a tree of its own (below). The right pane interleaves their events as they
   come (the last 300, nothing from before), each edged in its run's
   colour; a click looks at that run at that event.
 - **All runs, or a profile:** `harness.all` (this pack's own page key). The
@@ -59,7 +60,12 @@ colour live mode gives it, with a tree of its own. One is in focus, big,
 with every name; the others are small previews in a column beside it, in
 the order of their colours so each keeps its place, and a click on one
 brings it into focus. Focus starts on the last active agent and stays
-where it is put while that agent is live. Its
+where it is put while that agent is live. Trees go to the agent in focus,
+the six last active, and up to six more that act while watched; every
+other live agent is one line under the previews (its colour, name and
+profile), a click from focus, so a run that stopped without ending costs a
+line, not a tree. The previews and lines scroll. Hearing is asked once per
+set of profiles (`groupsOf`), not once per agent. Its
 tree holds only the nodes it hears (`profile.read.hears`), hung as the big
 tree is, with how many of all it hears. Small, a tree fits its dots to fill its cell
 (`dotsBox`), and names only what is lit, what the agent was told, and
