@@ -29,8 +29,8 @@ html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:
 .fr-top > * { min-width:0; }
 .fr-bottom { grid-area:bottom; display:flex; align-items:center; gap:var(--space-5); padding:var(--space-2) var(--space-4); border-top:1px solid var(--line); color:var(--dim); font-size:var(--text-s); }
 .fr-left, .fr-right { min-height:0; overflow:hidden; display:flex; flex-direction:column; background:var(--panel); }
-.fr-left { grid-area:left; width:var(--frame-left); border-right:1px solid var(--line); }
-.fr-right { grid-area:right; width:var(--frame-right); border-left:1px solid var(--line); }
+.fr-left { grid-area:left; width:min(var(--frame-left), 28vw); border-right:1px solid var(--line); }
+.fr-right { grid-area:right; width:min(var(--frame-right), 32vw); border-left:1px solid var(--line); }
 .fr-part { flex:1 1 0; min-height:0; overflow:auto; display:flex; flex-direction:column; }
 .fr-part > :last-child { flex:1; min-height:0; }
 .fr-part + .fr-part { border-top:1px solid var(--line); }
