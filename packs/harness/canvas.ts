@@ -13,12 +13,12 @@
  *   name lights when the light gets there, not before. Or it runs a spark on the bough of an act's place. Under reduced motion only the
  *   names light.
  *
- * - Tinting (every live run at once, each agent its own tree, tint.ts):
- *   `fire` colours the node told and its branch from the root in the
- *   agent's colour, and they fade back. Nothing travels. Small, a tree
- *   names only what is lit, said, or picked.
+ * - Small (one agent's tree among many, trees.ts): names show only on what
+ *   is lit, said or picked.
  *
- * Drag to move, wheel to zoom, double-click to fit. A click picks a node,
+ * Drag to move, wheel to zoom, double-click to fit. The camera fits itself
+ * only while it hasn't been moved by hand, and only when the tree's shape
+ * changes (`fitKey`), not each time it is read again. A click picks a node,
  */
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -27,7 +27,6 @@ import type { NodeInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { branchAt, dotsBox, lightOf, pointAt, route, STYLE, type Placed, type Tree } from "./layout.ts";
-import { tintOf, wayOf, type Dials } from "./tint.ts";
 import type { Verdict } from "./hooks.ts";
 import type { Heard, Hold } from "./replay.ts";
 
@@ -45,7 +44,6 @@ export const CANVAS_STYLE = sheet(`
 .rx-branch.way { stroke:var(--pick); stroke-opacity:1 !important; }
 .rx-canvas svg { --rx-fade:0s; }
 .rx-branch { transition:stroke var(--rx-fade), stroke-opacity var(--rx-fade); }
-.rx-branch.tint { stroke:var(--tint) !important; stroke-opacity:1 !important; filter:drop-shadow(0 0 2px var(--tint)); }
 .rx-name { transition:fill var(--rx-fade), opacity var(--rx-fade); }
 .rx-small .rx-name { opacity:0; font-size:15px; paint-order:stroke; stroke:var(--bg); stroke-width:3px; stroke-linejoin:round; }
 .rx-small .rx-branch { stroke-width:2px !important; }
@@ -85,12 +83,11 @@ export const CANVAS_STYLE = sheet(`
 
 /**
  * Runs a light for an event; with a colour (a run's, when many are shown), in it rather than the event's tone.
- * Tinting (dials given), it colours the node and its branch instead, and nothing moves.
  */
 export type Fire = (e: Pick<ExchangeEvent, "kind" | "node" | "place" | "act"> & { run?: string }, color?: string) => void;
 
 /** Runs the lights and sparks in a group of the svg, a frame at a time, outside Preact. */
-function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree; placed: Placed; k: number; dials?: Dials }) {
+function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree; placed: Placed; k: number }) {
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   type Fx = { start: number; els: SVGElement[]; step: (age: number, k: number) => boolean };
   const fx: Fx[] = [];
@@ -142,28 +139,9 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
     frame = fx.length ? requestAnimationFrame(tick) : 0;
   };
   const run_ = () => (frame ||= requestAnimationFrame(tick));
-  /** The node told and its branch from the root, in the agent's colour, for a while; then they fade back. */
-  const tinted = new Map<string, ReturnType<typeof setTimeout>>();
-  const tint = (e: Parameters<Fire>[0], color: string | undefined, d: Dials) => {
-    const { tree } = get();
-    const t = tintOf(tree, e);
-    if (!t?.at) return;
-    const ink = t.tone === "fail" ? C.fail : t.tone === "hold" ? v("quiet") : (color ?? C.say);
-    svg.style.setProperty("--rx-fade", `${d.tint_fade}s`);
-    for (const id of wayOf(tree, t.at)) {
-      const b = svg.querySelector<SVGPathElement>(`[data-b="${CSS.escape(id)}"]`);
-      if (!b) continue;
-      clearTimeout(tinted.get(id));
-      b.style.setProperty("--tint", ink);
-      b.classList.add("tint");
-      tinted.set(id, setTimeout(() => (b.classList.remove("tint"), tinted.delete(id)), d.tint_hold! * 1000));
-    }
-    light(t.at, t.tone === "fail" ? "fail" : "say", t.tone === "fail" ? undefined : ink, d.tint_hold);
-  };
   const glow = (tone: string) => [1, 0.6, 0.3].map((r, i) => el("circle", { class: `rx-glow k-${tone}`, r, "fill-opacity": [S.glow / 2, S.glow, Math.min(1, S.glow * 2)][i]!, opacity: 0 }));
   const fire: Fire = (e, color) => {
-    const { tree, placed, dials } = get();
-    if (dials) return tint(e, color, dials);
+    const { tree, placed } = get();
     const l = lightOf(tree, e);
     if (!l) return;
     if (still) return light(l.at, l.tone, color);
@@ -229,7 +207,6 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
       fx.forEach((f) => f.els.forEach((e) => e.remove()));
       fx.length = 0;
       lit.forEach((t) => clearTimeout(t));
-      tinted.forEach((t) => clearTimeout(t));
       for (const id of waiting.keys()) svg.querySelector(`[data-id="${CSS.escape(id)}"]`)?.classList.remove("rx-wait");
       waiting.clear();
     },
@@ -256,6 +233,14 @@ export const Key = ({ hues }: { hues: Map<string, string> }) => html`
   </div>
 `;
 
+/**
+ * What a fit depends on: how many nodes, and the bounds, rounded. A tree
+ * read again with the same shape keeps the camera where it is.
+ */
+export function fitKey(count: number, b: Placed["box"]): string {
+  return `${count}|${[b.x, b.y, b.width, b.height].map((n) => Math.round(n)).join(",")}`;
+}
+
 export interface CanvasProps {
   tree: Tree;
   placed: Placed;
@@ -271,30 +256,33 @@ export interface CanvasProps {
   fires: { current?: Fire };
   onPick(node: string | undefined): void;
   showKey: boolean;
-  /** Tinting: what is told colours its node and branch, by these dials; nothing moves. */
-  dials?: Dials;
   /** Small, one of many: names show only on what is lit, said or picked. */
   small?: boolean;
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, dials, small }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, small }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const fxGroup = useRef<SVGGElement>(null);
   const [view, setView] = useState({ x: placed.box.x, y: placed.box.y, k: 1 });
   const [panning, setPanning] = useState(false);
   const [fits, refit] = useState(0);
-  const now = useRef({ tree, placed, k: view.k, dials });
-  now.current = { tree, placed, k: view.k, dials };
+  const now = useRef({ tree, placed, k: view.k });
+  now.current = { tree, placed, k: view.k };
   // Small, names mostly hidden: fit the dots, so the tree fills its cell.
-  const bounds = small ? dotsBox(placed) : placed.box;
+  // Fit the dots, not the names: a long name never shrinks or shifts the picture.
+  const bounds = dotsBox(placed, small ? 40 : 60);
+  // Once the camera is moved by hand it stays where it is put; a double-click fits again and gives it back.
+  const manual = useRef(false);
+  const shape = fitKey(tree.order.length, bounds);
 
   useEffect(() => {
     const W = box.current?.clientWidth || 900;
     const H = box.current?.clientHeight || 700;
     const k = Math.min(3, Math.max(0.1, Math.min(W / bounds.width, H / bounds.height)));
+    if (manual.current) return;
     setView({ k, x: bounds.x - (W / k - bounds.width) / 2, y: bounds.y - (H / k - bounds.height) / 2 });
-  }, [placed, fits, small]);
+  }, [shape, fits, small]);
   // Fit again when the canvas changes size: it is first measured before the page has laid it out.
   useEffect(() => {
     let last = "";
@@ -332,6 +320,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   };
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
+    manual.current = true;
     const p = toWorld(e);
     const k = Math.min(6, Math.max(0.05, view.k * Math.exp(-e.deltaY * 0.0015)));
     const r = box.current!.getBoundingClientRect();
@@ -347,6 +336,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     const move = (m: PointerEvent) => {
       if (!moved && Math.hypot(m.clientX - start.cx, m.clientY - start.cy) < 4) return;
       moved = true;
+      manual.current = true;
       setPanning(true);
       setView({ ...start.view, x: start.view.x - (m.clientX - start.cx) / start.view.k, y: start.view.y - (m.clientY - start.cy) / start.view.k });
     };
@@ -371,7 +361,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   const statusOf = (n?: NodeInfo) => (n?.source ? statuses.get(n.source) : undefined);
   const rest = tree.order.filter((t) => t.parent);
   return html`
-    <div class=${`rx-canvas${panning ? " panning" : ""}${small ? " rx-small" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${() => refit((n) => n + 1)} title="Click a node to pick it; drag to move; wheel to zoom; double-click to fit">
+    <div class=${`rx-canvas${panning ? " panning" : ""}${small ? " rx-small" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${() => ((manual.current = false), refit((n) => n + 1))} title="Click a node to pick it; drag to move; wheel to zoom; double-click to fit">
       <svg ref=${svg}><g transform=${`scale(${view.k}) translate(${-view.x} ${-view.y})`}>
         <g>
           ${rest.map((t) => {

@@ -12,10 +12,11 @@ import type { NodeInfo, RunInfo } from "../spec/agent.ts";
 import { HUES } from "../spec/style.ts";
 import { colourOf, colours, keepLast, liveRuns, LIVE_MOST } from "../packs/harness/live.ts";
 import { foldForNode, groupsOf } from "../packs/harness/hooks.ts";
-import { DECIDED, dotsBox, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
+import { DECIDED, dotsBox, nameOf, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
+import { fitKey } from "../packs/harness/canvas.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 import { placementOf, placementText } from "../packs/harness/agents.ts";
-import { DIALS, dialsOf, tintOf, wayOf } from "../packs/harness/tint.ts";
+import { DIALS, dialsOf } from "../packs/harness/dials.ts";
 import { focusOf, heardBy, switchFocus, transitionName, treesAndRows } from "../packs/harness/trees.ts";
 import { landsLive } from "../packs/harness/hooks.ts";
 
@@ -440,32 +441,11 @@ test("the interleaved list keeps each event once, the last few", () => {
 // --- The home hub: agents round the tree, their traffic, their profiles ---
 
 test("dialsOf: given values kept within range, the rest where they start", () => {
-  const d = dialsOf({ tint_hold: 9999, tint_fade: 0.5, nope: 3 });
-  assert.equal(d.tint_hold, DIALS.find((x) => x.key === "tint_hold")!.max);
-  assert.equal(d.tint_fade, 0.5);
+  const d = dialsOf({ switch_s: 9999, nope: 3 });
+  assert.equal(d.switch_s, DIALS.find((x) => x.key === "switch_s")!.max);
   assert.ok(!("nope" in d));
   assert.deepEqual(dialsOf(undefined), dialsOf({}));
-});
-
-test("tintOf: a say colours its node in the run's colour, a refusal and a failed act in failed, a hold in quiet, an act its bough", () => {
-  const tree = treeOf(NODES);
-  assert.deepEqual(tintOf(tree, { kind: "say", node: "words/bash", place: "tool:Bash" }), { what: "node", at: "words/bash", tone: "run" });
-  assert.equal(tintOf(tree, { kind: "refuse", node: "words/bash" })!.tone, "fail");
-  assert.deepEqual(tintOf(tree, { kind: "gated", node: "words/bash" }), { what: "node", at: "words/bash", tone: "hold" });
-  const act = tintOf(tree, { kind: "act", place: "tool:Bash", act: { kind: "tool", by: "agent", ok: true } })!;
-  assert.equal(act.what, "bough");
-  assert.ok(act.at!.startsWith("~:tool"), "an act lands on the bough of its place");
-  assert.equal(tintOf(tree, { kind: "act", place: "tool:Bash", act: { kind: "tool", by: "agent", ok: false } })!.tone, "fail");
-  assert.equal(tintOf(tree, { kind: "compact" }), undefined);
-});
-
-test("wayOf: the branches from the root to a node, root side first", () => {
-  const tree = treeOf(NODES);
-  const way = wayOf(tree, "words/bash");
-  assert.equal(way[way.length - 1], "words/bash");
-  assert.ok(way.every((id) => tree.byId.has(id)));
-  assert.ok(!way.includes(tree.root.id), "the root has no branch");
-  assert.deepEqual(wayOf(tree, "nope"), []);
+  assert.equal(dialsOf({ switch_s: 0.2 }).switch_s, 0.2);
 });
 
 test("each agent's own tree: the nodes it hears, all while that isn't known; the one picked in focus while it is live, else the last active", () => {
@@ -527,4 +507,23 @@ test("foldForNode: the node pane opens when a node is picked and folds when none
   assert.equal(foldForNode(["harness/run"], "words/x"), undefined, "already open");
   assert.equal(foldForNode(["harness/node"], undefined), undefined, "already folded");
   assert.equal(foldForNode(undefined, "words/x"), undefined);
+});
+
+test("fitKey: the same shape read again keeps the camera; a node more or a new size fits again", () => {
+  const b = { x: -100.2, y: -80.4, width: 200.4, height: 160.6 };
+  assert.equal(fitKey(10, b), fitKey(10, { ...b, x: -100.4 }));
+  assert.notEqual(fitKey(10, b), fitKey(11, b));
+  assert.notEqual(fitKey(10, b), fitKey(10, { ...b, width: 260 }));
+});
+
+test("nameOf: a name never shows a path, but says whose it is: the project, and the file when it isn't the usual one", () => {
+  assert.equal(nameOf("project memory ~/Documents/Github/archipelago-next/CLAUDE.md"), "project memory · archipelago-next");
+  assert.equal(nameOf("local memory ~/Documents/Github/archipelago/CLAUDE.local.md"), "local memory · archipelago");
+  assert.equal(nameOf("project memory ~/Documents/Github/Aperture/.claude/pelago.md"), "project memory · Aperture pelago.md");
+  assert.equal(nameOf("auto memory ~/.claude/projects/C--Users-imjyx-Documents-Github-archipelago-next/memory/MEMORY.md"), "auto memory · archipelago-next");
+  assert.equal(nameOf("project memory ~/Documents/CLAUDE.md"), "project memory · Documents", "only plain folders: the last of them");
+  assert.equal(nameOf("C:\\work\\notes\\todo.md"), "notes todo.md");
+  assert.equal(nameOf("~/x/CLAUDE.md"), "x");
+  assert.equal(nameOf("project memory ~/Documents/.claude/pelago.md"), "project memory · Documents pelago.md", "never Claude's own folder");
+  assert.equal(nameOf("No secrets"), "No secrets");
 });

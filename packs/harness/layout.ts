@@ -234,7 +234,7 @@ export const STYLE = {
   spreadX: 1.3,
   nameText: 11,
   nameGap: 8,
-  nameMost: 22,
+  nameMost: Infinity,
   nameLift: 0.75,
   margin: 50,
   curveSteps: 10,
@@ -265,7 +265,63 @@ export const STYLE = {
   hues: HUES.map(v),
 };
 
+/** A word that is a path: it has a slash or a backslash in it, or starts at home (`~`). */
+const isPath = (w: string) => /[\\/]/.test(w) || w.startsWith("~");
+
+/** Folders that say nothing about whose a path is. */
+const PLAIN = new Set(["~", ".", "..", ".claude", "projects", "memory", "documents", "github", "desktop", "repos", "src", "code", "dev", "work", "users", "home"]);
+/** Claude's own folders: never where a path is. */
+const STRUCT = new Set(["~", ".", "..", ".claude", "projects", "memory"]);
+/** Files every project has: named by their project alone. */
+const USUAL = new Set(["claude.md", "claude.local.md", "memory.md", "agents.md"]);
+
+/**
+ * Whose a path is, in a word or two: the project's folder, and the file
+ * when it isn't the usual one. Claude's own `~/.claude/projects/<folder,
+ * its slashes as dashes>` gives back the folder's last name.
+ */
+export function placeName(path: string): string {
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  const file = parts.length && /\.[a-z0-9]+$/i.test(parts[parts.length - 1]!) ? parts.pop()! : undefined;
+  const folders = parts
+    .map((p) => (/^[a-z]--/i.test(p) ? decodeFolder(p) : p))
+    .filter((p) => !PLAIN.has(p.toLowerCase()) && !/^[a-z]:$/i.test(p));
+  // Only plain folders (a CLAUDE.md in Documents): the last of them still says where.
+  const where = folders[folders.length - 1] ?? parts.filter((p) => !STRUCT.has(p.toLowerCase()) && !/^[a-z]:$/i.test(p)).pop();
+  const extra = file && !USUAL.has(file.toLowerCase()) ? file : undefined;
+  return [where, extra].filter(Boolean).join(" ") || file || path;
+}
+
+/** `C--Users-me-Documents-Github-archipelago-next` → `archipelago-next`: past the drive, the user and the plain folders. */
+function decodeFolder(seg: string): string {
+  let rest = seg.replace(/^[a-z]--/i, "").replace(/^(users|home)-[^-]+-/i, "");
+  for (let again = true; again; ) {
+    again = false;
+    for (const p of PLAIN) {
+      if (rest.toLowerCase().startsWith(`${p}-`)) {
+        rest = rest.slice(p.length + 1);
+        again = true;
+      }
+    }
+  }
+  return rest;
+}
+
+/**
+ * A node's name as the tree shows it: never a path. Each path in it is said
+ * as whose it is (`placeName`), after a dot: "project memory ·
+ * archipelago-next". The whole title is in the tooltip.
+ */
+export function nameOf(title: string): string {
+  const words = title.split(/\s+/).filter(Boolean);
+  const plain = words.filter((w) => !isPath(w));
+  const places = words.filter(isPath).map(placeName);
+  if (!places.length) return plain.join(" ");
+  return plain.length ? `${plain.join(" ")} · ${places.join(", ")}` : places.join(", ");
+}
+
 /** A text cut to `most` letters, the cut marked. */
+
 export const cut = (text: string, most: number) => (text.length <= most ? text : `${text.slice(0, Math.max(1, most - 1))}…`);
 
 /** About the width of a sans-serif text. */
@@ -349,7 +405,7 @@ export function radial(tree: Tree, options: RadialOptions = {}): Placed {
     const ray = Math.atan2(Math.sin(p.a), Math.cos(p.a) * sx);
     const ux = Math.cos(ray), uy = Math.sin(ray);
     const right = ux >= -1e-9;
-    const text = cut(t.title, o.nameMost);
+    const text = cut(nameOf(t.title), o.nameMost);
     const wide = o.measure(text, o.nameText);
     const out = t.kids.length ? -1 : 1;
     const lift = out > 0 ? 0 : -o.nameText * o.nameLift;

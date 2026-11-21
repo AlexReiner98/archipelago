@@ -27,7 +27,6 @@ import { placementText, placementTip, type Placement } from "./agents.ts";
 import { Canvas, type Fire, type Standing } from "./canvas.ts";
 import { radial, treeOf, type Grouping } from "./layout.ts";
 import { stateAt } from "./replay.ts";
-import type { Dials } from "./tint.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -132,7 +131,6 @@ export interface TreesProps {
   statuses: Map<string, string>;
   standing: Map<string, Standing>;
   picked?: string;
-  dials: Dials;
   canPlace: boolean;
   onPick(node: string | undefined): void;
   onOpen(run: string): void;
@@ -145,7 +143,9 @@ export interface TreesProps {
 }
 
 const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
-  const nodes = useMemo(() => heardBy(p.nodes, a.hears), [p.nodes, a.hears]);
+  // Keyed by what it hears, not by the set read: hearing is read again often, mostly the same.
+  const hearsKey = a.hears ? [...a.hears].sort().join(",") : "*";
+  const nodes = useMemo(() => heardBy(p.nodes, a.hears), [p.nodes, hearsKey]);
   const tree = useMemo(() => treeOf(nodes, { by: p.by }), [nodes, p.by]);
   const placed = useMemo(() => radial(tree), [tree]);
   const mine = useMemo(() => p.events.filter((e) => e.run === a.run.run), [p.events, a.run.run]);
@@ -158,7 +158,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
       ${a.placement && html`<span class="prof" title=${`${placementTip(a.placement)}${big && p.canPlace ? "\nMove it to another profile" : ""}`} onClick=${big ? (e: MouseEvent) => p.canPlace && p.onProfile(a.run.run, e) : undefined}>${placementText(a.placement)}${big && p.canPlace ? " ▾" : ""}</span>`}
       <span class="n" title="The nodes it hears, of all">${a.hears ? (big ? `${nodes.length} / ${p.nodes.length}` : nodes.length) : ""}</span>
     </div>
-    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${false} dials=${p.dials} small=${!big} />
+    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${false} small=${!big} />
   </div>`;
 };
 

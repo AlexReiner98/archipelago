@@ -57,7 +57,7 @@ come.
 - **Playhead:** `here.event`, in one run. Unset, the view follows the run's
   end live.
 
-## The agents ([trees.ts](trees.ts), [tint.ts](tint.ts), [agents.ts](agents.ts))
+## The agents ([trees.ts](trees.ts), [agents.ts](agents.ts))
 
 Live mode and the agents are one idea: each live run is an agent, in the
 colour live mode gives it, with a tree of its own. One is in focus, big,
@@ -81,22 +81,14 @@ what is picked. Faint until it does
 something while watched (one that stopped without ending stays live). A
 click on the focused agent's name looks at it alone.
 
-What an agent is told colours that node and its branch from the root in
-the agent's colour, and they fade back. Nothing travels.
+What an agent is told runs a light from the root along its tree to that
+node, in the agent's colour (red for a refusal), and the name lights when
+the light gets there; an act sparks on the bough of its place. The light
+and spark are the tree's own (see the tree, below).
 
-| Event | Coloured |
-|---|---|
-| say | its node and branch, in the run's colour; the name shows |
-| refusal | the same, in `failed` |
-| hold (`gated`) | the same, in `quiet` |
-| act | the branch to the bough of its place (`failed` when it failed) |
-
-Every number is a dial, in the bar's ⋯ menu: how long a branch keeps its
-colour, how long the colour takes to come and go, and how long a switch
-of focus takes. Their values are
-`harness.dials` (page scope), so an agent can set them; the browser
-remembers them. Colours are style tokens only. One run looked at alone
-keeps its lights along the playhead.
+The one dial, in the bar's ⋯ menu, is how long a switch of focus takes
+(`switch_s`). Its value is `harness.dials` (page scope), so an agent can
+set it; the browser remembers it. Colours are style tokens only.
 
 Over each agent's tree, its profile from `profile.read.of`: ● the one it
 matches, ○ the workspace's fallback (nothing else placed it), – none. A
@@ -129,6 +121,15 @@ A step of the playhead runs a light from the root to its node (red for a
 refusal), or sparks on the bough of an act's place (amber, red when it
 failed). Under reduced motion only the names light. Drag to move, wheel to
 zoom, double-click to fit; "key" shows the marks.
+
+Names are whole, never cut, and never show a path: a path is said as
+whose it is, after a dot (`nameOf`, `placeName`): its project's folder,
+and the file when it isn't the usual CLAUDE.md or MEMORY.md, so
+"project memory · archipelago-next", "auto memory · Aperture". The whole
+title is in the tooltip. The camera fits the
+dots, not the names, so a long name never shrinks the picture; it fits
+again only when the tree's shape changes (`fitKey`), and never once you
+have moved it by hand, until a double-click.
 
 ## The timeline ([timeline.ts](timeline.ts), [replay.ts](replay.ts))
 

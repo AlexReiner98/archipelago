@@ -10,12 +10,12 @@
  *   (`harness.all`), or a profile (`harness.profile`). Live, each run is an
  *   agent with a tree of its own, the nodes its profile lets it hear
  *   (trees.ts), its profile over it and a click from changing (agents.ts);
- *   what it is told colours its tree in its colour, then fades (tint.ts).
+ *   what it is told runs a light along its tree, in its colour.
  * - Right: the run's events, one line each (events.ts): the wider side,
  *   as an opened line needs the room. Live: every live run's, interleaved.
  *   Every run: the runs, or a profile's runs.
- * - Left: the node looked at (node.ts). The dials of the colouring and the
- *   switch (dials.ts) are in the bar's ⋯ menu.
+ * - Left: the node looked at (node.ts). The dials (dials.ts) are in the
+ *   bar's ⋯ menu.
  *
  * The playhead is `here.event`: unset, the view follows the run's end
  * live. A click on a node sets `here.node`; on an event, `here.event` and
@@ -136,7 +136,7 @@ const harness: Pack = {
     const declare = ctx.get<HereDeclare>("here.declare");
     ctx.effect(() => declare.declare({ key: PROFILE, scope: "page", doc: "The profile the sensory interface shows: its holds over the tree." }));
     ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the sensory interface looks at every run, with all-time totals, not one run." }));
-    ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The Sensory interface's dials: how each agent's tree is coloured by what it is told, those moved from where they start." }));
+    ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The Sensory interface's dials, those moved from where they start." }));
     ctx.effect(() => declare.declare({ key: LIVE, scope: "page", doc: "True: the sensory interface looks at every live run at once, a colour each." }));
     // The node pane is open while a node is picked, from anywhere, and folds to its rail when none is (a click on the background).
     ctx.effect(() =>
@@ -366,7 +366,7 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} dials=${dials} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} />`
+              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} />`
               : html`<${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
             ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${lives.find((r) => r.run === menu.run)?.title ?? menu.run.slice(0, 8)} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}

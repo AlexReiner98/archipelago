@@ -1,7 +1,6 @@
 /**
- * The harness's dials, in the bar's ⋯ menu: every number of how an
- * agent's tree is coloured by what it is told and how focus switches
- * (tint.ts), one row each, ↺ to put it back. Their values
+ * The harness's dials, in the bar's ⋯ menu: how long a switch of focus
+ * takes (trees.ts), one row each, ↺ to put it back. Their values
  * are the page key `harness.dials`, so an agent can set them; the browser
  * remembers them.
  */
@@ -10,7 +9,30 @@ import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import type { HereRead, HereSet } from "../../spec/here.ts";
 import { sheet } from "../../spec/style.ts";
-import { DIALS, dialsOf, type Dials } from "./tint.ts";
+export interface Dial {
+  key: string;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  doc: string;
+}
+
+export const DIALS: readonly Dial[] = [
+  { key: "switch_s", label: "switch s", min: 0, max: 1.5, step: 0.05, value: 0.4, doc: "Seconds a tree takes to grow into focus while the old one shrinks into the column; 0 switches at once." },
+];
+
+export type Dials = Record<string, number>;
+
+/** The dials' values: each one given, within its range; else where it starts. */
+export function dialsOf(given: unknown): Dials {
+  const g = given && typeof given === "object" ? (given as Record<string, unknown>) : {};
+  return Object.fromEntries(DIALS.map((d) => {
+    const x = g[d.key];
+    return [d.key, typeof x === "number" && Number.isFinite(x) ? Math.min(d.max, Math.max(d.min, x)) : d.value];
+  }));
+}
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
