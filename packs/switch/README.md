@@ -2,7 +2,7 @@
 
 An on/off switch on each card of the Packs view ([packs/docs](../docs/README.md)),
 for the page's packs and the server's alike. Each flip is one change set,
-shown in activity like any other, and undone the same way.
+shown in activity like any other: flipping it back undoes it.
 
 ```
 switch ─▶ switch.set ─▶ page item (as page.set writes it) ─▶ page follows   (packs/page)
@@ -29,4 +29,5 @@ switch ─▶ switch.set ─▶ page item (as page.set writes it) ─▶ page fo
 - **Needed** shows instead of a switch on what the Packs view, the switch,
   the page following its item, undo and the frame stand on: turning one
   off here would stop the way back. An agent can still call `switch.set`.
-- **Undo** sits beside a switch after it flips, until it is used.
+- **Undo is flipping it back.** Each flip is its own change set in
+  activity, where `history.undo` takes any of them back too.
