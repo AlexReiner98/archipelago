@@ -10,7 +10,7 @@
  */
 import type { ActionInfo } from "../../spec/action.ts";
 import type { NodeInfo } from "../../spec/agent.ts";
-import type { Capability, Json } from "../../spec/common.ts";
+import type { Capability, Dispose, Json } from "../../spec/common.ts";
 import type { SlotRead } from "../../spec/slot.ts";
 import type { Fiber, Runtime } from "../../runtime/core.ts";
 import * as action from "../../spec/action.ts";
@@ -51,8 +51,22 @@ export interface PlaceDoc {
   nodes: number;
 }
 
+export const KEY = "docs.read";
+
+/** `docs.read`: the docs pack's own key, like `verdict.read`. */
+export interface DocsRead {
+  packs(): Promise<PackDoc[]>;
+  /** What each of these packs is for, from its README (for packs read elsewhere: the page's). */
+  about(ids: string[]): Promise<Record<string, string>>;
+  watch(on: () => void): Dispose;
+}
+
 export interface PackDoc {
   id: string;
+  /** What it is for: the first sentence of its README, in plain words. */
+  about?: string;
+  /** The kinds of item and link it defines. */
+  types?: { name: string; base?: string; doc?: string }[];
   /** Which runtime it runs in. */
   side: string;
   state: string;
@@ -76,6 +90,34 @@ export interface Sources {
   actions?: ActionInfo[];
   nodes?: NodeInfo[];
   slots?: SlotRead;
+  types?: { types: { name: string; base: string; doc?: string; pack: string }[]; links: { name: string; doc?: string; pack: string }[] };
+  /** What each pack is for, by id. */
+  about?: Record<string, string>;
+}
+
+/**
+ * What a pack is for, from its README: the first sentence of the first
+ * paragraph, as plain words. Links keep their text, code marks go, and
+ * what is wiring (what it provides, the spec it points at) is cut.
+ */
+export function aboutOf(markdown: string): string | undefined {
+  const para = markdown
+    .replace(/\r/g, "")
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .find((p) => p && !p.startsWith("#") && !p.startsWith("|") && !p.startsWith("```"));
+  if (!para) return undefined;
+  let s = para
+    .replace(/\s+/g, " ")
+    .replace(/\s*\([^()]*\]\([^()]*\)[^()]*\)/g, "") // a parenthesis that only points somewhere
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/`/g, "")
+    .replace(/^(page side|server side)[.:]\s*/i, "");
+  s = (s.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? s).trim();
+  s = s.replace(/[:;,]?\s*(it )?(provides|injects|see)\b.*$/i, "").replace(/[:;,]\s*$/, "");
+  if (!s || /^provides\b/i.test(s)) return undefined;
+  s = s[0]!.toUpperCase() + s.slice(1);
+  return /[.!?]$/.test(s) ? s : `${s}.`;
 }
 
 const BY_KEY = new Map<string, KeyDoc>();
@@ -139,8 +181,17 @@ export function reference(runtime: Runtime, src: Sources): PackDoc[] {
     const inject = [...new Set(all.flatMap((x) => x.inject))];
     const counts = new Map<string, number>();
     for (const n of src.nodes ?? []) if (ids.has(n.pack)) for (const p of n.at) counts.set(p, (counts.get(p) ?? 0) + 1);
+    const types = src.types
+      ? [
+          ...src.types.types.filter((t) => ids.has(t.pack)).map((t) => ({ name: t.name, ...(t.base !== t.name ? { base: t.base } : {}), ...(t.doc ? { doc: t.doc } : {}) })),
+          ...src.types.links.filter((l) => ids.has(l.pack)).map((l) => ({ name: l.name, base: "link", ...(l.doc ? { doc: l.doc } : {}) })),
+        ]
+      : [];
+    const about = src.about?.[f.pack.id];
     const doc: PackDoc = {
       id: f.pack.id,
+      ...(about ? { about } : {}),
+      ...(types.length ? { types } : {}),
       side: src.side,
       state,
       position: f.position(),

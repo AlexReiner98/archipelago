@@ -9,18 +9,18 @@
  */
 import type { Context, Pack } from "../../runtime/core.ts";
 import { HOST, type McpHost, type ToolResult } from "../mcp/host.ts";
-import { KEY, type DocsRead } from "./index.ts";
+import { KEY, type DocsRead } from "./read.ts";
 import type { PackDoc } from "./read.ts";
 
 export const DESCRIPTION =
   "The packs running on the server, read from the packs themselves: what each provides and injects (with the spec contract), its actions and their inputs, " +
-  "the places it speaks at, its config. Give pack for one in full.";
+  "the kinds of item it defines, the places it speaks at, its config. Give pack for one in full.";
 
-/** One line per pack: its state, what it provides, its actions. */
+/** One line per pack: its state, what it is for, what it provides, its actions. */
 export function brief(docs: PackDoc[]): string {
   return docs
     .map((d) => {
-      const parts = [`${d.id} (${d.state})`];
+      const parts = [`${d.id} (${d.state})${d.about ? ` ${d.about}` : ""}`];
       if (d.provides.length) parts.push(`provides ${d.provides.map((k) => k.key).join(", ")}`);
       if (d.actions.length) parts.push(`actions ${d.actions.map((a) => a.name).join(", ")}`);
       if (d.places.length) parts.push(`speaks at ${d.places.length} place${d.places.length === 1 ? "" : "s"}`);
