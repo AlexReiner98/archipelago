@@ -13,8 +13,10 @@
  * - HMR (§5.2.2, Algorithm 10): `reload` re-imports changed modules first
  *   and swaps fibers only if every import succeeded.
  *
- * Isomorphic: the host gives it `import`.
+ * Isomorphic: the host gives it `import`. It provides `loader.tree`
+ * (spec/loader.md) on the runtime's root, so a pack can edit the tree too.
  */
+import type { LoaderTree } from "../spec/loader.ts";
 import type { Context, Fiber, Meta, Pack, Runtime, State } from "./core.ts";
 
 export interface Entry {
@@ -80,12 +82,18 @@ export function packOf(mod: unknown, url: string): Pack {
   return pack;
 }
 
+/** The tree's entries copied, configs shared: a config may hold functions, which can't be cloned. */
+const copy = (tree: Entry[]): Entry[] => tree.map((e) => ({ ...e, ...(e.children ? { children: copy(e.children) } : {}) }));
+
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 export class Loader {
   readonly runtime: Runtime;
   readonly options: LoaderOptions;
   tree: Entry[] = [];
+  /** The first tree applied: the host's template. */
+  private first?: Entry[];
+  private watchers = new Set<() => void>();
   private nodes = new Map<string, Node>();
   /** One apply or reload at a time. */
   private queue: Promise<unknown> = Promise.resolve();
@@ -93,6 +101,17 @@ export class Loader {
   constructor(runtime: Runtime, options: LoaderOptions) {
     this.runtime = runtime;
     this.options = options;
+    runtime.root.provide<LoaderTree>("loader.tree", (_caller, from) => ({
+      tree: () => copy(this.tree),
+      base: () => copy(this.first ?? this.tree),
+      status: () => this.status(),
+      edit: (change) => this.edit(change as (t: Entry[]) => Entry[]),
+      watch: (on) =>
+        from.effect(() => {
+          this.watchers.add(on);
+          return () => void this.watchers.delete(on);
+        }),
+    }));
   }
 
   private serial<T>(task: () => Promise<T>): Promise<T> {
@@ -176,10 +195,18 @@ export class Loader {
     });
 
     this.tree = tree;
+    this.first ??= copy(tree);
     // A move changes which provider is first: let every fiber look again.
     this.runtime.reorder();
     await Promise.all(changes);
     await this.runtime.settle();
+    for (const on of [...this.watchers]) {
+      try {
+        on();
+      } catch (err) {
+        this.runtime.onError(this.runtime.rootFiber, err);
+      }
+    }
   }
 
   private instantiate(node: Node, pack: Pack): Fiber {
