@@ -8,7 +8,7 @@ the two beside show while the view does
 
 | Fill | Region | Shows |
 |---|---|---|
-| Harness (`harness/view`) | `center` | The bar (run, profile, grouping), the tree, the timeline |
+| Harness (`harness/view`) | `center` | The bar (run and its verdicts ✓ ✕ ○, profile, grouping), the tree, the timeline |
 | Node (`harness/node`) | `left` | Its words, standing, places, pack, kind, record, and its verdict per run |
 | Run (`harness/run`) | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room |
 

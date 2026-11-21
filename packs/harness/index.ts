@@ -59,8 +59,11 @@ const STYLE = sheet(`
 .hv-pick { box-shadow:inset 3px 0 0 var(--pick); }
 .hv-m { width:1em; text-align:center; flex:none; }
 .m-held { color:var(--held); } .m-failed { color:var(--failed); } .m-quiet, .m-none { color:var(--quiet); } .m-act { color:${"var(--write)"}; }
-.hv-btn, .hv-bar button { font:inherit; background:var(--control); border:1px solid var(--control-line); color:var(--dim); padding:0 var(--space-3); border-radius:var(--radius); cursor:pointer; }
-.hv-bar button.on { color:var(--fg); border-color:var(--dim); }
+.hv-btn { font:inherit; background:var(--control); border:1px solid var(--control-line); color:var(--dim); padding:0 var(--space-3); border-radius:var(--radius); cursor:pointer; }
+.hv-bar button { font:inherit; background:none; border:0; color:var(--dim); padding:0; cursor:pointer; flex:none; }
+.hv-bar button:hover { color:var(--fg); }
+.hv-bar button.on { color:var(--fg); text-decoration:underline; text-underline-offset:4px; }
+.hv-by { display:flex; gap:var(--space-2); align-items:baseline; color:var(--dim); flex:none; }
 .hv-select { font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); max-width:220px; min-width:0; }
 .hv-select option { background:var(--panel); color:var(--fg); }
 .hv-ev { cursor:pointer; }
@@ -229,7 +232,6 @@ const harness: Pack = {
       const pick = (id: string | undefined) => set.set(KEYS.node, id);
       const sum = { held: 0, failed: 0, quiet: 0 };
       for (const x of verdictsOfRun) sum[x.verdict]++;
-      const shown = tree.order.filter((t) => t.node).length;
       return html`
         <div class="hv-view">
           <div class="hv-bar">
@@ -241,17 +243,16 @@ const harness: Pack = {
               ${runs.map((r) => html`<option value=${r.run}>${r.ended ? "○" : "●"} ${short(r.title ?? r.run.slice(0, 8), 40)} · ${clock(r.started)}</option>`)}
             </select>
             ${info && !info.ended && html`<span class="live" title="The run hasn't ended">●</span>`}
+            <span class="hv-n" title="This run's verdicts: held, failed, quiet"><span class="m-held">${token(verdictGlyph("held"))} ${sum.held}</span> <span class="m-failed">${token(verdictGlyph("failed"))} ${sum.failed}</span> <span class="m-quiet">${token(verdictGlyph("quiet"))} ${sum.quiet}</span></span>
             <select class="hv-select" value=${profile ?? ""} title="The profile whose holds the tree shows" onChange=${(e: Event) => set.set(PROFILE, (e.target as HTMLSelectElement).value || undefined)}>
               <option value="">the run's profiles</option>
               ${profileList.map((p) => html`<option value=${p.id}>${p.status === "on" ? "●" : p.status === "off" ? "○" : "◌"} ${p.title}</option>`)}
             </select>
-            <button class=${by === "place" ? "on" : ""} onClick=${() => setBy("place")}>place</button>
-            <button class=${by === "pack" ? "on" : ""} onClick=${() => setBy("pack")}>pack</button>
-            ${profileList.length > 0 && html`<button class=${by === "profile" ? "on" : ""} onClick=${() => setBy("profile")} title="Under the profile each node is in">profile</button>`}
+            <span class="hv-by" title="How the tree hangs its nodes">
+              ${(["place", "pack", ...(profileList.length ? ["profile"] : [])] as Grouping[]).map((g, i) => html`${i > 0 && html`<span>·</span>`}<button class=${by === g ? "on" : ""} onClick=${() => setBy(g)}>${g}</button>`)}
+            </span>
             ${by === "place" && (tree.hidden > 0 || unsaid) && html`<button class=${unsaid ? "on" : ""} onClick=${() => setUnsaid(!unsaid)} title="Nodes with no place: kept, never said">${unsaid ? "" : `+${tree.hidden} `}never said</button>`}
             <span class="sp"></span>
-            <span class="hv-dim hv-n" title="nodes">${shown}</span>
-            <span class="hv-n" title="In the run: held, failed, quiet"><span class="m-held">${token(verdictGlyph("held"))} ${sum.held}</span> <span class="m-failed">${token(verdictGlyph("failed"))} ${sum.failed}</span> <span class="m-quiet">${token(verdictGlyph("quiet"))} ${sum.quiet}</span></span>
             <button class=${showKey ? "on" : ""} onClick=${() => setShowKey(!showKey)} title="What the marks mean">key</button>
           </div>
           <div style="position:relative;min-height:0;display:grid">
