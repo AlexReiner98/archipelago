@@ -39,7 +39,7 @@ const host = await startBrowser({
     { id: "page", pack: "packs/page/view.ts" },
     { id: "field", pack: "packs/field/index.ts" },
     // Map (packs/map) and its legend (packs/legend) are kept but not loaded, so no one sees them
-    // (Alex, 21 Nov 2026: Field is home). To use them, add:
+    // (21 Nov 2026: Field is home). To use them, add:
     //   { id: "map", pack: "packs/map/index.ts" }, { id: "legend", pack: "packs/legend/index.ts" },
     // Examples to copy, off until turned on (packs/examples): a panel, and a frame of your own.
     { id: "today", pack: "packs/examples/today.ts", disabled: true },

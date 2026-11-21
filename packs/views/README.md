@@ -45,13 +45,13 @@ own.
 
 - **One picker** in `top`, and no tabs: the title of the view shown, with
   ▾. It opens the list. The bar stays the same however many views there
-  are (Alex, 21 Nov 2026).
+  are (21 Nov 2026).
 - **The list** in `over`: home first, then views tagged `pinned`, then the kinds, then
   a section for each item views are `part_of`, by its title. Typing
   filters by title and section; arrows move, Enter picks, Esc closes.
 - **Ctrl+K** is the command line's: the views are offered there through
-  find's `find.offer`, beside the items, so one key goes to either (Alex,
-  21 Nov 2026).
+  find's `find.offer`, beside the items, so one key goes to either (21 Nov
+  2026).
 - **The hash** names the view shown (`#map`, `#i_…`), so a link opens it.
   An older `#map/map` link opens that kind.
 - **A view whose pack reloads** (a hot update, a pack switched off and on)
