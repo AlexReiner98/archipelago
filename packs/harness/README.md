@@ -131,6 +131,11 @@ dots, not the names, so a long name never shrinks the picture; it fits
 again only when the tree's shape changes (`fitKey`), and never once you
 have moved it by hand, until a double-click.
 
+The names on the wires (a bough's, along its branch) grow and shrink with
+the zoom, and give way ([labels.ts](labels.ts)): after each draw, one that
+overlaps a node's name or dot, a bough's dot, the root or a wire name
+nearer the root fades out, and comes back when zoom or a move clears it.
+
 ## The timeline ([timeline.ts](timeline.ts), [replay.ts](replay.ts))
 
 One tick per event, in order: blue a say, red a refusal or a failed act,

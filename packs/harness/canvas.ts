@@ -26,6 +26,7 @@ import htm from "htm";
 import type { NodeInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { sheet, v } from "../../spec/style.ts";
+import { fadeCrowded } from "./labels.ts";
 import { branchAt, dotsBox, lightOf, pointAt, route, STYLE, type Placed, type Tree } from "./layout.ts";
 import type { Verdict } from "./hooks.ts";
 import type { Heard, Hold } from "./replay.ts";
@@ -45,6 +46,8 @@ export const CANVAS_STYLE = sheet(`
 .rx-canvas svg { --rx-fade:0s; }
 .rx-branch { transition:stroke var(--rx-fade), stroke-opacity var(--rx-fade); }
 .rx-name { transition:fill var(--rx-fade), opacity var(--rx-fade); }
+.rx-bough .rx-name { transition:opacity .25s; }
+.rx-bough .rx-name.rx-hide { opacity:0 !important; }
 .rx-small .rx-name { opacity:0; font-size:15px; paint-order:stroke; stroke:var(--bg); stroke-width:3px; stroke-linejoin:round; }
 .rx-small .rx-branch { stroke-width:2px !important; }
 .rx-small .rx-dot { r:3.5px; }
@@ -352,6 +355,12 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     el.addEventListener("pointercancel", up);
   };
 
+  // The names on the wires give way: after each draw, those that overlap anything fade (labels.ts).
+  useEffect(() => {
+    const f = requestAnimationFrame(() => svg.current && fadeCrowded(svg.current));
+    return () => cancelAnimationFrame(f);
+  });
+
   // The picked node's way from the root.
   const way = useMemo(() => {
     const s = new Set<string>();
@@ -395,7 +404,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
               ? `${n.title}\n${n.kind} · ${n.pack}${trial ? " · trial" : ""}${hear ? ` · ${hear}` : ""}${hold ? ` · ${hold === "held" ? "held back" : "a shadow would hold it back"}` : ""}${ver ? ` · ${ver}` : ""}\n${n.at.join(", ") || "said nowhere"}${said ? `\nsaid ${said} times` : ""}`
               : t.decided ? `${t.title}\n${t.decided.up ? "kept" : "retired"}` : t.title;
             return html`
-              <g key=${`n:${t.id}`} data-id=${t.id} class=${cls} transform=${`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
+              <g key=${`n:${t.id}`} data-id=${t.id} data-depth=${t.depth} class=${cls} transform=${`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
                 <title>${tip}</title>
                 ${ver && html`<circle class=${`rx-ring v-${ver}`} r=${r + 2.5} />`}
                 <circle class="rx-dot" r=${r} style=${hue ? (trial ? `stroke:${hue}` : `fill:${hue}`) : ""} />

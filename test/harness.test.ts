@@ -14,6 +14,7 @@ import { colourOf, colours, keepLast, liveRuns, LIVE_MOST } from "../packs/harne
 import { foldForNode, groupsOf } from "../packs/harness/hooks.ts";
 import { DECIDED, dotsBox, nameOf, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
 import { fitKey } from "../packs/harness/canvas.ts";
+import { crowded, quadsOverlap, type Quad } from "../packs/harness/labels.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 import { placementOf, placementText } from "../packs/harness/agents.ts";
 import { DIALS, dialsOf } from "../packs/harness/dials.ts";
@@ -526,4 +527,15 @@ test("nameOf: a name never shows a path, but says whose it is: the project, and 
   assert.equal(nameOf("~/x/CLAUDE.md"), "x");
   assert.equal(nameOf("project memory ~/Documents/.claude/pelago.md"), "project memory · Documents pelago.md", "never Claude's own folder");
   assert.equal(nameOf("No secrets"), "No secrets");
+});
+
+test("quadsOverlap: turned outlines, not boxes; crowded: a wire name that hits anything shown, or one kept before it, fades", () => {
+  const box = (x: number, y: number, w: number, h: number): Quad => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+  assert.ok(quadsOverlap(box(0, 0, 10, 4), box(5, 2, 10, 4)));
+  assert.ok(!quadsOverlap(box(0, 0, 10, 4), box(11, 0, 10, 4)));
+  // Two thin diagonals whose boxes overlap but whose outlines don't.
+  const diag = (x: number): Quad => [[x, 0], [x + 1, 0], [x + 11, 10], [x + 10, 10]];
+  assert.ok(!quadsOverlap(diag(0), diag(3)));
+  const names = [box(0, 0, 10, 4), box(5, 0, 10, 4), box(30, 0, 10, 4)];
+  assert.deepEqual(crowded(names, [box(32, 1, 2, 2)]), [false, true, true], "the second hits the first, kept; the third hits a dot");
 });
