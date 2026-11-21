@@ -2,9 +2,9 @@
  * The legend, and the filter: each type with its colour, each side (open,
  * closed), each kind of link, and items with no links, each with how many
  * the map has and how many show. A box switches each one; a type opens to
- * its statuses and kinds, each switched the same way. Hidden items keep
- * their place unless "lay out only what is shown" is on. Folded, it is one
- * line of types, still switches.
+ * its statuses and kinds, each switched the same way. Every switch settles
+ * the graph again with what is shown. Folded, it is one line of types,
+ * still switches.
  */
 import { h } from "preact";
 import { useState } from "preact/hooks";
@@ -50,7 +50,7 @@ const num = (c: Count) => (c.shown === c.n ? String(c.n) : `${c.shown} of ${c.n}
 export function Legend({ facets, hide, set }: { facets: Facets; hide: Hide; set: (next: Hide | undefined) => void }) {
   const [open, setOpen] = useState(false);
   const [opened, setOpened] = useState<Record<string, boolean>>({});
-  const any = Object.keys(hide).some((k) => k !== "relay");
+  const any = Object.keys(hide).length > 0;
   const box = (on: boolean, flip: () => void, label: unknown, c: Count, title: string) => html`
     <label class=${on ? "" : "off"} title=${title}>
       <input type="checkbox" checked=${on} onChange=${flip} />
@@ -67,7 +67,7 @@ export function Legend({ facets, hide, set }: { facets: Facets; hide: Hide; set:
         <div class="hd">
           <b>${num(facets.items)}</b> items
           <span class="sp"></span>
-          ${any && html`<button class="ln" onClick=${() => set(hide.relay ? { relay: true } : undefined)} title="Show everything again">show all</button>`}
+          ${any && html`<button class="ln" onClick=${() => set(undefined)} title="Show everything again">show all</button>`}
           <button class="ln" onClick=${() => setOpen(true)} title="Open the legend: every status, kind and link, each a switch">filter ▴</button>
         </div>
         <div class="inline">${facets.types.map((t) => html`<span key=${t.name}>${typeBox(t)}</span>`)}</div>
@@ -79,7 +79,7 @@ export function Legend({ facets, hide, set }: { facets: Facets; hide: Hide; set:
       <div class="hd">
         <span>showing <b>${num(facets.items)}</b> items</span>
         <span class="sp"></span>
-        ${any && html`<button onClick=${() => set(hide.relay ? { relay: true } : undefined)} title="Show everything again">show all</button>`}
+        ${any && html`<button onClick=${() => set(undefined)} title="Show everything again">show all</button>`}
         <button class="ln" onClick=${() => setOpen(false)} title="Fold the legend to one line">fold ▾</button>
       </div>
       <div class="grp">
@@ -112,12 +112,6 @@ export function Legend({ facets, hide, set }: { facets: Facets; hide: Hide; set:
       <div class="grp">
         <div class="gt">links</div>
         ${facets.links.map((l) => box(!hide.links?.includes(l.name), () => set(toggle(hide, "links", l.name)), html`<svg viewBox="0 0 20 8"><path d="M0 4H20" stroke="currentColor" stroke-width=${l.name === "part_of" ? 1.6 : 1} /></svg><span class="nm">${l.name}</span>`, l, `Show or hide ${l.name} links`))}
-      </div>
-      <div class="grp">
-        <label title="Off: hidden items keep their place, so the picture does not move. On: the layout settles again with only what is shown.">
-          <input type="checkbox" checked=${!!hide.relay} onChange=${() => set(toggle(hide, "relay"))} />
-          <span class="nm">lay out only what is shown</span>
-        </label>
       </div>
       <div class="note"><i class="ring"></i> pointed at: it and its links light, the rest dims</div>
     </div>

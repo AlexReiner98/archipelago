@@ -24,7 +24,8 @@ export const isOn = (b: Behaviour, S: Settings) => (S[`on_${b.name}`] ?? (b.on ?
 export const RUN: Dial[] = [
   { key: "alpha_decay", label: "cooling", min: 0.001, max: 0.1, step: 0.001, value: 0.012, doc: "How much warmth the run loses each step: about 450 steps from hot to asleep." },
   { key: "alpha_min", label: "asleep under", min: 0.0005, max: 0.05, step: 0.0005, value: 0.004, doc: "The forces sleep once warmth falls under this." },
-  { key: "alpha_warm", label: "rewarm to", min: 0, max: 1, step: 0.01, value: 0.25, doc: "How warm a new answer, a drag or a dial makes the run again." },
+  { key: "alpha_warm", label: "rewarm to", min: 0, max: 1, step: 0.01, value: 0.25, doc: "How warm a change to the map, a drag or a dial makes the run again." },
+  { key: "alpha_filter", label: "filter rewarms to", min: 0, max: 1, step: 0.01, value: 0.6, doc: "How warm a change to the legend's filter makes the run: the graph settles again with what is shown (1: from fully hot)." },
   { key: "friction", label: "friction", min: 0, max: 0.95, step: 0.01, value: 0.4, doc: "The share of its speed a particle loses each step." },
   { key: "speed_most", label: "fastest", min: 1, max: 100, step: 1, value: 30, doc: "No particle moves further than this in one step." },
   { key: "dt", label: "time per step", min: 0.1, max: 3, step: 0.05, value: 1, doc: "Physics time per step." },
@@ -87,9 +88,9 @@ export function step(g: G, S: Settings, list: Behaviour[] = BEHAVIOURS): number 
   return sim.alpha;
 }
 
-/** Warm the run again, never past `alpha_warm` unless it is warmer already. */
-export function warm(g: G, S: Settings): void {
-  g.sim.alpha = Math.max(g.sim.alpha, S.alpha_warm!);
+/** Warm the run again, to `to` (else `alpha_warm`), never cooler than it is already. */
+export function warm(g: G, S: Settings, to?: number): void {
+  g.sim.alpha = Math.max(g.sim.alpha, to ?? S.alpha_warm!);
 }
 
 /** Every dial's starting value, by key. */

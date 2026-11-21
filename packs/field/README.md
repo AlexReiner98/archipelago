@@ -31,9 +31,10 @@ particle, it only lights what it finds and fades the rest (`query_fade`).
 - **The legend is the filter** ([legend.ts](legend.ts), [filter.ts](filter.ts)).
   Each type (with its colour), each of a type's statuses and kinds, open
   and closed, items with no links, and each link type is a switch, with how
-  many the map has and how many show. Hidden items are not drawn and hold
-  their place, so the picture does not move; "lay out only what is shown"
-  settles a layout of what is left instead. What is hidden is `field.hide`
+  many the map has and how many show. What is hidden is left out of the
+  layout: each change settles the graph again with what is shown, warmed
+  to `alpha_filter` (a run dial), kept particles starting where they were
+  and returning ones beside a neighbour. What is hidden is `field.hide`
   (page scope), so an agent can set it; the browser remembers it. Folded,
   the legend is one line of type switches.
 - **Reading it.** Closed items are drawn faded. The most linked items

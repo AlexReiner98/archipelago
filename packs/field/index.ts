@@ -98,7 +98,7 @@ const fieldPack: Pack = {
       const r = remembered();
       if (Object.keys(r).length) set.set(DIALS, r);
     }
-    ctx.get<HereDeclare>("here.declare").declare({ key: HIDE, scope: "page", doc: "What the field's legend hides: types, type:status, type:kind, open, closed, links, lone; relay to lay out only what is shown." });
+    ctx.get<HereDeclare>("here.declare").declare({ key: HIDE, scope: "page", doc: "What the field's legend hides: types, type:status, type:kind, open, closed, links, lone. The layout is what is left." });
     if (here.get(HIDE) === undefined) {
       try {
         const h = JSON.parse(localStorage.getItem(REMEMBER_HIDE) ?? "null");
@@ -177,16 +177,15 @@ const fieldPack: Pack = {
           engine.current = null;
         };
       }, []);
-      // What the legend hides: drawn nowhere and holding its place, or (relay) left out of the layout.
+      // What the legend hides is left out of the layout: a change to it settles the graph again with what is left.
       const hide = (useHere<Json>(HIDE) ?? {}) as Hide;
       const hideKey = JSON.stringify(hide);
-      const vis = useMemo(() => shown(input, hide), [input, hideKey]);
       const facets = useMemo(() => facetsOf(input, hide), [input, hideKey]);
-      const hiding = Object.keys(hide).some((k) => k !== "relay");
-      const laid = useMemo<FieldIn>(
-        () => (hide.relay && hiding ? { items: input.items.filter((it) => vis.items.has(it.id)), links: input.links.filter((l) => vis.links.has(l.id)) } : input),
-        [input, hide.relay && hiding ? hideKey : ""],
-      );
+      const laid = useMemo<FieldIn>(() => {
+        if (!Object.keys(hide).length) return input;
+        const vis = shown(input, hide);
+        return { items: input.items.filter((it) => vis.items.has(it.id)), links: input.links.filter((l) => vis.links.has(l.id)) };
+      }, [input, hideKey]);
       const setHide = (next: Hide | undefined) => {
         const v = next && Object.keys(next).length ? next : undefined;
         try {
@@ -197,8 +196,13 @@ const fieldPack: Pack = {
         }
         set.set(HIDE, v as Json | undefined);
       };
-      useEffect(() => engine.current?.input(laid), [laid]);
-      useEffect(() => engine.current?.show(hiding && !hide.relay ? vis : null), [vis, laid]);
+      // A filter change warms the run to alpha_filter (a full resolve at 1); a change to the map, to alpha_warm.
+      const lastHide = useRef(hideKey);
+      useEffect(() => {
+        const byFilter = lastHide.current !== hideKey;
+        lastHide.current = hideKey;
+        engine.current?.input(laid, byFilter ? S.alpha_filter : undefined);
+      }, [laid]);
       useEffect(() => engine.current?.found(found), [found, laid]);
 
       const last = useRef<Settings>(S);

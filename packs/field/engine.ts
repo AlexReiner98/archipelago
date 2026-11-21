@@ -30,11 +30,10 @@ export interface Stats {
 }
 
 export interface Field {
-  input(next: FieldIn): void;
+  /** A new map to lay out; `warmTo` is how warm the run gets (else alpha_warm). */
+  input(next: FieldIn, warmTo?: number): void;
   /** What the find line finds, lit over the rest, or null for none: it never moves a particle. */
   found(ids: Set<Id> | null): void;
-  /** What the legend shows (items and links by id), or null for all: the rest is not drawn, and holds its place. */
-  show(shown: { items: Set<Id>; links: Set<Id> } | null): void;
   settings(S: Settings, then: Dial["then"] | "none"): void;
   reseed(): void;
   fit(): void;
@@ -59,12 +58,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   let colours: Ink = ink(canvas);
   let hover = -1, dirty = true, awake = false, stopped = false;
   let foundIds: Set<Id> | null = null, match: Uint8Array | null = null;
-  let shownIds: { items: Set<Id>; links: Set<Id> } | null = null, vis: Uint8Array | null = null, lvis: Uint8Array | null = null;
   const remark = () => {
     match = foundIds ? Uint8Array.from(g.id, (id) => (foundIds!.has(id) ? 1 : 0)) : null;
-    vis = shownIds ? Uint8Array.from(g.id, (id) => (shownIds!.items.has(id) ? 1 : 0)) : null;
-    lvis = shownIds ? Uint8Array.from(g.linkId, (id) => (shownIds!.links.has(id) ? 1 : 0)) : null;
-    if (hover >= 0 && vis && !vis[hover]) hover = -1;
     dirty = true;
   };
   let stepMs = 0, runStart = { steps: 0, at: 0 }, settledIn: Stats["settledIn"];
@@ -72,7 +67,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
 
   /** The camera that fits the whole picture now. */
   const fitted = (): Cam => {
-    const [x0, y0, x1, y1] = bounds(g, vis), { width, height } = size();
+    const [x0, y0, x1, y1] = bounds(g), { width, height } = size();
     const pad = S.fit_pad!;
     const w = Math.max(1, width - 2 * pad), h = Math.max(1, height - 2 * pad);
     const k = Math.min(w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0));
@@ -140,7 +135,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   };
   const under = (sx: number, sy: number) => {
     const [wx, wy] = toWorld(sx, sy);
-    return pick.nearest(wx, wy, 4 / cam.k, vis ? (i) => !!vis![i] : undefined);
+    return pick.nearest(wx, wy, 4 / cam.k);
   };
 
   // ─── The loop ───
@@ -156,7 +151,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
         canvas.height = Math.round(s.height * s.dpr);
       }
       const easing = light.ease(g, hover, S);
-      paint(c, g, cam, S, light, colours, pick, s, match, vis, lvis);
+      paint(c, g, cam, S, light, colours, pick, s, match);
       dirty = easing || following;
     }
     raf = requestAnimationFrame(tick);
@@ -251,26 +246,21 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   canvas.addEventListener("dblclick", onDbl);
 
   return {
-    input(next) {
+    input(next, warmTo) {
       const first = !g.n;
       g = build(next, g.n ? g : null);
       seed(g, S);
       if (first) g.sim = { alpha: 1, steps: 0 };
-      else warm(g, S);
+      else warm(g, S, warmTo);
       pick = grid(g);
       hover = -1;
       remark();
-      if (!cam.moved) fit();
+      if (first && !cam.moved) fit();
       wake();
     },
     found(ids) {
       foundIds = ids;
       remark();
-    },
-    show(next) {
-      shownIds = next;
-      remark();
-      if (!cam.moved) following = true;
     },
     settings(next, then) {
       S = next;

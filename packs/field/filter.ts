@@ -3,8 +3,8 @@
  *
  * The filter is what is hidden (so a type the map gains later shows): types,
  * a type's statuses or kinds, open or closed items, link types, and items
- * with no link. Hidden items keep their place (the layout is the whole map)
- * unless `relay` is set: then the layout is only what is shown.
+ * with no link. What is hidden is left out of the layout: the graph settles
+ * again with what is shown.
  */
 import type { Id } from "../../spec/common.ts";
 import { typeColours, type FieldIn } from "./graph.ts";
@@ -20,8 +20,6 @@ export interface Hide {
   links?: string[];
   /** Items with no link among the drawn ones. */
   lone?: boolean;
-  /** Lay out only what is shown, instead of hiding in place. */
-  relay?: boolean;
 }
 
 export interface Count {
@@ -115,11 +113,11 @@ export function facets(input: FieldIn, hide: Hide): Facets {
 
 /** `hide` with one value switched: a list entry added or taken out, or a flag flipped. */
 export function toggle(hide: Hide, key: "types" | "statuses" | "kinds" | "links", value: string): Hide;
-export function toggle(hide: Hide, key: "open" | "closed" | "lone" | "relay"): Hide;
+export function toggle(hide: Hide, key: "open" | "closed" | "lone"): Hide;
 export function toggle(hide: Hide, key: keyof Hide, value?: string): Hide {
   const next: Hide = { ...hide };
   if (value === undefined) {
-    const flag = key as "open" | "closed" | "lone" | "relay";
+    const flag = key as "open" | "closed" | "lone";
     if (hide[flag]) delete next[flag];
     else next[flag] = true;
     return next;
