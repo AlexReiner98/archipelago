@@ -6,10 +6,12 @@
  * and speed, so a change to the map is seen as motion, not a new picture.
  */
 import type { Id } from "../../spec/common.ts";
+import { CIRCLE } from "./shapes.ts";
 
 /** What the field draws: items and the links among them. No item belongs to a group: clusters come from the links. */
 export interface FieldIn {
-  items: { id: Id; title: string; type: string; status: string; closed: boolean; kind?: string }[];
+  /** `shape`: the base's mark shape, an index in SHAPES (absent: circle); `side`: where the status sits, an index in SIDES (absent: done). */
+  items: { id: Id; title: string; type: string; status: string; closed: boolean; kind?: string; shape?: number; side?: number }[];
   /**
    * The order types take their colours in: the whole map's types, so a
    * type keeps its colour whatever a filter leaves out. Absent, the items'.
@@ -25,7 +27,16 @@ export type Settings = Record<string, number>;
 export interface Sim {
   alpha: number;
   steps: number;
+  /** The particles' mean speed squared, after the last step. */
   energy?: number;
+  /** The mean push left on a particle, at the last step. */
+  push?: number;
+  /** How far particles moved in the last step, on average. */
+  moved?: number;
+  /** Whether the run ended because the pushes balance (false: it hit steps_most). */
+  settled?: boolean;
+  /** The step this run was started or warmed at: steps_most counts from it. */
+  from?: number;
 }
 
 export interface G {
@@ -36,6 +47,9 @@ export interface G {
   type: string[];
   status: string[];
   closed: Uint8Array;
+  /** Each particle's shape (SHAPES) and how full it is (SIDES): shapes.ts. */
+  shape: Uint8Array;
+  side: Uint8Array;
   /** The types drawn, each with its colour; a particle's colour is its type's. */
   types: { name: string; colour: string }[];
   typeIx: Int32Array;
@@ -84,6 +98,8 @@ export function build(input: FieldIn, last: G | null, pal: string[] = []): G {
     type: items.map((it) => it.type),
     status: items.map((it) => it.status),
     closed: Uint8Array.from(items, (it) => (it.closed ? 1 : 0)),
+    shape: Uint8Array.from(items, (it) => it.shape ?? CIRCLE),
+    side: Uint8Array.from(items, (it) => it.side ?? 2),
     types,
     typeIx: new Int32Array(n),
     linkKinds,
@@ -194,16 +210,19 @@ export function sizes(g: G, S: Settings): void {
   for (let i = 0; i < g.n; i++) g.r[i] = S.node_size! * (1 + S.node_grow! * Math.log1p(g.degree[i]!));
 }
 
-export function bounds(g: G): [number, number, number, number] {
+/** The box round every particle, or only those `only` marks (when it marks any). */
+export function bounds(g: G, only?: (i: number) => boolean): [number, number, number, number] {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  if (only && !Array.from({ length: g.n }, (_, i) => i).some(only)) only = undefined;
   for (let i = 0; i < g.n; i++) {
+    if (only && !only(i)) continue;
     const x = g.x[i]!, y = g.y[i]!, r = g.r[i]!;
     if (x - r < x0) x0 = x - r;
     if (y - r < y0) y0 = y - r;
     if (x + r > x1) x1 = x + r;
     if (y + r > y1) y1 = y + r;
   }
-  return g.n ? [x0, y0, x1, y1] : [0, 0, 1, 1];
+  return x0 < Infinity ? [x0, y0, x1, y1] : [0, 0, 1, 1];
 }
 
 export function neighbours(g: G, i: number): Set<number> {
@@ -251,7 +270,7 @@ export function grid(g: G, cellOf?: number): Grid {
     each,
     nearest(x, y, slack) {
       let best = -1, bd = Infinity;
-      const reach = cell;
+      const reach = cell + slack;
       each(x - reach, y - reach, x + reach, y + reach, (i) => {
         const d = Math.hypot(g.x[i]! - x, g.y[i]! - y) - g.r[i]!;
         if (d < slack && d < bd) {

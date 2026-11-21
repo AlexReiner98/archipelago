@@ -7,6 +7,7 @@
  * again with what is shown.
  */
 import type { Id } from "../../spec/common.ts";
+import type { Dial } from "./behaviour.ts";
 import { typeColours, type FieldIn } from "./graph.ts";
 
 export interface Hide {
@@ -133,3 +134,41 @@ export function toggle(hide: Hide, key: keyof Hide, value?: string): Hide {
 }
 
 export { NO_KIND };
+
+/** Found by the find line: lit, named first. */
+export const FOUND = 2;
+/** Within `find_steps` links of what is found: drawn in full, as its context. */
+export const NEAR = 1;
+/** Within `find_faint` more links: drawn at `query_fade`, the edge of the context. */
+export const FAINT = 0;
+
+/** The find line's dials: how much of the map round what it finds stays in the layout. */
+export const FIND: Dial[] = [
+  { key: "find_steps", label: "keeps steps", min: 0, max: 4, step: 1, value: 1, then: "paint", doc: "While the find line has words, what it finds stays, with what lies this many links from it, drawn in full; the rest of the map leaves the layout and what is kept settles again." },
+  { key: "find_faint", label: "then faint steps", min: 0, max: 4, step: 1, value: 1, then: "paint", doc: "This many links further still stay too, drawn faint (the drawing's 'find fades rest to')." },
+  { key: "find_follow_ms", label: "camera jumps in", min: 0, max: 3000, step: 50, value: 350, then: "paint", doc: "When the find line's words change, how fast the view goes to what is kept, in ms (about two thirds of the way in this time; 0: it snaps)." },
+];
+
+/**
+ * What the find line keeps: each item within `steps + faint` links of one
+ * it finds (over the links given, so a hidden link type is not walked), by
+ * how it is drawn: FOUND, NEAR or FAINT. Items not in `items` are never kept.
+ */
+export function around(input: FieldIn, found: Set<Id>, steps: number, faint: number): Map<Id, number> {
+  const ids = new Set(input.items.map((it) => it.id));
+  const next = new Map<Id, Id[]>();
+  for (const l of input.links) {
+    if (!ids.has(l.from) || !ids.has(l.to)) continue;
+    (next.get(l.from) ?? next.set(l.from, []).get(l.from)!).push(l.to);
+    (next.get(l.to) ?? next.set(l.to, []).get(l.to)!).push(l.from);
+  }
+  const level = new Map<Id, number>();
+  let ring: Id[] = [];
+  for (const id of found) if (ids.has(id)) level.set(id, FOUND), ring.push(id);
+  for (let d = 1; d <= steps + faint && ring.length; d++) {
+    const out: Id[] = [];
+    for (const id of ring) for (const j of next.get(id) ?? []) if (!level.has(j)) level.set(j, d <= steps ? NEAR : FAINT), out.push(j);
+    ring = out;
+  }
+  return level;
+}

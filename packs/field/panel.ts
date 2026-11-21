@@ -21,7 +21,7 @@ export const PANEL_STYLE = `
 .fl-panel::-webkit-scrollbar-thumb:hover { background:var(--dim); }
 .fl-run { padding:6px 10px; border-bottom:1px solid var(--line); color:var(--dim); font-variant-numeric:tabular-nums; display:grid; grid-template-columns:auto 1fr; column-gap:10px; row-gap:1px; }
 .fl-run b { color:var(--fg); font-weight:600; }
-.fl-run .st-settling { color:var(--pick); } .fl-run .st-settled { color:var(--held); }
+.fl-run .st-settling { color:var(--pick); } .fl-run .st-settled { color:var(--held); } .fl-run .st-stopped { color:var(--failed, var(--pick)); }
 .fl-acts { display:flex; gap:6px; padding:6px 10px; border-bottom:1px solid var(--line); }
 .fl-acts button { font:inherit; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:1px 8px; cursor:pointer; }
 .fl-acts button:hover { border-color:var(--dim); }
@@ -95,6 +95,7 @@ const RunLine = ({ stats, found }: { stats: () => Stats | undefined; found: numb
       ${found !== null && html`<span>found</span><span><b>${found}</b> lit by the find line</span>`}
       <span>step</span><span><b>${s.steps}</b> · ${s.ms.toFixed(1)} ms each</span>
       <span>warmth</span><span>${s.alpha.toFixed(3)}</span>
+      ${s.moved !== undefined && html`<span>moves</span><span title="How far particles moved in the last step, on average, and the mean push left on one">${s.moved.toFixed(3)} a step · push ${(s.push ?? 0).toFixed(3)}</span>`}
       ${s.settledIn && html`<span>last settle</span><span>${s.settledIn.steps} steps in ${(s.settledIn.ms / 1000).toFixed(1)} s</span>`}
     </div>
   `;
