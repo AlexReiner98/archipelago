@@ -22,8 +22,7 @@ export interface Stats {
   m: number;
   steps: number;
   alpha: number;
-  crossings: number;
-  state: "settling" | "untangling" | "settled";
+  state: "settling" | "settled";
   /** The mean time of a step over the last frames, in ms. */
   ms: number;
   /** Steps and time from the last seed or warm to settled. */
@@ -250,7 +249,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       const first = !g.n;
       g = build(next, g.n ? g : null);
       seed(g, S);
-      if (first) g.sim = { alpha: 1, steps: 0, crossings: 0 };
+      if (first) g.sim = { alpha: 1, steps: 0 };
       else warm(g, S);
       pick = grid(g);
       hover = -1;
@@ -275,7 +274,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       g.vy.fill(0);
       g.vz.fill(0);
       seed(g, S);
-      g.sim = { alpha: 1, steps: 0, crossings: 0 };
+      g.sim = { alpha: 1, steps: 0 };
       pick = grid(g);
       cam.moved = false;
       fit();
@@ -288,9 +287,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       dirty = true;
     },
     stats() {
-      const un = g.sim.un as { done?: boolean } | undefined;
-      const state = g.sim.alpha >= S.alpha_min! ? "settling" : awake && un && !un.done ? "untangling" : awake ? "untangling" : "settled";
-      return { n: g.n, m: g.m, steps: g.sim.steps, alpha: g.sim.alpha, crossings: g.sim.crossings, state, ms: stepMs, settledIn };
+      const state = awake ? "settling" : "settled";
+      return { n: g.n, m: g.m, steps: g.sim.steps, alpha: g.sim.alpha, state, ms: stepMs, settledIn };
     },
     places() {
       return new Map(g.id.map((id, i) => [id, [g.x[i]!, g.y[i]!]]));

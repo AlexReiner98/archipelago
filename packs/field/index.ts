@@ -64,7 +64,7 @@ const STYLE = `
 .fl-body { display:flex; min-height:0; }
 .fl-canvas { flex:1; min-width:0; position:relative; overflow:hidden; }
 .fl-canvas canvas { width:100%; height:100%; display:block; cursor:grab; touch-action:none; }
-.fl-side { width:min(380px, 40%); flex:none; border-left:1px solid var(--line); overflow:auto; }
+.fl-side { width:min(380px, 40%); flex:none; border-left:1px solid var(--line); overflow:auto; scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--dim) 55%, transparent) transparent; }
 .fl-tip { position:absolute; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:3px 7px; max-width:320px; box-shadow:0 2px 8px rgb(0 0 0 / 12%); }
 .fl-tip .s { color:var(--dim); font-size:11px; }
 .fl-key { position:absolute; left:8px; bottom:6px; color:var(--dim); font-size:11px; background:color-mix(in srgb, var(--bg) 88%, transparent); padding:4px 8px; border-radius:3px; border:1px solid var(--line); display:flex; flex-wrap:wrap; gap:2px 12px; max-width:calc(100% - 32px); pointer-events:none; }
@@ -133,17 +133,16 @@ const fieldPack: Pack = {
       const picked = useHere<string>(KEYS.item);
       const over = (useHere<Record<string, number>>(DIALS) ?? {}) as Settings;
       const linkNames = index.links().map((l) => l.name).join(" ");
-      // Every dial, by section: the start, each behaviour, the run, the drawing.
+      // Every dial, by section: the start, each behaviour, the run. The drawing's (paint.ts DRAW) keep their values, out of the panel.
       const sections = useMemo<Section[]>(() => {
         const links = linkNames.split(" ").filter(Boolean);
         return [
           { key: "start", title: "start", doc: "What is drawn, and where particles start.", dials: START },
           ...BEHAVIOURS.map((b) => ({ key: b.name, title: b.name, doc: b.doc, behaviour: b, dials: b.dials({ links }) })),
           { key: "run", title: "run", doc: "How the run cools and moves.", dials: RUN },
-          { key: "draw", title: "draw", doc: "How particles, links and words are drawn.", dials: DRAW },
         ];
       }, [linkNames]);
-      const all = useMemo(() => sections.flatMap((s) => s.dials), [sections]);
+      const all = useMemo(() => [...sections.flatMap((s) => s.dials), ...DRAW], [sections]);
       const S = useMemo(() => ({ ...defaults(all), ...over }), [all, JSON.stringify(over)]);
 
       // The layout is always the whole map: the find line never moves a particle, it only lights what it finds.

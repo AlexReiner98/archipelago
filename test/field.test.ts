@@ -8,7 +8,6 @@ import assert from "node:assert/strict";
 import { build, seed, type FieldIn } from "../packs/field/graph.ts";
 import { BEHAVIOURS, RUN, defaults, step } from "../packs/field/step.ts";
 import { DRAW } from "../packs/field/paint.ts";
-import { segments } from "../packs/field/segments.ts";
 
 /** A seeded random, so the map is the same each run. */
 function rand(s: number) {
@@ -62,37 +61,22 @@ test("every number a behaviour reads is one of its dials", () => {
 
 test("2000 items settle in about 460 steps, a few ms each, the same way twice", () => {
   const input = sample();
-  // The forces alone: untangle's own work is timed on a smaller map below.
-  const a = settle(input, { ...settings(), on_untangle: 0 });
-  console.log(`settled: ${a.forces} force steps, ${a.steps} in all, ${a.ms.toFixed(0)} ms (${(a.ms / a.steps).toFixed(1)} ms a step), ${a.g.sim.crossings} crossings`);
+  const a = settle(input);
+  console.log(`settled: ${a.forces} force steps, ${a.steps} in all, ${a.ms.toFixed(0)} ms (${(a.ms / a.steps).toFixed(1)} ms a step)`);
   assert.ok(a.forces > 400 && a.forces < 520, `${a.forces} force steps`);
   assert.ok(a.ms / a.steps < 40, `${(a.ms / a.steps).toFixed(1)} ms a step`);
   const small = sample(300, 8);
   assert.deepEqual([...settle(small).g.x], [...settle(small).g.x], "the same answer settles the same way");
 });
 
-test("untangle takes crossings down, and leaves no particle on another", () => {
-  const input = sample(600, 12);
-  const off = settle(input, { ...settings(), on_untangle: 0 });
-  const on = settle(input);
-  const before = segments(off.g).count(), after = segments(on.g).count();
-  console.log(`crossings: ${before} without untangle, ${after} with`);
-  assert.ok(after < before * 0.8, `${after} against ${before}`);
-  const g = on.g;
+test("collide leaves no particle on another, and part_of keeps a tree together", () => {
+  const { g } = settle(sample(600, 12));
   let overlaps = 0;
   for (let i = 0; i < g.n; i++) for (let j = i + 1; j < g.n; j++) if (Math.hypot(g.x[i]! - g.x[j]!, g.y[i]! - g.y[j]!) < (g.r[i]! + g.r[j]!) * 0.9) overlaps++;
   assert.ok(overlaps <= g.n * 0.01, `${overlaps} overlaps`);
-});
-
-test("flow puts what depends on something below it, more often than without it (untangle off: its moves ignore flow)", () => {
-  const input = sample(600, 12);
-  const below = (S: ReturnType<typeof settings>) => {
-    const { g } = settle(input, S);
-    let down = 0, all = 0;
-    for (let e = 0; e < g.m; e++) if (g.linkKinds[g.kind[e]!] === "depends_on") all++, (down += g.y[g.a[e]!]! > g.y[g.b[e]!]! ? 1 : 0);
-    return down / all;
-  };
-  const off = below({ ...settings(), on_flow: 0, on_untangle: 0 }), on = below({ ...settings(), on_untangle: 0 });
-  console.log(`depends_on pointing down: ${(off * 100).toFixed(0)}% without flow, ${(on * 100).toFixed(0)}% with`);
-  assert.ok(on > off + 0.08, `${on} against ${off}`);
+  // A part_of link ends up shorter than the average distance between any two particles.
+  let part = 0, parts = 0, any = 0;
+  for (let e = 0; e < g.m; e++) if (g.linkKinds[g.kind[e]!] === "part_of") (part += Math.hypot(g.x[g.a[e]!]! - g.x[g.b[e]!]!, g.y[g.a[e]!]! - g.y[g.b[e]!]!)), parts++;
+  for (let i = 0; i < 200; i++) any += Math.hypot(g.x[i]! - g.x[599 - i]!, g.y[i]! - g.y[599 - i]!);
+  assert.ok(part / parts < (any / 200) / 3, `${(part / parts).toFixed(0)} against ${(any / 200).toFixed(0)}`);
 });

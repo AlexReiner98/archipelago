@@ -15,29 +15,24 @@ particle, it only lights what it finds and fades the rest (`query_fade`).
   moves the particles. Each is a module in [behaviours/](behaviours):
   `gather`, `repel` (Barnes-Hut on an [octree](octree.ts), with a reach
   past which particles don't push, so gather keeps clusters together),
-  `springs` (length and stiffness per link type), `collide`, `untangle`,
-  `flow` and `plane` (off by default). A behaviour is
+  `springs` (length and stiffness per link type) and `collide`. A
+  behaviour is
   `{ name, doc, on, dials, apply, move?, busy?, firm? }`
   ([behaviour.ts](behaviour.ts)).
 - **Every number is a dial.** Each behaviour's dials, then the start, the
-  run and the drawing, are in the panel on the left, in sections that
+  run, are in the panel on the left, in sections that
   start closed and say how many of their dials are changed; springs are
   grouped by link type. Each dial says what it does on hover, and ↺ puts
   it back. Their values are `field.dials`
   (page scope), so an agent can set them; the browser remembers them.
-- **Untangle is sliced.** Once the run cools to `untangle_from`, each step
-  does at most `untangle_work` link tests, trying the particles in most
-  crossings at the middle of their neighbours or mirrored across what they
-  cross, and keeps a move only if crossings fall
-  ([segments.ts](segments.ts)). It goes on after the forces sleep until a
-  pass moves nothing.
 - **It settles to the end.** The physics runs on its own loop (a message
   channel), in slices of `frame_ms`, until no behaviour has work left;
   animation frames only paint. A tab in the background settles as fast.
 - **Reading it.** A legend gives each type's colour and count, what faded
   means (closed), a link, and the ring. The most linked items
   (`label_hubs`) are named at any zoom. The run line says how far the run
-  is, and that crossings are not counted while untangle is off.
+  is. How particles, links and words are drawn keeps its values in
+  `DRAW` ([paint.ts](paint.ts)), out of the panel.
 - **Hover** lights a particle, its links and its neighbours, dims the rest,
   and names them ([paint.ts](paint.ts)). A click sets `here.item`; the
   item page opens beside (`map.side`). Drag a particle to move it (it
@@ -48,5 +43,5 @@ particle, it only lights what it finds and fades the rest (`query_fade`).
 
 On 2000 items and about 2700 links the forces settle in about 460 steps at
 about 4 ms each (node, `test/field.test.ts`). The physics is ported from
-the old map's Field layout (14 Nov 2026), without its islands, bends and
-meaning.
+the old map's Field layout (14 Nov 2026), without its islands, untangle,
+flow, plane, bends and meaning.

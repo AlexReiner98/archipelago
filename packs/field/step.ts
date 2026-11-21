@@ -10,15 +10,12 @@
 import type { Behaviour, Dial } from "./behaviour.ts";
 import type { G, Settings } from "./graph.ts";
 import collide from "./behaviours/collide.ts";
-import flow from "./behaviours/flow.ts";
 import gather from "./behaviours/gather.ts";
-import plane from "./behaviours/plane.ts";
 import repel from "./behaviours/repel.ts";
 import springs from "./behaviours/springs.ts";
-import untangle from "./behaviours/untangle.ts";
 
 /** The behaviours, in the order they run. */
-export const BEHAVIOURS: Behaviour[] = [gather, repel, springs, collide, untangle, flow, plane];
+export const BEHAVIOURS: Behaviour[] = [gather, repel, springs, collide];
 
 /** Whether a behaviour runs: its `on_<name>` dial, else its own default. */
 export const isOn = (b: Behaviour, S: Settings) => (S[`on_${b.name}`] ?? (b.on ? 1 : 0)) > 0 && (S[`w_${b.name}`] ?? 1) > 0;
@@ -39,7 +36,7 @@ export function step(g: G, S: Settings, list: Behaviour[] = BEHAVIOURS): number 
   const sim = g.sim;
   const on = list.filter((b) => isOn(b, S));
   if (sim.alpha < S.alpha_min!) {
-    // Asleep, a search that is not done (untangle) still runs, alone, without the forces.
+    // Asleep, a behaviour with a search not yet done (busy) still runs, alone, without the forces.
     const busy = on.filter((b) => b.busy?.(sim));
     if (!busy.length) return 0;
     for (const b of busy) b.move?.(g, S, sim);
@@ -86,16 +83,13 @@ export function step(g: G, S: Settings, list: Behaviour[] = BEHAVIOURS): number 
   for (const b of on) b.move?.(g, S, sim);
   sim.alpha *= 1 - S.alpha_decay!;
   sim.steps++;
-  // Asleep, a map the plane holds ends flat; without the plane, z is never used.
-  if (sim.alpha < S.alpha_min! || !on.some((b) => b.name === "plane")) g.z.fill(0);
   sim.energy = energy / Math.max(1, n);
   return sim.alpha;
 }
 
-/** Warm the run again, never past `alpha_warm` unless it is warmer already; the searches start over. */
+/** Warm the run again, never past `alpha_warm` unless it is warmer already. */
 export function warm(g: G, S: Settings): void {
   g.sim.alpha = Math.max(g.sim.alpha, S.alpha_warm!);
-  g.sim.un = undefined;
 }
 
 /** Every dial's starting value, by key. */

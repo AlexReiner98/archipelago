@@ -2,7 +2,7 @@
  * What a behaviour is, and what a dial is. Each behaviour adds a push to
  * every particle's force; the step sums them, each times its weight, and
  * moves the particles. A behaviour may also move particles outright after
- * the step (`move`), for a search no force expresses (untangle).
+ * the step (`move`), for a search no force expresses.
  *
  * Every number a behaviour reads is one of its dials: the panel shows each,
  * so nothing is hard-coded. Its first dial is its weight, `w_<name>`.

@@ -1,7 +1,7 @@
 /**
  * Collide: two particles never overlap. A pair nearer than their radii and
  * a gap is pushed apart, found through a grid. Firm: its push is not cooled
- * with the run, so particles an untangle move put together part even late.
+ * with the run, so particles a hand put together part even late.
  */
 import { weight, type Behaviour } from "../behaviour.ts";
 

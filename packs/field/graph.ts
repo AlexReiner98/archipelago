@@ -16,15 +16,11 @@ export interface FieldIn {
 /** The dials' values, by key. */
 export type Settings = Record<string, number>;
 
-/** How the run goes: how warm it is, how far it has come, and the searches' own state. */
+/** How the run goes: how warm it is and how far it has come. */
 export interface Sim {
   alpha: number;
   steps: number;
-  crossings: number;
-  /** Untangle's search, when it runs. */
-  un?: unknown;
   energy?: number;
-  untangled?: number;
 }
 
 export interface G {
@@ -103,7 +99,7 @@ export function build(input: FieldIn, last: G | null): G {
     adj: new Int32Array(2 * m),
     incident: Array.from({ length: n }, () => []),
     idIx: at,
-    sim: last?.sim ? { ...last.sim, un: undefined } : { alpha: 1, steps: 0, crossings: 0 },
+    sim: last?.sim ? { ...last.sim } : { alpha: 1, steps: 0 },
     force: { x: f32(), y: f32(), z: f32() },
     total: { x: f32(), y: f32(), z: f32() },
   };
@@ -182,8 +178,7 @@ export function seed(g: G, S: Settings): void {
       g.x[i] = rr * Math.cos(s * golden);
       g.y[i] = rr * Math.sin(s * golden);
     }
-    // Out of the plane by a fixed amount each, so a run with the plane has a third direction to untangle in.
-    g.z[i] = reach * 0.1 * S.depth_seed! * (((i * 7919) % 101) / 50 - 1);
+    g.z[i] = 0;
     g.placed[i] = 1;
   });
   sizes(g, S);

@@ -1,7 +1,6 @@
 /**
  * The field's panel: how the run is going, then a section per behaviour,
- * with its switch and every one of its dials, then the start, the run and
- * the drawing. Sections start closed; each names how many of its dials
+ * with its switch and every one of its dials, then the start and the run. Sections start closed; each names how many of its dials
  * differ from where they started. Each dial says what it does on hover and
  * goes back to where it started with ↺.
  */
@@ -15,10 +14,14 @@ import type { Stats } from "./engine.ts";
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
 export const PANEL_STYLE = `
-.fl-panel { width:290px; flex:none; border-right:1px solid var(--line); overflow:auto; font-size:12px; background:var(--bg); }
+.fl-panel { width:290px; flex:none; border-right:1px solid var(--line); overflow:auto; font-size:12px; background:var(--bg); scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--dim) 55%, transparent) transparent; scrollbar-gutter:stable; }
+.fl-panel::-webkit-scrollbar { width:8px; }
+.fl-panel::-webkit-scrollbar-track { background:transparent; }
+.fl-panel::-webkit-scrollbar-thumb { background:color-mix(in srgb, var(--dim) 55%, transparent); border-radius:4px; border:2px solid var(--bg); }
+.fl-panel::-webkit-scrollbar-thumb:hover { background:var(--dim); }
 .fl-run { padding:6px 10px; border-bottom:1px solid var(--line); color:var(--dim); font-variant-numeric:tabular-nums; display:grid; grid-template-columns:auto 1fr; column-gap:10px; row-gap:1px; }
 .fl-run b { color:var(--fg); font-weight:600; }
-.fl-run .st-settling, .fl-run .st-untangling { color:var(--pick); } .fl-run .st-settled { color:var(--held); }
+.fl-run .st-settling { color:var(--pick); } .fl-run .st-settled { color:var(--held); }
 .fl-acts { display:flex; gap:6px; padding:6px 10px; border-bottom:1px solid var(--line); }
 .fl-acts button { font:inherit; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:1px 8px; cursor:pointer; }
 .fl-acts button:hover { border-color:var(--dim); }
@@ -78,7 +81,7 @@ const DialRow = ({ d, value, set }: { d: Dial; value: number; set: (key: string,
   `;
 };
 
-const RunLine = ({ stats, counting, found }: { stats: () => Stats | undefined; counting: boolean; found: number | null }) => {
+const RunLine = ({ stats, found }: { stats: () => Stats | undefined; found: number | null }) => {
   const [s, setS] = useState(stats());
   useEffect(() => {
     const t = setInterval(() => setS(stats()), 250);
@@ -92,7 +95,6 @@ const RunLine = ({ stats, counting, found }: { stats: () => Stats | undefined; c
       ${found !== null && html`<span>found</span><span><b>${found}</b> lit by the find line</span>`}
       <span>step</span><span><b>${s.steps}</b> · ${s.ms.toFixed(1)} ms each</span>
       <span>warmth</span><span>${s.alpha.toFixed(3)}</span>
-      <span>crossings</span>${counting ? html`<b>${s.crossings}</b>` : html`<span>not counted (untangle is off)</span>`}
       ${s.settledIn && html`<span>last settle</span><span>${s.settledIn.steps} steps in ${(s.settledIn.ms / 1000).toFixed(1)} s</span>`}
     </div>
   `;
@@ -108,11 +110,9 @@ export function Panel({ sections, S, set, reset, stats, reseed, fit, found }: {
   fit: () => void;
   found: number | null;
 }) {
-  const untangle = sections.find((s) => s.behaviour?.name === "untangle")?.behaviour;
-  const isOn = (b: Behaviour) => (S[`on_${b.name}`] ?? (b.on ? 1 : 0)) > 0 && (S[`w_${b.name}`] ?? 1) > 0;
   return html`
     <div class="fl-panel">
-      <${RunLine} stats=${stats} counting=${!!untangle && isOn(untangle)} found=${found} />
+      <${RunLine} stats=${stats} found=${found} />
       <div class="fl-acts">
         <button onClick=${reseed} title="Start every particle from its seed again and settle">Settle again</button>
         <button onClick=${fit} title="Fit the picture to the view (also: double-click the sea)">Fit</button>
