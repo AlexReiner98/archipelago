@@ -6,6 +6,7 @@
  * - `stateAt`: what the run had heard, refused and held back by then, and
  *   how often it said each node, node by node; and whether that is its end.
  * - `tickOf`: an event's mark on the timeline.
+ * - `nodeOf`: the node an event involves, for the node pane to follow.
  * - `holdsOf`: a profile's answer (`profile.read.hears`) as holds, for a
  *   profile looked at without a run.
  */
@@ -83,4 +84,23 @@ export function holdsOf(hearing: Map<string, Hearing>): Map<string, Hold> {
 export function indexAt(fraction: number, n: number): number {
   if (n <= 0) return -1;
   return Math.max(0, Math.min(n - 1, Math.floor(fraction * n)));
+}
+
+/**
+ * The node an event involves: its own; for an act, a node it failed (by the
+ * run's verdicts), else the nearest node said or refused in the moment just
+ * before it (the map's lines right above it). Nothing when none did.
+ */
+export function nodeOf(events: ExchangeEvent[], index: number, failedBy: { node: string; failed_by: number[] }[] = []): string | undefined {
+  const e = events[index];
+  if (!e) return undefined;
+  if (e.node) return e.node;
+  if (e.kind !== "act") return undefined;
+  const failed = failedBy.find((v) => v.failed_by.includes(e.seq));
+  if (failed) return failed.node;
+  for (let i = index - 1; i >= 0 && events[i]!.direction === "to_agent"; i--) {
+    const before = events[i]!;
+    if ((before.kind === "say" || before.kind === "refuse") && before.node) return before.node;
+  }
+  return undefined;
 }

@@ -9,7 +9,7 @@ import type { ExchangeEvent } from "../spec/exchange.ts";
 import { asText, expand, fold, pretty } from "../packs/harness/expand.ts";
 import type { NodeInfo } from "../spec/agent.ts";
 import { DECIDED, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
-import { holdsOf, indexAt, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
+import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 
 const base = { id: "e1", run: "r", seq: 3, time: "2026-11-21T09:00:00Z" };
 const labels = (e: ExchangeEvent) => expand(e).map((p) => p.label);
@@ -365,4 +365,17 @@ test("indexAt: a click on the strip lands on one of n equal ticks", () => {
   assert.equal(indexAt(1.2, 10), 9);
   assert.equal(indexAt(-1, 10), 0);
   assert.equal(indexAt(0.5, 0), -1);
+});
+
+test("nodeOf: an event's own node; an act's failed node, else the one told just before it", () => {
+  assert.equal(nodeOf(RUN, 1), "words/a");
+  // #5, an act: the map's lines above it (two holds, then a say) are its moment; the say is its node.
+  assert.equal(nodeOf(RUN, 4), "words/a");
+  // An act right after another act was told nothing.
+  assert.equal(nodeOf([ev(1, "say", { node: "words/a" }), ev(2, "act", { act: { kind: "tool", by: "agent" } }), ev(3, "act", { act: { kind: "tool", by: "agent" } })], 2), undefined);
+  assert.equal(nodeOf(RUN, 4, [{ node: "words/b", failed_by: [5] }]), "words/b");
+  const told = [ev(1, "say", { node: "words/x", place: "tool:Edit" }), ev(2, "say", { node: "words/y", place: "file:a.ts" }), ev(3, "act", { place: "tool:Edit", act: { kind: "tool", by: "agent" } })];
+  assert.equal(nodeOf(told, 2), "words/y");
+  assert.equal(nodeOf([ev(1, "begin")], 0), undefined);
+  assert.equal(nodeOf(RUN, 99), undefined);
 });

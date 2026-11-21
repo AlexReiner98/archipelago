@@ -64,7 +64,9 @@ a step at a time, "● live" (or "■ end") follows the end again.
 ## The run ([events.ts](events.ts))
 
 The line at the playhead is picked; those after it are faint. A click
-opens a line in place ([expand.ts](expand.ts)): for the map to the agent,
+picks its node for the node pane: its own, or for an act the node it
+failed, else the node told just before it (`nodeOf`, replay.ts); and it
+opens the line in place ([expand.ts](expand.ts)): for the map to the agent,
 the node, place, pack and what was said, whole; for the agent to the map,
 the act's input and output field by field, each label over its value.
 Each part folds past a dozen lines. A red edge: the event failed the node picked.

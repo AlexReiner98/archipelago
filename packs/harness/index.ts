@@ -34,7 +34,7 @@ import { ALL, hooks, PROFILE, type VerdictRead } from "./hooks.ts";
 import { KEEP_STYLE, keepParts } from "./keep.ts";
 import { packHues, radial, treeOf, type Grouping } from "./layout.ts";
 import { nodePane } from "./node.ts";
-import { holdsOf, playhead, stateAt } from "./replay.ts";
+import { holdsOf, nodeOf, playhead, stateAt } from "./replay.ts";
 import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
@@ -313,7 +313,8 @@ const harness: Pack = {
       if (all) return html`<${Runs} runs=${runs} />`;
       return html`<${Events} info=${info} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} node=${picked} profiles=${inProfiles} onPick=${(e: ExchangeEvent) => {
         set.set(KEYS.event, e.id);
-        if (e.node) set.set(KEYS.node, e.node);
+        // The node pane follows: the event's node, or for an act the node it failed or was told just before.
+        set.set(KEYS.node, nodeOf(events, events.indexOf(e), verdictsOfRun));
       }} />`;
     };
 
