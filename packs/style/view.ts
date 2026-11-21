@@ -4,6 +4,10 @@
  * scale and the spaces. It reads the page's tokens (spec/style.md), not
  * the style pack's data, so it shows whatever style is loaded, or the
  * plain fallback when none is.
+ *
+ * It is a section of the style pack's own page in the Packs view (the
+ * slot `docs.page`), not a view in the list: a reference for whoever
+ * builds a pack, out of the way of everyone else (Alex, 21 Nov 2026).
  */
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
@@ -45,7 +49,7 @@ const STYLE = sheet(`
 
 const styleView: Pack = {
   id: "style-view",
-  about: "The Style view: the colours, type and marks every view uses.",
+  about: "The style pack's page shows every colour, type size and mark, day and night.",
   inject: ["slot.fill"],
   apply(ctx: Context) {
     const Half = ({ scheme }: { scheme: "light" | "dark" }) => html`
@@ -83,7 +87,10 @@ const styleView: Pack = {
       document.head.append(el);
       return () => el.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "center", name: "view", title: "Style", view: View });
+    // Not a view of its own: a section of the style pack's page in the Packs view (docs' slot `docs.page`).
+    const Section = ({ pack }: { pack: { id: string } }) =>
+      pack.id === "style" ? html`<section class="dk-sec"><h4>Every token, as drawn now</h4><${View} /></section>` : null;
+    ctx.get<SlotFill>("slot.fill").fill({ slot: "docs.page", name: "tokens", view: Section as any });
   },
 };
 

@@ -57,7 +57,7 @@ export interface View {
 }
 
 export interface Config {
-  /** The kind that is home while no view item is tagged home. Default `map`. */
+  /** The kind that is home while no view item is tagged home. Default `field`. */
   home?: string;
   /** Kinds listed next after home, in order. */
   pinned?: string[];
@@ -99,7 +99,7 @@ export function views(kinds: Kind[], rows: Row[], parent: (id: Id) => { id: Id; 
   // One home: the newest item tagged home (ids grow with time), else the configured kind, else the first.
   const tagged = stored.filter((v) => v.home).sort((a, b) => (a.id < b.id ? 1 : -1));
   for (const v of stored) v.home = false;
-  const home = tagged[0] ?? seeded.find((v) => v.id === (config.home ?? "map")) ?? seeded[0] ?? stored[0];
+  const home = tagged[0] ?? seeded.find((v) => v.id === (config.home ?? "field")) ?? seeded[0] ?? stored[0];
   if (home) home.home = true;
 
   const all = [...seeded, ...stored];

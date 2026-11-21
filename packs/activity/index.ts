@@ -37,7 +37,8 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 
 export const VIEW = "activity/view";
 const HARNESS = "harness/view";
-const MAP = "map/map";
+/** The view an item opens in from Activity: Field, home. */
+const OPENS_IN = "field/field";
 /** Change sets read per page, and runs. */
 const CHANGES = 100;
 const RUNS = 50;
@@ -210,7 +211,7 @@ const activity: Pack = {
 
     const openItem = (id: string) => {
       set.set(KEYS.item, id);
-      set.set(KEYS.view, MAP);
+      set.set(KEYS.view, OPENS_IN);
     };
     const openRun = (run: string) => {
       set.set(KEYS.run, run);

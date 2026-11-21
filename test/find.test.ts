@@ -114,21 +114,22 @@ test("find.line jumps: the item is looked at, shown in the view, and the line si
   assert.deepEqual(
     fills.map((f) => [f.slot, f.name, (f.when as Record<string, unknown>)["here.view"]]),
     [
-      ["top", "find", DRAWS[0]],
-      ["top", "find-field", DRAWS[1]],
+      ["top", "find", "map/map"],
+      ["top", "find-field", "field/field"],
     ],
   );
+  assert.equal(DRAWS[0], "field/field", "a jump opens Field, home");
   set.set("here.view", "harness/run");
   line.jump("b");
   assert.equal(read.get("here.item"), "b");
   assert.equal(read.get(QUERY), undefined, "the empty query draws it: kept");
-  assert.equal(read.get("here.view"), "map/map", "from a view that does not draw the query, to Map");
+  assert.equal(read.get("here.view"), "field/field", "from a view that does not draw the query, to Field");
 
-  set.set("here.view", "field/field");
+  set.set("here.view", "map/map");
   line.jump("a");
   assert.equal(read.get("here.item"), "a");
   assert.equal(read.get(QUERY), "near:a", "a closed item, among its neighbours");
-  assert.equal(read.get("here.view"), "field/field", "Field draws the query: it stays");
+  assert.equal(read.get("here.view"), "map/map", "Map, where it's on, draws the query too: it stays");
 });
 
 test("the command line puts what packs offer (views) between the terms and the items, filtered by the words", () => {

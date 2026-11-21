@@ -34,8 +34,8 @@ export { suggest, jumpQuery, complete, offered, type Suggestion, type Offer } fr
 export type { LineProps } from "./line.ts";
 
 export const QUERY = "find.query";
-/** The views that draw the query, as `here.view` names them: a jump from elsewhere opens the first. */
-export const DRAWS = ["map/map", "field/field"];
+/** The views that draw the query, as `here.view` names them: a jump from elsewhere opens the first (Field, home). Map is kept, off by default. */
+export const DRAWS = ["field/field", "map/map"];
 
 /** `find.index`: the map as this page holds it. */
 export interface FindIndex {
@@ -205,8 +205,8 @@ const find: Pack = {
     });
     // Wherever the query is drawn: Map, and Field (which lights what it finds).
     const fill = ctx.get<SlotFill>("slot.fill");
-    fill.fill({ slot: "top", name: "find", title: "Find", when: { "here.view": DRAWS[0]! }, view: Line });
-    fill.fill({ slot: "top", name: "find-field", title: "Find", when: { "here.view": DRAWS[1]! }, view: Line });
+    fill.fill({ slot: "top", name: "find", title: "Find", when: { "here.view": "map/map" }, view: Line });
+    fill.fill({ slot: "top", name: "find-field", title: "Find", when: { "here.view": "field/field" }, view: Line });
   },
 };
 

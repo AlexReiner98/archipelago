@@ -33,7 +33,7 @@ the settings it set that the next one doesn't.
 
 Every fill in center is a view with no item, titled by the fill, with the
 id `map` (its pack), or `pack/name` when a pack has two. Config names the
-home kind (`home`, default `map`) and the kinds listed next (`pinned`).
+home kind (`home`, default `field`) and the kinds listed next (`pinned`).
 
 ## Home
 

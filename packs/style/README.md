@@ -13,5 +13,7 @@ back to the system's own colours and font, with plain marks.
 - Fires `style:changed` on `document` when its sheet comes or goes; views
   that draw glyphs or a canvas re-read then.
 
-`view.ts` is the pack `style-view`, the tab "Style": every token as the
-page draws it now, day and night side by side.
+`view.ts` is the pack `style-view`: every token as the page draws it now, day
+and night side by side, as a section of the style pack's own page in the
+Packs view (the slot `docs.page`). It is not a view in the list: a
+reference for whoever builds a pack.

@@ -92,9 +92,16 @@ const views_: Pack<Config> = {
       // A view picked, from anywhere (the list, the command line, a link, an agent), closes the list.
       open = false;
       show.show(v);
-      if (location.hash.slice(1) !== v.id) history.replaceState(null, "", `#${v.id}`);
+      // Only a choice goes in the URL: home shown on its own leaves it bare, so a reload opens home again.
+      if (chosen && location.hash.slice(1) !== v.id) history.replaceState(null, "", `#${v.id}`);
+      else if (!chosen && location.hash) history.replaceState(null, "", location.pathname + location.search);
       tell();
     };
+    /** How long the first view waits for home's own pack before taking what there is. */
+    const WAIT = 3000;
+    let waited = false;
+    const giveUp = setTimeout(() => ((waited = true), follow()), WAIT);
+    ctx.effect(() => () => clearTimeout(giveUp));
     /** Looks again at what there is: the view the hash names, the one shown, else home. */
     const follow = () => {
       const all = list();
@@ -102,9 +109,13 @@ const views_: Pack<Config> = {
       const hashed = byHash(all, location.hash);
       if (!settled) {
         // The hash may name an item the map hasn't loaded yet: wait for it, but not past the first read.
+        // With none, wait for home itself (an item tagged home, or the configured kind), not whichever view
+        // came first: packs arrive in any order. After WAIT, the first there is will do.
+        const homeHere = all.some((v) => v.home && (!v.kind || v.id === (config.home ?? "field")));
         if (hashed) settled = true;
-        else if (location.hash.length < 2 || index.ready()) settled = true;
-        else return;
+        else if (location.hash.length >= 2 && !index.ready()) return;
+        else if (!homeHere && !waited) return;
+        else settled = true;
         if (hashed) pick(hashed);
         else pick(all.find((v) => v.home)!, false);
         return;

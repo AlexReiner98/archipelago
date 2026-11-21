@@ -33,7 +33,7 @@ const today: Pack = {
       const [, tick] = useState(0);
       useEffect(() => index.watch(() => tick((x) => x + 1)) as () => void, []);
       return html`<div>${index.run("status:doing", 30).items.map(
-        (r) => html`<div class="td-row" key=${r.id} onClick=${() => (set.set(KEYS.view, "map/map"), set.set(KEYS.item, r.id))}>${String(r.fields.title ?? r.id)}</div>`,
+        (r) => html`<div class="td-row" key=${r.id} onClick=${() => (set.set(KEYS.view, "field/field"), set.set(KEYS.item, r.id))}>${String(r.fields.title ?? r.id)}</div>`,
       )}</div>`;
     };
 
