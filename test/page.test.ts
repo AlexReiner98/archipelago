@@ -23,10 +23,15 @@ test("changes merge: on and off, config key by key, null clears, an empty change
   let c = merge({}, { pack: "tabs", on: false });
   assert.deepEqual(c, { tabs: { off: true } });
   c = merge(c, { pack: "renderer", config: { arrange: { "item/page": "left" } } });
-  c = merge(c, { pack: "tabs", on: true });
-  assert.deepEqual(c, { renderer: { config: { arrange: { "item/page": "left" } } } }, "back on as the template has it");
+  c = merge(c, { pack: "tabs", on: null });
+  assert.deepEqual(c, { renderer: { config: { arrange: { "item/page": "left" } } } }, "back as the template has it");
+  assert.deepEqual(merge({}, { pack: "today", on: true }), { today: { off: false } }, "on is kept: the template may have it off");
   c = merge(c, { pack: "renderer", config: null });
   assert.deepEqual(c, {});
+});
+
+test("the overlay turns on what the template has off", () => {
+  assert.equal(overlay([{ id: "today", pack: "t.ts", disabled: true }], { today: { off: false } })[0]!.disabled, false);
 });
 
 test("the overlay turns off, lays config over the template's, and moves; the template is untouched", () => {

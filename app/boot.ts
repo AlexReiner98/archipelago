@@ -38,6 +38,9 @@ const host = await startBrowser({
     { id: "reflex", pack: "packs/reflex/index.ts" },
     { id: "map", pack: "packs/map/index.ts" },
     { id: "legend", pack: "packs/legend/index.ts" },
+    // Examples to copy, off until turned on (packs/examples): a panel, and a frame of your own.
+    { id: "today", pack: "packs/examples/today.ts", disabled: true },
+    { id: "column", pack: "packs/examples/column.ts", disabled: true },
     { id: "item", pack: "packs/item/index.ts" },
     { id: "style-view", pack: "packs/style/view.ts" },
   ],

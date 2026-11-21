@@ -15,7 +15,8 @@ page.set ─▶ the page item (field packs) ─▶ page copy of the map ─▶ o
 
 - **`page.set`** takes `{ pack, on?, config?, after? }`, where `pack` is an
   entry id of the page's tree ([app/boot.ts](../../app/boot.ts)).
-  - `on: false` turns the pack off.
+  - `on: false` turns the pack off, `on: true` on (a pack the template has
+    off, like the examples), and `on: null` puts it back as the template has it.
   - `config` lays keys over its config; `null` clears every change to it.
   - `after` places it after a sibling: `""` first, `null` back where it was.
 - **One item holds every change,** keyed by entry id. Each call is one change

@@ -33,7 +33,8 @@ export type Changes = Record<string, Change>;
 export interface SetInput {
   /** The entry's id in the page's tree (`renderer`, `tabs`). */
   pack: string;
-  on?: boolean;
+  /** On or off; `null` back to what the template says. */
+  on?: boolean | null;
   /** Keys laid over its config; `null` clears every change to its config. */
   config?: Record<string, Json> | null;
   /** Place it after this sibling; `""` first; `null` back where the template has it. */
@@ -44,12 +45,12 @@ export interface SetInput {
 export function merge(now: Changes, input: SetInput): Changes {
   const next: Changes = structuredClone(now);
   const c: Change = { ...next[input.pack] };
-  if (input.on !== undefined) c.off = !input.on;
+  if (input.on === null) delete c.off;
+  else if (input.on !== undefined) c.off = !input.on;
   if (input.config === null) delete c.config;
   else if (input.config) c.config = { ...c.config, ...input.config };
   if (input.after === null) delete c.after;
   else if (input.after !== undefined) c.after = input.after;
-  if (c.off === false) delete c.off;
   if (Object.keys(c).length) next[input.pack] = c;
   else delete next[input.pack];
   return next;
