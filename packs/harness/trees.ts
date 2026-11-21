@@ -8,10 +8,11 @@
  * (tint.ts); nothing moves. Small, a tree names only what is lit, what the
  * agent was told, and what is picked.
  *
- * A switch of focus is smooth: each tree's drawing, and nothing else, has
- * a view-transition name by its colour slot, so the one clicked grows into
- * the big place and the old one shrinks into the column; headers and lines
- * change in place (`switchFocus`, `switch_s`).
+ * A switch of focus is smooth: each tree's drawing, or a line's coloured
+ * dot, and nothing else, has a view-transition name by its colour slot, so
+ * the one clicked grows into the big place (out of its dot, from a line)
+ * and the old one shrinks into the column (into its dot, if it becomes a
+ * line); headers and text change in place (`switchFocus`, `switch_s`).
  *
  * In focus, a click on the agent's name looks at it alone; on its profile,
  * lists the profiles to move it into one (`profile.place`, agents.ts).
@@ -30,19 +31,17 @@ import type { Dials } from "./tint.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
-/** How many of the most recently active agents get a tree, besides any acting while watched. */
-export const TREES_MOST = 6;
+/** How many previews the column shows as trees. */
+export const PREVIEWS = 3;
 
 /**
  * Which live agents get a tree and which a one-line row. A tree: the one in
- * focus, the `most` last active of those that acted while watched, and the
- * `most` last active. The rest,
+ * focus, and the `most` last active besides it, as previews. The rest,
  * however many (a run that stopped without ending stays live), are rows.
  * `runs` is last active first; each list keeps that order.
  */
-export function treesAndRows(runs: string[], acting: ReadonlySet<string>, focus: string | undefined, most: number = TREES_MOST): { trees: string[]; rows: string[] } {
-  // At most twice `most` trees, however many act: the last active of those acting first.
-  const tree = new Set([...(focus ? [focus] : []), ...runs.filter((r) => acting.has(r)).slice(0, most), ...runs.slice(0, most)]);
+export function treesAndRows(runs: string[], focus: string | undefined, most: number = PREVIEWS): { trees: string[]; rows: string[] } {
+  const tree = new Set([...(focus ? [focus] : []), ...runs.filter((r) => r !== focus).slice(0, most)]);
   return { trees: runs.filter((r) => tree.has(r)), rows: runs.filter((r) => !tree.has(r)) };
 }
 
@@ -81,6 +80,8 @@ html.hv-switching { view-transition-name:none; }
 .hv-tree .rx-canvas { view-transition-name:var(--hv-vt, none); view-transition-class:hv-agent; }
 ::view-transition-group(*.hv-agent) { animation-duration:var(--hv-switch, .4s); animation-timing-function:cubic-bezier(.2,.7,.2,1); }
 ::view-transition-old(*.hv-agent), ::view-transition-new(*.hv-agent) { height:100%; object-fit:contain; animation-duration:var(--hv-switch, .4s); }
+::view-transition-old(*.hv-agent) { animation:hv-gone .12s ease-out both; }
+@keyframes hv-gone { to { opacity:0; } }
 .hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); }
 .hv-trees.many { grid-template-columns:minmax(0,1fr) minmax(180px,22%); }
 .hv-peeks { min-height:0; overflow-y:auto; border-left:1px solid var(--line); scrollbar-width:thin; }
@@ -90,6 +91,7 @@ html.hv-switching { view-transition-name:none; }
 .hv-rows .h { padding:var(--space-1) var(--space-4); color:var(--dim); font-size:var(--text-s); }
 .hv-rows .r { display:flex; gap:var(--space-3); align-items:baseline; padding:1px var(--space-4); white-space:nowrap; cursor:pointer; min-width:0; }
 .hv-rows .r:hover { background:color-mix(in srgb, var(--line) 35%, transparent); }
+.hv-rows .r .dot { display:inline-block; view-transition-name:var(--hv-vt, none); view-transition-class:hv-agent; }
 .hv-rows .r .x { overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; color:var(--dim); }
 .hv-rows .r .p { color:var(--dim); flex:none; font-size:var(--text-s); max-width:45%; overflow:hidden; text-overflow:ellipsis; }
 .hv-tree.peek:hover { background:color-mix(in srgb, var(--line) 35%, transparent); }
@@ -172,7 +174,7 @@ export const Trees = (p: TreesProps) => {
       ${p.rows?.length ? html`<div class="hv-rows">
         <div class="h" title="Live, but not among the last active: a run that stopped without ending stays live">${p.rows.length} more live</div>
         ${p.rows.map((a) => html`<div class="r" key=${a.run.run} title=${`${a.run.title ?? a.run.run}\nBring it into focus`} onClick=${() => p.onFocus(a.run.run)}>
-          <span style=${`color:${a.colour}`}>●</span><span class="x">${a.run.title ?? a.run.run.slice(0, 8)}</span>${a.placement && html`<span class="p">${placementText(a.placement)}</span>`}
+          <span class="dot" style=${`color:${a.colour};--hv-vt:${transitionName(a.slot)}`}>●</span><span class="x">${a.run.title ?? a.run.run.slice(0, 8)}</span>${a.placement && html`<span class="p">${placementText(a.placement)}</span>`}
         </div>`)}
       </div>` : ""}
     </div>`}

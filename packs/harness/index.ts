@@ -14,7 +14,8 @@
  * - Right: the run's events, one line each (events.ts): the wider side,
  *   as an opened line needs the room. Live: every live run's, interleaved.
  *   Every run: the runs, or a profile's runs.
- * - Left: the node looked at (node.ts), and the Dials of that colouring (dials.ts).
+ * - Left: the node looked at (node.ts). The dials of the colouring and the
+ *   switch (dials.ts) are in the bar's ⋯ menu.
  *
  * The playhead is `here.event`: unset, the view follows the run's end
  * live. A click on a node sets `here.node`; on an event, `here.event` and
@@ -248,12 +249,12 @@ const harness: Pack = {
       // Live: each run an agent with a tree of its own (what it hears), in its colour, its profile over it.
       const dials = useDials(here);
       const acting = useMemo(() => new Set(liveEvents.map((e) => e.run)), [liveEvents]);
-      // Trees for the agent in focus, those acting and the last active; a line each for the rest.
+      // Trees for the agent in focus and the three last active besides; a line each for the rest.
       const [focus, setFocus] = useState<string>();
       const split = useMemo(() => {
         const ids = lives.map((r) => r.run);
-        return treesAndRows(ids, acting, focusOf(ids, focus));
-      }, [lives, acting, focus]);
+        return treesAndRows(ids, focusOf(ids, focus));
+      }, [lives, focus]);
       const treed = useMemo(() => lives.filter((r) => split.trees.includes(r.run)), [lives, split]);
       const hears = hk.useHears(treed, nodes, placements);
       const fallbacks = useMemo(() => new Set(profileList.filter((p) => p.fallback).map((p) => p.id)), [profileList]);
@@ -359,6 +360,7 @@ const harness: Pack = {
               set.set(ALL, val ? true : undefined);
               if (val) set.set(LIVE, undefined);
             }}
+            more=${html`<${DialsPane} here=${here} set=${set} />`}
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
@@ -450,7 +452,6 @@ const harness: Pack = {
     const whileShown = { "here.view": "harness/view" };
     fill.fill({ slot: "left", name: "node", title: "Node", when: whileShown, view: NodeFill });
     fill.fill({ slot: "center", name: "view", title: "Harness", view: Center });
-    fill.fill({ slot: "left", name: "dials", title: "Dials", when: whileShown, view: () => html`<${DialsPane} here=${here} set=${set} />` });
     fill.fill({ slot: "right", name: "run", title: "Run", when: whileShown, view: RunFill });
   },
 };

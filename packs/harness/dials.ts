@@ -1,6 +1,7 @@
 /**
- * The harness's Dials panel: every number of how an agent's tree is
- * coloured by what it is told (tint.ts), one row each, ↺ to put it back. Their values
+ * The harness's dials, in the bar's ⋯ menu: every number of how an
+ * agent's tree is coloured by what it is told and how focus switches
+ * (tint.ts), one row each, ↺ to put it back. Their values
  * are the page key `harness.dials`, so an agent can set them; the browser
  * remembers them.
  */

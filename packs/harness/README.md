@@ -5,8 +5,8 @@ live or replayed, and every profile. What the map says to an agent is a
 tree of places and nodes. It lands on every live run: each agent has a tree
 of its own, holding the nodes its profile lets it hear, under its name in
 its colour and its profile, and what it is told colours that tree. Nothing
-moves. Four fills,
-linked through `here`; the three beside show while the view does
+moves. Three fills,
+linked through `here`; the two beside show while the view does
 (`when: { "here.view": "harness/view" }`), and start folded to rails (the
 frame's `folded` config in `app/boot.ts`), so the landing is the tree and
 the agents only. Picking a node opens the node pane.
@@ -15,14 +15,14 @@ the agents only. Picking a node opens the node pane.
 |---|---|---|
 | Harness (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline |
 | Node (`harness/node`, "Node") | `left` | Its words, standing, places, pack, kind, record, and its verdict per run |
-| Dials (`harness/dials`, "Dials") | `left` | Every number of how a tree is coloured ([dials.ts](dials.ts)), ↺ to put one back |
 | Run (`harness/run`, "Run") | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: every live run's events, interleaved. All runs: the runs, or a profile's |
 
 ## The bar ([bar.ts](bar.ts))
 
 Kept quiet: the run picker, the live dot and the ✓ ✕ ○ tally. The profile
-looked at, how the tree hangs (place, pack, profile), nodes never said and
-the key are in one ⋯ menu.
+looked at, how the tree hangs (place, pack, profile), nodes never said,
+the key and the view's dials ([dials.ts](dials.ts), ↺ to put one back)
+are in one ⋯ menu.
 
 ## Picking
 
@@ -61,13 +61,13 @@ with every name; the others are small previews in a column beside it, in
 the order of their colours so each keeps its place, and a click on one
 brings it into focus. The switch is smooth: the one clicked grows into
 the big place while the old one shrinks into the column (a view
-transition of the tree drawings only, each named by its colour slot;
-headers and lines change in place; `switch_s` seconds, at once under
+transition of the tree drawings, or a line's dot, only, each named by
+its colour slot; headers and text change in place; `switch_s` seconds, at once under
 reduced motion). Focus starts on the last active agent and stays
-where it is put while that agent is live. Trees go to the agent in focus,
-the six last active, and up to six more that act while watched; every
-other live agent is one line under the previews (its colour, name and
-profile), a click from focus, so a run that stopped without ending costs a
+where it is put while that agent is live. Trees go to the agent in focus
+and the three last active besides, as previews; every other live agent is
+one line under the previews (its colour, name and profile), a click from
+focus, and its tree grows out of its coloured dot, so a run that stopped without ending costs a
 line, not a tree. The previews and lines scroll. Hearing is asked once per
 set of profiles (`groupsOf`), not once per agent. Its
 tree holds only the nodes it hears (`profile.read.hears`), hung as the big
@@ -87,7 +87,7 @@ the agent's colour, and they fade back. Nothing travels.
 | hold (`gated`) | the same, in `quiet` |
 | act | the branch to the bough of its place (`failed` when it failed) |
 
-Every number is a dial, in the Dials panel: how long a branch keeps its
+Every number is a dial, in the bar's ⋯ menu: how long a branch keeps its
 colour, how long the colour takes to come and go, and how long a switch
 of focus takes. Their values are
 `harness.dials` (page scope), so an agent can set them; the browser

@@ -21,7 +21,7 @@ regions and nothing in them. Any pack that fills `root` can take its place.
   The folded fills are the page key `frame.folded` (fill keys,
   `pack/name`); a side is a rail when every fill it shows is folded. The
   page starts with the config's `folded`, so the harness view lands with
-  its node, dials and run panes folded, and any pack opens one by taking
+  its node and run panes folded, and any pack opens one by taking
   its fill out of the list.
 - **Center:** one fill at a time, the one `here.view` names, else the first.
   The frame sets `here.view` to what it shows. The [views](../views/README.md)

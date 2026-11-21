@@ -1,8 +1,8 @@
 /**
  * The harness view's bar, kept quiet: the run picker (every live run, every
  * run, or one), the live dot and the verdict tally in sight; the rest (the
- * profile looked at, how the tree hangs, nodes never said, the key) in one
- * ⋯ menu.
+ * profile looked at, how the tree hangs, nodes never said, the key, and the
+ * view's dials) in one ⋯ menu.
  */
 import { h } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
@@ -17,7 +17,9 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 
 export const BAR_STYLE = sheet(`
 .hv-more { position:relative; flex:none; }
-.hv-more .hv-menu { right:0; top:calc(100% + 6px); display:grid; gap:var(--space-2); padding:var(--space-3); min-width:220px; white-space:nowrap; }
+.hv-more .hv-menu { right:0; top:calc(100% + 6px); display:grid; gap:var(--space-2); padding:var(--space-3); min-width:300px; max-width:360px; white-space:nowrap; }
+.hv-more .hv-menu .hv-dials { padding:var(--space-2) 0 0; margin-top:var(--space-1); border-top:1px solid var(--line); height:auto; }
+.hv-more .hv-menu .hv-dial { padding:1px 0; }
 .hv-more .row { display:flex; gap:var(--space-2); align-items:baseline; color:var(--dim); }
 .hv-more .row .k { width:5em; flex:none; }
 .hv-more button { font:inherit; background:none; border:0; color:var(--dim); padding:0; cursor:pointer; }
@@ -46,6 +48,8 @@ export interface BarProps {
   onBy(by: Grouping): void;
   onUnsaid(on: boolean): void;
   onKey(on: boolean): void;
+  /** More in the menu, under the rest: the view's dials. */
+  more?: unknown;
 }
 
 export const Bar = (p: BarProps) => {
@@ -72,7 +76,7 @@ export const Bar = (p: BarProps) => {
       ${p.profile && html`<span class="hv-dim hv-cut" title="The profile looked at: what it holds back">in ${p.profiles.find((x) => x.id === p.profile)?.title ?? p.profile}</span>`}
       <span class="sp"></span>
       <span class="hv-more" ref=${more}>
-        <button class=${open ? "on" : ""} title="Profile, grouping, key" onClick=${() => setOpen(!open)}>⋯</button>
+        <button class=${open ? "on" : ""} title="Profile, grouping, key, dials" onClick=${() => setOpen(!open)}>⋯</button>
         ${open && html`<div class="hv-menu">
           <label class="row" title="A profile: what it holds back, over every run's totals"><span class="k">profile</span>
             <select class="hv-select" value=${p.profile ?? ""} onChange=${(e: Event) => p.onProfile((e.target as HTMLSelectElement).value || undefined)}>
@@ -83,6 +87,7 @@ export const Bar = (p: BarProps) => {
           <span class="row" title="How the tree hangs its nodes"><span class="k">hang by</span>${groupings.map((g, i) => html`${i > 0 && html`<span>·</span>`}<button class=${p.by === g ? "on" : ""} onClick=${() => p.onBy(g)}>${g}</button>`)}</span>
           ${p.by === "place" && html`<span class="row" title="Nodes with no place: kept, never said"><span class="k">show</span><button class=${p.unsaid ? "on" : ""} onClick=${() => p.onUnsaid(!p.unsaid)}>never said${p.hidden > 0 ? ` · ${p.hidden}` : ""}</button></span>`}
           <span class="row"><span class="k">marks</span><button class=${p.showKey ? "on" : ""} onClick=${() => p.onKey(!p.showKey)} title="What the marks mean">key</button></span>
+          ${p.more}
         </div>`}
       </span>
     </div>`;

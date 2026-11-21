@@ -9,7 +9,7 @@
  * - `wayOf`: the branches from the root to a node, the ones it colours.
  *
  * Every number is a dial (`DIALS`), with how long a switch of focus
- * takes (trees.ts), shown in the harness's Dials panel and
+ * takes (trees.ts), shown in the harness bar's ⋯ menu and
  * kept in the page key `harness.dials`. Colours are style tokens: the
  * run's hue, `failed`, `quiet`.
  */

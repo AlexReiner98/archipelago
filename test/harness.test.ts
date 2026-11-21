@@ -503,13 +503,14 @@ test("dotsBox: a small tree fits its dots, tighter than its bounds with names", 
   assert.ok(d.width * d.height < placed.box.width * placed.box.height);
 });
 
-test("treesAndRows: a tree for the one in focus, those acting and the last active; a line for each of the rest", () => {
+test("treesAndRows: a tree for the one in focus and three last active besides; a line for each of the rest", () => {
   const runs = Array.from({ length: 40 }, (_, i) => `r${i}`);
-  const { trees, rows } = treesAndRows(runs, new Set(["r30"]), "r25", 3);
-  assert.deepEqual(trees, ["r0", "r1", "r2", "r25", "r30"]);
-  assert.equal(rows.length, 35);
-  assert.ok(!rows.includes("r25") && !rows.includes("r30"));
-  assert.deepEqual(treesAndRows(["a", "b"], new Set(), undefined), { trees: ["a", "b"], rows: [] });
+  const { trees, rows } = treesAndRows(runs, "r25");
+  assert.deepEqual(trees, ["r0", "r1", "r2", "r25"]);
+  assert.equal(rows.length, 36);
+  assert.ok(!rows.includes("r25"));
+  assert.deepEqual(treesAndRows(runs, "r1").trees, ["r0", "r1", "r2", "r3"], "focus among the last active: the next one previews");
+  assert.deepEqual(treesAndRows(["a", "b"], undefined), { trees: ["a", "b"], rows: [] });
 });
 
 test("switchFocus: where the page has no view transitions, the change happens at once; names are one per colour slot", () => {

@@ -30,8 +30,8 @@ const host = await startBrowser({
     { id: "here", pack: "packs/here/index.ts" },
     { id: "style", pack: "packs/style/index.ts" },
     { id: "renderer", pack: "packs/renderer/index.ts", config: { mount: "#app" } },
-    // The harness view lands clean: its node, dials and run panes start folded to rails.
-    { id: "frame", pack: "packs/frame/index.ts", config: { folded: ["harness/node", "harness/dials", "harness/run"] } },
+    // The harness view lands clean: its node and run panes start folded to rails.
+    { id: "frame", pack: "packs/frame/index.ts", config: { folded: ["harness/node", "harness/run"] } },
     { id: "views", pack: "packs/views/view.ts", config: { home: "field" } },
     { id: "harness", pack: "packs/harness/index.ts" },
     { id: "activity", pack: "packs/activity/index.ts" },
