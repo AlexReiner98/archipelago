@@ -20,7 +20,8 @@ plane; the query (`find.query`) is the whole surface.
   over the rest, the items linked to it yellow. The legend's "lit" line
   says so.
 - A click sets `here.item`. Drag the plane to move it, wheel to zoom,
-  double-click to fit.
+  double-click to fit. An item looked at from elsewhere (a jump from find)
+  that is off the plane's edge is brought to the middle.
 - It only shows: nobody adds or links items by hand. Agents change the
   map through the items actions, and the canvas follows live.
 - Declares no slots. Find fills the region `top`, the item page `right`,

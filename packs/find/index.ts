@@ -7,14 +7,13 @@
  *   types from types.read; and `run(query)` (query.ts). The canvas and the
  *   item page read the map through it.
  * - Declares `find.query` (page scope): the query the canvas draws. The
- *   line it puts in `map.bar` sets it; so can anything else, an agent
- *   included.
+ *   line it puts in `top` sets it; so can anything else, an agent
+ *   included. As you type, the line suggests terms and items (suggest.ts).
+ * - Provides `find.line`: the line, for the command line to draw, and
+ *   `jump(id)`: looks at an item and shows it in the view.
  *
  * It never writes: changes go through actions.
  */
-import { h } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
-import htm from "htm";
 import type { Committed } from "../../spec/changeset.ts";
 import type { Dispose, Id, Json } from "../../spec/common.ts";
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
@@ -22,15 +21,19 @@ import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
 import type { LinkInfo, TypeInfo, TypesRead } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
+import { KEYS } from "../../spec/here.ts";
 import { closed, run, type Index, type Result, type Row, type Wire } from "./query.ts";
-import { sheet } from "../../spec/style.ts";
+import { jumpQuery } from "./suggest.ts";
+import { makeLine, STYLE, type LineProps } from "./line.ts";
 
 export { parse, run, closed } from "./query.ts";
 export type { Result, Row, Wire } from "./query.ts";
-
-const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
+export { suggest, jumpQuery, complete, type Suggestion } from "./suggest.ts";
+export type { LineProps } from "./line.ts";
 
 export const QUERY = "find.query";
+/** The views that draw the query, as `here.view` names them: a jump from elsewhere opens the first. */
+export const DRAWS = ["map/map", "field/field"];
 
 /** `find.index`: the map as this page holds it. */
 export interface FindIndex {
@@ -49,11 +52,13 @@ export interface FindIndex {
   watch(on: () => void): Dispose;
 }
 
-const STYLE = sheet(`
-.fd { display:flex; align-items:center; gap:var(--space-3); flex:1; min-width:0; }
-.fd input { flex:1; min-width:0; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-1) var(--space-3); }
-.fd .n { color:var(--dim); white-space:nowrap; font-variant-numeric:tabular-nums; }
-`);
+/** `find.line`: the line, to draw anywhere, and the jump it makes. */
+export interface FindLine {
+  /** The find line; `command` is the Ctrl+K form (see line.ts). */
+  Line: (props: LineProps) => unknown;
+  /** Looks at an item (`here.item`) and shows it in the view: the query becomes `near:<id>` unless it draws it already. */
+  jump(id: Id): void;
+}
 
 const find: Pack = {
   id: "find",
@@ -165,29 +170,16 @@ const find: Pack = {
         }),
     }));
 
-    const Line = () => {
-      const [q, setQ] = useState(here.get<string>(QUERY) ?? "");
-      const [n, setN] = useState<Result | undefined>();
-      const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-      useEffect(() => here.watch(QUERY, (c) => setQ(typeof c.value === "string" ? c.value : "")) as () => void, []);
-      useEffect(() => {
-        const count = () => setN(run(index, q));
-        count();
-        watchers.add(count);
-        return () => void watchers.delete(count);
-      }, [q]);
-      const send = (v: string) => {
-        setQ(v);
-        clearTimeout(timer.current);
-        timer.current = setTimeout(() => set.set(QUERY, v || undefined), 150);
-      };
-      return html`
-        <label class="fd" title="words match titles · is:open is:closed · status:x · type:x · in:<id> · near:<id>">
-          <input value=${q} placeholder="find: words, is:open, type:question, in:<id>" onInput=${(e: Event) => send((e.target as HTMLInputElement).value)} />
-          <span class="n">${n ? `${n.items.length}${n.more ? ` of ${n.items.length + n.more}` : ""}` : ""}</span>
-        </label>
-      `;
+    /** Looks at an item, and shows it in the view: the query stays if it draws the item, else it becomes near:<id>. */
+    const jump = (id: Id) => {
+      const q = here.get<string>(QUERY) ?? "";
+      const next = jumpQuery(index, q, id);
+      if (next !== q) set.set(QUERY, next);
+      set.set(KEYS.item, id);
+      if (!DRAWS.includes(here.get<string>(KEYS.view) ?? "")) set.set(KEYS.view, DRAWS[0]);
     };
+    const Line = makeLine({ index, types: () => [...byType.values()], watchers, here, set, query: QUERY, jump });
+    ctx.provide<FindLine>("find.line", () => ({ Line, jump }));
 
     ctx.effect(() => {
       const style = document.createElement("style");
@@ -197,8 +189,8 @@ const find: Pack = {
     });
     // Wherever the query is drawn: Map, and Field (which lights what it finds).
     const fill = ctx.get<SlotFill>("slot.fill");
-    fill.fill({ slot: "top", name: "find", title: "Find", when: { "here.view": "map/map" }, view: Line });
-    fill.fill({ slot: "top", name: "find-field", title: "Find", when: { "here.view": "field/field" }, view: Line });
+    fill.fill({ slot: "top", name: "find", title: "Find", when: { "here.view": DRAWS[0]! }, view: Line });
+    fill.fill({ slot: "top", name: "find-field", title: "Find", when: { "here.view": DRAWS[1]! }, view: Line });
   },
 };
 
