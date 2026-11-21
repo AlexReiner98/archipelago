@@ -1,0 +1,239 @@
+/**
+ * The field pack, page side: the map as particles, in the shell as the
+ * view "Field", beside "Map". It draws the same query (`find.query`, up to
+ * `field_limit` items): each item a particle in its island's colour,
+ * islands as clusters, links as faint lines. Composable behaviours settle
+ * it (step.ts, behaviours/); each behaviour, and every number it reads, is
+ * a dial in the panel on the left.
+ *
+ * - Hovering a particle lights it and its links; a click sets `here.item`
+ *   and the item page opens beside (`map.side`, as on Map).
+ * - The dials' values are `field.dials` (page scope), so an agent can turn
+ *   them too; this browser also remembers them.
+ * - It only shows: nothing here writes to the map.
+ */
+import { h } from "preact";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import htm from "htm";
+import type { Id, Json } from "../../spec/common.ts";
+import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
+import { KEYS } from "../../spec/here.ts";
+import type { SlotFill, SlotRead } from "../../spec/slot.ts";
+import type { Context, Pack } from "../../runtime/core.ts";
+import type { LinkInfo } from "../../spec/types.ts";
+import type { Dial } from "./behaviour.ts";
+import { field, type Field } from "./engine.ts";
+import type { Settings } from "./graph.ts";
+import { BY, fieldOf, type Source } from "./islands.ts";
+import { DRAW } from "./paint.ts";
+import { Panel, PANEL_STYLE, type Section } from "./panel.ts";
+import { BEHAVIOURS, RUN, defaults } from "./step.ts";
+
+export { BEHAVIOURS, step } from "./step.ts";
+
+const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
+
+interface Row {
+  id: Id;
+  type: string;
+  fields: Record<string, Json>;
+}
+interface FindIndex extends Source {
+  ready(): boolean;
+  links(): LinkInfo[];
+  run(query: string, limit?: number): { items: Row[]; links: (Row & { from: Id; to: Id })[]; more: number };
+  watch(on: () => void): () => void;
+}
+
+const DIALS = "field.dials";
+const QUERY = "find.query";
+const REMEMBER = "archipelago.field.dials";
+
+/** Where the field starts: what it draws, and how its islands are found and first laid out. */
+const START: Dial[] = [
+  { key: "field_scope", label: "draws", min: 0, max: 1, step: 1, value: 1, choices: ["the find line", "the whole map"], then: "seed", doc: "What is drawn: the find line's query (as Map), or every item, open and closed." },
+  { key: "field_limit", label: "items at most", min: 50, max: 5000, step: 50, value: 2000, then: "seed", doc: "At most this many of the query's items are drawn." },
+  { key: "islands_by", label: "islands by", min: 0, max: 1, step: 1, value: 1, choices: [...BY], then: "seed", doc: "An item's island: the island item it is part_of at any depth, or the top of its part_of chain." },
+  { key: "island_spread", label: "island spread", min: 0.5, max: 15, step: 0.1, value: 4.5, doc: "How large an island is for its count: where its particles start, and how much sea it keeps." },
+  { key: "island_gap", label: "island gap", min: 0.2, max: 5, step: 0.05, value: 1.5, then: "seed", doc: "How far apart islands start, as multiples of their own size." },
+];
+
+const STYLE = `
+.fl { display:grid; grid-template-rows:auto 1fr; height:100%; min-height:0; }
+.fl-bar { display:flex; gap:8px; align-items:center; padding:5px 10px; border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; }
+.fl-body { display:flex; min-height:0; }
+.fl-canvas { flex:1; min-width:0; position:relative; overflow:hidden; }
+.fl-canvas canvas { width:100%; height:100%; display:block; cursor:grab; touch-action:none; }
+.fl-side { width:min(380px, 40%); flex:none; border-left:1px solid var(--line); overflow:auto; }
+.fl-tip { position:absolute; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:3px 7px; max-width:320px; box-shadow:0 2px 8px rgb(0 0 0 / 12%); }
+.fl-tip .s { color:var(--dim); font-size:11px; }
+.fl-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); pointer-events:none; }
+${PANEL_STYLE}
+`;
+
+const fieldPack: Pack = {
+  id: "field",
+  inject: ["find.index", "here.read", "here.set", "here.declare", "slot.fill", "slot.read"],
+  apply(ctx: Context) {
+    const index = ctx.get<FindIndex>("find.index");
+    const here = ctx.get<HereRead>("here.read");
+    const set = ctx.get<HereSet>("here.set");
+    const slots = ctx.get<SlotRead>("slot.read");
+    ctx.get<HereDeclare>("here.declare").declare({ key: DIALS, scope: "page", doc: "The field's dials that differ from where they start, by key." });
+
+    const remembered = (): Settings => {
+      try {
+        const v = JSON.parse(localStorage.getItem(REMEMBER) ?? "{}");
+        return v && typeof v === "object" ? v : {};
+      } catch {
+        return {};
+      }
+    };
+    if (here.get(DIALS) === undefined) {
+      const r = remembered();
+      if (Object.keys(r).length) set.set(DIALS, r);
+    }
+
+    const useHere = <T extends Json>(key: string): T | undefined => {
+      const [v, setV] = useState<T | undefined>(here.get<T>(key));
+      useEffect(() => here.watch(key, (c) => setV(c.value as T | undefined)) as () => void, [key]);
+      return v;
+    };
+    const Slot = ({ name }: { name: string }) => {
+      const [, tick] = useState(0);
+      useEffect(() => {
+        const stop = slots.watch(name, () => tick((x) => x + 1));
+        tick((x) => x + 1);
+        return stop as () => void;
+      }, [name]);
+      return html`${slots.fills(name).map((f) => html`<${f.view} key=${`${f.pack}/${f.name}`} />`)}`;
+    };
+
+    /** Every item, open and closed (as the old lens "The whole map as particles"), up to `limit`, and the links among them. */
+    const whole = (limit: number) => {
+      const open = index.run("is:open", limit), shut = index.run("is:closed", limit);
+      const items = [...open.items, ...shut.items].slice(0, limit);
+      const ids = new Set(items.map((r) => r.id));
+      const links = new Map<Id, Row & { from: Id; to: Id }>();
+      for (const id of ids) for (const l of index.linksOf(id)) if (ids.has(l.from) && ids.has(l.to)) links.set(l.id, l);
+      return { items, links: [...links.values()], more: open.items.length + open.more + shut.items.length + shut.more - items.length };
+    };
+
+    const View = () => {
+      const [version, tick] = useState(0);
+      useEffect(() => index.watch(() => tick((x) => x + 1)) as () => void, []);
+      const q = useHere<string>(QUERY) ?? "";
+      const picked = useHere<string>(KEYS.item);
+      const over = (useHere<Record<string, number>>(DIALS) ?? {}) as Settings;
+      const linkNames = index.links().map((l) => l.name).join(" ");
+      // Every dial, by section: the start, each behaviour, the run, the drawing.
+      const sections = useMemo<Section[]>(() => {
+        const links = linkNames.split(" ").filter(Boolean);
+        return [
+          { key: "start", title: "start", doc: "What is drawn, its islands, and where particles start.", dials: START },
+          ...BEHAVIOURS.map((b) => ({ key: b.name, title: b.name, doc: b.doc, behaviour: b, dials: b.dials({ links }) })),
+          { key: "run", title: "run", doc: "How the run cools and moves.", dials: RUN },
+          { key: "draw", title: "draw", doc: "How particles, links and words are drawn.", dials: DRAW },
+        ];
+      }, [linkNames]);
+      const all = useMemo(() => sections.flatMap((s) => s.dials), [sections]);
+      const S = useMemo(() => ({ ...defaults(all), ...over }), [all, JSON.stringify(over)]);
+
+      // Worked out again only when the map, the query or what is drawn changes, never on a hover.
+      const result = useMemo(() => (S.field_scope ? whole(S.field_limit!) : index.run(q, S.field_limit)), [version, q, S.field_scope, S.field_limit]);
+      const shape = useMemo(() => JSON.stringify([result.items.map((r) => [r.id, r.fields.title, r.fields.status]), result.links.map((l) => l.id), S.islands_by]), [result, S.islands_by]);
+      const input = useMemo(() => fieldOf(index, result, S.islands_by!), [shape]);
+
+      const box = useRef<HTMLCanvasElement>(null);
+      const engine = useRef<Field | null>(null);
+      const [tip, setTip] = useState<{ title: string; sub: string; x: number; y: number } | null>(null);
+      useEffect(() => {
+        const f = field(box.current!, S, { open: (id) => set.set(KEYS.item, id), hover: setTip });
+        engine.current = f;
+        (globalThis as { field?: Field }).field = f;
+        return () => {
+          f.destroy();
+          engine.current = null;
+        };
+      }, []);
+      useEffect(() => engine.current?.input(input), [input]);
+
+      const last = useRef<Settings>(S);
+      useEffect(() => {
+        const prev = last.current;
+        last.current = S;
+        const changed = all.filter((d) => prev[d.key] !== S[d.key]);
+        const toggled = Object.keys(S).some((k) => k.startsWith("on_") && prev[k] !== S[k]) || Object.keys(prev).some((k) => k.startsWith("on_") && !(k in S));
+        if (!changed.length && !toggled) return;
+        const thens = new Set(changed.map((d) => d.then ?? "warm"));
+        if (toggled) thens.add("warm");
+        const then = thens.has("seed") ? "seed" : thens.has("size") ? "size" : thens.has("warm") ? "warm" : "paint";
+        if (changed.some((d) => d.key === "field_scope" || d.key === "field_limit" || d.key === "islands_by")) return void engine.current?.settings(S, "paint");
+        engine.current?.settings(S, then);
+      }, [S]);
+      // A new query or islands' choice warms the run through input(); a limit or islands change also reseeds once the new input lands.
+      const lastStart = useRef(`${S.field_scope}:${S.field_limit}:${S.islands_by}`);
+      useEffect(() => {
+        const k = `${S.field_scope}:${S.field_limit}:${S.islands_by}`;
+        if (k !== lastStart.current) (lastStart.current = k), engine.current?.reseed();
+      }, [input]);
+
+      const setDial = (key: string, v: number | undefined) => {
+        const next: Settings = { ...over };
+        const start = all.find((d) => d.key === key)?.value;
+        if (v === undefined || v === start) delete next[key];
+        else next[key] = v;
+        if (key.startsWith("on_")) {
+          const b = BEHAVIOURS.find((x) => `on_${x.name}` === key);
+          if (b && (v ? 1 : 0) === (b.on ? 1 : 0)) delete next[key];
+        }
+        try {
+          localStorage.setItem(REMEMBER, JSON.stringify(next));
+        } catch {
+          // This browser keeps nothing: the dials still hold for the page.
+        }
+        set.set(DIALS, Object.keys(next).length ? next : undefined);
+      };
+
+      return html`
+        <div class="fl">
+          <div class="fl-bar"><${Slot} name="map.bar" /></div>
+          <div class="fl-body">
+            <${Panel}
+              sections=${sections}
+              S=${S}
+              set=${setDial}
+              reset=${() => {
+                try {
+                  localStorage.removeItem(REMEMBER);
+                } catch {
+                  // Nothing kept.
+                }
+                set.set(DIALS, undefined);
+              }}
+              stats=${() => engine.current?.stats()}
+              reseed=${() => engine.current?.reseed()}
+              fit=${() => engine.current?.fit()}
+            />
+            <div class="fl-canvas">
+              <canvas ref=${box} title="Click a particle to open it; drag a particle to move it; drag the sea to pan; wheel to zoom; double-click the sea to fit"></canvas>
+              ${tip && html`<div class="fl-tip" style=${`left:${tip.x + 14}px; top:${tip.y + 12}px`}><div>${tip.title}</div><div class="s">${tip.sub}</div></div>`}
+              ${!result.items.length && html`<div class="fl-empty">${index.ready() ? "Nothing matches." : "Reading the map…"}</div>`}
+            </div>
+            ${picked && html`<div class="fl-side"><${Slot} name="map.side" /></div>`}
+          </div>
+        </div>
+      `;
+    };
+
+    ctx.effect(() => {
+      const style = document.createElement("style");
+      style.textContent = STYLE;
+      document.head.append(style);
+      return () => style.remove();
+    });
+    ctx.get<SlotFill>("slot.fill").fill({ slot: "shell.main", name: "field", title: "Field", view: View });
+  },
+};
+
+export default fieldPack;
