@@ -8,6 +8,8 @@
  * is for (its `about`) and whether it was loaded from this repository.
  *
  * - `docs.read.packs()`: every pack loaded now, in config-tree order.
+ * - `docs.read.guide()`, `docs.read.chapter(path)`: the guide, read from
+ *   the repository's Markdown files as they are now (files.ts).
  * - `docs.read.watch(on)`: `on` when packs come, go or change state, their
  *   actions, types or nodes do, or the map or the exchange moves (at most
  *   once a second for those two).
@@ -28,6 +30,8 @@ import type { LoaderTree } from "../../spec/loader.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { TypesRead } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
+import { fileURLToPath } from "node:url";
+import { guide, read } from "./files.ts";
 import { activityOf, digest, KEY, reference, type DocsRead, type PackDoc } from "./read.ts";
 
 export { KEY, type DocsRead } from "./read.ts";
@@ -122,6 +126,8 @@ const docs: Pack<DocsConfig> = {
         await Promise.all([counted(graph, docs), active(exchange, docs)]);
         return docs;
       },
+      guide: () => guide(fileURLToPath(ROOT)),
+      chapter: (path) => read(fileURLToPath(ROOT), path),
       watch: (on) =>
         from.effect(() => {
           listeners.add(on);
