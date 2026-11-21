@@ -14,8 +14,12 @@ the same way the host does.
   It's the template a person's changes lie over.
 - **`edit(change)`** applies a new tree. Each fiber changes the least it can:
   a pack turned off unloads, a new config reloads it, a move only reorders.
+  `change` gets the tree copied entry by entry with configs shared (a
+  server's config holds functions, which can't be cloned): give an entry a
+  new config rather than change one in place.
 - Injecting it means trusting the pack with every other pack. A UI never
-  edits through it directly: a person's change is an action (`page.set`),
-  which writes an item, and the `page` pack applies that item
-  ([packs/page](../packs/page/README.md)). That way the change is journaled
+  edits through it directly: a person's change is an action (`page.set`,
+  or `switch.set` for both runtimes), which writes an item, and a pack
+  applies that item ([packs/page](../packs/page/README.md),
+  [packs/switch](../packs/switch/README.md)). That way the change is journaled
   and undone like any other.

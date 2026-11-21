@@ -1,7 +1,7 @@
 /**
  * The app, page side: the browser runtime and its config tree. The bridge
  * provides the server's capabilities here; the style, renderer, here, frame, views (the picker),
- * harness, activity, reflex, find, command, map, field, item and docs (the Packs view) packs make the page. The bridge is two ports above the page
+ * harness, activity, reflex, find, command, map, field, item, docs (the Packs view) and switch (its on/off switches) packs make the page. The bridge is two ports above the page
  * (5180 serves the page and 5182 the bridge, 5280 and 5282 for dev), or at
  * `/bridge/` on the page's own origin when a host in front serves both. `host` is on window, so a pack can be turned
  * off from the console: `host.loader.edit(t => (t.find(e => e.id === "harness").disabled = true, t))`.
@@ -47,6 +47,7 @@ const host = await startBrowser({
     { id: "item", pack: "packs/item/index.ts" },
     { id: "style-view", pack: "packs/style/view.ts" },
     { id: "docs", pack: "packs/docs/view.ts" },
+    { id: "switch", pack: "packs/switch/view.ts" },
   ],
 });
 host.runtime.onError = (fiber, error) => console.error(`[${fiber.pack.id}]`, error);

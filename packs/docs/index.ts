@@ -24,6 +24,7 @@ import type { ActionList } from "../../spec/action.ts";
 import type { AgentTree } from "../../spec/agent.ts";
 import type { ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
+import type { LoaderTree } from "../../spec/loader.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { TypesRead } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
@@ -72,13 +73,15 @@ async function active(exchange: ExchangeRead, docs: PackDoc[]): Promise<void> {
 const docs: Pack<DocsConfig> = {
   id: "docs",
   about: "Shows every running pack: what it is for and what it adds.",
-  inject: ["action.list", "agent.tree", "types.read", "graph.read", "graph.watch", "exchange.read", "exchange.watch"],
+  inject: ["action.list", "agent.tree", "types.read", "graph.read", "graph.watch", "exchange.read", "exchange.watch", "loader.tree"],
   apply(ctx: Context, config: DocsConfig = {}) {
     const actions = ctx.get<ActionList>("action.list");
     const tree = ctx.get<AgentTree>("agent.tree");
     const types = ctx.get<TypesRead>("types.read");
     const graph = ctx.get<GraphRead>("graph.read");
     const exchange = ctx.get<ExchangeRead>("exchange.read");
+    // Read only: each entry's id and state, so a card knows what turns it on and off.
+    const loader = ctx.get<LoaderTree>("loader.tree");
     const side = config.side ?? "server";
     const every = config.every ?? 1000;
     const listeners = new Set<() => void>();
@@ -115,7 +118,7 @@ const docs: Pack<DocsConfig> = {
 
     ctx.provide<DocsRead>(KEY, (_caller, from) => ({
       packs: async () => {
-        const docs = reference(ctx.runtime, { side, root: ROOT, actions: actions.list(), nodes: tree.nodes(), types: types.all() });
+        const docs = reference(ctx.runtime, { side, root: ROOT, actions: actions.list(), nodes: tree.nodes(), types: types.all(), entries: loader.status() });
         await Promise.all([counted(graph, docs), active(exchange, docs)]);
         return docs;
       },

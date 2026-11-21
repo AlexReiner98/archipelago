@@ -171,6 +171,7 @@ export function byFolder(docs: PackDoc[]): PackDoc[] {
       uses: [...new Set(ds.flatMap((d) => d.uses ?? []))],
       users: [...new Set(ds.flatMap((d) => d.users ?? []))],
       parts: [...new Set(ds.flatMap((d) => [d.id, ...(d.parts ?? [])]))],
+      ...(ds.some((d) => d.entries) ? { entries: ds.flatMap((d) => d.entries ?? []) } : {}),
     };
   });
 }

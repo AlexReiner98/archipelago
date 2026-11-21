@@ -17,6 +17,29 @@ import { merge, PAGE, TYPE, type Changes, type SetInput } from "./overlay.ts";
 
 export const SET = "page.set";
 
+/**
+ * Lays `inputs` over the one item of `type` (made the first time) and
+ * writes it into the change set being built: what `page.set` does, shared
+ * with any action that changes the page's packs together with something
+ * else in one change set (the switch pack's `switch.set`).
+ */
+export async function record(graph: GraphRead, call: ActionContext, type: string, title: string, inputs: SetInput[]): Promise<{ id: string; packs: Changes }> {
+  const [item] = (await graph.of(type, { limit: 1 })).items;
+  const now = (item?.fields.packs ?? {}) as unknown as Changes;
+  const next = inputs.reduce(merge, now);
+  const id = item?.id ?? `p_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  if (!item) {
+    call.write([
+      ["+", id, "type", type],
+      ["+", id, "title", title],
+      ["+", id, "status", "current"],
+    ]);
+  }
+  if (item?.fields.packs !== undefined) call.write([["-", id, "packs", item.fields.packs]]);
+  call.write([["+", id, "packs", next as unknown as Json]]);
+  return { id, packs: next };
+}
+
 const page: Pack = {
   id: "page",
   about: "Turns the page's packs on and off, as a change that can be undone.",
@@ -40,20 +63,8 @@ const page: Pack = {
         required: ["pack"],
       },
       async run(input: SetInput, call: ActionContext) {
-        const [item] = (await graph.of(TYPE, { limit: 1 })).items;
-        const now = (item?.fields.packs ?? {}) as unknown as Changes;
-        const next = merge(now, input);
-        const id = item?.id ?? `p_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-        if (!item) {
-          call.write([
-            ["+", id, "type", TYPE],
-            ["+", id, "title", "The page's packs"],
-            ["+", id, "status", "current"],
-          ]);
-        }
-        if (item?.fields.packs !== undefined) call.write([["-", id, "packs", item.fields.packs]]);
-        call.write([["+", id, "packs", next as unknown as Json]]);
-        return { page: id, packs: next as unknown as Json };
+        const out = await record(graph, call, TYPE, "The page's packs", [input]);
+        return { page: out.id, packs: out.packs as unknown as Json };
       },
     });
   },

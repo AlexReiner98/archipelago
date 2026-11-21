@@ -68,6 +68,7 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }
     { id: "items", pack: "packs/items/index.ts" },
     { id: "page", pack: "packs/page/index.ts" },
     { id: "views", pack: "packs/views/index.ts" },
+    { id: "switch", pack: "packs/switch/server.ts" },
     { id: "schema", pack: "packs/schema/index.ts", config: { db: join(data, "schema.sqlite") } },
     { id: "history", pack: "packs/history/index.ts", config: { db: join(data, "history.sqlite") } },
     { id: "interchange", pack: "packs/interchange/index.ts" },

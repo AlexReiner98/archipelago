@@ -238,7 +238,8 @@ export class Loader {
 
   /** Edits the tree and applies it. */
   edit(change: (tree: Entry[]) => Entry[]): Promise<void> {
-    return this.serial(() => this.reconcile(change(structuredClone(this.tree))));
+    // Copied, configs shared: a server config holds functions, which structuredClone refuses.
+    return this.serial(() => this.reconcile(change(copy(this.tree))));
   }
 
   fiber(id: string): Fiber | undefined {

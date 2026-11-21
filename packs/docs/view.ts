@@ -25,6 +25,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import htm from "htm";
 import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
+import type { LoaderTree } from "../../spec/loader.ts";
 import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
 import { sheet } from "../../spec/style.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
@@ -88,9 +89,11 @@ const SHEET = sheet(`
 const view: Pack = {
   id: "docs",
   about: "Shows every running pack: what it is for and what it adds.",
-  inject: [KEY, "slot.declare", "slot.fill", "slot.read", "here.declare", "here.read", "here.set"],
+  inject: [KEY, "slot.declare", "slot.fill", "slot.read", "here.declare", "here.read", "here.set", "loader.tree"],
   apply(ctx: Context) {
     const server = ctx.get<DocsRead>(KEY);
+    // Read only: each entry's id and state, so a card knows what turns it on and off.
+    const loader = ctx.get<LoaderTree>("loader.tree");
     const slots = ctx.get<SlotRead>("slot.read");
     const declare = ctx.get<SlotDeclare>("slot.declare");
     const fill = ctx.get<SlotFill>("slot.fill");
@@ -179,7 +182,7 @@ const view: Pack = {
         let live = true;
         const read = async () => {
           const remote = await server.packs().catch(() => [] as PackDoc[]);
-          if (live) setDocs(byFolder([...remote, ...reference(ctx.runtime, { side: "page", root: ROOT, slots })]));
+          if (live) setDocs(byFolder([...remote, ...reference(ctx.runtime, { side: "page", root: ROOT, slots, entries: loader.status() })]));
         };
         void read();
         const stop = server.watch(() => void read());

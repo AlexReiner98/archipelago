@@ -10,7 +10,7 @@ page.set ─▶ the page item (field packs) ─▶ page copy of the map ─▶ o
 | File | Runs | What it is |
 |---|---|---|
 | [overlay.ts](overlay.ts) | both | The flavour `page` (of record, field `packs`), `merge` and `overlay` |
-| [index.ts](index.ts) | server | `page.set`, the action. Injects `types.define`, `graph.read`, `action.register` |
+| [index.ts](index.ts) | server | `page.set`, the action, and `record`, the write it makes, shared with `switch.set` ([packs/switch](../switch/README.md)). Injects `types.define`, `graph.read`, `action.register` |
 | [view.ts](view.ts) | page | Lays the item's changes over the tree the page started with. Injects `find.index`, `loader.tree` |
 
 - **`page.set`** takes `{ pack, on?, config?, after? }`, where `pack` is an

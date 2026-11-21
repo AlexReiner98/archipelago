@@ -12,6 +12,7 @@
 import type { ActionInfo } from "../../spec/action.ts";
 import type { NodeInfo } from "../../spec/agent.ts";
 import type { Capability, Dispose, Json } from "../../spec/common.ts";
+import type { LoaderStatus } from "../../spec/loader.ts";
 import type { SlotRead } from "../../spec/slot.ts";
 import type { Fiber, Runtime } from "../../runtime/core.ts";
 import * as action from "../../spec/action.ts";
@@ -91,6 +92,18 @@ export interface PackDoc {
   config?: Json;
   /** Packs it loaded as its own children. */
   parts?: string[];
+  /** Its entries in the config tree, which turn it on and off: a card of several packs has one each. */
+  entries?: EntryDoc[];
+}
+
+/** An entry of a runtime's config tree (spec/loader.md), as a card holds it. */
+export interface EntryDoc {
+  /** The entry's id: what `page.set` and `switch.set` take. */
+  id: string;
+  /** The runtime its tree is in. */
+  side: string;
+  /** Turned off now. */
+  off: boolean;
 }
 
 /** What a pack did in one run, from the exchange: its nodes' says and refusals, and the acts of its actions. */
@@ -129,6 +142,8 @@ export interface Sources {
   types?: { types: { name: string; base: string; doc?: string; pack: string }[]; links: { name: string; doc?: string; pack: string }[] };
   /** This repository's root URL: a pack loaded from under it is built in. */
   root?: string;
+  /** The config tree's entries as they run (`loader.tree` status): a pack's entry is the one at its position. */
+  entries?: LoaderStatus[];
 }
 
 const BY_KEY = new Map<string, KeyDoc>();
@@ -183,6 +198,7 @@ export function reference(runtime: Runtime, src: Sources): PackDoc[] {
     groups.set(t, [...(groups.get(t) ?? []), f]);
   }
   const slots = src.slots?.slots() ?? [];
+  const at = new Map((src.entries ?? []).filter((e) => e.state !== "group").map((e) => [e.position.join("."), e]));
   const docs: PackDoc[] = [];
   for (const [f, all] of groups) {
     const ids = new Set(all.map((x) => x.pack.id));
@@ -230,6 +246,8 @@ export function reference(runtime: Runtime, src: Sources): PackDoc[] {
     if (config !== undefined) doc.config = config;
     const parts = all.filter((x) => x !== f).map((x) => x.pack.id);
     if (parts.length) doc.parts = parts;
+    const entry = at.get(f.position().join("."));
+    if (entry) doc.entries = [{ id: entry.id, side: src.side, off: entry.state === "off" }];
     docs.push(doc);
   }
   return docs.sort((a, b) => before(a.position, b.position));
