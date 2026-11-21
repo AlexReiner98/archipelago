@@ -1,6 +1,7 @@
 /**
- * The field's panel: how the run is going, then a section per behaviour,
- * with its switch and every one of its dials, then the start and the run. Sections start closed; each names how many of its dials
+ * The field's panel: its buttons, then a section per behaviour, with its
+ * switch and every one of its dials, then the start and the run, and last,
+ * closed, how the run is going (its state). Sections start closed; each names how many of its dials
  * differ from where they started. Each dial says what it does on hover and
  * goes back to where it started with ↺.
  */
@@ -113,7 +114,6 @@ export function Panel({ sections, S, set, reset, stats, reseed, fit, found }: {
 }) {
   return html`
     <div class="fl-panel">
-      <${RunLine} stats=${stats} found=${found} />
       <div class="fl-acts">
         <button onClick=${reseed} title="Start every particle from its seed again and settle">Settle again</button>
         <button onClick=${fit} title="Fit the picture to the view (also: double-click the sea)">Fit</button>
@@ -142,6 +142,10 @@ export function Panel({ sections, S, set, reset, stats, reseed, fit, found }: {
           </details>
         `;
       })}
+      <details class="fl-sec">
+        <summary title="How the run is going: its state, what is drawn, steps, warmth, and how far it still moves"><span class="nm">state</span></summary>
+        <${RunLine} stats=${stats} found=${found} />
+      </details>
     </div>
   `;
 }

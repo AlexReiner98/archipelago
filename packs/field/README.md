@@ -70,8 +70,9 @@ find line has words, only what it finds and what lies near it.
   left out of the layout and the graph settles again with what is shown.
   What is hidden is `field.hide` (page scope); it starts with closed items
   hidden, so Field opens on the work still open, and `show all` shows
-  everything (kept as `{}`). `dials` opens the run line
-  and every dial, in the same box, the same size.
+  everything (kept as `{}`). `dials` opens every dial,
+  in the same box, the same size, with how the run is going last, closed
+  (`state`).
 - **Titles** ([labels.ts](labels.ts)). Placed in order: the particle
   pointed at and its neighbours, what the find line finds, what was named
   last frame (so names hold still while it settles), the most linked

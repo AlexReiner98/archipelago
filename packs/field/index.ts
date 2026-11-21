@@ -9,7 +9,7 @@
  *   less what the legend hides. While the find line (`find.query`) has
  *   words, only what it finds and what lies near it (`find_steps`, then
  *   `find_faint`) stay, settled again and fitted to the view.
- * - The legend's "dials" tab: the run line and every dial. Each
+ * - The legend's "dials" tab: every dial, and the run's state last. Each
  *   behaviour, and every number it reads, is one. Their values are `field.dials` and what the
  *   legend hides is `field.hide` (both page scope), so an agent can set
  *   them; this browser also remembers them.
@@ -281,7 +281,7 @@ const fieldPack: Pack = {
       `;
     };
 
-    /** The legend's dials tab: the run line and every dial. */
+    /** The legend's dials tab: every dial, and the run's state last, closed. */
     const Dials = () => {
       const version = useVersion();
       const q = useHere<string>(QUERY) ?? "";
