@@ -66,8 +66,15 @@ export interface PackDoc {
   about?: string;
   /** Loaded from this repository, not added from elsewhere. */
   builtIn?: boolean;
+  /** The folder its module is in (`packs/<folder>/`): packs in one folder are one to a person. */
+  folder?: string;
+  /** What it did in the newest run. */
+  activity?: Activity;
+  /** The packs it stands on, and those that use it, by card name: set when packs are joined (cards.ts). */
+  uses?: string[];
+  users?: string[];
   /** The kinds of item and link it defines. */
-  types?: { name: string; base?: string; doc?: string }[];
+  types?: { name: string; base?: string; doc?: string; count?: number; more?: boolean }[];
   /** Which runtime it runs in. */
   side: string;
   state: string;
@@ -84,6 +91,34 @@ export interface PackDoc {
   config?: Json;
   /** Packs it loaded as its own children. */
   parts?: string[];
+}
+
+/** What a pack did in one run, from the exchange: its nodes' says and refusals, and the acts of its actions. */
+export interface Activity {
+  run: string;
+  said: number;
+  refused: number;
+  acted: number;
+}
+
+/** Each pack's activity in one run's events. */
+export function activityOf(run: string, events: { kind: string; pack?: string }[]): Map<string, Activity> {
+  const out = new Map<string, Activity>();
+  for (const e of events) {
+    if (!e.pack) continue;
+    const a = out.get(e.pack) ?? { run, said: 0, refused: 0, acted: 0 };
+    if (e.kind === "say") a.said++;
+    else if (e.kind === "refuse") a.refused++;
+    else if (e.kind === "act") a.acted++;
+    else continue;
+    out.set(e.pack, a);
+  }
+  return out;
+}
+
+/** The folder a pack's module is in: `packs/<folder>/…`. */
+export function folderOf(source: string | undefined): string | undefined {
+  return source?.match(/\/packs\/([^/]+)\/[^/]+$/)?.[1];
 }
 
 export interface Sources {
@@ -165,10 +200,12 @@ export function reference(runtime: Runtime, src: Sources): PackDoc[] {
       : [];
     const about = f.pack.about;
     const builtIn = src.root && f.source ? f.source.startsWith(src.root) : undefined;
+    const folder = folderOf(f.source);
     const doc: PackDoc = {
       id: f.pack.id,
       ...(about ? { about } : {}),
       ...(builtIn !== undefined ? { builtIn } : {}),
+      ...(folder ? { folder } : {}),
       ...(types.length ? { types } : {}),
       side: src.side,
       state,

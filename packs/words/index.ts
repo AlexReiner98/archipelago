@@ -72,7 +72,7 @@ export function fill(template: string, vars: Record<string, string>): string {
 
 const words: Pack<WordsConfig> = {
   id: "words",
-  about: "Notes to agents whose wording lives on the map, so it can be edited there.",
+  about: "Nodes whose words live on the map, so they can be edited there.",
   inject: ["graph.read", "graph.watch", "agent.node", "action.register", "action.invoke"],
   async apply(ctx: Context, config: WordsConfig = {}) {
     const graph = ctx.get<GraphRead>("graph.read");

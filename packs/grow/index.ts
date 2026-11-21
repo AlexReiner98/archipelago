@@ -117,7 +117,7 @@ const refuse = (code: string, message: string) => new Refused({ code, message, b
 
 const grow: Pack = {
   id: "grow",
-  about: "When an agent stumbles where the map said nothing, drafts a note for next time.",
+  about: "When an agent stumbles where the map said nothing, drafts a trial node for next time.",
   inject: ["exchange.read", "agent.tree", "agent.node", "action.register", "action.list", "action.invoke", "graph.read"],
   async apply(ctx: Context) {
     const read = ctx.get<ExchangeRead>("exchange.read");
