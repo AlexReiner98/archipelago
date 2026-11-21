@@ -56,3 +56,12 @@ builders.
 - A pack's effects are revertible: when it unloads, everything it registered
   goes.
 - Keep it small. A new idea becomes a pack, not kernel code.
+- The spec is the contract between packs, and it is versioned. Ask the
+  owner before changing it, and say which capability and edition.
+- A pack's code comes with its tests, in `test/<pack>.test.ts`: input in,
+  what it records or answers out.
+- Every read of the graph or the exchange is bounded: ids given, or a page
+  with a limit and a cursor (`LIMIT_MAX` in `spec/graph.ts`).
+- Docs change in the same commit as the code: the pack's README, the
+  interface's `spec/<name>.md`, and `spec/README.md` when the list changes.
+- Before you finish, `npm run check` passes.

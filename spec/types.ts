@@ -1,7 +1,7 @@
 /**
  * types: what kinds of item and link the map holds. See types.md.
  *
- * Few bases, flavours (Alex, 20 Nov 2026): a base decides statuses and
+ * Few bases, flavours (20 Nov 2026): a base decides statuses and
  * behaviour; a flavour names its base and adds fields only. The UI,
  * verdicts and statuses know bases and field kinds, never a type's name.
  */

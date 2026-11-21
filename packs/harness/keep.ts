@@ -16,6 +16,7 @@ import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import type { ActionInvoke, ActionList } from "../../spec/action.ts";
 import type { GraphWatch } from "../../spec/graph.ts";
+import { read, sheet, verdictGlyph } from "../../spec/style.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -40,15 +41,15 @@ export interface Review {
   nodes: Reviewed[];
 }
 
-export const KEEP_STYLE = `
+export const KEEP_STYLE = sheet(`
 .hv-tag.up { border-style:solid; border-color:var(--held); color:var(--held); }
 .hv-tag.down { border-style:solid; border-color:var(--failed); color:var(--failed); }
 .hv-tag.gone { border-style:solid; border-color:var(--failed); background:color-mix(in srgb, var(--failed) 15%, transparent); color:var(--failed); }
-.hv-why { margin:1px 10px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.hv-check { margin:1px 10px; padding:0 6px; border-left:3px solid var(--failed); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hv-why { margin:1px var(--space-4); color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hv-check { margin:1px var(--space-4); padding:0 var(--space-3); border-left:3px solid var(--failed); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .hv-dec { color:var(--dim); }
 .hv-dec.retired .x { text-decoration:line-through; }
-`;
+`);
 
 interface Deps {
   actions: ActionList;
@@ -152,7 +153,7 @@ export function keepParts({ actions, invoke, graphLive, onVerdicts, pick }: Deps
     const rec = r.record;
     return html`
       <div class="hv-group" title=${rules}>standing · ${head}</div>
-      ${rec && html`<div class="hv-why" title=${`said ${rec.said} times in ${rec.runs} runs`}>${rec.runs} runs · <span class="m-held">✓ ${rec.held}/${t.promote}</span> · <span class="m-failed">✕ ${rec.failed}/${t.fail}</span> · <span class="m-quiet">○ ${rec.quiet}/${t.idle}</span></div>`}
+      ${rec && html`<div class="hv-why" title=${`said ${rec.said} times in ${rec.runs} runs`}>${rec.runs} runs · <span class="m-held">${read(verdictGlyph("held"))} ${rec.held}/${t.promote}</span> · <span class="m-failed">${read(verdictGlyph("failed"))} ${rec.failed}/${t.fail}</span> · <span class="m-quiet">${read(verdictGlyph("quiet"))} ${rec.quiet}/${t.idle}</span></div>`}
       ${why && html`<div class="hv-why" title=${why}>${why}</div>`}
       ${r.checks.map((c) => html`<div class="hv-check" title=${`Held back from every run: ${c}`}>⊝ ${c}</div>`)}
       ${has(APPLY) && html`<div class="hv-words"><div class="bar">

@@ -74,7 +74,7 @@ function setup(home: string, graphFile: string) {
     { id: "written", pack: "written.ts", config: { home } },
     { id: "probe", pack: "probe.ts" },
   ];
-  const as = (actor: { id: string; kind: "person" | "agent" } = { id: "person:alex", kind: "person" }) => {
+  const as = (actor: { id: string; kind: "person" | "agent" } = { id: "person:owner", kind: "person" }) => {
     const ctx = loader.fiber("probe")!.ctx.intercept({ actor, run: "r1" });
     return {
       invoke: ctx.get<ActionInvoke>("action.invoke"),
@@ -137,13 +137,13 @@ test("adopt imports skills and memory as nodes at their places, through an actio
   const { loader, errors, tree, as, call } = setup(home, join(root, "graph.sqlite"));
   await loader.apply(tree);
   try {
-    const alex = as();
+    const owner = as();
     // A load seen before adoption: the loaded pack says it until the map does.
-    const seen = await call(alex, "loaded.note", { place: "skill:review", kind: "skill", title: "skill review", path: f.projectSkill });
+    const seen = await call(owner, "loaded.note", { place: "skill:review", kind: "skill", title: "skill review", path: f.projectSkill });
     assert.ok(seen.ok);
-    assert.deepEqual(alex.tree.nodes().filter((n) => n.pack === "loaded").map((n) => n.at), [["skill:review"]]);
+    assert.deepEqual(owner.tree.nodes().filter((n) => n.pack === "loaded").map((n) => n.at), [["skill:review"]]);
 
-    const out = await call(alex, "written.adopt", { scan: { user: true, plugins: true, project }, paths: [f.old, f.settings] });
+    const out = await call(owner, "written.adopt", { scan: { user: true, plugins: true, project }, paths: [f.old, f.settings] });
     assert.ok(out.ok, JSON.stringify(out));
     const o = (out as unknown as { output: { adopted: { node: string; place: string; held?: string }[]; skipped: { file: string; why: string }[] } }).output;
     assert.equal(o.adopted.length, 7);
@@ -154,24 +154,24 @@ test("adopt imports skills and memory as nodes at their places, through an actio
     ]);
 
     // Each is a words node said at its place, with the file's text as its words, exactly.
-    const nodes = alex.tree.nodes();
+    const nodes = owner.tree.nodes();
     const review = o.adopted.find((a) => a.place === "skill:review")!;
     assert.ok(nodes.some((n) => n.id === `words/${review.node}` && n.kind === "skill" && n.at[0] === "skill:review"));
     const keep = o.adopted.find((a) => a.place === "skill:keep")!;
-    const [item] = await alex.read.get([keep.node]);
+    const [item] = await owner.read.get([keep.node]);
     assert.equal(item!.fields.words, await readFile(f.userSkill, "utf8"));
     assert.equal(item!.fields.file, f.userSkill);
     // The loaded record steps aside, and a later note answers the map's node.
-    assert.deepEqual(alex.tree.nodes().filter((n) => n.pack === "loaded"), []);
-    const again = await call(alex, "loaded.note", { place: "skill:review", kind: "skill", title: "skill review" });
+    assert.deepEqual(owner.tree.nodes().filter((n) => n.pack === "loaded"), []);
+    const again = await call(owner, "loaded.note", { place: "skill:review", kind: "skill", title: "skill review" });
     assert.deepEqual(again.ok && again.output, { node: review.node });
-    const said = await alex.run.reach({ run: "r1", places: ["skill:review"], time: T, input: { text: "# Review" } });
+    const said = await owner.run.reach({ run: "r1", places: ["skill:review"], time: T, input: { text: "# Review" } });
     assert.deepEqual(said.said.map((s) => [s.node, s.text]), [[`words/${review.node}`, "# Review\nRead the diff first."]]);
 
     // Nothing was written: every file is as it was.
     assert.equal(await readFile(f.userSkill, "utf8"), "---\nname: keep\ndescription: Keep it.\n---\r\n# Keep\r\nKeep what holds.\r\n");
     // Adopting again changes nothing.
-    const twice = await call(alex, "written.adopt", { paths: [f.project] });
+    const twice = await call(owner, "written.adopt", { paths: [f.project] });
     assert.ok(twice.ok && !twice.change);
     await quiet();
     assert.deepEqual(errors, []);
@@ -188,9 +188,9 @@ test("a held node refuses refinement and says why; opened, words.set writes the 
   await loader.apply(tree);
   const ORIGINAL = await readFile(f.project, "utf8");
   try {
-    const alex = as();
+    const owner = as();
     const agentRun = as({ id: "agent:claude", kind: "agent" });
-    const out = await call(alex, "written.adopt", { paths: [f.project, f.projectSkill], why: "Alex's working rules: prose is his." });
+    const out = await call(owner, "written.adopt", { paths: [f.project, f.projectSkill], why: "Owner's working rules: prose is his." });
     assert.ok(out.ok);
     const [md, skill] = (out as unknown as { output: { adopted: { node: string }[] } }).output.adopted;
 
@@ -198,38 +198,38 @@ test("a held node refuses refinement and says why; opened, words.set writes the 
     const no = await call(agentRun, "words.set", { node: md!.node, words: "# Rules\n\nSomething else.\n" }, "agent");
     assert.ok(!no.ok);
     assert.equal(no.refused.code, "words.held");
-    assert.match(no.refused.message, /held as written: Alex's working rules: prose is his\./);
+    assert.match(no.refused.message, /held as written: Owner's working rules: prose is his\./);
     assert.ok(!(await call(agentRun, "words.retire", { node: md!.node }, "agent")).ok);
     assert.equal(await readFile(f.project, "utf8"), ORIGINAL);
 
     // Opened by its rule: refinement applies and reaches the file.
-    assert.ok((await call(alex, "written.rule", { node: md!.node, refine: "open" })).ok);
+    assert.ok((await call(owner, "written.rule", { node: md!.node, refine: "open" })).ok);
     const NEW = "# Rules\r\n\r\nRun npm run check, then the full suite.\r\n";
     assert.ok((await call(agentRun, "words.set", { node: md!.node, words: NEW }, "agent")).ok);
     await settles(f.project, NEW);
     // Held again, it refuses again.
-    assert.ok((await call(alex, "written.rule", { node: md!.node, refine: "held", why: "Settled." })).ok);
+    assert.ok((await call(owner, "written.rule", { node: md!.node, refine: "held", why: "Settled." })).ok);
     assert.match((await call(agentRun, "words.set", { node: md!.node, words: "x" }, "agent") as { refused: { message: string } }).refused.message, /Settled\./);
 
     // Undo: the words it had are written back.
-    assert.ok((await call(alex, "written.rule", { node: skill!.node, refine: "open" })).ok);
+    assert.ok((await call(owner, "written.rule", { node: skill!.node, refine: "open" })).ok);
     const SKILL = await readFile(f.projectSkill, "utf8");
-    assert.ok((await call(alex, "words.set", { node: skill!.node, words: "# Review\nRead the tests first.\n" })).ok);
+    assert.ok((await call(owner, "words.set", { node: skill!.node, words: "# Review\nRead the tests first.\n" })).ok);
     await settles(f.projectSkill, "# Review\nRead the tests first.\n");
-    assert.ok((await call(alex, "words.set", { node: skill!.node, words: SKILL })).ok);
+    assert.ok((await call(owner, "words.set", { node: skill!.node, words: SKILL })).ok);
     await settles(f.projectSkill, SKILL);
 
     // A hand edit: the map no longer writes over it, and says so, until it is adopted again.
     await writeFile(f.projectSkill, "# Review\nBy hand.\n");
-    assert.ok((await call(alex, "words.set", { node: skill!.node, words: "# Review\nFrom the map.\n" })).ok);
+    assert.ok((await call(owner, "words.set", { node: skill!.node, words: "# Review\nFrom the map.\n" })).ok);
     await quiet();
     assert.equal(await readFile(f.projectSkill, "utf8"), "# Review\nBy hand.\n");
     assert.match(String(errors.pop()), /changed outside the map/);
-    const re = await call(alex, "written.adopt", { paths: [f.projectSkill] });
+    const re = await call(owner, "written.adopt", { paths: [f.projectSkill] });
     assert.ok(re.ok && (re.output as { updated: unknown[] }).updated.length === 1);
-    const [back] = await alex.read.get([skill!.node]);
+    const [back] = await owner.read.get([skill!.node]);
     assert.equal(back!.fields.words, "# Review\nBy hand.\n");
-    assert.ok((await call(alex, "words.set", { node: skill!.node, words: "# Review\nFrom the map.\n" })).ok);
+    assert.ok((await call(owner, "words.set", { node: skill!.node, words: "# Review\nFrom the map.\n" })).ok);
     await settles(f.projectSkill, "# Review\nFrom the map.\n");
 
     // Unloading undoes the writes: each file goes back to what was adopted. Loading writes the map's words again.

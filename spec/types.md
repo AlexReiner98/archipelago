@@ -13,7 +13,7 @@ against it in the write chain. Types: [types.ts](types.ts).
 
 ## Few bases, flavours
 
-Decided by Alex (20 Nov 2026, "How do types grow without creeping?"):
+Decided (20 Nov 2026, "How do types grow without creeping?"):
 
 - **A base** is a kind of item by behaviour: its statuses, open and
   closed. Edition 1's packs ship four: work, question, record, actor.
