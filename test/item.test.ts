@@ -9,7 +9,7 @@ test("a note: the lead before the first heading, each heading a section to fold"
       "The UI a stranger can open on launch day.",
       "Still read-only.",
       "",
-      "## Decided with Alex",
+      "## Decided with the owner",
       "- First run is in.",
       "- Read-only for people:",
       "  agents write.",
@@ -31,7 +31,7 @@ test("a note: the lead before the first heading, each heading a section to fold"
   assert.deepEqual(n.lead, [{ k: "p", text: "The UI a stranger can open on launch day. Still read-only." }]);
   assert.deepEqual(
     n.sections.map((s) => [s.title, s.depth]),
-    [["Decided with Alex", 2], ["Order", 3]],
+    [["Decided with the owner", 2], ["Order", 3]],
   );
   assert.deepEqual(n.sections[0]!.blocks, [{ k: "ul", items: ["First run is in.", "Read-only for people: agents write."] }]);
   assert.deepEqual(n.sections[1]!.blocks, [

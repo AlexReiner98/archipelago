@@ -6,7 +6,7 @@ for it.
 
 ## What to know
 
-- archipelago-next runs on one machine for one person. Its servers listen on
+- Archipelago runs on one machine for one person. Its servers listen on
   127.0.0.1 only.
 - Installing a pack means trusting its code: packs are not sandboxed.
 - Data lives in the ignored `.data/` folder, never in the repository.

@@ -28,7 +28,7 @@ This is **edition 8**. A capability that came after edition 1 shows the edition 
 [common.ts](common.ts) holds the shared words; [index.ts](index.ts) puts
 every capability's key and type in one map for a runtime to declare.
 
-Decided with Alex: panels are Preact, the graph is one WebGL2 scene
+Decided: panels are Preact, the graph is one WebGL2 scene
 surface, and the spec owns the six places of edition 1 and edition 2's
 `skill:` and `memory:`, where the map speaks through the files it writes.
 Edition 3 adds the place `compact` and the person's acts, `decision` and
@@ -106,7 +106,7 @@ The spec has editions: 1, 2, 3… Packs don't declare versions of anything.
 - Each capability says the edition it arrived in (`since`) and, if
   retired, the edition and what replaces it. The list is the spec's
   history.
-- Edition 1 is accepted (Alex, 20 Nov 2026): its capabilities' meanings
+- Edition 1 is accepted (20 Nov 2026): its capabilities' meanings
   are fixed.
 
 Cordis links by key alone and leaves versioning open (§6.6). It names two

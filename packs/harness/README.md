@@ -10,20 +10,32 @@ the two beside show while the view does
 |---|---|---|
 | Harness (`harness/view`) | `center` | The bar (run and its verdicts ✓ ✕ ○, profile, grouping), the tree, the timeline |
 | Node (`harness/node`) | `left` | Its words, standing, places, pack, kind, record, and its verdict per run |
-| Run (`harness/run`) | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room |
+| Run (`harness/run`) | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: every live run's events, interleaved. All runs: the runs, or a profile's |
 
 ## Picking
 
-One run, or every run. The counts and the ✓ ✕ ○ tally follow the choice.
+One run, every live run at once, or every run. The counts and the ✓ ✕ ○
+tally follow the choice. Runs come last active first (`exchange.read.runs`),
+so a long run acting now is at the top, and the list reads again as events
+come.
 
-- **A run:** `here.run`, else the newest. ● not ended, ○ ended. The counts
+- **A run:** `here.run`, else the last active. ● not ended, ○ ended. The counts
   are what that run said, up to the playhead; the tally, its verdicts; its
   holds, its own `gated` events. Picking a run anywhere (the node's runs,
   Activity) looks at it alone.
+- **Live:** `harness.live` (this pack's own page key), "live" in the run
+  picker. Every run not ended, as many as the style has hues, each lit in
+  its own colour (`hue-1`…, tokens: [live.ts](live.ts)). A run keeps its
+  colour while it stays live. A legend over the tree names them, faint
+  until a run does something while watched (one that stopped without
+  ending stays live); a click looks at one alone. The right pane interleaves their events as they
+  come (the last 300, nothing from before), each edged in its run's
+  colour; a click looks at that run at that event.
 - **All runs, or a profile:** `harness.all` (this pack's own page key). The
   counts and the tally are all time; the right pane lists the runs. A
-  profile picked (`harness.profile`) is looked at this way, and shows over
-  the tree what a run in only that profile would not hear
+  profile picked (`harness.profile`) is looked at this way, lists only the
+  runs it has in it (`profile.read.of`, of the last 50), and shows over the
+  tree what a run in only that profile would not hear
   (`profile.read.hears`).
 - **Playhead:** `here.event`, in one run. Unset, the view follows the run's
   end live.
@@ -83,5 +95,5 @@ rule (`written.rule`).
 Injects `slot.fill`, `here.*`, `agent.tree`, `exchange.read`,
 `exchange.watch`, `verdict.read`, `action.list`, `action.invoke`,
 `graph.read`, `graph.watch`, `profile.read`. Unloading it removes the three
-fills, its page key and its styles. The pure parts are tested in
+fills, its page keys and its styles. The pure parts are tested in
 `test/harness.test.ts`.

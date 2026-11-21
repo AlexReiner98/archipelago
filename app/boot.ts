@@ -1,7 +1,7 @@
 /**
  * The app, page side: the browser runtime and its config tree. The bridge
  * provides the server's capabilities here; the style, renderer, here, frame, views (the picker),
- * harness, activity, find, command, field (home), item, docs (the Packs view) and switch (its on/off switches) packs make the page. The bridge is two ports above the page
+ * harness, activity, find, command, field (home), item, docs (the Packs view), guide (the Guide) and switch (its on/off switches) packs make the page. The bridge is two ports above the page
  * (5180 serves the page and 5182 the bridge, 5280 and 5282 for dev), or at
  * `/bridge/` on the page's own origin when a host in front serves both. `host` is on window, so a pack can be turned
  * off from the console: `host.loader.edit(t => (t.find(e => e.id === "harness").disabled = true, t))`.
@@ -39,7 +39,7 @@ const host = await startBrowser({
     { id: "page", pack: "packs/page/view.ts" },
     { id: "field", pack: "packs/field/index.ts" },
     // Map (packs/map) and its legend (packs/legend) are kept but not loaded, so no one sees them
-    // (Alex, 21 Nov 2026: Field is home). To use them, add:
+    // (21 Nov 2026: Field is home). To use them, add:
     //   { id: "map", pack: "packs/map/index.ts" }, { id: "legend", pack: "packs/legend/index.ts" },
     // Examples to copy, off until turned on (packs/examples): a panel, and a frame of your own.
     { id: "today", pack: "packs/examples/today.ts", disabled: true },
@@ -47,6 +47,7 @@ const host = await startBrowser({
     { id: "item", pack: "packs/item/index.ts" },
     { id: "style-view", pack: "packs/style/view.ts" },
     { id: "docs", pack: "packs/docs/view.ts" },
+    { id: "guide", pack: "packs/docs/guide.ts" },
     { id: "switch", pack: "packs/switch/view.ts" },
   ],
 });

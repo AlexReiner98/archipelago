@@ -53,7 +53,7 @@ const mark = (val: Verdict | "none") => read(verdictGlyph(val));
 export const Mark = ({ v }: { v?: Verdict }) => html`<span class=${`hv-m m-${v ?? "none"}`} title=${v ?? "not said"}>${mark(v ?? "none")}</span>`;
 
 /** An event's mark. */
-function EventMark({ e, v }: { e: ExchangeEvent; v?: Verdict }) {
+export function EventMark({ e, v }: { e: ExchangeEvent; v?: Verdict }) {
   if (e.kind === "say") return html`<${Mark} v=${v} />`;
   if (e.kind === "refuse") return html`<span class="hv-m m-failed">⊘</span>`;
   if (e.kind === "act") return html`<span class=${`hv-m ${e.act?.ok === false ? "m-failed" : "m-act"}`}>${e.act?.ok === false ? "✕" : "●"}</span>`;
@@ -64,7 +64,8 @@ function EventMark({ e, v }: { e: ExchangeEvent; v?: Verdict }) {
   return html`<span class="hv-m m-failed">!</span>`;
 }
 
-function what(e: ExchangeEvent, titles: Map<string, string>, cwd?: string): string {
+/** One line for an event. */
+export function what(e: ExchangeEvent, titles: Map<string, string>, cwd?: string): string {
   if (e.kind === "act") return actLine(e, cwd);
   if (e.node) return `${(e.detail as { resaid?: boolean } | undefined)?.resaid ? "re-said · " : ""}${titles.get(e.node) ?? e.node}: ${short(e.text)}`;
   if (e.kind === "begin") return beginLine(e);
