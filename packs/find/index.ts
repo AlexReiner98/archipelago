@@ -194,7 +194,10 @@ const find: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "top", name: "find", title: "Find", when: { "here.view": "map/map" }, view: Line });
+    // Wherever the query is drawn: Map, and Field (which lights what it finds).
+    const fill = ctx.get<SlotFill>("slot.fill");
+    fill.fill({ slot: "top", name: "find", title: "Find", when: { "here.view": "map/map" }, view: Line });
+    fill.fill({ slot: "top", name: "find-field", title: "Find", when: { "here.view": "field/field" }, view: Line });
   },
 };
 
