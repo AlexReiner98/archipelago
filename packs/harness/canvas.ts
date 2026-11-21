@@ -57,6 +57,7 @@ export const CANVAS_STYLE = sheet(`
 .rx-pick .rx-name { fill:var(--pick); }
 .rx-pick .rx-dot { stroke:var(--pick); stroke-width:2; }
 .rx-lit .rx-name { fill:${C.say}; }
+.rx-lit.rx-run .rx-name { fill:var(--rx-run); }
 .rx-lit.rx-hot-fail .rx-name { fill:${C.fail}; }
 .rx-root { fill:var(--fg); }
 .rx-trail { fill:none; stroke-width:${S.trail}; stroke-opacity:${S.trailInk}; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
@@ -68,7 +69,8 @@ export const CANVAS_STYLE = sheet(`
 .rx-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); pointer-events:none; }
 `);
 
-export type Fire = (e: Pick<ExchangeEvent, "kind" | "node" | "place" | "act">) => void;
+/** Runs a light for an event; with a colour (a run's, when many are shown), in it rather than the event's tone. */
+export type Fire = (e: Pick<ExchangeEvent, "kind" | "node" | "place" | "act">, color?: string) => void;
 
 /** Runs the lights and sparks in a group of the svg, a frame at a time, outside Preact. */
 function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree; placed: Placed; k: number }) {
@@ -83,13 +85,20 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
     group.append(e);
     return e;
   };
-  const light = (id: string, tone: string) => {
-    const node = svg.querySelector(`[data-id="${CSS.escape(id)}"]`);
+  const light = (id: string, tone: string, color?: string) => {
+    const node = svg.querySelector<SVGElement>(`[data-id="${CSS.escape(id)}"]`);
     if (!node) return;
     clearTimeout(lit.get(id));
     node.classList.add("rx-lit");
     node.classList.toggle("rx-hot-fail", tone === "fail");
-    lit.set(id, setTimeout(() => (node.classList.remove("rx-lit", "rx-hot-fail"), lit.delete(id)), S.linger * 1000));
+    node.classList.toggle("rx-run", !!color);
+    if (color) node.style.setProperty("--rx-run", color);
+    lit.set(id, setTimeout(() => (node.classList.remove("rx-lit", "rx-hot-fail", "rx-run"), lit.delete(id)), S.linger * 1000));
+  };
+  /** Paints an effect's elements in a run's colour. */
+  const paint = (els: SVGElement[], color?: string) => {
+    if (!color) return;
+    for (const e of els) e.style.setProperty(e.tagName === "path" ? "stroke" : "fill", color);
   };
   // A node a light is on its way to keeps its name unlit until the light gets there.
   const waiting = new Map<string, number>();
@@ -117,17 +126,18 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
   };
   const run = () => (frame ||= requestAnimationFrame(tick));
   const glow = (tone: string) => [1, 0.6, 0.3].map((r, i) => el("circle", { class: `rx-glow k-${tone}`, r, "fill-opacity": [S.glow / 2, S.glow, Math.min(1, S.glow * 2)][i]!, opacity: 0 }));
-  const fire: Fire = (e) => {
+  const fire: Fire = (e, color) => {
     const { tree, placed } = get();
     const l = lightOf(tree, e);
     if (!l) return;
-    if (still) return light(l.at, l.tone);
+    if (still) return light(l.at, l.tone, color);
     if (l.kind === "light") {
       const pts = route(tree, placed, l.at);
       if (pts.length < 2) return;
       const trail = el("path", { class: `rx-trail k-${l.tone}`, fill: "none" });
       const head = el("circle", { class: `rx-head k-${l.tone}`, r: S.head });
       const rings = glow(l.tone);
+      paint([trail, head, ...rings], color);
       let reached = false;
       wait(l.at);
       fx.push({
@@ -136,7 +146,7 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
         step: (age, k) => {
           const u = Math.min(1, age / S.pulse);
           const flash = u < 1 ? 1 : 1 - (age - S.pulse) / S.flashTime;
-          if (u >= 1 && !reached) (reached = true), arrive(l.at), light(l.at, l.tone);
+          if (u >= 1 && !reached) (reached = true), arrive(l.at), light(l.at, l.tone, color);
           if (flash <= 0) return false;
           const [hx, hy] = pointAt(pts, u);
           const upto = pts.slice(0, Math.floor(u * (pts.length - 1)) + 1);
@@ -157,8 +167,9 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
     } else {
       const p = placed.xy.get(l.at);
       if (!p) return;
-      light(l.at, l.tone);
+      light(l.at, l.tone, color);
       const rings = glow(l.tone);
+      paint(rings, color);
       fx.push({
         start: performance.now(),
         els: rings,

@@ -3,7 +3,7 @@
  * shared by the three fills. Every read is bounded (a page and a cursor,
  * or ids given).
  */
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import type { ActionList } from "../../spec/action.ts";
 import type { AgentTree, NodeInfo, RunInfo } from "../../spec/agent.ts";
 import type { Json } from "../../spec/common.ts";
@@ -11,6 +11,7 @@ import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exch
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import type { HereRead } from "../../spec/here.ts";
 import type { Hearing, ProfileInfo, ProfileRead } from "../../spec/profile.ts";
+import { keepLast } from "./live.ts";
 
 /** What `verdict.read` answers (the verdict pack's own key). */
 export type Verdict = "held" | "failed" | "quiet";
@@ -56,6 +57,10 @@ export interface Caps {
 export const PROFILE = "harness.profile";
 /** The page key set when every run is looked at, not one (the harness pack's own). */
 export const ALL = "harness.all";
+/** The page key set when every live run is looked at at once (the harness pack's own). */
+export const LIVE = "harness.live";
+/** How many events the live view keeps, newest last. */
+export const LIVE_KEEP = 300;
 
 export function hooks(c: Caps) {
   const useHere = <T extends Json>(key: string): T | undefined => {
@@ -77,20 +82,77 @@ export function hooks(c: Caps) {
   const useRuns = (): RunInfo[] => {
     const [runs, setRuns] = useState<RunInfo[]>([]);
     useEffect(() => {
-      const load = () => void c.read.runs({ limit: 50 }).then((p) => setRuns(p.items));
+      // Runs come last active first, so any event may move one up: read again, at most every so often.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let gone = false;
+      const load = () => void c.read.runs({ limit: 50 }).then((p) => !gone && setRuns(p.items));
       load();
-      return c.live.watch({ kinds: ["begin", "end"] }, load) as () => void;
+      const stop = c.live.watch({}, (e) => {
+        if (timer) return;
+        timer = setTimeout(() => ((timer = undefined), load()), e.kind === "begin" || e.kind === "end" ? 0 : 1000);
+      });
+      return () => {
+        gone = true;
+        clearTimeout(timer);
+        void stop();
+      };
     }, []);
     return runs;
   };
 
-  /** The run looked at: none when every run is (`harness.all`), else the one pinned in `here.run`, else the newest. */
+  /**
+   * The run looked at: none when every live run is (`harness.live`) or every
+   * run (`harness.all`), else the one pinned in `here.run`, else the last active.
+   */
   const useRun = () => {
     const runs = useRuns();
     const pinned = useHere<string>("here.run");
-    const all = useHere<boolean>(ALL) === true;
-    const run = all ? undefined : (pinned ?? runs[0]?.run);
-    return { runs, run, pinned, all, info: runs.find((r) => r.run === run) };
+    const live = useHere<boolean>(LIVE) === true;
+    const every = useHere<boolean>(ALL) === true;
+    const all = !live && every;
+    const run = all || live ? undefined : (pinned ?? runs[0]?.run);
+    return { runs, run, pinned, all, live, info: runs.find((r) => r.run === run) };
+  };
+
+  /** The runs a profile has in it (`profile.read.of`), from those given; undefined while it reads. */
+  const useRunsIn = (runs: RunInfo[], profile: string | undefined): RunInfo[] | undefined => {
+    const [inIt, setInIt] = useState<RunInfo[]>();
+    const key = `${profile}|${runs.map((r) => r.run).join(",")}`;
+    useEffect(() => {
+      setInIt(undefined);
+      if (!profile) return;
+      let gone = false;
+      const load = () =>
+        void Promise.all(runs.map(async (r) => ((await c.profiles.of(r)).some((p) => p.id === profile) ? r : undefined))).then(
+          (xs) => !gone && setInIt(xs.filter((r): r is RunInfo => !!r)),
+        );
+      load();
+      const stop = c.profiles.watch(load);
+      return () => {
+        gone = true;
+        void stop();
+      };
+    }, [key]);
+    return profile ? inIt : runs;
+  };
+
+  /**
+   * The events of the runs given, as they come: interleaved, the last
+   * LIVE_KEEP. Nothing from before. Every run's are kept while watching, so
+   * a run that begins shows its first events once it is among those given.
+   */
+  const useLiveEvents = (runs: string[], on: boolean): ExchangeEvent[] => {
+    const [events, setEvents] = useState<ExchangeEvent[]>([]);
+    useEffect(() => {
+      setEvents([]);
+      if (!on) return;
+      return c.live.watch({}, (e) => setEvents((es) => keepLast(es, e, LIVE_KEEP))) as () => void;
+    }, [on]);
+    const key = runs.join(",");
+    return useMemo(() => {
+      const want = new Set(runs);
+      return events.filter((e) => want.has(e.run));
+    }, [events, key]);
   };
 
   /** A run's events in order, kept live. */
@@ -264,7 +326,7 @@ export function hooks(c: Caps) {
     return hearing;
   };
 
-  return { useHere, useNodes, useRun, useEvents, useVerdictData, useVerdictsOfRun, useRecords, useItem, useStatuses, useHas, useProfileList, useRunProfiles, useHearing };
+  return { useHere, useNodes, useRun, useRunsIn, useLiveEvents, useEvents, useVerdictData, useVerdictsOfRun, useRecords, useItem, useStatuses, useHas, useProfileList, useRunProfiles, useHearing };
 }
 
 export type Hooks = ReturnType<typeof hooks>;

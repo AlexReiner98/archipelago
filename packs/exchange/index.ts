@@ -48,8 +48,8 @@ function pageOf<T>(list: T[], page?: PageRequest): Page<T> {
 export class Log {
   /** Events per run, in seq order. */
   readonly runs = new Map<RunId, ExchangeEvent[]>();
-  /** Runs in the order they began. */
-  readonly order: RunId[] = [];
+  /** Runs by their last event: the one that acted last is last. */
+  readonly order = new Set<RunId>();
   /** Events per node, oldest first. */
   readonly byNode = new Map<string, ExchangeEvent[]>();
 
@@ -58,8 +58,9 @@ export class Log {
     if (!list) {
       list = [];
       this.runs.set(e.run, list);
-      this.order.push(e.run);
     }
+    this.order.delete(e.run);
+    this.order.add(e.run);
     const seq = e.seq ?? list.length + 1;
     const event: ExchangeEvent = { ...e, seq, id: e.id ?? `${e.run}:${seq}` };
     list.push(event);
@@ -73,7 +74,9 @@ export class Log {
 
   /**
    * A run as its `begin` events recorded it: a later one says more (a
-   * title, its task) and keeps when the first began. With its end if it has one.
+   * title, its task) and keeps when the first began. With its end if one
+   * came after its last begin: a run that begins again (a server restart)
+   * is open again.
    */
   info(run: RunId): RunInfo | undefined {
     const list = this.runs.get(run) ?? [];
@@ -81,7 +84,8 @@ export class Log {
     if (!begins.length) return undefined;
     const first = begins[0]!.detail as unknown as RunInfo;
     const merged = Object.assign({}, ...begins.map((b) => b.detail)) as RunInfo;
-    const end = list.find((e) => e.kind === "end");
+    const last = list.lastIndexOf(begins[begins.length - 1]!);
+    const end = list.slice(last + 1).find((e) => e.kind === "end");
     return { ...merged, started: first.started, ...(end ? { ended: end.time } : {}) };
   }
 }

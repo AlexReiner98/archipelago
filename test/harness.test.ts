@@ -7,7 +7,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ExchangeEvent } from "../spec/exchange.ts";
 import { asText, expand, fold, pretty } from "../packs/harness/expand.ts";
-import type { NodeInfo } from "../spec/agent.ts";
+import type { NodeInfo, RunInfo } from "../spec/agent.ts";
+import { HUES } from "../spec/style.ts";
+import { colours, keepLast, liveRuns } from "../packs/harness/live.ts";
 import { DECIDED, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 
@@ -378,4 +380,35 @@ test("nodeOf: an event's own node; an act's failed node, else the one told just 
   assert.equal(nodeOf(told, 2), "words/y");
   assert.equal(nodeOf([ev(1, "begin")], 0), undefined);
   assert.equal(nodeOf(RUN, 99), undefined);
+});
+
+// ---------- live.ts: every live run at once ----------
+
+const runInfo = (run: string, ended?: string) => ({ run, agent: { kind: "agent", id: "a" }, harness: "test", reaches: [], started: "2026-11-21T09:00:00Z", ...(ended ? { ended } : {}) }) as unknown as RunInfo;
+
+test("the live runs: those not ended, in the order given, as many as there are colours", () => {
+  const runs = [runInfo("a"), runInfo("b", "2026-11-21T10:00:00Z"), runInfo("c"), runInfo("d")];
+  assert.deepEqual(liveRuns(runs).map((r) => r.run), ["a", "c", "d"]);
+  assert.deepEqual(liveRuns(runs, 2).map((r) => r.run), ["a", "c"]);
+  assert.equal(liveRuns(Array.from({ length: 10 }, (_, i) => runInfo(`r${i}`))).length, HUES.length);
+});
+
+test("a live run keeps its colour while it stays; a new one takes the first free", () => {
+  const one = colours(["a", "b", "c"]);
+  assert.deepEqual([...one], [["a", "hue-1"], ["b", "hue-2"], ["c", "hue-3"]]);
+  // b ends, d begins, and a moves to the back by acting last: no one else's colour changes.
+  const two = colours(["c", "d", "a"], one);
+  assert.equal(two.get("a"), "hue-1");
+  assert.equal(two.get("c"), "hue-3");
+  assert.equal(two.get("d"), "hue-2");
+  assert.equal(two.has("b"), false);
+  // The colours are the style's tokens, never values.
+  for (const t of two.values()) assert.ok((HUES as readonly string[]).includes(t));
+});
+
+test("the interleaved list keeps each event once, the last few", () => {
+  const e = (run: string, seq: number) => ({ ...base, id: `${run}:${seq}`, run, seq, direction: "to_agent", kind: "say" }) as ExchangeEvent;
+  let list: ExchangeEvent[] = [];
+  for (const x of [e("a", 1), e("b", 1), e("a", 2), e("a", 2), e("b", 2)]) list = keepLast(list, x, 3);
+  assert.deepEqual(list.map((x) => x.id), ["b:1", "a:2", "b:2"]);
 });

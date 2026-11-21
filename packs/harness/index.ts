@@ -5,10 +5,12 @@
  * - Center (the view "Harness"): the tree of places and nodes (canvas.ts),
  *   lit by what the run looked at heard, refused and did up to the
  *   playhead, with the timeline under it (timeline.ts). The bar picks the
- *   run (`here.run`, else the newest), or every run (`harness.all`), or a
- *   profile (`harness.profile`): counts are the run's, or all time.
+ *   run (`here.run`, else the last active), or every live run at once
+ *   (`harness.live`, live.ts), or every run (`harness.all`), or a profile
+ *   (`harness.profile`): counts are the run's, or all time.
  * - Right: the run's events, one line each (events.ts): the wider side,
- *   as an opened line needs the room.
+ *   as an opened line needs the room. Live: every live run's, interleaved.
+ *   Every run: the runs, or a profile's runs.
  * - Left: the node looked at (node.ts).
  *
  * The playhead is `here.event`: unset, the view follows the run's end
@@ -27,10 +29,11 @@ import type { ProfileRead } from "../../spec/profile.ts";
 import { KEYS } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { read as token, sheet, verdictGlyph } from "../../spec/style.ts";
+import { read as token, sheet, v, verdictGlyph, type Token } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
 import { Events, short } from "./events.ts";
-import { ALL, hooks, PROFILE, type VerdictRead } from "./hooks.ts";
+import { ALL, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
+import { colours, Legend, LIVE_STYLE, liveRuns, LiveEvents } from "./live.ts";
 import { KEEP_STYLE, keepParts } from "./keep.ts";
 import { packHues, radial, treeOf, type Grouping } from "./layout.ts";
 import { nodePane } from "./node.ts";
@@ -96,6 +99,7 @@ const STYLE = sheet(`
 .hv-bar .live { color:var(--say); flex:none; }
 .hv-n { font-variant-numeric:tabular-nums; flex:none; }
 ${KEEP_STYLE}
+${LIVE_STYLE}
 ${CANVAS_STYLE}
 ${TIMELINE_STYLE}`);
 
@@ -117,9 +121,11 @@ const harness: Pack = {
     const declare = ctx.get<HereDeclare>("here.declare");
     ctx.effect(() => declare.declare({ key: PROFILE, scope: "page", doc: "The profile the harness view shows: its holds over the tree." }));
     ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the harness view looks at every run, with all-time totals, not one run." }));
+    ctx.effect(() => declare.declare({ key: LIVE, scope: "page", doc: "True: the harness view looks at every live run at once, a colour each." }));
     // A run picked anywhere (here, the node's runs, Activity) is looked at alone, with its own profiles.
     ctx.effect(() =>
       here.watch(KEYS.run, () => {
+        if (here.get(LIVE)) set.set(LIVE, undefined);
         if (here.get(ALL)) set.set(ALL, undefined);
         if (here.get(PROFILE)) set.set(PROFILE, undefined);
       }),
@@ -172,7 +178,10 @@ const harness: Pack = {
 
     const Center = () => {
       const nodes = hk.useNodes();
-      const { runs, run, pinned, all, info } = hk.useRun();
+      const { runs, run, pinned, all, live, info } = hk.useRun();
+      const lives = useMemo(() => (live ? liveRuns(runs) : []), [live, runs]);
+      const colour = useLiveColours(lives);
+      const liveEvents = hk.useLiveEvents(lives.map((r) => r.run), live);
       const fires = useRef<Fire | undefined>(undefined);
       const following = useRef(true);
       const events = hk.useEvents(run);
@@ -181,7 +190,8 @@ const harness: Pack = {
       const profile = hk.useHere<string>(PROFILE);
       const index = playhead(events, event);
       following.current = !event || !events.some((e) => e.id === event);
-      const state = useMemo(() => stateAt(events, index), [events, index]);
+      // Live: what the live runs did since the view opened on them.
+      const state = useMemo(() => (live ? stateAt(liveEvents, liveEvents.length - 1) : stateAt(events, index)), [live, liveEvents, events, index]);
       const verdictsOfRun = hk.useVerdictsOfRun(run);
       const rings = useMemo(() => (run && state.end ? new Map(verdictsOfRun.map((x) => [x.node, x.verdict])) : undefined), [state.end, verdictsOfRun]);
       const hearing = hk.useHearing(profile, nodes);
@@ -230,8 +240,15 @@ const harness: Pack = {
         for (const e of events) if (e.seq > was.seq) fires.current?.(e);
       }, [events, run]);
       useLayoutEffect(() => {
-        if (at && !following.current) fires.current?.(at);
+        if (at && !following.current && !live) fires.current?.(at);
       }, [at?.id]);
+      // Live: each event as it comes, in its run's colour.
+      const lit = useRef(new Set<string>());
+      useLayoutEffect(() => {
+        const was = lit.current;
+        lit.current = new Set(liveEvents.map((e) => e.id));
+        for (const e of liveEvents) if (!was.has(e.id)) fires.current?.(e, v(colour.get(e.run) ?? "say"));
+      }, [liveEvents]);
       // Playing: a step every STEP ms, from the start when at the end.
       useEffect(() => {
         if (!playing) return;
@@ -255,25 +272,29 @@ const harness: Pack = {
       return html`
         <div class="hv-view">
           <div class="hv-bar">
-            <select class="hv-select" value=${all ? "*" : (pinned ?? "")} title="The run shown, or every run" onChange=${(e: Event) => {
+            <select class="hv-select" value=${live ? "live" : all ? "*" : (pinned ?? "")} title="The run shown, every live run at once, or every run" onChange=${(e: Event) => {
               const val = (e.target as HTMLSelectElement).value;
               set.set(KEYS.event, undefined);
               set.set(PROFILE, undefined);
+              set.set(LIVE, val === "live" ? true : undefined);
+              if (val === "live") return;
               if (val === "*") return set.set(ALL, true);
               set.set(KEYS.run, val || undefined);
               set.set(ALL, undefined);
             }}>
+              <option value="live">live · ${liveRuns(runs).length} at once</option>
               <option value="*">all runs</option>
-              <option value="">newest${runs[0] ? ` · ${short(runs[0].title ?? runs[0].run.slice(0, 8), 40)}` : ""}</option>
+              <option value="">last active${runs[0] ? ` · ${short(runs[0].title ?? runs[0].run.slice(0, 8), 40)}` : ""}</option>
               ${runs.map((r) => html`<option value=${r.run}>${r.ended ? "○" : "●"} ${short(r.title ?? r.run.slice(0, 8), 40)} · ${clock(r.started)}</option>`)}
             </select>
             ${info && !info.ended && html`<span class="live" title="The run hasn't ended">●</span>`}
-            <span class="hv-n" title=${all ? "Every run's verdicts, node by run: held, failed, quiet" : "This run's verdicts: held, failed, quiet"}><span class="m-held">${token(verdictGlyph("held"))} ${sum.held}</span> <span class="m-failed">${token(verdictGlyph("failed"))} ${sum.failed}</span> <span class="m-quiet">${token(verdictGlyph("quiet"))} ${sum.quiet}</span></span>
+            ${!live && html`<span class="hv-n" title=${all ? "Every run's verdicts, node by run: held, failed, quiet" : "This run's verdicts: held, failed, quiet"}><span class="m-held">${token(verdictGlyph("held"))} ${sum.held}</span> <span class="m-failed">${token(verdictGlyph("failed"))} ${sum.failed}</span> <span class="m-quiet">${token(verdictGlyph("quiet"))} ${sum.quiet}</span></span>`}
             <select class="hv-select" value=${profile ?? ""} title="A profile: what it holds back, over every run's totals" onChange=${(e: Event) => {
               const val = (e.target as HTMLSelectElement).value;
               set.set(KEYS.event, undefined);
               set.set(PROFILE, val || undefined);
               set.set(ALL, val ? true : undefined);
+              if (val) set.set(LIVE, undefined);
             }}>
               <option value="">${all ? "no profile" : "the run's profiles"}</option>
               ${profileList.map((p) => html`<option value=${p.id}>${p.status === "on" ? "●" : p.status === "off" ? "○" : "◌"} ${p.title}</option>`)}
@@ -286,6 +307,11 @@ const harness: Pack = {
             <button class=${showKey ? "on" : ""} onClick=${() => setShowKey(!showKey)} title="What the marks mean">key</button>
           </div>
           <div style="position:relative;min-height:0;display:grid">
+            ${live && html`<${Legend} runs=${lives} colour=${colour} acting=${new Set(liveEvents.map((e) => e.run))} onOpen=${(r: string) => {
+              set.set(LIVE, undefined);
+              set.set(KEYS.event, undefined);
+              set.set(KEYS.run, r);
+            }} />`}
             <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />
           </div>
           ${run && html`<${Timeline}
@@ -310,7 +336,13 @@ const harness: Pack = {
 
     const RunFill = () => {
       const nodes = hk.useNodes();
-      const { run, info, runs, all } = hk.useRun();
+      const { run, info, runs, all, live } = hk.useRun();
+      const profile = hk.useHere<string>(PROFILE);
+      const inProfile = hk.useRunsIn(runs, all ? profile : undefined);
+      const profileTitle = hk.useProfileList().find((p) => p.id === profile)?.title;
+      const lives = useMemo(() => (live ? liveRuns(runs) : []), [live, runs]);
+      const colour = useLiveColours(lives);
+      const liveEvents = hk.useLiveEvents(lives.map((r) => r.run), live);
       const events = hk.useEvents(run);
       const event = hk.useHere<string>(KEYS.event);
       const picked = hk.useHere<string>(KEYS.node);
@@ -318,7 +350,14 @@ const harness: Pack = {
       const verdictsOfRun = hk.useVerdictsOfRun(run);
       const titles = useMemo(() => new Map(nodes.map((n) => [n.id, n.title])), [nodes]);
       const inProfiles = hk.useRunProfiles(info);
-      if (all) return html`<${Runs} runs=${runs} />`;
+      if (live)
+        return html`<${LiveEvents} runs=${lives} events=${liveEvents} colour=${colour} titles=${titles} onPick=${(e: ExchangeEvent) => {
+          set.set(LIVE, undefined);
+          set.set(KEYS.run, e.run);
+          set.set(KEYS.event, e.id);
+          set.set(KEYS.node, e.node);
+        }} />`;
+      if (all) return html`<${Runs} runs=${inProfile} of=${profile ? (profileTitle ?? profile) : undefined} />`;
       return html`<${Events} info=${info} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} node=${picked} profiles=${inProfiles} onPick=${(e: ExchangeEvent) => {
         set.set(KEYS.event, e.id);
         // The node pane follows: the event's node, or for an act the node it failed or was told just before.
@@ -326,16 +365,23 @@ const harness: Pack = {
       }} />`;
     };
 
-    /** Every run, newest first: a click looks at it alone. */
-    const Runs = ({ runs }: { runs: RunInfo[] }) => html`
+    /** Every run, or a profile's (`of`), last active first: a click looks at it alone. */
+    const Runs = ({ runs, of }: { runs?: RunInfo[]; of?: string }) => html`
       <div class="hv-pane">
-        <div class="hv-head"><span class="t">Runs</span><span class="hv-dim">${runs.length}</span></div>
+        <div class="hv-head"><span class="t">Runs</span>${of && html`<span class="hv-cut" title="Only the runs this profile has in it">in ${of}</span>`}<span class="hv-dim">${runs ? runs.length : "…"}</span></div>
         <div class="hv-body">
-          ${runs.map((r) => html`<div class="hv-row" title=${r.title ?? r.run} onClick=${() => set.set(KEYS.run, r.run)}>
+          ${runs && !runs.length && html`<div class="hv-empty" title="Of the last 50 runs, by profile.read.of">${of ? `No run in ${of}.` : "No run yet."}</div>`}
+          ${(runs ?? []).map((r) => html`<div class="hv-row" title=${r.title ?? r.run} onClick=${() => set.set(KEYS.run, r.run)}>
             <span class="hv-m">${r.ended ? "○" : "●"}</span><span class="x">${r.title ?? r.run.slice(0, 8)}</span><span class="n">${clock(r.started)}</span>
           </div>`)}
         </div>
       </div>`;
+
+    /** Each live run's colour, kept while it stays live. */
+    const useLiveColours = (lives: RunInfo[]): Map<string, Token> => {
+      const had = useRef(new Map<string, Token>());
+      return useMemo(() => (had.current = colours(lives.map((r) => r.run), had.current)), [lives.map((r) => r.run).join(",")]);
+    };
 
     const NodeFill = () => html`<${node.Pane} nodes=${hk.useNodes()} review=${kp.useReview()} />`;
 
