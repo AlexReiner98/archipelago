@@ -232,7 +232,7 @@ const view: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    fill.fill({ slot: "shell.main", name: "view", title: "Packs", view: View });
+    fill.fill({ slot: "center", name: "view", title: "Packs", view: View });
   },
 };
 

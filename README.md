@@ -28,7 +28,7 @@ it worked.
 One process ([app/server.ts](app/server.ts)) runs the server's packs (graph,
 action, exchange, agent, verdict, words, loaded, written, grow, keep, the Claude
 Code adapter, the bridge) and the page's dev server. The page's own packs
-(bridge client, here, renderer, shell, harness) are in
+(bridge client, here, renderer, frame, tabs, harness) are in
 [app/boot.ts](app/boot.ts).
 
 It runs twice, so that editing the code never touches what real sessions

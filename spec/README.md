@@ -11,6 +11,8 @@ short doc. This is **edition 1, in draft**, while its owner shapes it.
 | [agent](agent.md) | `agent.node` `agent.tree` `agent.run` | Say, refuse, act. Places, nodes, runs |
 | [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event per say, refusal and act |
 | [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` | UI composition: places in the UI that packs fill |
+| [frame](frame.md) | (regions) | The page's six regions; a frame is a pack |
+| [loader](loader.md) | `loader.tree` | The config tree: read, watch, edit |
 | [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | Large graphs: one WebGL2 surface, filled with layers |
 | [here](here.md) | `here.declare` `here.read` `here.set` | Shared ephemeral state: what is being looked at |
 | [types](types.md) | `types.define` `types.read` | Bases, flavours that add fields, and kinds of link |
@@ -29,6 +31,9 @@ Edition 3 adds the place `compact` and the person's acts, `decision` and
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
 ([agent](agent.md)), and the read side of profiles ([profile](profile.md)).
 Edition 6 adds the style tokens every view draws with ([style](style.md)).
+Edition 7 adds the page's six regions, a fill's `when`, the broker's
+`arrange`, the shared `Slot` and `here.view` ([frame](frame.md)), and
+`loader.tree`, the config tree as a capability ([loader](loader.md)).
 
 ## Packs ask for capabilities
 

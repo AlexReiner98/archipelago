@@ -150,7 +150,7 @@ const item: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "map.side", name: "page", title: "Item", view: Page });
+    ctx.get<SlotFill>("slot.fill").fill({ slot: "right", name: "page", title: "Item", when: { "here.item": true, "here.view": "map/map" }, view: Page });
   },
 };
 

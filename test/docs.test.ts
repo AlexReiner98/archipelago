@@ -137,13 +137,14 @@ test("the page side: slots a pack declares and fills", () => {
   rt.root.plugin({ id: "shell", apply() {} });
   rt.root.plugin({ id: "docs", apply() {} });
   const slots: SlotRead = {
-    slots: () => [{ name: "shell.main", merge: "many", pack: "shell", doc: "views" }],
-    fills: (s) => (s === "shell.main" ? [{ slot: s, name: "view", title: "Packs", pack: "docs", view: () => null }] : []),
+    slots: () => [{ name: "center", merge: "many", pack: "shell", doc: "views" }],
+    fills: (s) => (s === "center" ? [{ slot: s, name: "view", title: "Packs", pack: "docs", view: () => null }] : []),
     watch: () => () => {},
+    Slot: () => null,
   };
   const all = reference(rt, { side: "page", slots });
-  assert.deepEqual(all.find((d) => d.id === "shell")!.slots, { declares: [{ name: "shell.main", merge: "many", doc: "views" }], fills: [] });
-  assert.deepEqual(all.find((d) => d.id === "docs")!.slots, { declares: [], fills: [{ slot: "shell.main", name: "view", title: "Packs" }] });
+  assert.deepEqual(all.find((d) => d.id === "shell")!.slots, { declares: [{ name: "center", merge: "many", doc: "views" }], fills: [] });
+  assert.deepEqual(all.find((d) => d.id === "docs")!.slots, { declares: [], fills: [{ slot: "center", name: "view", title: "Packs" }] });
 });
 
 test("the packs tool: agents read the same reference", async () => {
@@ -198,7 +199,7 @@ test("reading: the folder a pack is in, and each pack's acts in a run", () => {
 });
 
 test("cards: what a pack adds, as counts, live where they can be, each opening where it is", () => {
-  const map = doc({ id: "map", slots: { declares: [{ name: "map.bar", merge: "many" }], fills: [{ slot: "shell.main", name: "view", title: "Map" }] } });
+  const map = doc({ id: "map", slots: { declares: [{ name: "map.bar", merge: "many" }], fills: [{ slot: "center", name: "view", title: "Map" }] } });
   const find = doc({ id: "find", slots: { declares: [], fills: [{ slot: "map.bar", name: "find", title: "Find" }, { slot: "root", name: "x" }] } });
   const p = doc({
     actions: [{ name: "items.create", title: "Make an item", input: {} }],
@@ -256,7 +257,7 @@ test("byFolder: the packs in one folder are one card, its line the folder's own"
   const all = byFolder([
     doc({ id: "docs", folder: "docs", about: "What each pack is for.", provides: [key("docs.read")], activity: { run: "r", said: 1, refused: 0, acted: 0 } }),
     doc({ id: "docs-tool", folder: "docs", about: "The tool.", inject: [key("mcp.host")], activity: { run: "r", said: 2, refused: 0, acted: 1 } }),
-    doc({ id: "docs", folder: "docs", side: "page", slots: { declares: [], fills: [{ slot: "shell.main", name: "view", title: "Packs" }] } }),
+    doc({ id: "docs", folder: "docs", side: "page", slots: { declares: [], fills: [{ slot: "center", name: "view", title: "Packs" }] } }),
     doc({ id: "bridge", folder: "bridge" }),
     doc({ id: "bridge", folder: "bridge", side: "page", state: "failed", error: "boom", provides: [key("graph.read", "graph")] }),
     doc({ id: "graph", provides: [key("graph.read", "graph")] }),

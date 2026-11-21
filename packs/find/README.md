@@ -7,7 +7,7 @@ it.
   (`types.read`), read in bounded pages through `graph.read` and kept live
   by `graph.watch`; `run(query)` answers a query over it (query.ts).
 - Declares `find.query` (page): the query the canvas draws. Its line, in
-  `map.bar`, sets it; anything else may too.
+  the region `top` while the map shows, sets it; anything else may too.
 
 | Term | Matches |
 |---|---|

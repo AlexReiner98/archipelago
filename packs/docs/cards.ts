@@ -38,6 +38,9 @@ export interface Count {
   to?: Named;
 }
 
+/** The region views go in (spec/frame.md): the frame shows one at a time. */
+export const CENTER = "center";
+
 const n = (x: number, one: string, many = `${one}s`) => `${x} ${x === 1 ? one : many}`;
 const ownKeys = (doc: PackDoc) => new Set(doc.provides.map((k) => k.key));
 
@@ -64,10 +67,12 @@ export const foundation = (doc: PackDoc) => doc.provides.some((k) => !!k.contrac
 export function addsOf(doc: PackDoc, all: PackDoc[] = []) {
   const fills = doc.slots?.fills ?? [];
   const owner = new Map(all.flatMap((d) => (d.slots?.declares ?? []).map((s) => [s.name, d.id] as const)));
-  const views: Named[] = fills.filter((f) => f.slot === "shell.main").map((f) => ({ title: f.title ?? f.name, view: doc.id }));
+  const views: Named[] = fills.filter((f) => f.slot === CENTER).map((f) => ({ title: f.title ?? f.name, view: doc.id }));
+  // A part opens the view it is in, when the pack that declared its slot has one.
+  const hasView = (id: string | undefined) => !!id && all.some((d) => d.id === id && d.slots?.fills.some((f) => f.slot === CENTER));
   const parts: Named[] = fills
-    .filter((f) => f.slot !== "shell.main" && f.slot !== "root" && f.title)
-    .map((f) => ({ title: f.title!, ...(owner.get(f.slot) ? { view: owner.get(f.slot) } : {}) }));
+    .filter((f) => f.slot !== CENTER && f.slot !== "root" && f.title)
+    .map((f) => ({ title: f.title!, ...(hasView(owner.get(f.slot)) ? { view: owner.get(f.slot) } : {}) }));
   const kinds = (doc.types ?? []).filter((t) => t.base !== "link");
   const links = (doc.types ?? []).filter((t) => t.base === "link");
   const items = kinds.reduce((s, t) => s + (t.count ?? 0), 0);

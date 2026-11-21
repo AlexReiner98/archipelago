@@ -1,6 +1,6 @@
 /**
  * The reflex tree, page side: every node the map says to agents as one
- * circular tree grown from its root, in the shell as the view "Reflex tree".
+ * circular tree grown from its root, in the region `center` as the view "Reflex tree".
  * The shape is layout.ts's; this draws it and lights it.
  *
  * - Grouped by place (the default) or by pack. Nodes said nowhere are left
@@ -549,7 +549,7 @@ const reflex: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "shell.main", name: "view", title: "Reflex tree", view: View });
+    ctx.get<SlotFill>("slot.fill").fill({ slot: "center", name: "view", title: "Reflex tree", view: View });
   },
 };
 

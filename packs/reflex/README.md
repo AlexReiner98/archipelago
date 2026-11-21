@@ -1,7 +1,7 @@
 # reflex
 
 The reflex tree: every node the map says to agents, as one circular tree
-grown from its root, lit live as the agent works. Fills `shell.main` as the
+grown from its root, lit live as the agent works. Fills the region `center` as the
 view "Reflex tree", beside Harness and Map. The design is the old repo's
 reflex_view pack and its lens "Reflex tree": its sizes and numbers are
 `STYLE` in layout.ts, its colours and hues the style's tokens

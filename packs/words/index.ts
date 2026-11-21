@@ -132,6 +132,31 @@ const words: Pack<WordsConfig> = {
       },
     });
 
+    // A node's name: items.set can't change it, since `node` is not a type the items pack edits.
+    register.register({
+      name: "words.title",
+      title: "Rename a node",
+      input: {
+        type: "object",
+        properties: { node: { type: "string", description: "The node's item id" }, title: { type: "string", description: "A name of a few words" } },
+        required: ["node", "title"],
+      },
+      async run(input: { node: Id; title: string }, call: ActionContext) {
+        const [item] = await graph.get([input.node]);
+        if (!item || item.type !== TYPE) {
+          throw new Refused({ code: "words.not_a_node", message: `${input.node} is not a node on the map.`, by: { pack: "words" } });
+        }
+        const title = typeof input.title === "string" ? input.title.trim() : "";
+        if (!title) throw new Refused({ code: "words.title", message: "A node needs a name: title can't be empty.", by: { pack: "words" } });
+        heldCheck(item);
+        const facts: Fact[] = [];
+        if (item.fields.title !== undefined) facts.push(["-", input.node, "title", item.fields.title]);
+        facts.push(["+", input.node, "title", title]);
+        call.write(facts);
+        return { node: input.node };
+      },
+    });
+
     register.register({
       name: "words.retire",
       title: "Retire a node: it is no longer said",

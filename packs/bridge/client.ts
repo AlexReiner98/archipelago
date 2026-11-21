@@ -4,6 +4,11 @@
  * `verdict.read` as if they ran there. Each consumer's watches are its own
  * effects and go when it unloads. If the stream drops and comes back (the
  * server restarted), every watch is made again and the copies refreshed.
+ *
+ * A stream the browser gives up on is opened again: an EventSource retries
+ * by itself only after a network error, and closes for good on an answer
+ * that isn't the stream, such as a proxy's 502 while the server restarts
+ * behind it. The page would then stay on its old copy of the map.
  */
 import type { Dispose } from "../../spec/common.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
@@ -11,6 +16,8 @@ import type { Context, Pack } from "../../runtime/core.ts";
 export interface BridgeClientConfig {
   /** The bridge server, ending in `/`. Default http://127.0.0.1:5182/. */
   url?: string;
+  /** Milliseconds before a closed stream is opened again, doubling to 30 s. Default 1000. */
+  retry?: number;
 }
 
 interface Watch {
@@ -50,9 +57,10 @@ const client: Pack<BridgeClientConfig> = {
 
     let opened!: () => void;
     const ready = new Promise<void>((ok) => (opened = ok));
-    const events = new EventSource(url + "events");
-    ctx.effect(() => () => events.close());
-    events.onmessage = (e) => {
+    let events: EventSource | undefined;
+    let wait = config.retry ?? 1000;
+    const onmessage = (e: MessageEvent) => {
+      wait = config.retry ?? 1000;
       const m = JSON.parse(e.data);
       if (m.stream) {
         const again = stream !== undefined;
@@ -70,6 +78,27 @@ const client: Pack<BridgeClientConfig> = {
         ctx.runtime.report(ctx.fiber, err);
       }
     };
+    // The stream, and opening it again when the browser has given up on it.
+    let reopen: ReturnType<typeof setTimeout> | undefined;
+    let done = false;
+    const open = () => {
+      reopen = undefined;
+      if (done) return;
+      const es = new EventSource(url + "events");
+      events = es;
+      es.onmessage = onmessage;
+      es.onerror = () => {
+        if (es.readyState !== EventSource.CLOSED || done || reopen) return;
+        reopen = setTimeout(open, wait);
+        wait = Math.min(wait * 2, 30000);
+      };
+    };
+    ctx.effect(() => () => {
+      done = true;
+      clearTimeout(reopen);
+      events?.close();
+    });
+    open();
     await ready;
 
     // The synchronous reads: a copy, kept fresh by the key's own watch.

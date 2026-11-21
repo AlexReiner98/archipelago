@@ -83,7 +83,7 @@ const styleView: Pack = {
       document.head.append(el);
       return () => el.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "shell.main", name: "view", title: "Style", view: View });
+    ctx.get<SlotFill>("slot.fill").fill({ slot: "center", name: "view", title: "Style", view: View });
   },
 };
 

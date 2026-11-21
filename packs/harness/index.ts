@@ -1,7 +1,8 @@
 /**
  * The harness view: what the map says to an agent, what the agent does,
- * and whether each thing said works. Three panes in `shell.main`, linked
- * through `here`:
+ * and whether each thing said works. Three fills, linked through `here`:
+ * the tree in the region `left`, the run in `center` (the view "Harness"),
+ * the node in `right`; the two beside show while the run does:
  *
  * - Tree: every node that can be said, by place or by pack, each with its
  *   verdict in the run looked at.
@@ -82,9 +83,7 @@ const RULE = "written.rule";
 const mark = (v: Verdict | "none") => read(verdictGlyph(v));
 
 const STYLE = sheet(`
-.hv { display:grid; grid-template-columns:minmax(220px,26%) 1fr minmax(260px,28%); height:100%; }
-.hv-pane { display:flex; flex-direction:column; min-width:0; min-height:0; border-right:1px solid var(--line); }
-.hv-pane:last-child { border-right:0; }
+.hv-pane { display:flex; flex-direction:column; min-width:0; min-height:0; height:100%; }
 .hv-head { display:flex; gap:var(--space-3); align-items:center; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; min-height:20px; }
 .hv-head .t { font-weight:var(--bold); }
 .hv-head .sp { flex:1; }
@@ -618,27 +617,43 @@ const harness: Pack = {
       `;
     };
 
-    const View = () => {
-      const nodes = useNodes();
+    /** The run looked at: the one pinned, else the newest. */
+    const useRun = () => {
       const runs = useRuns();
       const pinned = useHere<string>(KEYS.run);
-      const run = pinned ?? runs[0]?.run;
-      const events = useEvents(run);
-      const verdictsOfRun = useVerdictData(() => (run ? verdicts.run(run) : Promise.resolve([])), [run], run) ?? [];
+      return { runs, run: pinned ?? runs[0]?.run };
+    };
+    const useVerdictsOfRun = (run: string | undefined) => useVerdictData(() => (run ? verdicts.run(run) : Promise.resolve([])), [run], run) ?? [];
+
+    /** Left: the tree, each node with its verdict in the run looked at. */
+    const Tree = () => {
+      const nodes = useNodes();
+      const { run } = useRun();
+      const verdictsOfRun = useVerdictsOfRun(run);
       const records = useVerdictData(() => verdicts.records({ limit: 500 }).then((p) => p.items), []) ?? [];
-      const editable = useEditable();
       const statuses = useStatuses();
       const review = kp.useReview();
       const byNode = useMemo(() => new Map(verdictsOfRun.map((v) => [v.node, v])), [verdictsOfRun]);
       const counts = useMemo(() => new Map(records.map((r) => [r.node, r.said])), [records]);
+      return html`<${TreePane} nodes=${nodes} byNode=${byNode} counts=${counts} statuses=${statuses} review=${review} />`;
+    };
+
+    /** Center: one run live. */
+    const Run = () => {
+      const nodes = useNodes();
+      const { runs, run } = useRun();
+      const events = useEvents(run);
+      const verdictsOfRun = useVerdictsOfRun(run);
       const titles = useMemo(() => new Map(nodes.map((n) => [n.id, n.title])), [nodes]);
-      return html`
-        <div class="hv">
-          <${TreePane} nodes=${nodes} byNode=${byNode} counts=${counts} statuses=${statuses} review=${review} />
-          <${RunPane} runs=${runs} run=${run} events=${events} verdictsOfRun=${verdictsOfRun} titles=${titles} />
-          <${NodePane} nodes=${nodes} editable=${editable} review=${review} />
-        </div>
-      `;
+      return html`<${RunPane} runs=${runs} run=${run} events=${events} verdictsOfRun=${verdictsOfRun} titles=${titles} />`;
+    };
+
+    /** Right: the node looked at. */
+    const Node = () => {
+      const nodes = useNodes();
+      const editable = useEditable();
+      const review = kp.useReview();
+      return html`<${NodePane} nodes=${nodes} editable=${editable} review=${review} />`;
     };
 
     ctx.effect(() => {
@@ -647,7 +662,12 @@ const harness: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "shell.main", name: "view", title: "Harness", view: View });
+    // Three fills that show together: the run is the view, the tree and the node stand beside it while it shows.
+    const fill = ctx.get<SlotFill>("slot.fill");
+    const whileShown = { "here.view": "harness/view" };
+    fill.fill({ slot: "left", name: "tree", when: whileShown, view: Tree });
+    fill.fill({ slot: "center", name: "view", title: "Harness", view: Run });
+    fill.fill({ slot: "right", name: "node", when: whileShown, view: Node });
   },
 };
 

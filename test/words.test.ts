@@ -87,6 +87,26 @@ test("a seeded node speaks its words; an edit through words.set is what the next
   await loader.apply([]);
 });
 
+test("words.title renames a node: one change set, and the tree shows the new name; empty or not a node is refused", async () => {
+  const { rt, loader, errors, as } = setup();
+  await loader.apply(tree());
+  await rt.settle();
+  const person = as({ id: "person:owner", kind: "person" });
+  const [node] = person.tree.nodes();
+  const act = (input: Record<string, unknown>) => person.invoke.invoke({ action: "words.title", input: input as never, authority: { of: "human", basis: "test" }, reason: "rename" });
+  const out = await act({ node: node!.source, title: "The spec is the contract" });
+  assert.ok(out.ok && out.committed);
+  if (out.ok) assert.deepEqual(out.committed!.facts, [["-", node!.source, "title", "Spec"], ["+", node!.source, "title", "The spec is the contract"]]);
+  await rt.settle();
+  assert.equal(person.tree.nodes()[0]?.title, "The spec is the contract");
+  const empty = await act({ node: node!.source, title: "  " });
+  assert.ok(!empty.ok && empty.refused.code === "words.title");
+  const none = await act({ node: "n_none", title: "X" });
+  assert.ok(!none.ok && none.refused.code === "words.not_a_node");
+  assert.deepEqual(errors, []);
+  await loader.apply([]);
+});
+
 test("a refusing node refuses; changing its places re-registers it", async () => {
   const { rt, loader, as } = setup();
   await loader.apply(tree(undefined, [{ title: "No .env", kind: "rule", at: ["file:.env"], words: "Secrets.", refuse: true } as never]));
