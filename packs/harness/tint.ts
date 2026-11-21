@@ -8,7 +8,8 @@
  * - `tintOf`: what an event colours, and in which tone.
  * - `wayOf`: the branches from the root to a node, the ones it colours.
  *
- * Every number is a dial (`DIALS`), shown in the harness's Dials panel and
+ * Every number is a dial (`DIALS`), with how long a switch of focus
+ * takes (trees.ts), shown in the harness's Dials panel and
  * kept in the page key `harness.dials`. Colours are style tokens: the
  * run's hue, `failed`, `quiet`.
  */
@@ -27,6 +28,7 @@ export interface Dial {
 
 export const DIALS: readonly Dial[] = [
   { key: "tint_hold", label: "stays s", min: 0.2, max: 20, step: 0.1, value: 3, doc: "Seconds a branch keeps its agent's colour after it is told." },
+  { key: "switch_s", label: "switch s", min: 0, max: 1.5, step: 0.05, value: 0.4, doc: "Seconds a tree takes to grow into focus while the old one shrinks into the column; 0 switches at once." },
   { key: "tint_fade", label: "fades s", min: 0, max: 5, step: 0.1, value: 1.2, doc: "Seconds the colour takes to come and to go." },
 ];
 

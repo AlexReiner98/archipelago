@@ -16,7 +16,7 @@ import { DECIDED, dotsBox, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf,
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 import { placementOf, placementText } from "../packs/harness/agents.ts";
 import { DIALS, dialsOf, tintOf, wayOf } from "../packs/harness/tint.ts";
-import { focusOf, heardBy, treesAndRows } from "../packs/harness/trees.ts";
+import { focusOf, heardBy, switchFocus, transitionName, treesAndRows } from "../packs/harness/trees.ts";
 import { landsLive } from "../packs/harness/hooks.ts";
 
 const base = { id: "e1", run: "r", seq: 3, time: "2026-11-21T09:00:00Z" };
@@ -510,4 +510,12 @@ test("treesAndRows: a tree for the one in focus, those acting and the last activ
   assert.equal(rows.length, 35);
   assert.ok(!rows.includes("r25") && !rows.includes("r30"));
   assert.deepEqual(treesAndRows(["a", "b"], new Set(), undefined), { trees: ["a", "b"], rows: [] });
+});
+
+test("switchFocus: where the page has no view transitions, the change happens at once; names are one per colour slot", () => {
+  let changed = 0;
+  switchFocus(() => changed++, 0.4);
+  assert.equal(changed, 1);
+  assert.equal(transitionName(7), "hv-agent-7");
+  assert.notEqual(transitionName(0), transitionName(1));
 });

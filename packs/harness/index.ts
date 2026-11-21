@@ -38,7 +38,7 @@ import { Events, short } from "./events.ts";
 import { ALL, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
 import { colourOf, colours, liveRuns, LiveEvents } from "./live.ts";
 import { AGENTS_STYLE, placementOf, ProfileMenu } from "./agents.ts";
-import { focusOf, Trees, TREES_STYLE, treesAndRows } from "./trees.ts";
+import { focusOf, switchFocus, Trees, TREES_STYLE, treesAndRows } from "./trees.ts";
 import { DIALS_KEY, DIALS_STYLE, DialsPane, useDials } from "./dials.ts";
 import { Bar, BAR_STYLE } from "./bar.ts";
 import { KEEP_STYLE, keepParts } from "./keep.ts";
@@ -264,7 +264,7 @@ const harness: Pack = {
           // In the order of their colours, so a tree keeps its place while its agent is live.
           [...lives].sort((a, b) => (colour.get(a.run) ?? 0) - (colour.get(b.run) ?? 0)).map((r) => {
             const ps = placements.get(r.run);
-            return { run: r, colour: colourOf(colour.get(r.run) ?? 0), hears: hears.get(r.run), quiet: !acting.has(r.run), fires: firesOf(r.run), ...(ps ? { placement: placementOf(ps, fallbacks, values(r.facts?.profiles)) } : {}) };
+            return { run: r, slot: colour.get(r.run) ?? 0, colour: colourOf(colour.get(r.run) ?? 0), hears: hears.get(r.run), quiet: !acting.has(r.run), fires: firesOf(r.run), ...(ps ? { placement: placementOf(ps, fallbacks, values(r.facts?.profiles)) } : {}) };
           }),
         [lives, colour, placements, fallbacks, acting, hears],
       );
@@ -362,7 +362,7 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} dials=${dials} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} focus=${focus} onFocus=${setFocus} rows=${rows} />`
+              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} dials=${dials} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} />`
               : html`<${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
             ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${lives.find((r) => r.run === menu.run)?.title ?? menu.run.slice(0, 8)} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}

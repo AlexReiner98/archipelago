@@ -59,7 +59,10 @@ Live mode and the agents are one idea: each live run is an agent, in the
 colour live mode gives it, with a tree of its own. One is in focus, big,
 with every name; the others are small previews in a column beside it, in
 the order of their colours so each keeps its place, and a click on one
-brings it into focus. Focus starts on the last active agent and stays
+brings it into focus. The switch is smooth: the one clicked grows into
+the big place while the old one shrinks into the column (a view
+transition, each tree and line named by its colour slot; `switch_s`
+seconds, at once under reduced motion). Focus starts on the last active agent and stays
 where it is put while that agent is live. Trees go to the agent in focus,
 the six last active, and up to six more that act while watched; every
 other live agent is one line under the previews (its colour, name and
@@ -84,7 +87,8 @@ the agent's colour, and they fade back. Nothing travels.
 | act | the branch to the bough of its place (`failed` when it failed) |
 
 Every number is a dial, in the Dials panel: how long a branch keeps its
-colour, and how long the colour takes to come and go. Their values are
+colour, how long the colour takes to come and go, and how long a switch
+of focus takes. Their values are
 `harness.dials` (page scope), so an agent can set them; the browser
 remembers them. Colours are style tokens only. One run looked at alone
 keeps its lights along the playhead.

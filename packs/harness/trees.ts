@@ -8,6 +8,10 @@
  * (tint.ts); nothing moves. Small, a tree names only what is lit, what the
  * agent was told, and what is picked.
  *
+ * A switch of focus is smooth: each tree and line has a view-transition
+ * name by its colour slot, so the one clicked grows into the big place and
+ * the old one shrinks into the column (`switchFocus`, `switch_s`).
+ *
  * In focus, a click on the agent's name looks at it alone; on its profile,
  * lists the profiles to move it into one (`profile.place`, agents.ts).
  */
@@ -51,7 +55,30 @@ export function heardBy(nodes: NodeInfo[], hears: ReadonlySet<string> | undefine
   return hears ? nodes.filter((n) => hears.has(n.id)) : nodes;
 }
 
+/** A tree's or line's view-transition name: one per colour slot, so it carries across a switch. */
+export const transitionName = (slot: number) => `hv-agent-${slot}`;
+
+type Doc = Document & { startViewTransition?: (update: () => Promise<void>) => { finished: Promise<void> } };
+
+/**
+ * Runs `change` (which moves focus) as a view transition taking `secs`:
+ * at once when it is 0, under reduced motion, or where the page has none.
+ */
+export function switchFocus(change: () => void, secs: number): void {
+  const doc = typeof document === "undefined" ? undefined : (document as Doc);
+  if (!doc?.startViewTransition || !secs || matchMedia("(prefers-reduced-motion: reduce)").matches) return change();
+  const root = doc.documentElement;
+  root.classList.add("hv-switching");
+  root.style.setProperty("--hv-switch", `${secs}s`);
+  // The page renders the change on a microtask; the transition takes its picture after that.
+  const t = doc.startViewTransition(() => new Promise<void>((done) => (change(), setTimeout(done, 0))));
+  void t.finished.finally(() => root.classList.remove("hv-switching"));
+}
+
 export const TREES_STYLE = sheet(`
+html.hv-switching { view-transition-name:none; }
+::view-transition-group(*.hv-agent) { animation-duration:var(--hv-switch, .4s); animation-timing-function:cubic-bezier(.2,.7,.2,1); }
+::view-transition-old(*.hv-agent), ::view-transition-new(*.hv-agent) { height:100%; object-fit:contain; animation-duration:var(--hv-switch, .4s); }
 .hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); }
 .hv-trees.many { grid-template-columns:minmax(0,1fr) minmax(180px,22%); }
 .hv-peeks { min-height:0; overflow-y:auto; border-left:1px solid var(--line); scrollbar-width:thin; }
@@ -80,6 +107,8 @@ export const TREES_STYLE = sheet(`
 
 export interface AgentTree {
   run: RunInfo;
+  /** Its colour slot: its view-transition name. */
+  slot: number;
   /** Its colour, as CSS. */
   colour: string;
   placement?: Placement;
@@ -118,7 +147,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
   const mine = useMemo(() => p.events.filter((e) => e.run === a.run.run), [p.events, a.run.run]);
   const state = useMemo(() => stateAt(mine, mine.length - 1), [mine]);
   const title = a.run.title ?? a.run.run.slice(0, 8);
-  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
+  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}`} style=${`view-transition-name:${transitionName(a.slot)};view-transition-class:hv-agent`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
     <div class="hd">
       <span class="d" style=${`color:${a.colour}`}>●</span>
       <span class="who" title=${big ? `${title}\nLook at it alone` : `${title}\nBring it into focus`} onClick=${big ? () => p.onOpen(a.run.run) : undefined}>${title}</span>
@@ -140,7 +169,7 @@ export const Trees = (p: TreesProps) => {
       ${rest.map((a) => html`<${One} key=${a.run.run} a=${a} p=${p} big=${false} />`)}
       ${p.rows?.length ? html`<div class="hv-rows">
         <div class="h" title="Live, but not among the last active: a run that stopped without ending stays live">${p.rows.length} more live</div>
-        ${p.rows.map((a) => html`<div class="r" key=${a.run.run} title=${`${a.run.title ?? a.run.run}\nBring it into focus`} onClick=${() => p.onFocus(a.run.run)}>
+        ${p.rows.map((a) => html`<div class="r" key=${a.run.run} style=${`view-transition-name:${transitionName(a.slot)};view-transition-class:hv-agent`} title=${`${a.run.title ?? a.run.run}\nBring it into focus`} onClick=${() => p.onFocus(a.run.run)}>
           <span style=${`color:${a.colour}`}>●</span><span class="x">${a.run.title ?? a.run.run.slice(0, 8)}</span>${a.placement && html`<span class="p">${placementText(a.placement)}</span>`}
         </div>`)}
       </div>` : ""}
