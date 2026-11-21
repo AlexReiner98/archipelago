@@ -7,6 +7,12 @@ import { join } from "node:path";
 import type { Entry } from "../runtime/loader.ts";
 import { localOrigins } from "../runtime/guard.ts";
 
+/**
+ * What a fresh map says before anyone has written a node: only what fits
+ * any repository a run is in. This repository's own rules (the spec, tests,
+ * docs, bounded reads, the check) are in its CLAUDE.md, which reaches the
+ * people and agents who work on it; a seed would say them in everyone's.
+ */
 export const SEED = [
   {
     title: "Says the run is recorded",
@@ -15,35 +21,11 @@ export const SEED = [
     words: "This run is recorded on the exchange: every say, refusal and act shows live in the harness view.",
   },
   {
-    title: "The spec is Alex's",
-    kind: "reflex",
-    at: ["file:spec/**"],
-    words: "spec/ holds the contracts. Don't change one silently: ask Alex first.",
-  },
-  {
-    title: "Packs, not kernel",
-    kind: "reflex",
-    at: ["file:runtime/**"],
-    words: "runtime/ is the kernel. Keep it small: a new idea becomes a pack.",
-  },
-  {
-    title: "Read files with Read",
-    kind: "reflex",
-    at: ["tool:Bash"],
-    words: "To read or search files, prefer Read, Grep and Glob over Bash.",
-  },
-  {
     title: "No secrets",
     kind: "rule",
     at: ["file:.env", "file:**/.env"],
     words: "The map refuses .env files: they hold secrets.",
     refuse: true,
-  },
-  {
-    title: "Check before you stop",
-    kind: "reflex",
-    at: ["reply_end"],
-    words: "Before you finish: did every change you made pass npm run check?",
   },
 ];
 
