@@ -7,6 +7,7 @@
 import type { Dial } from "./behaviour.ts";
 import { HUES, read } from "../../spec/style.ts";
 import { neighbours, type G, type Grid, type Settings } from "./graph.ts";
+import { place, type Want } from "./labels.ts";
 
 /** The drawing's own dials. */
 export const DRAW: Dial[] = [
@@ -17,7 +18,12 @@ export const DRAW: Dial[] = [
   { key: "link_width", label: "link width", min: 0.1, max: 4, step: 0.1, value: 0.6, then: "paint", doc: "A link's width, in screen px." },
   { key: "label_px", label: "titles from", min: 2, max: 40, step: 0.5, value: 9, then: "paint", doc: "A particle's title shows once its radius reaches this on screen, in px." },
   { key: "label_hubs", label: "always name hubs", min: 0, max: 100, step: 1, value: 15, then: "paint", doc: "The this-many most linked items are named at any zoom, so the picture reads before you zoom in." },
-  { key: "label_most", label: "titles at most", min: 0, max: 600, step: 10, value: 160, then: "paint", doc: "At most this many titles at once." },
+  { key: "label_most", label: "titles at most", min: 0, max: 600, step: 10, value: 120, then: "paint", doc: "At most this many titles at once." },
+  { key: "label_room", label: "room per title", min: 1000, max: 40000, step: 500, value: 9000, then: "paint", doc: "At most one title per this many square pixels of the view, so a small view is not buried in words." },
+  { key: "label_gap", label: "title gap", min: 0, max: 20, step: 1, value: 4, then: "paint", doc: "Space between a particle and its title, in screen px." },
+  { key: "label_chars", label: "title length", min: 8, max: 120, step: 1, value: 36, then: "paint", doc: "A title longer than this many letters is cut, with …; the whole of it shows on hover." },
+  { key: "label_inside", label: "title inside from", min: 0, max: 200, step: 2, value: 40, then: "paint", doc: "A particle this many screen px across or more holds its title inside itself, cut to fit (0: never)." },
+  { key: "label_cover_px", label: "titles avoid", min: 0, max: 20, step: 0.5, value: 2, then: "paint", doc: "A title never covers another particle this many screen px across or more (0: it covers none at all)." },
   { key: "label_halo", label: "title halo", min: 0, max: 8, step: 0.5, value: 3, then: "paint", doc: "A ring of the sea round every letter, in screen px, so words read over particles and links." },
   { key: "label_fade", label: "title fade-in", min: 0.1, max: 20, step: 0.1, value: 3, then: "paint", doc: "A title fades in as its particle grows on screen from 'titles from' to this much more." },
   { key: "query_fade", label: "find fades rest to", min: 0, max: 1, step: 0.01, value: 0.12, then: "paint", doc: "While the find line has words, how faint what it does not find is drawn (it never moves)." },
@@ -61,6 +67,8 @@ export class Light {
   shine = new Float32Array(0);
   shining = new Set<number>();
   focus = -1;
+  /** The ids named last frame: they are placed first, so names hold still while the map settles. */
+  named = new Set<string>();
   private leftAt = 0;
   private last = 0;
   /** Eases toward the particle pointed at (hover) and its neighbours; true while it still moves. */
@@ -101,13 +109,43 @@ function hubs(g: G, most: number): Uint8Array {
   return hub;
 }
 
+/** Words onto at most `rows` lines, each at most `px` wide in the canvas's font now; the last cut with … if more is left. */
+function wrap(c: CanvasRenderingContext2D, s: string, px: number, rows: number): string[] {
+  const words = s.split(/\s+/).filter(Boolean), lines: string[] = [];
+  let line = "";
+  for (let k = 0; k < words.length; k++) {
+    const next = line ? `${line} ${words[k]}` : words[k]!;
+    if (c.measureText(next).width <= px) {
+      line = next;
+      continue;
+    }
+    if (lines.length === rows - 1) return [...lines, fit(c, `${next} ${words.slice(k + 1).join(" ")}`.trim(), px)].filter(Boolean);
+    if (line) lines.push(line);
+    line = c.measureText(words[k]!).width <= px ? words[k]! : fit(c, words[k]!, px);
+  }
+  if (line) lines.push(line);
+  return lines.length > rows ? lines.slice(0, rows) : lines;
+}
+
+/** The title cut, with …, to fit `px` wide in the canvas's font now. */
+function fit(c: CanvasRenderingContext2D, s: string, px: number): string {
+  if (c.measureText(s).width <= px) return s;
+  let lo = 0, hi = s.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (c.measureText(`${s.slice(0, mid)}…`).width <= px) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo ? `${s.slice(0, lo).trimEnd()}…` : "";
+}
+
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 /**
  * `match`: what the find line finds (1) and not (0), or null when it has no
  * words; what it does not find is drawn at `query_fade`.
  */
-export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, light: Light, ink: Ink, grid: Grid, size: { width: number; height: number; dpr: number }, match: Uint8Array | null = null): void {
+export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, light: Light, ink: Ink, grid: Grid, size: { width: number; height: number; dpr: number }, match: Uint8Array | null = null, clear: [number, number, number, number][] = []): void {
   const { width, height, dpr } = size;
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   c.globalAlpha = 1;
@@ -196,47 +234,70 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     }
   }
 
-  // Words, in screen space. A title goes right of its particle, else left, never over another word.
+  // Words, in screen space (labels.ts places them): the lit first, then what the find line finds, then what was
+  // named last frame, then hubs, then the largest; none over another word or particle, none off the view.
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   c.textBaseline = "middle";
   c.lineJoin = "round";
-  c.strokeStyle = ink.sea;
-  c.fillStyle = ink.text;
-  type Box = [number, number, number, number];
-  const taken: Box[] = [];
-  const overlaps = (b: Box) => taken.some((t) => b[0] < t[2] && b[2] > t[0] && b[1] < t[3] && b[3] > t[1]);
-  const say = (text: string, x: number, y: number, alpha: number) => {
-    c.globalAlpha = alpha;
-    if (S.label_halo! > 0) (c.lineWidth = S.label_halo!), c.strokeText(text, x, y);
-    c.fillText(text, x, y);
-  };
-  const big: number[] = [];
-  // What the find line finds, and the most linked (label_hubs), are named whatever their size.
-  const hub = hubs(g, S.label_hubs!);
-  for (let i = 0; i < g.n; i++) if ((g.r[i]! * cam.k >= S.label_px! || match?.[i] || hub[i]) && inView(i, 0)) big.push(i);
-  // The lit ones first, so the particle pointed at and its neighbours are always named; then what is found; then hubs.
-  big.sort((p, q) => shine[q]! - shine[p]! || (match ? match[q]! - match[p]! : 0) || hub[q]! - hub[p]! || g.r[q]! - g.r[p]! || p - q);
-  for (const i of shining) if (!big.includes(i) && inView(i, 0)) big.unshift(i);
-  let shown = 0;
   c.font = "11px ui-sans-serif, system-ui, sans-serif";
-  for (const i of big) {
-    if (shown >= S.label_most!) break;
-    if (light.dim > 0.5 && shine[i]! < 0.5) continue;
-    if (match && !match[i] && !shine[i]) continue;
-    const text = clip(g.title[i]!, 40), w = c.measureText(text).width;
-    const sx = g.x[i]! * cam.k + cam.tx, sy = g.y[i]! * cam.k + cam.ty, rs = g.r[i]! * cam.k;
-    let box: Box | null = null;
-    for (const lx of [sx + rs + 4, sx - rs - 4 - w]) {
-      const b: Box = [lx - 2, sy - 7, lx + w + 2, sy + 7];
-      if (!overlaps(b)) {
-        box = b;
-        break;
-      }
-    }
-    if (!box) continue;
-    taken.push(box);
-    shown++;
-    const grow = shine[i]! > 0 || match?.[i] || hub[i] ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
-    say(text, box[0] + 2, sy, grow * Math.max(faint * fade(i), shine[i]!));
+  const hub = hubs(g, S.label_hubs!);
+  const lit = light.dim > 0.5;
+  const rank = (i: number) =>
+    (i === focus ? 64 : 0) + (shine[i]! > 0 ? 32 : 0) + (match?.[i] ? 16 : 0) + (light.named.has(g.id[i]!) ? 8 : 0) + (hub[i] ? 4 : 0) + (g.closed[i] ? 0 : 2);
+  const wants: number[] = [];
+  for (let i = 0; i < g.n; i++) {
+    if (!inView(i, 0)) continue;
+    // While one is pointed at, only it and its neighbours are named; while the find line has words, what it finds.
+    if (lit ? !(shine[i]! > 0.5) : match ? !match[i] : !(g.r[i]! * cam.k >= S.label_px! || hub[i])) continue;
+    wants.push(i);
   }
+  wants.sort((p, q) => rank(q) - rank(p) || g.r[q]! - g.r[p]! || p - q);
+  const budget = Math.min(S.label_most!, Math.floor((width * height) / Math.max(1, S.label_room!)));
+  const texts = new Map<number, string[]>();
+  const LINE = 13;
+  const want: Want[] = wants.slice(0, Math.max(budget * 4, 40)).map((i) => {
+    const r = g.r[i]! * cam.k;
+    // Wide enough: the title inside the particle, cut to what fits across most of it.
+    // Wide enough: the title inside the particle, on as many lines as fit across it (at most three), the last cut with ….
+    const rows = Math.min(3, Math.floor((2 * r * 0.75) / LINE));
+    const lines = S.label_inside! > 0 && 2 * r >= S.label_inside! && rows >= 1 ? wrap(c, clip(g.title[i]!, S.label_chars!), 2 * r * 0.8, rows) : [];
+    // Lines of under four letters in all say nothing: then the title goes beside, whole.
+    const inside = lines.join("").replace("…", "").length >= 4;
+    const text = inside ? lines : [clip(g.title[i]!, S.label_chars!)];
+    texts.set(i, text);
+    const w = Math.max(...text.map((t) => c.measureText(t).width)) + 4;
+    return { i, x: g.x[i]! * cam.k + cam.tx, y: g.y[i]! * cam.k + cam.ty, r, w, h: text.length * LINE + 1, must: shine[i]! > 0.5, inside };
+  });
+  // Whether a box covers a particle other than i that is label_cover_px or more across on screen.
+  const covers = (b: [number, number, number, number], i: number) => {
+    let hit = false;
+    grid.each((b[0] - cam.tx) / cam.k, (b[1] - cam.ty) / cam.k, (b[2] - cam.tx) / cam.k, (b[3] - cam.ty) / cam.k, (j) => {
+      if (hit || j === i) return;
+      const rs = g.r[j]! * cam.k;
+      if (2 * rs < S.label_cover_px!) return;
+      const cx = g.x[j]! * cam.k + cam.tx, cy = g.y[j]! * cam.k + cam.ty;
+      const nx = Math.max(b[0], Math.min(cx, b[2])), ny = Math.max(b[1], Math.min(cy, b[3]));
+      if (Math.hypot(cx - nx, cy - ny) < rs) hit = true;
+    });
+    return hit;
+  };
+  const placed = place(want, { width, height, room: S.label_room!, most: S.label_most!, gap: S.label_gap!, covers, clear });
+  light.named = new Set(placed.map((p) => g.id[p.i]!));
+  c.strokeStyle = ink.sea;
+  for (const { i, box, within } of placed) {
+    const rs = g.r[i]! * cam.k;
+    const grow = shine[i]! > 0 || match?.[i] || hub[i] ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
+    // A closed item's title is muted, like its particle.
+    const shut = g.closed[i] && !(shine[i]! > 0) && !within;
+    c.globalAlpha = grow * Math.max(faint * fade(i), shine[i]!) * (shut ? 0.75 : 1);
+    c.fillStyle = shut ? ink.muted : ink.text;
+    const lines = texts.get(i)!, mid = (box[0] + box[2]) / 2;
+    c.textAlign = within ? "center" : "left";
+    lines.forEach((line, k) => {
+      const x = within ? mid : box[0] + 2, y = box[1] + LINE * (k + 0.5) + 0.5;
+      if (S.label_halo! > 0) (c.lineWidth = S.label_halo!), c.strokeText(line, x, y);
+      c.fillText(line, x, y);
+    });
+  }
+  c.textAlign = "left";
 }

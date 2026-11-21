@@ -153,7 +153,13 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
         canvas.height = Math.round(s.height * s.dpr);
       }
       const easing = light.ease(g, hover, S);
-      paint(c, g, cam, S, light, colours, pick, s, match);
+      // What lies over the canvas (the legend), in canvas pixels: no title goes under it.
+      const at = canvas.getBoundingClientRect();
+      const clear = Array.from(canvas.parentElement?.querySelectorAll(".fl-key") ?? [], (el) => {
+        const r = el.getBoundingClientRect();
+        return [r.left - at.left - 4, r.top - at.top - 4, r.right - at.left + 4, r.bottom - at.top + 4] as [number, number, number, number];
+      });
+      paint(c, g, cam, S, light, colours, pick, s, match, clear);
       dirty = easing || following;
     }
     raf = requestAnimationFrame(tick);
@@ -236,6 +242,9 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     dirty = true;
   });
   resize.observe(canvas);
+  // The legend opening or closing over the canvas moves where titles may go: paint again.
+  const overlay = new MutationObserver(() => (dirty = true));
+  if (canvas.parentElement) overlay.observe(canvas.parentElement, { childList: true, subtree: true });
   const scheme = matchMedia("(prefers-color-scheme: dark)");
   // The style's tokens again, on a new theme or a new style: the inks, and each type's hue.
   const recolour = () => {
@@ -308,6 +317,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       cancelAnimationFrame(raf);
       chan.port1.close();
       resize.disconnect();
+      overlay.disconnect();
       scheme.removeEventListener("change", recolour);
       unstyle();
       canvas.removeEventListener("pointermove", onMove);

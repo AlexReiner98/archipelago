@@ -113,3 +113,34 @@ test("the legend's filter: what it hides, and how it counts", async () => {
   assert.deepEqual(toggle(toggle({}, "types", "work"), "types", "work"), {});
   assert.deepEqual(toggle({ lone: true }, "lone"), {});
 });
+
+test("titles: no two overlap, none leaves the view, none covers a particle, the budget holds", async () => {
+  const { place } = await import("../packs/field/labels.ts");
+  // A crowd of particles on a 400 x 300 view, each wanting a 80 x 14 title.
+  const r = rand(3);
+  const dots = Array.from({ length: 120 }, (_, i) => ({ i, x: 20 + r() * 360, y: 20 + r() * 260, r: 3 }));
+  const covers = (b: [number, number, number, number], i: number) =>
+    dots.some((d) => d.i !== i && Math.hypot(d.x - Math.max(b[0], Math.min(d.x, b[2])), d.y - Math.max(b[1], Math.min(d.y, b[3]))) < d.r);
+  const at = { width: 400, height: 300, room: 4000, most: 100, gap: 4, covers };
+  const placed = place(dots.map((d) => ({ ...d, w: 80, h: 14 })), at);
+  assert.ok(placed.length > 0 && placed.length <= 30, `${placed.length} placed, budget 30`);
+  for (const [k, a] of placed.entries()) {
+    const [x0, y0, x1, y1] = a.box;
+    assert.ok(x0 >= 0 && y0 >= 0 && x1 <= 400 && y1 <= 300, "inside the view");
+    assert.ok(!covers(a.box, a.i), "covers no other particle");
+    for (const b of placed.slice(k + 1)) assert.ok(!(x0 < b.box[2] && x1 > b.box[0] && y0 < b.box[3] && y1 > b.box[1]), "no overlap");
+  }
+  // A title that must show (the particle pointed at) is placed even over particles, and first.
+  const must = place([{ i: 0, x: 200, y: 150, r: 3, w: 80, h: 14, must: true }], { ...at, covers: () => true });
+  assert.equal(must.length, 1);
+  // Near the right edge, a title goes left instead of off the view.
+  const edge = place([{ i: 0, x: 390, y: 150, r: 3, w: 80, h: 14 }], { ...at, covers: () => false });
+  assert.ok(edge[0]!.box[2] <= 400 && edge[0]!.box[0] < 390);
+  // Nothing goes under what the view keeps clear (the legend).
+  const legend: [number, number, number, number] = [0, 200, 200, 300];
+  for (const p of place(dots.map((d) => ({ ...d, w: 80, h: 14 })), { ...at, clear: [legend] }))
+    assert.ok(!(p.box[0] < legend[2] && p.box[2] > legend[0] && p.box[1] < legend[3] && p.box[3] > legend[1]), "clear of the legend");
+  // A particle wider than its title holds it inside.
+  const big = place([{ i: 0, x: 200, y: 150, r: 50, w: 80, h: 14, inside: true }], { ...at, covers: () => true });
+  assert.equal(big[0]?.within, true);
+});

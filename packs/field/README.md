@@ -37,6 +37,15 @@ particle, it only lights what it finds and fades the rest (`query_fade`).
   and returning ones beside a neighbour. What is hidden is `field.hide`
   (page scope), so an agent can set it; the browser remembers it. Folded,
   the legend is one line of type switches.
+- **Titles** ([labels.ts](labels.ts)). Placed in order: the particle
+  pointed at and its neighbours, what the find line finds, what was named
+  last frame (so names hold still while it settles), the most linked
+  (`label_hubs`), then the largest on screen. A particle wide enough
+  (`label_inside`) holds its title inside, wrapped onto up to three lines;
+  otherwise a title tries eight spots round its particle and takes the
+  first inside the view that overlaps no title, no particle and not the
+  legend. At most one per `label_room` square pixels. A closed item's
+  title is muted.
 - **Reading it.** Closed items are drawn faded. The most linked items
   (`label_hubs`) are named at any zoom. The run line says how far the run
   is. How particles, links and words are drawn keeps its values in
