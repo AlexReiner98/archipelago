@@ -114,27 +114,6 @@ test("showing a view sets here.view and its settings, lays its arrange; the next
   assert.ok(declared.some((e) => e.includes(SHOWN)), "views.view isn't declared here: reported, not thrown");
 });
 
-test("slot.arrange: layers over config, later wins, disposing takes it back", async () => {
-  const rt = new Runtime();
-  rt.root.plugin(here);
-  rt.root.plugin(renderer, { arrange: { "item/page": "bottom" } });
-  rt.root.plugin(filler);
-  await rt.settle();
-  const read = rt.root.get<SlotRead>("slot.read");
-  const lay = rt.root.get<SlotArrange>("slot.arrange");
-  let heard = 0;
-  read.watch("left", () => heard++);
-  assert.equal(read.fills("bottom").length, 1);
-  const one = lay.lay({ "item/page": "left" });
-  const two = lay.lay({ "item/page": "off" });
-  assert.equal(read.fills("left").length + read.fills("bottom").length, 0);
-  await two();
-  assert.equal(read.fills("left").length, 1);
-  assert.ok(heard > 0);
-  await one();
-  assert.equal(read.fills("bottom").length, 1, "back to config");
-});
-
 test("the flavour view: an agent makes a view with items.create", async () => {
   const rt = new Runtime();
   const modules: Record<string, Pack> = { graph, action, types, record, items, views };

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { HereSet } from "../spec/here.ts";
-import type { SlotDeclare, SlotFill, SlotRead } from "../spec/slot.ts";
+import type { SlotArrange, SlotDeclare, SlotFill, SlotRead } from "../spec/slot.ts";
 import { REGIONS } from "../spec/slot.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import here from "../packs/here/index.ts";
@@ -51,4 +51,20 @@ test("arrange moves a fill to another region, or hides it", async () => {
   assert.deepEqual(names(read, "left"), []);
   assert.deepEqual(names(read, "right"), ["b/today"]);
   assert.deepEqual(names(read, "center"), ["b/map"]);
+});
+
+test("slot.arrange lays an arrange over config while held: later wins, disposing takes it back", async () => {
+  const { rt, read } = await page({ "b/today": "bottom" });
+  const lay = rt.root.get<SlotArrange>("slot.arrange");
+  let heard = 0;
+  read.watch("right", () => heard++);
+  assert.deepEqual(names(read, "bottom"), ["b/today"]);
+  const one = lay.lay({ "b/today": "right" });
+  const two = lay.lay({ "b/today": "off" });
+  assert.deepEqual([...names(read, "right"), ...names(read, "bottom")], []);
+  await two();
+  assert.deepEqual(names(read, "right"), ["b/today"]);
+  assert.ok(heard > 0, "the region heard the change");
+  await one();
+  assert.deepEqual(names(read, "bottom"), ["b/today"], "back to config");
 });
