@@ -2,9 +2,10 @@
 
 The harness view: the hub to watch every agent at once, and every run,
 live or replayed, and every profile. What the map says to an agent is a
-tree of places and nodes. It lands on every live run: each agent sits on an
-orbit round the tree in its own colour, with its profile under it, and what
-passes between them is a curve drawn on from the tree's own. Four fills,
+tree of places and nodes. It lands on every live run: each agent has a tree
+of its own, holding the nodes its profile lets it hear, under its name in
+its colour and its profile, and what it is told colours that tree. Nothing
+moves. Four fills,
 linked through `here`; the three beside show while the view does
 (`when: { "here.view": "harness/view" }`), and start folded to rails (the
 frame's `folded` config in `app/boot.ts`), so the landing is the tree and
@@ -12,9 +13,9 @@ the agents only. Picking a node opens the node pane.
 
 | Fill | Region | Shows |
 |---|---|---|
-| Harness (`harness/view`) | `center` | The bar, the tree with its agents, the timeline |
+| Harness (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline |
 | Node (`harness/node`, "Node") | `left` | Its words, standing, places, pack, kind, record, and its verdict per run |
-| Dials (`harness/dials`, "Dials") | `left` | Every number of the curves to the agents ([dials.ts](dials.ts)), ↺ to put one back |
+| Dials (`harness/dials`, "Dials") | `left` | Every number of how a tree is coloured ([dials.ts](dials.ts)), ↺ to put one back |
 | Run (`harness/run`, "Run") | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: every live run's events, interleaved. All runs: the runs, or a profile's |
 
 ## The bar ([bar.ts](bar.ts))
@@ -39,7 +40,7 @@ come.
   picker, and what the view shows while nothing else is picked. Every run
   not ended, as many as the style has hues, each in its own colour
   (`hue-1`…, tokens: [live.ts](live.ts)). A run keeps its colour while it
-  stays live. Each is an agent round the tree (below). The right pane interleaves their events as they
+  stays live. Each is an agent with a tree of its own (below). The right pane interleaves their events as they
   come (the last 300, nothing from before), each edged in its run's
   colour; a click looks at that run at that event.
 - **All runs, or a profile:** `harness.all` (this pack's own page key). The
@@ -51,42 +52,38 @@ come.
 - **Playhead:** `here.event`, in one run. Unset, the view follows the run's
   end live.
 
-## The agents ([agents.ts](agents.ts), [reach.ts](reach.ts))
+## The agents ([trees.ts](trees.ts), [tint.ts](tint.ts), [agents.ts](agents.ts))
 
 Live mode and the agents are one idea: each live run is an agent, in the
-colour live mode gives it, on an orbit outside the tree and its names, at
-the seat of that colour (six seats, the first at the top), so it stays put
-while live. Faint until it does something while watched (one that stopped
-without ending stays live). A click on it looks at it alone.
+colour live mode gives it, with a tree of its own in a grid (one, two, then
+three across), in the order of their colours so a tree keeps its place. Its
+tree holds only the nodes it hears (`profile.read.hears`), hung as the big
+tree is, with how many of all it hears. Small, a tree names only what is
+lit, what the agent was told, and what is picked. Faint until it does
+something while watched (one that stopped without ending stays live). A
+click on its name looks at it alone.
 
-What reaches between the tree and an agent is a curve, drawn on from the
-tree's own: it leaves its node along its branch's tangent, runs on past
-the names, and comes into the agent. An agent near the node takes it
-straight in, as one bezier. One further round takes it on its own lane, an
-ellipse between the tree and the agents, one per seat, so no two agents'
-curves share a stretch and none crosses the tree. The curve sweeps from
-its start to its end, then fades; nothing else moves.
+What an agent is told colours that node and its branch from the root in
+the agent's colour, and they fade back. Nothing travels.
 
-| Event | Drawn |
+| Event | Coloured |
 |---|---|
-| say | from its node to the agent, in the run's colour; the name lights as it leaves |
+| say | its node and branch, in the run's colour; the name shows |
 | refusal | the same, in `failed` |
-| hold (`gated`) | from its node, in `quiet`, stopping part way |
-| act | from the agent to the bough of its place (`failed` when it failed) |
-| begin, end | the agent's halo pulses |
+| hold (`gated`) | the same, in `quiet` |
+| act | the branch to the bough of its place (`failed` when it failed) |
 
-Every number is a dial, in the Dials panel: how far out the agents sit,
-how far a curve runs on along its branch and how straight it comes in, how
-far round before it takes its lane, its width and ink, its sweep and
-linger, how far a hold gets. Their values are `harness.dials` (page
-scope), so an agent can set them; the browser remembers them. Colours are
-style tokens only. Under reduced motion only the names and the agents
-light.
+Every number is a dial, in the Dials panel: how long a branch keeps its
+colour, and how long the colour takes to come and go. Their values are
+`harness.dials` (page scope), so an agent can set them; the browser
+remembers them. Colours are style tokens only. One run looked at alone
+keeps its lights along the playhead.
 
-Under each agent, its profile from `profile.read.of`: ● the one it
+Over each agent's tree, its profile from `profile.read.of`: ● the one it
 matches, ○ the workspace's fallback (nothing else placed it), – none. A
 click on it lists the profiles, and picking one moves the agent there
-through the profile pack's `profile.place`; the page never writes itself.
+through the profile pack's `profile.place`, and its tree changes to match;
+the page never writes itself.
 
 ## The tree ([layout.ts](layout.ts), [canvas.ts](canvas.ts))
 

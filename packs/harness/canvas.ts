@@ -13,13 +13,12 @@
  *   name lights when the light gets there, not before. Or it runs a spark on the bough of an act's place. Under reduced motion only the
  *   names light.
  *
- * - With agents (every live run at once, agents.ts): each sits on an orbit
- *   round the tree in its colour, its profile under its name, and `fire`
- *   draws the curve between the event's node and its agent instead
- *   (reach.ts): it sweeps from start to end, then fades.
+ * - Tinting (every live run at once, each agent its own tree, tint.ts):
+ *   `fire` colours the node told and its branch from the root in the
+ *   agent's colour, and they fade back. Nothing travels. Small, a tree
+ *   names only what is lit, said, or picked.
  *
  * Drag to move, wheel to zoom, double-click to fit. A click picks a node,
- * or looks at an agent alone; a click on its profile opens the profiles.
  */
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -28,8 +27,7 @@ import type { NodeInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { branchAt, lightOf, pointAt, route, STYLE, type Placed, type Tree } from "./layout.ts";
-import { placementText, placementTip, type Placement } from "./agents.ts";
-import { dialsOf, lengthOf, orbitBox, reachOf, type Dials, type Orbit, type Seat } from "./reach.ts";
+import { tintOf, wayOf, type Dials } from "./tint.ts";
 import type { Verdict } from "./hooks.ts";
 import type { Heard, Hold } from "./replay.ts";
 
@@ -45,6 +43,12 @@ export const CANVAS_STYLE = sheet(`
 .rx-canvas svg { width:100%; height:100%; display:block; }
 .rx-branch { fill:none; stroke:${C.say}; stroke-linecap:round; }
 .rx-branch.way { stroke:var(--pick); stroke-opacity:1 !important; }
+.rx-canvas svg { --rx-fade:0s; }
+.rx-branch { transition:stroke var(--rx-fade), stroke-opacity var(--rx-fade); }
+.rx-branch.tint { stroke:var(--tint) !important; stroke-opacity:1 !important; filter:drop-shadow(0 0 2px var(--tint)); }
+.rx-name { transition:fill var(--rx-fade), opacity var(--rx-fade); }
+.rx-small .rx-name { opacity:0; }
+.rx-small .rx-lit .rx-name, .rx-small .rx-said .rx-name, .rx-small .rx-refused .rx-name, .rx-small .rx-pick .rx-name { opacity:1; }
 .rx-dot { fill:var(--fg); fill-opacity:.85; }
 .rx-bough .rx-dot { fill-opacity:.5; }
 .rx-node { cursor:pointer; }
@@ -79,26 +83,12 @@ export const CANVAS_STYLE = sheet(`
 
 /**
  * Runs a light for an event; with a colour (a run's, when many are shown), in it rather than the event's tone.
- * When the event's run is an agent on the orbit, the curve between its node and the agent is drawn.
+ * Tinting (dials given), it colours the node and its branch instead, and nothing moves.
  */
 export type Fire = (e: Pick<ExchangeEvent, "kind" | "node" | "place" | "act"> & { run?: string }, color?: string) => void;
 
-/** An agent on the orbit: a live run. */
-export interface AgentMark {
-  run: string;
-  title: string;
-  /** Its colour, as CSS. */
-  colour: string;
-  /** Its colour's slot: its seat and its lane. */
-  slot: number;
-  seat: Seat;
-  /** Nothing from it since the view opened. */
-  quiet: boolean;
-  placement?: Placement;
-}
-
 /** Runs the lights and sparks in a group of the svg, a frame at a time, outside Preact. */
-function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree; placed: Placed; k: number; orbit?: Orbit; agents?: AgentMark[]; dials: Dials }) {
+function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree; placed: Placed; k: number; dials?: Dials }) {
   const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   type Fx = { start: number; els: SVGElement[]; step: (age: number, k: number) => boolean };
   const fx: Fx[] = [];
@@ -110,7 +100,7 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
     group.append(e);
     return e;
   };
-  const light = (id: string, tone: string, color?: string) => {
+  const light = (id: string, tone: string, color?: string, secs: number = S.linger) => {
     const node = svg.querySelector<SVGElement>(`[data-id="${CSS.escape(id)}"]`);
     if (!node) return;
     clearTimeout(lit.get(id));
@@ -118,7 +108,7 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
     node.classList.toggle("rx-hot-fail", tone === "fail");
     node.classList.toggle("rx-run", !!color);
     if (color) node.style.setProperty("--rx-run", color);
-    lit.set(id, setTimeout(() => (node.classList.remove("rx-lit", "rx-hot-fail", "rx-run"), lit.delete(id)), S.linger * 1000));
+    lit.set(id, setTimeout(() => (node.classList.remove("rx-lit", "rx-hot-fail", "rx-run"), lit.delete(id)), secs * 1000));
   };
   /** Paints an effect's elements in a run's colour. */
   const paint = (els: SVGElement[], color?: string) => {
@@ -150,61 +140,28 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
     frame = fx.length ? requestAnimationFrame(tick) : 0;
   };
   const run_ = () => (frame ||= requestAnimationFrame(tick));
-  /** An agent's halo pulses. */
-  const ping = (run: string) => {
-    const a = svg.querySelector(`[data-agent="${CSS.escape(run)}"]`);
-    if (!a) return;
-    a.classList.remove("ping");
-    void (a as SVGGraphicsElement).getBBox?.();
-    a.classList.add("ping");
-  };
-  /** The curve between a node and an agent, drawn from its start to its end, then faded. False: the run has no agent on the orbit. */
-  const fly = (run: string, e: Parameters<Fire>[0], color?: string): boolean => {
-    const { tree, placed, orbit, agents, dials: d } = get();
-    const agent = agents?.find((a) => a.run === run);
-    if (!orbit || !agent) return false;
-    const r = reachOf(tree, placed, orbit, agent.slot, e, d);
-    if (!r) return true;
-    const failed = r.tone === "fail";
-    const ink = failed ? C.fail : r.tone === "hold" ? v("quiet") : (color ?? C.say);
-    const lightAt = (at: string) => light(at, failed ? "fail" : "say", failed ? undefined : color);
-    if (r.way === "pulse" || still) {
-      if (r.at && r.way !== "hold") lightAt(r.at);
-      ping(run);
-      return true;
+  /** The node told and its branch from the root, in the agent's colour, for a while; then they fade back. */
+  const tinted = new Map<string, ReturnType<typeof setTimeout>>();
+  const tint = (e: Parameters<Fire>[0], color: string | undefined, d: Dials) => {
+    const { tree } = get();
+    const t = tintOf(tree, e);
+    if (!t?.at) return;
+    const ink = t.tone === "fail" ? C.fail : t.tone === "hold" ? v("quiet") : (color ?? C.say);
+    svg.style.setProperty("--rx-fade", `${d.tint_fade}s`);
+    for (const id of wayOf(tree, t.at)) {
+      const b = svg.querySelector<SVGPathElement>(`[data-b="${CSS.escape(id)}"]`);
+      if (!b) continue;
+      clearTimeout(tinted.get(id));
+      b.style.setProperty("--tint", ink);
+      b.classList.add("tint");
+      tinted.set(id, setTimeout(() => (b.classList.remove("tint"), tinted.delete(id)), d.tint_hold! * 1000));
     }
-    if (r.way === "out") lightAt(r.at!);
-    const curve = el("path", { class: "rx-reach", d: `M${r.points.map((p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" L")}` });
-    curve.style.stroke = ink;
-    const len = lengthOf(r.points);
-    curve.setAttribute("stroke-dasharray", `${len.toFixed(1)} ${len.toFixed(1)}`);
-    const sweep = d.reach_sweep!, linger = Math.max(0.05, d.reach_linger!);
-    let done = false;
-    fx.push({
-      start: performance.now(),
-      els: [curve],
-      step: (age, k) => {
-        const u = Math.min(1, age / sweep);
-        if (u >= 1 && !done) {
-          done = true;
-          if (r.way === "out") ping(run);
-          if (r.way === "in" && r.at) lightAt(r.at);
-        }
-        const fade = u < 1 ? 1 : 1 - (age - sweep) / linger;
-        if (fade <= 0) return false;
-        curve.setAttribute("stroke-dashoffset", (len * (1 - u)).toFixed(1));
-        curve.setAttribute("stroke-width", (d.reach_width! / Math.sqrt(k)).toFixed(2));
-        curve.setAttribute("opacity", (d.reach_ink! * fade * (r.way === "hold" ? 0.7 : 1)).toFixed(2));
-        return true;
-      },
-    });
-    run_();
-    return true;
+    light(t.at, t.tone === "fail" ? "fail" : "say", t.tone === "fail" ? undefined : ink, d.tint_hold);
   };
   const glow = (tone: string) => [1, 0.6, 0.3].map((r, i) => el("circle", { class: `rx-glow k-${tone}`, r, "fill-opacity": [S.glow / 2, S.glow, Math.min(1, S.glow * 2)][i]!, opacity: 0 }));
   const fire: Fire = (e, color) => {
-    if (e.run && fly(e.run, e, color)) return;
-    const { tree, placed } = get();
+    const { tree, placed, dials } = get();
+    if (dials) return tint(e, color, dials);
     const l = lightOf(tree, e);
     if (!l) return;
     if (still) return light(l.at, l.tone, color);
@@ -270,6 +227,7 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
       fx.forEach((f) => f.els.forEach((e) => e.remove()));
       fx.length = 0;
       lit.forEach((t) => clearTimeout(t));
+      tinted.forEach((t) => clearTimeout(t));
       for (const id of waiting.keys()) svg.querySelector(`[data-id="${CSS.escape(id)}"]`)?.classList.remove("rx-wait");
       waiting.clear();
     },
@@ -311,31 +269,29 @@ export interface CanvasProps {
   fires: { current?: Fire };
   onPick(node: string | undefined): void;
   showKey: boolean;
-  /** Every live run at once: the orbit and the agents on it, and the dials of the curves between. */
-  orbit?: Orbit;
+  /** Tinting: what is told colours its node and branch, by these dials; nothing moves. */
   dials?: Dials;
-  agents?: AgentMark[];
-  /** A click on an agent: its dot or name looks at it alone, its profile opens the profiles (at, in the canvas's pixels). */
-  onAgent?(run: string, part: "open" | "profile", at: { x: number; y: number }): void;
+  /** Small, one of many: names show only on what is lit, said or picked. */
+  small?: boolean;
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, orbit, agents, onAgent, dials }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, dials, small }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const fxGroup = useRef<SVGGElement>(null);
   const [view, setView] = useState({ x: placed.box.x, y: placed.box.y, k: 1 });
   const [panning, setPanning] = useState(false);
   const [fits, refit] = useState(0);
-  const now = useRef({ tree, placed, k: view.k, orbit, agents, dials: dials ?? dialsOf({}) });
-  now.current = { tree, placed, k: view.k, orbit, agents, dials: dials ?? dialsOf({}) };
-  const bounds = orbit ? orbitBox(orbit) : placed.box;
+  const now = useRef({ tree, placed, k: view.k, dials });
+  now.current = { tree, placed, k: view.k, dials };
+  const bounds = placed.box;
 
   useEffect(() => {
     const W = box.current?.clientWidth || 900;
     const H = box.current?.clientHeight || 700;
     const k = Math.min(3, Math.max(0.1, Math.min(W / bounds.width, H / bounds.height)));
     setView({ k, x: bounds.x - (W / k - bounds.width) / 2, y: bounds.y - (H / k - bounds.height) / 2 });
-  }, [placed, fits, !!orbit, orbit?.rx]);
+  }, [placed, fits]);
   // Fit again when the canvas changes size: it is first measured before the page has laid it out.
   useEffect(() => {
     let last = "";
@@ -360,15 +316,6 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     const r = box.current!.getBoundingClientRect();
     return { x: view.x + (e.clientX - r.left) / view.k, y: view.y + (e.clientY - r.top) / view.k };
   };
-  /** An agent under a point: its dot and name, or its profile line under them. */
-  const hitAgent = (p: { x: number; y: number }): { run: string; part: "open" | "profile" } | undefined => {
-    for (const a of agents ?? []) {
-      const dx = Math.abs(p.x - a.seat.x), dy = p.y - a.seat.y;
-      if (Math.hypot(dx, dy) < 16 / view.k || (dx < 110 && dy > 10 && dy < 35)) return { run: a.run, part: "open" };
-      if (a.placement && dx < 110 && dy >= 35 && dy < 58) return { run: a.run, part: "profile" };
-    }
-    return undefined;
-  };
   const hit = (p: { x: number; y: number }) => {
     let best: string | undefined, d = 12 / view.k;
     for (const t of tree.order) {
@@ -389,8 +336,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   };
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
-    const agent = hitAgent(toWorld(e));
-    const on = agent ? undefined : hit(toWorld(e));
+    const on = hit(toWorld(e));
     const start = { cx: e.clientX, cy: e.clientY, view };
     let moved = false;
     const el = box.current!;
@@ -406,12 +352,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
       el.removeEventListener("pointerup", up);
       el.removeEventListener("pointercancel", up);
       setPanning(false);
-      if (moved) return;
-      if (agent) {
-        const r = box.current!.getBoundingClientRect();
-        return onAgent?.(agent.run, agent.part, { x: e.clientX - r.left, y: e.clientY - r.top });
-      }
-      onPick(on);
+      if (!moved) onPick(on);
     };
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
@@ -427,12 +368,12 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   const statusOf = (n?: NodeInfo) => (n?.source ? statuses.get(n.source) : undefined);
   const rest = tree.order.filter((t) => t.parent);
   return html`
-    <div class=${`rx-canvas${panning ? " panning" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${() => refit((n) => n + 1)} title="Click a node to pick it; drag to move; wheel to zoom; double-click to fit">
+    <div class=${`rx-canvas${panning ? " panning" : ""}${small ? " rx-small" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${() => refit((n) => n + 1)} title="Click a node to pick it; drag to move; wheel to zoom; double-click to fit">
       <svg ref=${svg}><g transform=${`scale(${view.k}) translate(${-view.x} ${-view.y})`}>
         <g>
           ${rest.map((t) => {
             const b = branchAt(t.depth);
-            return html`<path key=${`b:${t.id}`} class=${`rx-branch${way.has(t.id) ? " way" : ""}`} d=${placed.branch.get(t.id)} style=${`stroke-width:${way.has(t.id) ? b.width + 1 : b.width};stroke-opacity:${b.ink}`} />`;
+            return html`<path key=${`b:${t.id}`} data-b=${t.id} class=${`rx-branch${way.has(t.id) ? " way" : ""}`} d=${placed.branch.get(t.id)} style=${`stroke-width:${way.has(t.id) ? b.width + 1 : b.width};stroke-opacity:${b.ink}`} />`;
           })}
         </g>
         <g>
@@ -475,13 +416,6 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
           })}
         </g>
         <circle class="rx-root" r=${S.root} />
-        ${(agents ?? []).map((a) => html`<g key=${`a:${a.run}`} data-agent=${a.run} class=${`rx-agent${a.quiet ? " quiet" : ""}`} transform=${`translate(${a.seat.x.toFixed(1)} ${a.seat.y.toFixed(1)})`}>
-          <title>${`${a.title}\nClick to look at it alone`}</title>
-          <circle class="halo" r="10" style=${`stroke:${a.colour}`} />
-          <circle class="dot" r="9" style=${`fill:${a.colour}`} />
-          <text class="who" y="30">${a.title.length > 26 ? `${a.title.slice(0, 25)}…` : a.title}</text>
-          ${a.placement && html`<text class=${`prof ${a.placement.kind}`} y="50"><title>${`${placementTip(a.placement)}\nClick to move it to another profile`}</title>${placementText(a.placement)} ▾</text>`}
-        </g>`)}
         <g ref=${fxGroup}></g>
       </g></svg>
       ${tree.order.length === 1 && html`<div class="rx-empty">No nodes to show.</div>`}

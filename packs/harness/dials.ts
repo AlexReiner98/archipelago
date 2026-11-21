@@ -1,6 +1,6 @@
 /**
- * The harness's Dials panel: every number of the curves between the tree
- * and the agents (reach.ts), one row each, ↺ to put it back. Their values
+ * The harness's Dials panel: every number of how an agent's tree is
+ * coloured by what it is told (tint.ts), one row each, ↺ to put it back. Their values
  * are the page key `harness.dials`, so an agent can set them; the browser
  * remembers them.
  */
@@ -9,7 +9,7 @@ import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import type { HereRead, HereSet } from "../../spec/here.ts";
 import { sheet } from "../../spec/style.ts";
-import { DIALS, dialsOf, type Dials } from "./reach.ts";
+import { DIALS, dialsOf, type Dials } from "./tint.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 

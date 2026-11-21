@@ -1,8 +1,6 @@
 /**
- * The agents round the tree, when every live run is watched at once.
- *
- * Each sits on an orbit outside the tree and its names, at the seat of its
- * colour (reach.ts, which also draws how events reach between them).
+ * The agents, when every live run is watched at once: each with a tree of
+ * its own (trees.ts).
  *
  * - `placementOf`: the profile an agent is in, as a mark: matched, the
  *   workspace's fallback, or none.
@@ -40,17 +38,6 @@ export const placementTip = (p: Placement) =>
   p.kind === "matched" ? `In ${p.title}, by its facts or its own say` : p.kind === "fallback" ? `In ${p.title}: the fallback, as nothing else placed it` : "In no profile: it hears every node";
 
 export const AGENTS_STYLE = sheet(`
-.rx-agent { cursor:pointer; }
-.rx-agent .dot { stroke:var(--bg); stroke-width:2; }
-.rx-agent .halo { fill:none; stroke-width:1.5; opacity:0; }
-.rx-agent.ping .halo { animation:rx-ping .9s ease-out; }
-@keyframes rx-ping { from { opacity:.9; r:10px; } to { opacity:0; r:32px; } }
-.rx-agent.quiet { opacity:.45; }
-.rx-agent .who { fill:var(--fg); font:var(--bold) 16px var(--font); text-anchor:middle; }
-.rx-agent .prof { fill:var(--dim); font:400 14px var(--font); text-anchor:middle; }
-.rx-agent .prof.none { font-style:italic; }
-.rx-agent:hover .who { fill:var(--pick); }
-.rx-reach { fill:none; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
 .hv-menu { position:absolute; z-index:4; min-width:180px; max-width:280px; padding:var(--space-1) 0; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 6px 20px color-mix(in srgb, var(--bg) 60%, transparent); }
 .hv-menu .h { padding:var(--space-1) var(--space-3); color:var(--dim); font-size:var(--text-xs); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .hv-menu .o { display:flex; gap:var(--space-2); align-items:baseline; padding:var(--space-1) var(--space-3); cursor:pointer; white-space:nowrap; }

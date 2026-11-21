@@ -8,7 +8,7 @@
  *   are colours.
  * - `colours`: each live run's colour, kept from before where it can be.
  * - `keepLast`: an event added to the interleaved list, the last few kept.
- * - The runs themselves are agents on an orbit round the tree (agents.ts).
+ * - The runs themselves are agents, each with a tree of its own (trees.ts).
  * - `LiveEvents`: the right pane: their events as they come, interleaved,
  *   each marked with its run's colour.
  */

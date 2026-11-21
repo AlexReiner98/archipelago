@@ -335,6 +335,29 @@ export function hooks(c: Caps) {
     return m;
   };
 
+  /** The nodes each of the runs given hears (`profile.read.hears`), by run, kept live: each agent's own tree. */
+  const useHears = (runs: RunInfo[], nodes: NodeInfo[]): Map<string, Set<string>> => {
+    const [m, setM] = useState<Map<string, Set<string>>>(new Map());
+    const key = `${runs.map((r) => `${r.run}\n${JSON.stringify(r.facts ?? {})}`).join("\n\n")}|${nodes.map((n) => n.id).join(",")}`;
+    useEffect(() => {
+      let gone = false;
+      const load = () =>
+        void Promise.all(
+          runs.map(async (r) => {
+            const hs = await Promise.all(nodes.map(async (n) => [n.id, (await c.profiles.hears(r, n)).hears] as const));
+            return [r.run, new Set(hs.filter(([, yes]) => yes).map(([id]) => id))] as const;
+          }),
+        ).then((all) => !gone && setM(new Map(all)));
+      load();
+      const stop = c.profiles.watch(load);
+      return () => {
+        gone = true;
+        void stop();
+      };
+    }, [key]);
+    return m;
+  };
+
   /**
    * Whether a run in one profile hears each node (`profile.read.hears` for a
    * run whose only fact is the profile), kept live. Nothing when none is picked.
@@ -359,7 +382,7 @@ export function hooks(c: Caps) {
     return hearing;
   };
 
-  return { useHere, useNodes, useRun, useRunsIn, useLiveEvents, useEvents, useVerdictData, useVerdictsOfRun, useRecords, useItem, useStatuses, useHas, useProfileList, useRunProfiles, usePlacements, useHearing };
+  return { useHere, useNodes, useRun, useRunsIn, useLiveEvents, useEvents, useVerdictData, useVerdictsOfRun, useRecords, useItem, useStatuses, useHas, useProfileList, useRunProfiles, usePlacements, useHears, useHearing };
 }
 
 export type Hooks = ReturnType<typeof hooks>;

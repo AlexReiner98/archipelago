@@ -8,13 +8,13 @@
  *   picks every live run at once (`harness.live`, live.ts: where the view
  *   lands), or one run (`here.run`, else the last active), or every run
  *   (`harness.all`), or a profile (`harness.profile`). Live, each run is an
- *   agent on an orbit round the tree, its profile under it and a click
- *   from changing (agents.ts); what reaches between it and the tree is a
- *   curve drawn on from the tree's own (reach.ts).
+ *   agent with a tree of its own, the nodes its profile lets it hear
+ *   (trees.ts), its profile over it and a click from changing (agents.ts);
+ *   what it is told colours its tree in its colour, then fades (tint.ts).
  * - Right: the run's events, one line each (events.ts): the wider side,
  *   as an opened line needs the room. Live: every live run's, interleaved.
  *   Every run: the runs, or a profile's runs.
- * - Left: the node looked at (node.ts), and the Dials of those curves (dials.ts).
+ * - Left: the node looked at (node.ts), and the Dials of that colouring (dials.ts).
  *
  * The playhead is `here.event`: unset, the view follows the run's end
  * live. A click on a node sets `here.node`; on an event, `here.event` and
@@ -38,7 +38,7 @@ import { Events, short } from "./events.ts";
 import { ALL, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
 import { colours, liveRuns, LiveEvents } from "./live.ts";
 import { AGENTS_STYLE, placementOf, ProfileMenu } from "./agents.ts";
-import { orbitOf, seatOf } from "./reach.ts";
+import { Trees, TREES_STYLE } from "./trees.ts";
 import { DIALS_KEY, DIALS_STYLE, DialsPane, useDials } from "./dials.ts";
 import { Bar, BAR_STYLE } from "./bar.ts";
 import { KEEP_STYLE, keepParts } from "./keep.ts";
@@ -110,6 +110,7 @@ const STYLE = sheet(`
 ${KEEP_STYLE}
 ${AGENTS_STYLE}
 ${DIALS_STYLE}
+${TREES_STYLE}
 ${BAR_STYLE}
 ${CANVAS_STYLE}
 ${TIMELINE_STYLE}`);
@@ -134,7 +135,7 @@ const harness: Pack = {
     const declare = ctx.get<HereDeclare>("here.declare");
     ctx.effect(() => declare.declare({ key: PROFILE, scope: "page", doc: "The profile the harness view shows: its holds over the tree." }));
     ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the harness view looks at every run, with all-time totals, not one run." }));
-    ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The harness view's dials: the numbers of the curves between the tree and the agents, those moved from where they start." }));
+    ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The harness view's dials: how each agent's tree is coloured by what it is told, those moved from where they start." }));
     ctx.effect(() => declare.declare({ key: LIVE, scope: "page", doc: "True: the harness view looks at every live run at once, a colour each." }));
     // A run picked anywhere (here, the node's runs, Activity) is looked at alone, with its own profiles.
     ctx.effect(() =>
@@ -244,24 +245,28 @@ const harness: Pack = {
       const tree = useMemo(() => treeOf(nodes, { by, unsaid, profiles: membership, decided }), [nodes, by, unsaid, membership, decided]);
       const placed = useMemo(() => radial(tree), [tree]);
       const hues = useMemo(() => packHues(nodes.map((n) => n.pack)), [nodes]);
-      // Live: each run an agent on the orbit, at the seat of its colour, its profile under it.
+      // Live: each run an agent with a tree of its own (what it hears), in its colour, its profile over it.
       const dials = useDials(here);
-      const orbit = useMemo(() => (live ? orbitOf(placed.box, dials.agents_out) : undefined), [live, placed, dials.agents_out]);
+      const hears = hk.useHears(lives, nodes);
       const acting = useMemo(() => new Set(liveEvents.map((e) => e.run)), [liveEvents]);
       const fallbacks = useMemo(() => new Set(profileList.filter((p) => p.fallback).map((p) => p.id)), [profileList]);
+      const treeFires = useRef(new Map<string, { current?: Fire }>());
+      const firesOf = (r: string) => treeFires.current.get(r) ?? (treeFires.current.set(r, {}), treeFires.current.get(r)!);
       const agents = useMemo(
         () =>
-          orbit &&
-          lives.map((r) => {
-            const tok = colour.get(r.run) ?? HUES[0];
+          // In the order of their colours, so a tree keeps its place while its agent is live.
+          [...lives].sort((a, b) => (HUES as readonly Token[]).indexOf(colour.get(a.run) ?? HUES[0]) - (HUES as readonly Token[]).indexOf(colour.get(b.run) ?? HUES[0])).map((r) => {
             const ps = placements.get(r.run);
-            const slot = Math.max(0, (HUES as readonly Token[]).indexOf(tok));
-            return { run: r.run, title: r.title ?? r.run.slice(0, 8), colour: v(tok), slot, seat: seatOf(orbit, slot), quiet: !acting.has(r.run), ...(ps ? { placement: placementOf(ps, fallbacks, values(r.facts?.profiles)) } : {}) };
+            return { run: r, colour: v(colour.get(r.run) ?? HUES[0]), hears: hears.get(r.run), quiet: !acting.has(r.run), fires: firesOf(r.run), ...(ps ? { placement: placementOf(ps, fallbacks, values(r.facts?.profiles)) } : {}) };
           }),
-        [orbit, lives, colour, placements, fallbacks, acting],
+        [lives, colour, placements, fallbacks, acting, hears],
       );
-      const onAgent = (r: string, part: "open" | "profile", at: { x: number; y: number }) => {
-        if (part === "profile" && canPlace) return setMenu({ run: r, x: Math.max(4, Math.min(at.x - 20, (stage.current?.clientWidth ?? 600) - 290)), y: at.y + 12 });
+      const onProfile = (r: string, ev: MouseEvent) => {
+        const box = stage.current?.getBoundingClientRect();
+        if (!box) return;
+        setMenu({ run: r, x: Math.max(4, Math.min(ev.clientX - box.left - 20, box.width - 290)), y: ev.clientY - box.top + 14 });
+      };
+      const onOpen = (r: string) => {
         set.set(KEYS.event, undefined);
         set.set(KEYS.run, r);
       };
@@ -293,7 +298,7 @@ const harness: Pack = {
       useLayoutEffect(() => {
         const was = lit.current;
         lit.current = new Set(liveEvents.map((e) => e.id));
-        for (const e of liveEvents) if (!was.has(e.id)) fires.current?.(e, v(colour.get(e.run) ?? "say"));
+        for (const e of liveEvents) if (!was.has(e.id)) firesOf(e.run).current?.(e, v(colour.get(e.run) ?? "say"));
       }, [liveEvents]);
       // Playing: a step every STEP ms, from the start when at the end.
       useEffect(() => {
@@ -346,8 +351,10 @@ const harness: Pack = {
               if (val) set.set(LIVE, undefined);
             }}
           />
-          <div style="position:relative;min-height:0;display:grid" ref=${stage}>
-            <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} orbit=${orbit} agents=${agents} onAgent=${onAgent} dials=${dials} />
+          <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
+            ${live
+              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} dials=${dials} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} />`
+              : html`<${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
             ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${lives.find((r) => r.run === menu.run)?.title ?? menu.run.slice(0, 8)} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}
           </div>
