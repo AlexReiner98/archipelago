@@ -9,6 +9,7 @@ reflex's condition) speaks only when the moment's input holds that text.
 | Action | Does |
 |---|---|
 | `words.set` `{ node, words }` | Changes what a node says |
+| `words.title` `{ node, title }` | Renames a node. `node` is not a type the items pack edits, so `items.set` can't |
 | `words.add` `{ title, kind, at, words, refuse?, when? }` | Adds a node |
 | `words.retire` `{ node }` | Retires a node: `status: retired`, no longer said |
 | `words.promote` `{ node }` | Keeps a trial or retired node: its `status` goes, and it is said as kept |
@@ -17,8 +18,8 @@ reflex's condition) speaks only when the moment's input holds that text.
 A node item with `repeat: "every"` is said each time its place is reached;
 otherwise its same words are said once per context (spec edition 4).
 
-A node whose item has `held` (a reason) is held as written: `words.set` and
-`words.retire` refuse it, with the reason (`words.held`). The
+A node whose item has `held` (a reason) is held as written: `words.set`,
+`words.title` and `words.retire` refuse it, with the reason (`words.held`). The
 [written](../written/README.md) pack sets it for the files the map writes.
 
 `config.seed` lists nodes made through `words.add` when the graph has none.
