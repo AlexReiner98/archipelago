@@ -1,18 +1,19 @@
 # field
 
 Page side: the map as particles, the view "Field" in the shell, beside
-"Map". Each item is a particle in its island's colour, islands are
-clusters, and links are faint lines. It always lays out the whole map,
+"Map". Each item is a particle in its type's colour, and links are faint
+lines. It always lays out the whole map,
 open and closed, up to `field_limit` items: the find line never moves a
 particle, it only lights what it finds and fades the rest (`query_fade`).
 
-- **Islands are links.** An item's island is the island item it is part_of
-  at any depth, or the top of its part_of chain (the `islands by` dial).
-  Neither: "No island". ([islands.ts](islands.ts))
+- **No groups.** The map has no islands, and Field knows none: clusters
+  form from the links alone (part_of springs are the shortest and
+  stiffest). Particles start on one spiral, in an order that walks the
+  links, so linked ones start near each other ([graph.ts](graph.ts)).
 - **Behaviours compose.** [step.ts](step.ts) sums the pushes of the
   behaviours that are on, each times its weight and the run's warmth, then
   moves the particles. Each is a module in [behaviours/](behaviours):
-  `islands`, `gather`, `repel` (Barnes-Hut on an [octree](octree.ts)),
+  `gather`, `repel` (Barnes-Hut on an [octree](octree.ts)),
   `springs` (length and stiffness per link type), `collide`, `untangle`,
   `flow` and `plane` (off by default). A behaviour is
   `{ name, doc, on, dials, apply, move?, busy?, firm? }`
@@ -40,4 +41,5 @@ particle, it only lights what it finds and fades the rest (`query_fade`).
 
 On 2000 items and about 2700 links the forces settle in about 460 steps at
 about 4 ms each (node, `test/field.test.ts`). The physics is ported from
-the old map's Field layout (14 Nov 2026), without its bends and meaning.
+the old map's Field layout (14 Nov 2026), without its islands, bends and
+meaning.

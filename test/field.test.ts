@@ -1,6 +1,6 @@
 /**
  * The field's physics, off the page: a map in, where its particles settle
- * out. 2000 items in 40 islands with about 2700 links, like the map Field
+ * out. 2000 items in 40 part_of trees with about 2700 links, like the map Field
  * was first tuned on.
  */
 import { test } from "node:test";
@@ -9,7 +9,6 @@ import { build, seed, type FieldIn } from "../packs/field/graph.ts";
 import { BEHAVIOURS, RUN, defaults, step } from "../packs/field/step.ts";
 import { DRAW } from "../packs/field/paint.ts";
 import { segments } from "../packs/field/segments.ts";
-import { fieldOf } from "../packs/field/islands.ts";
 
 /** A seeded random, so the map is the same each run. */
 function rand(s: number) {
@@ -17,8 +16,9 @@ function rand(s: number) {
 }
 
 function sample(n = 2000, islands = 40): FieldIn {
+  // "islands" here is only how many part_of trees the sample has: Field knows no groups.
   const r = rand(7);
-  const items = Array.from({ length: n }, (_, i) => ({ id: `i${i}`, title: `item ${i}`, type: "work", status: "todo", closed: r() < 0.3, island: `s${i % islands}` }));
+  const items = Array.from({ length: n }, (_, i) => ({ id: `i${i}`, title: `item ${i}`, type: "work", status: "todo", closed: r() < 0.3 }));
   const links: FieldIn["links"] = [];
   for (let i = islands; i < n; i++) {
     // Each item is part of an earlier one in its island; some depend on another there; a few reach across.
@@ -27,12 +27,11 @@ function sample(n = 2000, islands = 40): FieldIn {
     if (r() < 0.25) links.push({ id: `d${i}`, type: "depends_on", from: `i${i}`, to: `i${(i + islands) % n}` });
     if (r() < 0.1) links.push({ id: `a${i}`, type: "about", from: `i${i}`, to: `i${Math.floor(r() * n)}` });
   }
-  return { items, islands: Array.from({ length: islands }, (_, k) => ({ id: `s${k}`, title: `island ${k}` })), links };
+  return { items, links };
 }
 
 const dials = () => [
-  { key: "island_spread", value: 4.5 },
-  { key: "island_gap", value: 1.5 },
+  { key: "seed_spread", value: 4.5 },
   ...BEHAVIOURS.flatMap((b) => b.dials({ links: ["part_of", "depends_on", "about"] })),
   ...RUN,
   ...DRAW,
@@ -61,9 +60,10 @@ test("every number a behaviour reads is one of its dials", () => {
   }
 });
 
-test("2000 items settle in about 460 force steps, a few ms each, the same way twice", () => {
+test("2000 items settle in about 460 steps, a few ms each, the same way twice", () => {
   const input = sample();
-  const a = settle(input);
+  // The forces alone: untangle's own work is timed on a smaller map below.
+  const a = settle(input, { ...settings(), on_untangle: 0 });
   console.log(`settled: ${a.forces} force steps, ${a.steps} in all, ${a.ms.toFixed(0)} ms (${(a.ms / a.steps).toFixed(1)} ms a step), ${a.g.sim.crossings} crossings`);
   assert.ok(a.forces > 400 && a.forces < 520, `${a.forces} force steps`);
   assert.ok(a.ms / a.steps < 40, `${(a.ms / a.steps).toFixed(1)} ms a step`);
@@ -95,26 +95,4 @@ test("flow puts what depends on something below it, more often than without it (
   const off = below({ ...settings(), on_flow: 0, on_untangle: 0 }), on = below({ ...settings(), on_untangle: 0 });
   console.log(`depends_on pointing down: ${(off * 100).toFixed(0)}% without flow, ${(on * 100).toFixed(0)}% with`);
   assert.ok(on > off + 0.08, `${on} against ${off}`);
-});
-
-test("an item's island is the island item above it, or the top of its part_of chain", () => {
-  const rows = new Map(
-    [
-      ["isl", { kind: "island", title: "An island" }],
-      ["f", { title: "feature" }],
-      ["t", { title: "task" }],
-      ["x", { title: "lone" }],
-    ].map(([id, fields]) => [id as string, { id: id as string, type: "work", fields: fields as Record<string, string> }]),
-  );
-  const wires = [
-    { id: "w1", type: "part_of", from: "f", to: "isl", fields: {} },
-    { id: "w2", type: "part_of", from: "t", to: "f", fields: {} },
-  ];
-  const src = { item: (id: string) => rows.get(id), linksOf: (id: string) => wires.filter((w) => w.from === id || w.to === id), closed: () => false };
-  const res = { items: [rows.get("t")!, rows.get("f")!, rows.get("x")!], links: [wires[1]!] };
-  const byIsland = fieldOf(src, res, 0);
-  assert.deepEqual(byIsland.items.map((i) => i.island), ["isl", "isl", "sea"]);
-  assert.equal(byIsland.islands.find((i) => i.id === "isl")?.title, "An island");
-  const byTop = fieldOf(src, res, 1);
-  assert.deepEqual(byTop.items.map((i) => i.island), ["isl", "isl", "sea"]);
 });

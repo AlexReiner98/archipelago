@@ -14,7 +14,7 @@ const plane: Behaviour = {
     weight("plane"),
     { key: "plane_k", label: "pull", min: 0, max: 0.1, step: 0.001, value: 0.01, doc: "How hard a particle is pulled back to the plane." },
     { key: "plane_cool", label: "harder as it cools", min: 0, max: 3, step: 0.05, value: 1.5, doc: "How much faster the pull grows as the run cools (the pull is divided by warmth to this power)." },
-    { key: "depth_seed", label: "start depth", min: 0, max: 2, step: 0.05, value: 0.5, then: "seed", doc: "How far out of the plane particles start, as a share of their island's size." },
+    { key: "depth_seed", label: "start depth", min: 0, max: 2, step: 0.05, value: 0.5, then: "seed", doc: "How far out of the plane particles start, as a share of the map's size." },
   ],
   apply(g, f, S, sim) {
     const k = S.plane_k! / Math.max(0.02, sim.alpha) ** S.plane_cool!;

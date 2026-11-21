@@ -20,7 +20,6 @@ import { step, warm } from "./step.ts";
 export interface Stats {
   n: number;
   m: number;
-  islands: number;
   steps: number;
   alpha: number;
   crossings: number;
@@ -52,7 +51,7 @@ export interface Hooks {
 export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Field {
   let S = S0;
   const c = canvas.getContext("2d")!;
-  let g: G = build({ items: [], islands: [], links: [] }, null);
+  let g: G = build({ items: [], links: [] }, null);
   let pick: Grid = grid(g);
   const cam: Cam & { moved: boolean } = { k: 1, tx: 0, ty: 0, moved: false };
   const light = new Light();
@@ -185,9 +184,9 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     if (i !== hover) {
       hover = i;
       canvas.style.cursor = i >= 0 ? "pointer" : "grab";
-      hooks.hover(i >= 0 ? { title: g.title[i]!, sub: `${g.type[i]}${g.status[i] ? ` · ${g.status[i]}` : ""} · ${g.islands[g.island[i]!]!.title}`, x, y } : null);
+      hooks.hover(i >= 0 ? { title: g.title[i]!, sub: `${g.type[i]}${g.status[i] ? ` · ${g.status[i]}` : ""}`, x, y } : null);
       dirty = true;
-    } else if (i >= 0) hooks.hover({ title: g.title[i]!, sub: `${g.type[i]}${g.status[i] ? ` · ${g.status[i]}` : ""} · ${g.islands[g.island[i]!]!.title}`, x, y });
+    } else if (i >= 0) hooks.hover({ title: g.title[i]!, sub: `${g.type[i]}${g.status[i] ? ` · ${g.status[i]}` : ""}`, x, y });
   };
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
@@ -291,7 +290,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     stats() {
       const un = g.sim.un as { done?: boolean } | undefined;
       const state = g.sim.alpha >= S.alpha_min! ? "settling" : awake && un && !un.done ? "untangling" : awake ? "untangling" : "settled";
-      return { n: g.n, m: g.m, islands: g.islands.length, steps: g.sim.steps, alpha: g.sim.alpha, crossings: g.sim.crossings, state, ms: stepMs, settledIn };
+      return { n: g.n, m: g.m, steps: g.sim.steps, alpha: g.sim.alpha, crossings: g.sim.crossings, state, ms: stepMs, settledIn };
     },
     places() {
       return new Map(g.id.map((id, i) => [id, [g.x[i]!, g.y[i]!]]));

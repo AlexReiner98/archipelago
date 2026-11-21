@@ -7,10 +7,9 @@
  */
 import type { Id } from "../../spec/common.ts";
 
-/** What the field draws: items, each in one island, and links among them. */
+/** What the field draws: items and the links among them. No item belongs to a group: clusters come from the links. */
 export interface FieldIn {
-  items: { id: Id; title: string; type: string; status: string; closed: boolean; island: Id }[];
-  islands: { id: Id; title: string }[];
+  items: { id: Id; title: string; type: string; status: string; closed: boolean }[];
   links: { id: Id; type: string; from: Id; to: Id }[];
 }
 
@@ -36,9 +35,9 @@ export interface G {
   type: string[];
   status: string[];
   closed: Uint8Array;
-  islands: { id: Id; title: string; colour: string }[];
-  members: number[][];
-  island: Int32Array;
+  /** The types drawn, each with its colour; a particle's colour is its type's. */
+  types: { name: string; colour: string }[];
+  typeIx: Int32Array;
   linkKinds: string[];
   x: Float32Array;
   y: Float32Array;
@@ -69,10 +68,9 @@ export function build(input: FieldIn, last: G | null): G {
   const items = input.items;
   const n = items.length;
   const at = new Map(items.map((it, i) => [it.id, i]));
-  const named = new Map(input.islands.map((isl) => [isl.id, isl.title]));
-  const islandIds = [...new Set(items.map((it) => it.island))];
-  const islands = islandIds.map((id, k) => ({ id, title: named.get(id) ?? id, colour: hue(k) }));
-  const islandIx = new Map(islandIds.map((id, k) => [id, k]));
+  const typeNames = [...new Set(items.map((it) => it.type))].sort();
+  const types = typeNames.map((name, k) => ({ name, colour: hue(k) }));
+  const typeIx = new Map(typeNames.map((t, k) => [t, k]));
   const links = input.links.filter((l) => at.has(l.from) && at.has(l.to) && l.from !== l.to);
   const linkKinds = [...new Set(links.map((l) => l.type))];
   const m = links.length;
@@ -85,9 +83,8 @@ export function build(input: FieldIn, last: G | null): G {
     type: items.map((it) => it.type),
     status: items.map((it) => it.status),
     closed: Uint8Array.from(items, (it) => (it.closed ? 1 : 0)),
-    islands,
-    members: islands.map(() => []),
-    island: new Int32Array(n),
+    types,
+    typeIx: new Int32Array(n),
     linkKinds,
     x: f32(),
     y: f32(),
@@ -111,9 +108,7 @@ export function build(input: FieldIn, last: G | null): G {
     total: { x: f32(), y: f32(), z: f32() },
   };
   items.forEach((it, i) => {
-    const k = islandIx.get(it.island)!;
-    g.island[i] = k;
-    g.members[k]!.push(i);
+    g.typeIx[i] = typeIx.get(it.type)!;
     const was = last?.idIx.get(it.id);
     if (last && was !== undefined) {
       g.x[i] = last.x[was]!;
@@ -146,38 +141,50 @@ export function build(input: FieldIn, last: G | null): G {
 }
 
 /**
- * Where particles start: islands on a sunflower spiral, the biggest at the
- * middle, each sized by its count; an island's particles on a spiral of
- * their own round its middle, the most linked nearest. The same answer
- * starts the same way. A particle already placed stays; a new one starts
- * at the middle of its island's placed particles, or on the spiral. Also
- * sets each particle's radius.
+ * Where particles start: one sunflower spiral round the middle, sized by
+ * the count (`seed_spread`). The order along it walks the links outward
+ * from the most linked particle, so linked particles start near each other
+ * and clusters form from the links alone. The same answer starts the same
+ * way. A particle already placed stays; a new one starts beside a placed
+ * neighbour, or on the spiral. Also sets each particle's radius.
  */
 export function seed(g: G, S: Settings): void {
-  const order = g.islands.map((_, k) => k).sort((p, q) => g.members[q]!.length - g.members[p]!.length);
   const golden = Math.PI * (3 - Math.sqrt(5));
-  const sizeOf = (k: number) => S.island_spread! * S.node_size! * Math.sqrt(g.members[k]!.length + 1);
-  let reach = 0;
-  order.forEach((k, j) => {
-    const own = sizeOf(k);
-    reach = j === 0 ? 0 : Math.max(reach, sizeOf(order[0]!) * S.island_gap! + own * S.island_gap! * Math.sqrt(j));
-    let cx = reach * Math.cos(j * golden);
-    let cy = reach * Math.sin(j * golden);
-    const placed = g.members[k]!.filter((i) => g.placed[i]);
-    if (placed.length) {
-      cx = placed.reduce((t, i) => t + g.x[i]!, 0) / placed.length;
-      cy = placed.reduce((t, i) => t + g.y[i]!, 0) / placed.length;
+  const reach = S.seed_spread! * S.node_size! * Math.sqrt(g.n + 1);
+  // Breadth first along the links, each time from the most linked particle not yet met.
+  const order: number[] = [];
+  const met = new Uint8Array(g.n);
+  const starts = Array.from({ length: g.n }, (_, i) => i).sort((p, q) => g.degree[q]! - g.degree[p]! || p - q);
+  for (const s0 of starts) {
+    if (met[s0]) continue;
+    met[s0] = 1;
+    const ring = [s0];
+    for (let h = 0; h < ring.length; h++) {
+      const i = ring[h]!;
+      order.push(i);
+      for (let p = g.adjStart[i]!; p < g.adjStart[i + 1]!; p++) {
+        const j = g.adj[p]!;
+        if (!met[j]) (met[j] = 1), ring.push(j);
+      }
     }
-    const mine = [...g.members[k]!].sort((p, q) => g.degree[q]! - g.degree[p]! || p - q);
-    mine.forEach((i, s) => {
-      if (g.placed[i]) return;
-      const rr = own * Math.sqrt((s + 0.5) / mine.length);
-      g.x[i] = cx + rr * Math.cos(s * golden);
-      g.y[i] = cy + rr * Math.sin(s * golden);
-      // Out of the plane by a fixed amount each, so a run with the plane has a third direction to untangle in.
-      g.z[i] = own * S.depth_seed! * (((i * 7919) % 101) / 50 - 1);
-      g.placed[i] = 1;
-    });
+  }
+  // Kept particles stay; only then does a new one start beside a kept neighbour.
+  const kept = g.placed.slice();
+  order.forEach((i, s) => {
+    if (g.placed[i]) return;
+    let nb = -1;
+    for (let p = g.adjStart[i]!; p < g.adjStart[i + 1]!; p++) if (kept[g.adj[p]!]) nb = g.adj[p]!;
+    if (nb >= 0) {
+      g.x[i] = g.x[nb]! + S.node_size! * 4 * Math.cos(i);
+      g.y[i] = g.y[nb]! + S.node_size! * 4 * Math.sin(i);
+    } else {
+      const rr = reach * Math.sqrt((s + 0.5) / Math.max(1, g.n));
+      g.x[i] = rr * Math.cos(s * golden);
+      g.y[i] = rr * Math.sin(s * golden);
+    }
+    // Out of the plane by a fixed amount each, so a run with the plane has a third direction to untangle in.
+    g.z[i] = reach * 0.1 * S.depth_seed! * (((i * 7919) % 101) / 50 - 1);
+    g.placed[i] = 1;
   });
   sizes(g, S);
 }
@@ -199,24 +206,13 @@ export function bounds(g: G): [number, number, number, number] {
   return g.n ? [x0, y0, x1, y1] : [0, 0, 1, 1];
 }
 
-export function middle(g: G, k: number): [number, number] {
-  let sx = 0, sy = 0;
-  const ms = g.members[k]!;
-  for (const i of ms) {
-    sx += g.x[i]!;
-    sy += g.y[i]!;
-  }
-  const c = Math.max(1, ms.length);
-  return [sx / c, sy / c];
-}
-
 export function neighbours(g: G, i: number): Set<number> {
   const s = new Set([i]);
   for (let p = g.adjStart[i]!; p < g.adjStart[i + 1]!; p++) s.add(g.adj[p]!);
   return s;
 }
 
-/** Island colours: evenly round the hue wheel, lightness alternating so neighbours in the list differ. */
+/** Type colours: evenly round the hue wheel, lightness alternating so neighbours in the list differ. */
 export function hue(k: number): string {
   const h = (k * 360 * 0.618034) % 360;
   return `hsl(${h.toFixed(0)} ${k % 2 ? 55 : 68}% ${k % 3 === 0 ? 52 : k % 3 === 1 ? 60 : 45}%)`;

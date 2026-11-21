@@ -81,7 +81,7 @@ const RunLine = ({ stats }: { stats: () => Stats | undefined }) => {
   return html`
     <div class="fl-run">
       <span>state</span><b class=${`st-${s.state}`}>${s.state}</b>
-      <span>drawn</span><span><b>${s.n}</b> particles · ${s.m} links · ${s.islands} islands</span>
+      <span>drawn</span><span><b>${s.n}</b> particles · ${s.m} links</span>
       <span>step</span><span><b>${s.steps}</b> · ${s.ms.toFixed(1)} ms each · warmth ${s.alpha.toFixed(3)}</span>
       <span>crossings</span><b>${s.crossings}</b>
       ${s.settledIn && html`<span>last settle</span><span>${s.settledIn.steps} steps in ${(s.settledIn.ms / 1000).toFixed(1)} s</span>`}

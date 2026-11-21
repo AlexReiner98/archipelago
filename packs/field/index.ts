@@ -3,8 +3,8 @@
  * view "Field", beside "Map". It lays out the whole map, open and closed
  * (up to `field_limit` items), whatever the query: the find line
  * (`find.query`) only lights what it finds and fades the rest, so a query
- * never moves a particle. Each item a particle in its island's colour,
- * islands as clusters, links as faint lines. Composable behaviours settle
+ * never moves a particle. Each item a particle in its type's colour,
+ * links as faint lines; clusters come from the links alone. Composable behaviours settle
  * it (step.ts, behaviours/); each behaviour, and every number it reads, is
  * a dial in the panel on the left.
  *
@@ -25,8 +25,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import type { LinkInfo } from "../../spec/types.ts";
 import type { Dial } from "./behaviour.ts";
 import { field, type Field } from "./engine.ts";
-import type { Settings } from "./graph.ts";
-import { BY, fieldOf, type Source } from "./islands.ts";
+import type { FieldIn, Settings } from "./graph.ts";
 import { DRAW } from "./paint.ts";
 import { Panel, PANEL_STYLE, type Section } from "./panel.ts";
 import { BEHAVIOURS, RUN, defaults } from "./step.ts";
@@ -40,7 +39,9 @@ interface Row {
   type: string;
   fields: Record<string, Json>;
 }
-interface FindIndex extends Source {
+interface FindIndex {
+  linksOf(id: Id): (Row & { from: Id; to: Id })[];
+  closed(row: Row): boolean;
   ready(): boolean;
   links(): LinkInfo[];
   run(query: string, limit?: number): { items: Row[]; links: (Row & { from: Id; to: Id })[]; more: number };
@@ -51,12 +52,10 @@ const DIALS = "field.dials";
 const QUERY = "find.query";
 const REMEMBER = "archipelago.field.dials";
 
-/** Where the field starts: what it draws, and how its islands are found and first laid out. */
+/** Where the field starts: what it draws, and where particles first lie. */
 const START: Dial[] = [
   { key: "field_limit", label: "items at most", min: 50, max: 5000, step: 50, value: 2000, then: "seed", doc: "At most this many of the map's items, open and closed, are laid out." },
-  { key: "islands_by", label: "islands by", min: 0, max: 1, step: 1, value: 1, choices: [...BY], then: "seed", doc: "An item's island: the island item it is part_of at any depth, or the top of its part_of chain." },
-  { key: "island_spread", label: "island spread", min: 0.5, max: 15, step: 0.1, value: 4.5, doc: "How large an island is for its count: where its particles start, and how much sea it keeps." },
-  { key: "island_gap", label: "island gap", min: 0.2, max: 5, step: 0.05, value: 1.5, then: "seed", doc: "How far apart islands start, as multiples of their own size." },
+  { key: "seed_spread", label: "start spread", min: 0.5, max: 15, step: 0.1, value: 4.5, then: "seed", doc: "How widely particles start round the middle, for their count." },
 ];
 
 const STYLE = `
@@ -131,7 +130,7 @@ const fieldPack: Pack = {
       const sections = useMemo<Section[]>(() => {
         const links = linkNames.split(" ").filter(Boolean);
         return [
-          { key: "start", title: "start", doc: "What is drawn, its islands, and where particles start.", dials: START },
+          { key: "start", title: "start", doc: "What is drawn, and where particles start.", dials: START },
           ...BEHAVIOURS.map((b) => ({ key: b.name, title: b.name, doc: b.doc, behaviour: b, dials: b.dials({ links }) })),
           { key: "run", title: "run", doc: "How the run cools and moves.", dials: RUN },
           { key: "draw", title: "draw", doc: "How particles, links and words are drawn.", dials: DRAW },
@@ -144,8 +143,14 @@ const fieldPack: Pack = {
       // Worked out again only when the map or the limit changes, never on a hover or a query.
       const result = useMemo(() => whole(S.field_limit!), [version, S.field_limit]);
       const found = useMemo(() => (q.trim() ? new Set(index.run(q, S.field_limit).items.map((r) => r.id)) : null), [version, q, S.field_limit]);
-      const shape = useMemo(() => JSON.stringify([result.items.map((r) => [r.id, r.fields.title, r.fields.status]), result.links.map((l) => l.id), S.islands_by]), [result, S.islands_by]);
-      const input = useMemo(() => fieldOf(index, result, S.islands_by!), [shape]);
+      const shape = useMemo(() => JSON.stringify([result.items.map((r) => [r.id, r.fields.title, r.fields.status]), result.links.map((l) => l.id)]), [result]);
+      const input = useMemo<FieldIn>(
+        () => ({
+          items: result.items.map((r) => ({ id: r.id, title: String(r.fields.title ?? r.id), type: r.type, status: String(r.fields.status ?? ""), closed: index.closed(r) })),
+          links: result.links.map((l) => ({ id: l.id, type: l.type, from: l.from, to: l.to })),
+        }),
+        [shape],
+      );
 
       const box = useRef<HTMLCanvasElement>(null);
       const engine = useRef<Field | null>(null);
@@ -172,13 +177,13 @@ const fieldPack: Pack = {
         const thens = new Set(changed.map((d) => d.then ?? "warm"));
         if (toggled) thens.add("warm");
         const then = thens.has("seed") ? "seed" : thens.has("size") ? "size" : thens.has("warm") ? "warm" : "paint";
-        if (changed.some((d) => d.key === "field_limit" || d.key === "islands_by")) return void engine.current?.settings(S, "paint");
+        if (changed.some((d) => d.key === "field_limit")) return void engine.current?.settings(S, "paint");
         engine.current?.settings(S, then);
       }, [S]);
-      // A new query or islands' choice warms the run through input(); a limit or islands change also reseeds once the new input lands.
-      const lastStart = useRef(`${S.field_limit}:${S.islands_by}`);
+      // A change to the map warms the run through input(); a new limit also reseeds once the new input lands.
+      const lastStart = useRef(`${S.field_limit}`);
       useEffect(() => {
-        const k = `${S.field_limit}:${S.islands_by}`;
+        const k = `${S.field_limit}`;
         if (k !== lastStart.current) (lastStart.current = k), engine.current?.reseed();
       }, [input]);
 

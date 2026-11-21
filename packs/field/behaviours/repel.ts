@@ -1,14 +1,13 @@
 /**
- * Repel: particles push each other apart, as charges, within their island.
- * Barnes-Hut over an octree, so a far crowd pushes as one particle at its
- * middle. Between islands the islands behaviour keeps the sea.
+ * Repel: particles push each other apart, as charges. Barnes-Hut over an
+ * octree, so a far crowd pushes as one particle at its middle.
  */
 import { weight, type Behaviour } from "../behaviour.ts";
 import { octree } from "../octree.ts";
 
 const repel: Behaviour = {
   name: "repel",
-  doc: "Particles push apart within their island.",
+  doc: "Particles push each other apart.",
   on: true,
   dials: () => [
     weight("repel"),
@@ -20,10 +19,11 @@ const repel: Behaviour = {
     const q = new Float32Array(g.n).fill(S.repel_strength!);
     const th2 = S.repel_theta! ** 2, near2 = S.repel_near! ** 2;
     const stack: number[] = [];
-    for (const ms of g.members) {
-      if (ms.length < 2) continue;
-      const t = octree(g, q, ms);
-      for (const i of ms) {
+    if (g.n < 2) return;
+    const all = Array.from({ length: g.n }, (_, i) => i);
+    const t = octree(g, q, all);
+    {
+      for (let i = 0; i < g.n; i++) {
         const xi = g.x[i]!, yi = g.y[i]!, zi = g.z[i]!;
         let fx = 0, fy = 0, fz = 0;
         stack.length = 0;

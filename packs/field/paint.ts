@@ -1,9 +1,8 @@
 /**
  * Painting the field on a 2D canvas: links as faint lines, one path per
- * kind; particles in their island's colour, each filled on its own (one
+ * kind; particles in their type's colour, each filled on its own (one
  * path of many circles fills far slower on a GPU canvas); the lit particle
- * and its links over the faded rest; then titles and islands' names in
- * screen space, each with a halo of the sea round its letters.
+ * and its links over the faded rest; then titles in screen space, each with a halo of the sea round its letters.
  */
 import type { Dial } from "./behaviour.ts";
 import { neighbours, type G, type Grid, type Settings } from "./graph.ts";
@@ -19,7 +18,6 @@ export const DRAW: Dial[] = [
   { key: "label_most", label: "titles at most", min: 0, max: 600, step: 10, value: 160, then: "paint", doc: "At most this many titles at once." },
   { key: "label_halo", label: "title halo", min: 0, max: 8, step: 0.5, value: 3, then: "paint", doc: "A ring of the sea round every letter, in screen px, so words read over particles and links." },
   { key: "label_fade", label: "title fade-in", min: 0.1, max: 20, step: 0.1, value: 3, then: "paint", doc: "A title fades in as its particle grows on screen from 'titles from' to this much more." },
-  { key: "island_label_px", label: "island names", min: 0, max: 30, step: 1, value: 13, then: "paint", doc: "The size of an island's name, in screen px (0: none)." },
   { key: "query_fade", label: "find fades rest to", min: 0, max: 1, step: 0.01, value: 0.12, then: "paint", doc: "While the find line has words, how faint what it does not find is drawn (it never moves)." },
   { key: "hover_dim", label: "hover dims rest to", min: 0, max: 1, step: 0.01, value: 0.15, then: "paint", doc: "How faint the rest is while one particle is pointed at." },
   { key: "hover_grow", label: "hover grows", min: 0, max: 3, step: 0.05, value: 0.6, then: "paint", doc: "How much the particle pointed at grows (its neighbours a third of that), only into free room." },
@@ -137,14 +135,14 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     c.lineTo(g.x[j]!, g.y[j]!);
     c.stroke();
   }
-  // Particles: the colour set once per island and openness, each circle filled on its own.
-  for (let isl = 0; isl < g.islands.length; isl++) {
-    c.fillStyle = g.islands[isl]!.colour;
+  // Particles: the colour set once per type and openness, each circle filled on its own.
+  for (let ty = 0; ty < g.types.length; ty++) {
+    c.fillStyle = g.types[ty]!.colour;
     for (const [shut, hit] of [[1, 0], [0, 0], [1, 1], [0, 1]] as const) {
       if (!match && !hit) continue;
       c.globalAlpha = (shut ? S.closed_fade! : 1) * faint * (match && !hit ? S.query_fade! : 1);
-      for (const i of g.members[isl]!) {
-        if (g.closed[i] !== shut || !inView(i, g.r[i]!)) continue;
+      for (let i = 0; i < g.n; i++) {
+        if (g.typeIx[i] !== ty || g.closed[i] !== shut || !inView(i, g.r[i]!)) continue;
         if (match && match[i] !== hit) continue;
         c.beginPath();
         c.arc(g.x[i]!, g.y[i]!, g.r[i]!, 0, 2 * Math.PI);
@@ -167,7 +165,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     });
     const rr = Math.max(g.r[i]!, room);
     c.globalAlpha = shine[i]!;
-    c.fillStyle = g.islands[g.island[i]!]!.colour;
+    c.fillStyle = g.types[g.typeIx[i]!]!.colour;
     c.beginPath();
     c.arc(g.x[i]!, g.y[i]!, rr, 0, 2 * Math.PI);
     c.fill();
@@ -222,25 +220,5 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     shown++;
     const grow = shine[i]! > 0 || match?.[i] ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
     say(text, box[0] + 2, sy, grow * Math.max(faint * fade(i), shine[i]!));
-  }
-  // Islands' names at their middles, where there is room, fading as more titles are written.
-  const show = Math.max(0, 1 - shown / Math.max(1, S.label_most! / 4));
-  if (show > 0 && S.island_label_px! > 0) {
-    c.font = `600 ${S.island_label_px}px ui-sans-serif, system-ui, sans-serif`;
-    c.textAlign = "center";
-    const order = g.islands.map((_, k) => k).sort((p, q) => g.members[q]!.length - g.members[p]!.length);
-    for (const k of order) {
-      const ms = g.members[k]!;
-      if (ms.length < 2) continue;
-      let mx = 0, my = 0;
-      for (const i of ms) (mx += g.x[i]!), (my += g.y[i]!);
-      const sx = (mx / ms.length) * cam.k + cam.tx, sy = (my / ms.length) * cam.k + cam.ty;
-      const title = clip(g.islands[k]!.title, 48), half = c.measureText(title).width / 2, hh = S.island_label_px! / 2 + 2;
-      const b: Box = [sx - half - 2, sy - hh, sx + half + 2, sy + hh];
-      if (overlaps(b)) continue;
-      taken.push(b);
-      say(title, sx, sy, 0.9 * faint * show * (match ? Math.max(S.query_fade!, 0.35) : 1));
-    }
-    c.textAlign = "start";
   }
 }

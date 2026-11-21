@@ -12,14 +12,13 @@ import type { G, Settings } from "./graph.ts";
 import collide from "./behaviours/collide.ts";
 import flow from "./behaviours/flow.ts";
 import gather from "./behaviours/gather.ts";
-import islands from "./behaviours/islands.ts";
 import plane from "./behaviours/plane.ts";
 import repel from "./behaviours/repel.ts";
 import springs from "./behaviours/springs.ts";
 import untangle from "./behaviours/untangle.ts";
 
 /** The behaviours, in the order they run. */
-export const BEHAVIOURS: Behaviour[] = [islands, gather, repel, springs, collide, untangle, flow, plane];
+export const BEHAVIOURS: Behaviour[] = [gather, repel, springs, collide, untangle, flow, plane];
 
 /** Whether a behaviour runs: its `on_<name>` dial, else its own default. */
 export const isOn = (b: Behaviour, S: Settings) => (S[`on_${b.name}`] ?? (b.on ? 1 : 0)) > 0 && (S[`w_${b.name}`] ?? 1) > 0;
