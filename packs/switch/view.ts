@@ -33,7 +33,7 @@ const SHEET = sheet(`
 .sw-t[aria-checked="true"]::after { left:14px; background:var(--panel); }
 .sw-t:disabled { opacity:.5; cursor:default; }
 .sw-lock { color:var(--quiet); }
-.sw-tip { display:none; position:absolute; right:0; top:calc(100% + 4px); z-index:5; width:220px; padding:var(--space-1) var(--space-2); background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); color:var(--fg); font-size:var(--text-s); box-shadow:0 2px 8px rgb(0 0 0 / .12); }
+.sw-tip { display:none; position:absolute; right:0; top:calc(100% + 4px); z-index:5; width:220px; padding:var(--space-1) var(--space-2); background:var(--bg); border:1px solid var(--dim); border-radius:var(--radius); color:var(--fg); font-size:var(--text-s); box-shadow:0 4px 12px rgb(0 0 0 / .3); }
 .sw:hover .sw-tip, .sw:focus-within .sw-tip { display:block; }
 .sw-tip b { font-weight:var(--bold); }
 .sw-err { color:var(--failed); }
