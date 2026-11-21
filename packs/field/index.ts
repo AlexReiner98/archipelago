@@ -207,11 +207,14 @@ const fieldPack: Pack = {
       const [styled, restyle] = useState(0);
       useEffect(() => onStyle(() => restyle((n) => n + 1)), []);
       const facets = useMemo(() => facetsOf(input, hide, palette()), [input, hideKey, styled]);
+      // While the find line has words, open and closed are not switched: a plan shows its done steps beside the rest.
       const visible = useMemo<FieldIn>(() => {
-        if (!Object.keys(hide).length) return input;
-        const vis = shown(input, hide);
+        const { open: _open, closed: _closed, ...kept } = hide;
+        const by = found ? kept : hide;
+        if (!Object.keys(by).length) return input;
+        const vis = shown(input, by);
         return { items: input.items.filter((it) => vis.items.has(it.id)), links: input.links.filter((l) => vis.links.has(l.id)), types: input.types };
-      }, [input, hideKey]);
+      }, [input, hideKey, !!found]);
       // While the find line has words, only what it finds and what lies near it stay: each by how it is drawn.
       const levels = useMemo(() => (found ? around(visible, found, S.find_steps!, S.find_faint!) : null), [visible, found, S.find_steps, S.find_faint]);
       const laid = useMemo<FieldIn>(() => {

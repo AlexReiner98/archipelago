@@ -46,7 +46,9 @@ find line has words, only what it finds and what lies near it.
   full, and `find_faint` links further, drawn faint (`query_fade`); the
   rest of the map leaves the layout and what is kept settles again
   (`alpha_filter`). The view goes to what it finds (`find_follow_ms`).
-  What it finds is drawn whole, closed or not, and named first.
+  What it finds is drawn whole, closed or not, and named first; the
+  legend's open and closed switches do not apply while it has words, so a
+  plan shows its done steps.
 - **Shapes** ([shapes.ts](shapes.ts)). A particle is its base's mark shape
   (spec/style.ts: square, diamond, circle, triangle), each the area of its
   circle: hollow while its status is the first open one, half (◐, one
