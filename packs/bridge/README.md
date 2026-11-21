@@ -16,3 +16,6 @@ by calling it. Packs in the page inject them as if they ran there.
   the client keeps fresh by the key's own watch.
 - If the stream drops and returns (the server restarted), the client makes
   every watch again and refreshes its copies.
+- A stream the browser closes for good (an answer that isn't the stream,
+  such as a proxy's 502 while the server behind it restarts) is opened
+  again, after `config.retry` ms (1000), doubling to 30 s.
