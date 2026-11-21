@@ -31,7 +31,7 @@ const host = await startBrowser({
     { id: "style", pack: "packs/style/index.ts" },
     { id: "renderer", pack: "packs/renderer/index.ts", config: { mount: "#app" } },
     { id: "frame", pack: "packs/frame/index.ts" },
-    { id: "views", pack: "packs/views/view.ts", config: { home: "map", pinned: ["field", "harness", "docs"] } },
+    { id: "views", pack: "packs/views/view.ts", config: { home: "map" } },
     { id: "harness", pack: "packs/harness/index.ts" },
     { id: "find", pack: "packs/find/index.ts" },
     { id: "page", pack: "packs/page/view.ts" },

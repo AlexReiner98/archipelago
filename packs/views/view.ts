@@ -3,8 +3,8 @@
  * the views (pick.ts) from the fills in center and the `view` items in the
  * page's copy of the map, shows one (apply.ts), and draws:
  *
- * - in `top`: the page's name, home and the pinned views as tabs, and
- *   "Views", which opens the list;
+ * - in `top`: the page's name and one picker, the view shown, which opens
+ *   the list. No tabs: the bar stays the same however many views there are;
  * - in `over`: the list, sections by part_of, typed to filter. Ctrl+K
  *   opens it too; Enter picks the first, Esc closes.
  *
@@ -23,7 +23,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet } from "../../spec/style.ts";
 import type { FindIndex } from "../find/index.ts";
 import { SHOWN, shower } from "./apply.ts";
-import { byHash, search, sections, tabs, TYPE, views, type Config, type View } from "./pick.ts";
+import { byHash, search, sections, TYPE, views, type Config, type View } from "./pick.ts";
 
 // htm ships CommonJS types; in the page its module export is the function itself.
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
@@ -31,12 +31,10 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 const STYLE = sheet(`
 .vw-name { padding-bottom:var(--space-3); color:var(--dim); }
 .vw-name b { color:var(--fg); font-weight:var(--bold); }
-.vw-tabs { display:flex; gap:var(--space-5); align-items:baseline; }
-.vw-tab { color:var(--dim); text-decoration:none; padding-bottom:var(--space-2); border-bottom:2px solid transparent; cursor:pointer; background:none; border-top:0; border-left:0; border-right:0; font:inherit; }
-.vw-tab:hover { color:var(--fg); }
-.vw-tab.on { color:var(--fg); border-bottom-color:var(--pick); }
-.vw-more { color:var(--dim); }
-.vw-more kbd { font:var(--text-xs)/1 var(--mono); color:var(--dim); border:1px solid var(--line); border-radius:var(--radius); padding:1px 3px; margin-left:var(--space-2); }
+.vw-pick { display:flex; align-items:baseline; gap:var(--space-2); padding:0 0 var(--space-3); background:none; border:0; font:inherit; color:var(--fg); cursor:pointer; }
+.vw-pick .c { color:var(--dim); }
+.vw-pick:hover .c { color:var(--fg); }
+.vw-pick kbd { font:var(--text-xs)/1 var(--mono); color:var(--dim); border:1px solid var(--line); border-radius:var(--radius); padding:1px 3px; margin-left:var(--space-2); }
 .vw-veil { position:fixed; inset:0; display:flex; justify-content:center; align-items:flex-start; padding-top:12vh; background:color-mix(in srgb, var(--bg) 40%, transparent); }
 .vw-list { width:min(420px, calc(100vw - 32px)); max-height:60vh; display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 8px 28px rgba(0,0,0,.25); }
 .vw-list input { font:inherit; background:var(--control); color:var(--fg); border:0; border-bottom:1px solid var(--line); padding:var(--space-3) var(--space-4); outline:none; border-radius:var(--radius) var(--radius) 0 0; }
@@ -138,17 +136,13 @@ const views_: Pack<Config> = {
 
     const Name = () => html`<span class="vw-name"><b>archipelago</b> next</span>`;
 
-    const Tabs = () => {
-      const all = useList();
+    /** The one control in the bar: the view shown, opening the list. */
+    const Picker = () => {
+      useList();
       const now = show.shown();
-      const shownTabs = tabs(all);
-      if (now && !shownTabs.some((v) => v.id === now.id)) shownTabs.push(now);
-      return html`<span class="vw-tabs">
-        ${shownTabs.map(
-          (v) => html`<a key=${v.id} class=${`vw-tab${v.id === now?.id ? " on" : ""}`} href=${`#${v.id}`} onClick=${(e: Event) => (e.preventDefault(), pick(v))}>${v.title}</a>`,
-        )}
-        ${all.length > shownTabs.length && html`<button class="vw-tab vw-more" onClick=${() => setOpen(true)} title="Every view, by section">Views<kbd>Ctrl K</kbd></button>`}
-      </span>`;
+      return html`<button class="vw-pick" onClick=${() => setOpen(!open)} title="Every view, by section">
+        <span>${now?.title ?? "Views"}</span><span class="c">▾</span><kbd>Ctrl K</kbd>
+      </button>`;
     };
 
     const List = () => {
@@ -188,7 +182,7 @@ const views_: Pack<Config> = {
                 ${s.views.map((v) => {
                   const i = n++;
                   return html`<div key=${v.id} class=${`vw-row${i === at ? " at" : ""}${v.id === now?.id ? " on" : ""}`} onMouseEnter=${() => setAt(i)} onClick=${() => choose(v)}>
-                    <span class="t">${v.title}</span><span class="k">${v.home ? "home" : v.pinned ? "tab" : ""}</span>
+                    <span class="t">${v.title}</span><span class="k">${v.home ? "home" : v.pinned ? "pinned" : ""}</span>
                   </div>`;
                 })}
               </div>`,
@@ -218,7 +212,7 @@ const views_: Pack<Config> = {
     });
     const fill = ctx.get<SlotFill>("slot.fill");
     fill.fill({ slot: "top", name: "name", view: Name });
-    fill.fill({ slot: "top", name: "tabs", view: Tabs });
+    fill.fill({ slot: "top", name: "picker", view: Picker });
     fill.fill({ slot: "over", name: "list", view: List });
     follow();
   },

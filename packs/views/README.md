@@ -33,7 +33,7 @@ the settings it set that the next one doesn't.
 
 Every fill in center is a view with no item, titled by the fill, with the
 id `map` (its pack), or `pack/name` when a pack has two. Config names the
-home kind (`home`, default `map`) and the kinds that are tabs (`pinned`).
+home kind (`home`, default `map`) and the kinds listed next (`pinned`).
 
 ## Home
 
@@ -43,9 +43,10 @@ own.
 
 ## The picker
 
-- **Tabs** in `top`: home, then the pinned (at most five), then the view
-  shown if it isn't one. "Views" opens the list.
-- **The list** in `over`: home and the pinned first, then the kinds, then
+- **One picker** in `top`, and no tabs: the title of the view shown, with
+  ▾. It opens the list. The bar stays the same however many views there
+  are (Alex, 21 Nov 2026).
+- **The list** in `over`: home first, then views tagged `pinned`, then the kinds, then
   a section for each item views are `part_of`, by its title. Typing
   filters by title and section. **Ctrl+K** opens it; arrows move, Enter
   picks, Esc closes.

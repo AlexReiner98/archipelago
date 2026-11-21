@@ -11,8 +11,6 @@ import type { FlavourDef } from "../../spec/types.ts";
 export const TYPE = "view";
 export const HOME = "home";
 export const PINNED = "pinned";
-/** Home and at most this many more are tabs. */
-export const TABS = 5;
 
 /** The flavour: a view is one item holding a whole arrangement. */
 export const VIEW: FlavourDef = {
@@ -24,7 +22,7 @@ export const VIEW: FlavourDef = {
     center: { kind: "text", doc: "The fill shown in center, as pack/name (map/map, field/field)." },
     here: { kind: "json", doc: "Settings: here keys set while it shows ({ \"find.query\": \"in:i_…\" })." },
     arrange: { kind: "json", doc: "Fill (pack/name) to a region, a slot or \"off\", laid over the page's while it shows." },
-    tags: { kind: "text", doc: "Words: home (opens first, tops the list), pinned (a tab)." },
+    tags: { kind: "text", doc: "Words: home (opens first, tops the list), pinned (next in the list)." },
   },
 };
 
@@ -61,7 +59,7 @@ export interface View {
 export interface Config {
   /** The kind that is home while no view item is tagged home. Default `map`. */
   home?: string;
-  /** Kinds shown as tabs, in order. */
+  /** Kinds listed next after home, in order. */
   pinned?: string[];
 }
 
@@ -69,7 +67,7 @@ const words = (v: Json | undefined) => (typeof v === "string" ? v.toLowerCase().
 const obj = <T>(v: Json | undefined): T => (v && typeof v === "object" && !Array.isArray(v) ? (v as T) : ({} as T));
 
 /**
- * Every view there is, home first, then the tabs in order, then the rest by
+ * Every view there is, home first, then the pinned in order, then the rest by
  * section and title. A view whose center fill isn't loaded is left out.
  * `parent` answers what an item is part_of.
  */
@@ -116,11 +114,6 @@ export function views(kinds: Kind[], rows: Row[], parent: (id: Id) => { id: Id; 
       sectionOf(a).localeCompare(sectionOf(b)) ||
       a.title.localeCompare(b.title),
   );
-}
-
-/** The tabs: home, then the pinned, at most `TABS` of them. */
-export function tabs(list: View[]): View[] {
-  return [...list.filter((v) => v.home), ...list.filter((v) => !v.home && v.pinned).slice(0, TABS)];
 }
 
 /** Sections for the list, in order: each section's title (`""` for views part of nothing) and its views. */

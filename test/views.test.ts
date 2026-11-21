@@ -15,7 +15,7 @@ import here from "../packs/here/index.ts";
 import renderer from "../packs/renderer/index.ts";
 import views from "../packs/views/index.ts";
 import { SHOWN, shower } from "../packs/views/apply.ts";
-import { byHash, search, sections, tabs, views as list, type Kind, type Row } from "../packs/views/pick.ts";
+import { byHash, search, sections, views as list, type Kind, type Row } from "../packs/views/pick.ts";
 
 const KINDS: Kind[] = [
   { pack: "harness", name: "view", title: "Harness" },
@@ -37,7 +37,6 @@ test("each kind of center fill is a view; a pack with two is named pack/name; ho
   );
   assert.equal(all[0]!.home, true);
   assert.equal(all[0]!.center, "map/map");
-  assert.deepEqual(tabs(all).map((v) => v.id), ["map", "field"]);
 });
 
 test("a view item holds its center, settings and arrange; one whose center isn't loaded is left out", () => {
@@ -49,16 +48,11 @@ test("a view item holds its center, settings and arrange; one whose center isn't
   assert.ok(!all.some((v) => v.id === "i_x"));
 });
 
-test("the newest item tagged home is home, over the kind; pinned items are tabs", () => {
+test("the newest item tagged home is home, over the kind; pinned items come next", () => {
   const all = list(KINDS, [view("i_1", { center: "map/map", tags: "home" }), view("i_2", { center: "field/field", tags: "home pinned" }), view("i_3", { center: "map/map", tags: "pinned" })], none, { home: "map" });
   assert.equal(all[0]!.id, "i_2");
   assert.equal(all.filter((v) => v.home).length, 1, "one home");
-  assert.deepEqual(tabs(all).map((v) => v.id), ["i_2", "i_3"]);
-});
-
-test("at most five tabs past home", () => {
-  const rows = [1, 2, 3, 4, 5, 6, 7].map((n) => view(`i_${n}`, { center: "map/map", tags: "pinned" }));
-  assert.equal(tabs(list(KINDS, rows, none)).length, 6);
+  assert.deepEqual(all.slice(0, 2).map((v) => v.id), ["i_2", "i_3"]);
 });
 
 test("sections by part_of, search over titles and sections", () => {
