@@ -20,7 +20,7 @@ import { byHash, search, sections, views as list, type Kind, type Row } from "..
 const KINDS: Kind[] = [
   { pack: "harness", name: "view", title: "Sensory interface" },
   { pack: "map", name: "map", title: "Map" },
-  { pack: "field", name: "field", title: "Field" },
+  { pack: "field", name: "field", title: "Landscape" },
   { pack: "docs", name: "view", title: "Packs" },
   { pack: "two", name: "a", title: "A" },
   { pack: "two", name: "b", title: "B" },
@@ -62,7 +62,7 @@ test("sections by part_of, search over titles and sections", () => {
   assert.ok(s[0]!.views.some((v) => v.id === "i_c"));
   assert.deepEqual(s.find((x) => x.title === "Release")!.views.map((v) => v.id), ["i_b"]);
   assert.deepEqual(search(all, "release").map((v) => v.id), ["i_b"]);
-  assert.deepEqual(search(all, "fie").map((v) => v.id), ["field"]);
+  assert.deepEqual(search(all, "landsc").map((v) => v.id), ["field"]);
 });
 
 test("a hash names a view by id, or a kind by its center fill", () => {

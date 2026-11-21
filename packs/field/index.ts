@@ -96,7 +96,7 @@ const recall = (key: string): Json | undefined => {
 
 const fieldPack: Pack = {
   id: "field",
-  about: "The Field view: the whole map as particles, settled by gather, repel, springs and collide.",
+  about: "The Landscape view: the whole map as particles, settled by gather, repel, springs and collide.",
   inject: ["find.index", "here.read", "here.set", "here.declare", "slot.fill"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");
@@ -278,8 +278,8 @@ const fieldPack: Pack = {
       return () => style.remove();
     });
     const fill = ctx.get<SlotFill>("slot.fill");
-    fill.fill({ slot: "center", name: "field", title: "Field", view: Canvas });
-    fill.fill({ slot: "left", name: "dials", title: "Field", when: { "here.view": VIEW }, view: Dials });
+    fill.fill({ slot: "center", name: "field", title: "Landscape", view: Canvas });
+    fill.fill({ slot: "left", name: "dials", title: "Landscape", when: { "here.view": VIEW }, view: Dials });
   },
 };
 

@@ -127,7 +127,7 @@ const item: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    // Beside the views that open an item: Map, and Field.
+    // Beside the views that open an item: Map, and Landscape.
     const fill = ctx.get<SlotFill>("slot.fill");
     fill.fill({ slot: "right", name: "page", title: "Item", when: { "here.item": true, "here.view": "map/map" }, view: Page });
     fill.fill({ slot: "right", name: "page-field", title: "Item", when: { "here.item": true, "here.view": "field/field" }, view: Page });

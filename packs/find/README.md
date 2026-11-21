@@ -7,7 +7,7 @@ it.
   (`types.read`), read in bounded pages through `graph.read` and kept live
   by `graph.watch`; `run(query)` answers a query over it (query.ts).
 - Declares `find.query` (page): the query the canvas draws. Its line, in
-  the region `top` while Map or Field shows, sets it; anything else may too.
+  the region `top` while Map or Landscape shows, sets it; anything else may too.
 - Provides `find.line`: the line, to draw anywhere (the
   [command line](../command/README.md) draws it on Ctrl+K), and `jump(id)`.
 - Provides `find.offer`: another pack puts rows in the command line, between

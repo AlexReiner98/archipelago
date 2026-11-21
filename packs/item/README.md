@@ -1,6 +1,6 @@
 # item
 
-Page side: one page per item, in the region `right` while Map or Field
+Page side: one page per item, in the region `right` while Map or Landscape
 shows, for the item `here.item` names. It looks and undoes; nobody adds,
 links or edits items by hand. Agents change the map through the items
 actions, and the page follows live.
@@ -28,7 +28,7 @@ From the top:
 
 | File | What it is |
 |---|---|
-| [index.ts](index.ts) | The pack: the page, filled in `right` beside Map and Field |
+| [index.ts](index.ts) | The pack: the page, filled in `right` beside Map and Landscape |
 | [parts.ts](parts.ts) | The page's parts: note, marks, neighbours, history |
 | [note.ts](note.ts) | The note read as lead, sections and inline spans. Pure |
 | [read.ts](read.ts) | Marks, neighbours, a change's lines about the item, how long ago. Pure |

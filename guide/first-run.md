@@ -16,7 +16,7 @@ and the bridge between them run on 5280, 5281 and 5282. The map is kept in
 
 ## Look around
 
-- The view picker at the top switches views: **Field** (the map, home),
+- The view picker at the top switches views: **Landscape** (the map, home),
   **Sensory interface** (what is said to agents), **Packs** and this **Guide**.
 - Ctrl+K (⌘K) opens the find line from any view: type a view's name or an
   item's, and Enter goes to it.

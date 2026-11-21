@@ -37,7 +37,7 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 
 export const VIEW = "activity/view";
 const HARNESS = "harness/view";
-/** The view an item opens in from Activity: Field, home. */
+/** The view an item opens in from Activity: Landscape, home. */
 const OPENS_IN = "field/field";
 /** Change sets read per page, and runs. */
 const CHANGES = 100;
