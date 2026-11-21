@@ -2,8 +2,9 @@
 
 Page side: the map as particles, the view "Field" in the shell, beside
 "Map". Each item is a particle in its island's colour, islands are
-clusters, and links are faint lines. It draws the whole map (open and
-closed) or the find line's query, up to `field_limit` items.
+clusters, and links are faint lines. It always lays out the whole map,
+open and closed, up to `field_limit` items: the find line never moves a
+particle, it only lights what it finds and fades the rest (`query_fade`).
 
 - **Islands are links.** An item's island is the island item it is part_of
   at any depth, or the top of its part_of chain (the `islands by` dial).
@@ -26,6 +27,9 @@ closed) or the find line's query, up to `field_limit` items.
   cross, and keeps a move only if crossings fall
   ([segments.ts](segments.ts)). It goes on after the forces sleep until a
   pass moves nothing.
+- **It settles to the end.** The physics runs on its own loop (a message
+  channel), in slices of `frame_ms`, until no behaviour has work left;
+  animation frames only paint. A tab in the background settles as fast.
 - **Hover** lights a particle, its links and its neighbours, dims the rest,
   and names them ([paint.ts](paint.ts)). A click sets `here.item`; the
   item page opens beside (`map.side`). Drag a particle to move it (it

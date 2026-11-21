@@ -1,7 +1,9 @@
 /**
  * The field pack, page side: the map as particles, in the shell as the
- * view "Field", beside "Map". It draws the same query (`find.query`, up to
- * `field_limit` items): each item a particle in its island's colour,
+ * view "Field", beside "Map". It lays out the whole map, open and closed
+ * (up to `field_limit` items), whatever the query: the find line
+ * (`find.query`) only lights what it finds and fades the rest, so a query
+ * never moves a particle. Each item a particle in its island's colour,
  * islands as clusters, links as faint lines. Composable behaviours settle
  * it (step.ts, behaviours/); each behaviour, and every number it reads, is
  * a dial in the panel on the left.
@@ -51,8 +53,7 @@ const REMEMBER = "archipelago.field.dials";
 
 /** Where the field starts: what it draws, and how its islands are found and first laid out. */
 const START: Dial[] = [
-  { key: "field_scope", label: "draws", min: 0, max: 1, step: 1, value: 1, choices: ["the find line", "the whole map"], then: "seed", doc: "What is drawn: the find line's query (as Map), or every item, open and closed." },
-  { key: "field_limit", label: "items at most", min: 50, max: 5000, step: 50, value: 2000, then: "seed", doc: "At most this many of the query's items are drawn." },
+  { key: "field_limit", label: "items at most", min: 50, max: 5000, step: 50, value: 2000, then: "seed", doc: "At most this many of the map's items, open and closed, are laid out." },
   { key: "islands_by", label: "islands by", min: 0, max: 1, step: 1, value: 1, choices: [...BY], then: "seed", doc: "An item's island: the island item it is part_of at any depth, or the top of its part_of chain." },
   { key: "island_spread", label: "island spread", min: 0.5, max: 15, step: 0.1, value: 4.5, doc: "How large an island is for its count: where its particles start, and how much sea it keeps." },
   { key: "island_gap", label: "island gap", min: 0.2, max: 5, step: 0.05, value: 1.5, then: "seed", doc: "How far apart islands start, as multiples of their own size." },
@@ -139,8 +140,10 @@ const fieldPack: Pack = {
       const all = useMemo(() => sections.flatMap((s) => s.dials), [sections]);
       const S = useMemo(() => ({ ...defaults(all), ...over }), [all, JSON.stringify(over)]);
 
-      // Worked out again only when the map, the query or what is drawn changes, never on a hover.
-      const result = useMemo(() => (S.field_scope ? whole(S.field_limit!) : index.run(q, S.field_limit)), [version, q, S.field_scope, S.field_limit]);
+      // The layout is always the whole map: the find line never moves a particle, it only lights what it finds.
+      // Worked out again only when the map or the limit changes, never on a hover or a query.
+      const result = useMemo(() => whole(S.field_limit!), [version, S.field_limit]);
+      const found = useMemo(() => (q.trim() ? new Set(index.run(q, S.field_limit).items.map((r) => r.id)) : null), [version, q, S.field_limit]);
       const shape = useMemo(() => JSON.stringify([result.items.map((r) => [r.id, r.fields.title, r.fields.status]), result.links.map((l) => l.id), S.islands_by]), [result, S.islands_by]);
       const input = useMemo(() => fieldOf(index, result, S.islands_by!), [shape]);
 
@@ -157,6 +160,7 @@ const fieldPack: Pack = {
         };
       }, []);
       useEffect(() => engine.current?.input(input), [input]);
+      useEffect(() => engine.current?.found(found), [found, input]);
 
       const last = useRef<Settings>(S);
       useEffect(() => {
@@ -168,13 +172,13 @@ const fieldPack: Pack = {
         const thens = new Set(changed.map((d) => d.then ?? "warm"));
         if (toggled) thens.add("warm");
         const then = thens.has("seed") ? "seed" : thens.has("size") ? "size" : thens.has("warm") ? "warm" : "paint";
-        if (changed.some((d) => d.key === "field_scope" || d.key === "field_limit" || d.key === "islands_by")) return void engine.current?.settings(S, "paint");
+        if (changed.some((d) => d.key === "field_limit" || d.key === "islands_by")) return void engine.current?.settings(S, "paint");
         engine.current?.settings(S, then);
       }, [S]);
       // A new query or islands' choice warms the run through input(); a limit or islands change also reseeds once the new input lands.
-      const lastStart = useRef(`${S.field_scope}:${S.field_limit}:${S.islands_by}`);
+      const lastStart = useRef(`${S.field_limit}:${S.islands_by}`);
       useEffect(() => {
-        const k = `${S.field_scope}:${S.field_limit}:${S.islands_by}`;
+        const k = `${S.field_limit}:${S.islands_by}`;
         if (k !== lastStart.current) (lastStart.current = k), engine.current?.reseed();
       }, [input]);
 

@@ -20,6 +20,7 @@ export const DRAW: Dial[] = [
   { key: "label_halo", label: "title halo", min: 0, max: 8, step: 0.5, value: 3, then: "paint", doc: "A ring of the sea round every letter, in screen px, so words read over particles and links." },
   { key: "label_fade", label: "title fade-in", min: 0.1, max: 20, step: 0.1, value: 3, then: "paint", doc: "A title fades in as its particle grows on screen from 'titles from' to this much more." },
   { key: "island_label_px", label: "island names", min: 0, max: 30, step: 1, value: 13, then: "paint", doc: "The size of an island's name, in screen px (0: none)." },
+  { key: "query_fade", label: "find fades rest to", min: 0, max: 1, step: 0.01, value: 0.12, then: "paint", doc: "While the find line has words, how faint what it does not find is drawn (it never moves)." },
   { key: "hover_dim", label: "hover dims rest to", min: 0, max: 1, step: 0.01, value: 0.15, then: "paint", doc: "How faint the rest is while one particle is pointed at." },
   { key: "hover_grow", label: "hover grows", min: 0, max: 3, step: 0.05, value: 0.6, then: "paint", doc: "How much the particle pointed at grows (its neighbours a third of that), only into free room." },
   { key: "hover_ring", label: "hover ring", min: 0, max: 6, step: 0.1, value: 1.5, then: "paint", doc: "The accent ring round the particle pointed at, in screen px (0: none)." },
@@ -86,7 +87,11 @@ export class Light {
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, light: Light, ink: Ink, grid: Grid, size: { width: number; height: number; dpr: number }): void {
+/**
+ * `match`: what the find line finds (1) and not (0), or null when it has no
+ * words; what it does not find is drawn at `query_fade`.
+ */
+export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, light: Light, ink: Ink, grid: Grid, size: { width: number; height: number; dpr: number }, match: Uint8Array | null = null): void {
   const { width, height, dpr } = size;
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   c.globalAlpha = 1;
@@ -99,19 +104,21 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   const { shine, shining, focus } = light;
 
   c.setTransform(dpr * cam.k, 0, 0, dpr * cam.k, dpr * cam.tx, dpr * cam.ty);
-  // Links, faint, one path per kind; part_of in the muted ink.
+  // Links, faint, one path per kind (and per found or not); part_of in the muted ink.
   c.lineWidth = S.link_width! / cam.k;
   const partOf = g.linkKinds.indexOf("part_of");
-  for (let kind = 0; kind < g.linkKinds.length; kind++) {
+  const fade = (i: number) => (match && !match[i] ? S.query_fade! : 1);
+  for (let kind = 0; kind < g.linkKinds.length; kind++) for (const lit of match ? [0, 1] : [1]) {
     c.beginPath();
     for (let e = 0; e < g.m; e++) {
       if (g.kind[e] !== kind) continue;
       const a = g.a[e]!, b = g.b[e]!;
+      if (match && (match[a]! && match[b]! ? 1 : 0) !== lit) continue;
       if (Math.max(g.x[a]!, g.x[b]!) < vx0 || Math.min(g.x[a]!, g.x[b]!) > vx1 || Math.max(g.y[a]!, g.y[b]!) < vy0 || Math.min(g.y[a]!, g.y[b]!) > vy1) continue;
       c.moveTo(g.x[a]!, g.y[a]!);
       c.lineTo(g.x[b]!, g.y[b]!);
     }
-    c.globalAlpha = S.link_alpha! * faint * (kind === partOf ? 1.4 : 1);
+    c.globalAlpha = S.link_alpha! * faint * (kind === partOf ? 1.4 : 1) * (lit ? 1 : S.query_fade!);
     c.strokeStyle = kind === partOf ? ink.muted : ink.line;
     c.stroke();
   }
@@ -132,10 +139,12 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   // Particles: the colour set once per island and openness, each circle filled on its own.
   for (let isl = 0; isl < g.islands.length; isl++) {
     c.fillStyle = g.islands[isl]!.colour;
-    for (const shut of [1, 0]) {
-      c.globalAlpha = (shut ? S.closed_fade! : 1) * faint;
+    for (const [shut, hit] of [[1, 0], [0, 0], [1, 1], [0, 1]] as const) {
+      if (!match && !hit) continue;
+      c.globalAlpha = (shut ? S.closed_fade! : 1) * faint * (match && !hit ? S.query_fade! : 1);
       for (const i of g.members[isl]!) {
         if (g.closed[i] !== shut || !inView(i, g.r[i]!)) continue;
+        if (match && match[i] !== hit) continue;
         c.beginPath();
         c.arc(g.x[i]!, g.y[i]!, g.r[i]!, 0, 2 * Math.PI);
         c.fill();
@@ -186,15 +195,17 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     c.fillText(text, x, y);
   };
   const big: number[] = [];
-  for (let i = 0; i < g.n; i++) if (g.r[i]! * cam.k >= S.label_px! && inView(i, 0)) big.push(i);
-  // The lit ones first, so the particle pointed at and its neighbours are always named.
-  big.sort((p, q) => shine[q]! - shine[p]! || g.r[q]! - g.r[p]! || p - q);
+  // What the find line finds is named whatever its size.
+  for (let i = 0; i < g.n; i++) if ((g.r[i]! * cam.k >= S.label_px! || match?.[i]) && inView(i, 0)) big.push(i);
+  // The lit ones first, so the particle pointed at and its neighbours are always named; then what is found.
+  big.sort((p, q) => shine[q]! - shine[p]! || (match ? match[q]! - match[p]! : 0) || g.r[q]! - g.r[p]! || p - q);
   for (const i of shining) if (!big.includes(i) && inView(i, 0)) big.unshift(i);
   let shown = 0;
   c.font = "11px ui-sans-serif, system-ui, sans-serif";
   for (const i of big) {
     if (shown >= S.label_most!) break;
     if (light.dim > 0.5 && shine[i]! < 0.5) continue;
+    if (match && !match[i] && !shine[i]) continue;
     const text = clip(g.title[i]!, 40), w = c.measureText(text).width;
     const sx = g.x[i]! * cam.k + cam.tx, sy = g.y[i]! * cam.k + cam.ty, rs = g.r[i]! * cam.k;
     let box: Box | null = null;
@@ -208,8 +219,8 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     if (!box) continue;
     taken.push(box);
     shown++;
-    const grow = shine[i]! > 0 ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
-    say(text, box[0] + 2, sy, grow * Math.max(faint, shine[i]!));
+    const grow = shine[i]! > 0 || match?.[i] ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
+    say(text, box[0] + 2, sy, grow * Math.max(faint * fade(i), shine[i]!));
   }
   // Islands' names at their middles, where there is room, fading as more titles are written.
   const show = Math.max(0, 1 - shown / Math.max(1, S.label_most! / 4));
@@ -227,7 +238,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
       const b: Box = [sx - half - 2, sy - hh, sx + half + 2, sy + hh];
       if (overlaps(b)) continue;
       taken.push(b);
-      say(title, sx, sy, 0.9 * faint * show);
+      say(title, sx, sy, 0.9 * faint * show * (match ? Math.max(S.query_fade!, 0.35) : 1));
     }
     c.textAlign = "start";
   }

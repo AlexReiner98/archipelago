@@ -1,8 +1,10 @@
 /**
  * The field running on a canvas: the loop, the camera and the pointer.
  *
- * - The loop steps the physics while it has energy, as many steps as fit in
- *   `frame_ms`, paints when anything changed, and otherwise costs nothing.
+ * - The physics runs on its own loop (a message channel, not animation
+ *   frames), in slices of `frame_ms`, until the run is fully settled: a tab
+ *   in the background, where frames all but stop, settles as fast. The
+ *   frames only paint, when anything changed; asleep, it costs nothing.
  * - Over a particle: its title and its links lit. A click opens it.
  *   Dragging a particle holds it under the pointer, and once let go the
  *   layout settles round it again; dragging the sea pans; the wheel zooms
@@ -31,6 +33,8 @@ export interface Stats {
 
 export interface Field {
   input(next: FieldIn): void;
+  /** What the find line finds, lit over the rest, or null for none: it never moves a particle. */
+  found(ids: Set<Id> | null): void;
   settings(S: Settings, then: Dial["then"] | "none"): void;
   reseed(): void;
   fit(): void;
@@ -54,6 +58,11 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   const light = new Light();
   let colours: Ink = ink(canvas);
   let hover = -1, dirty = true, awake = false, stopped = false;
+  let foundIds: Set<Id> | null = null, match: Uint8Array | null = null;
+  const remark = () => {
+    match = foundIds ? Uint8Array.from(g.id, (id) => (foundIds!.has(id) ? 1 : 0)) : null;
+    dirty = true;
+  };
   let stepMs = 0, runStart = { steps: 0, at: 0 }, settledIn: Stats["settledIn"];
   const size = () => ({ width: canvas.clientWidth, height: canvas.clientHeight, dpr: devicePixelRatio || 1 });
 
@@ -65,10 +74,38 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     cam.tx = width / 2 - ((x0 + x1) / 2) * cam.k;
     cam.ty = height / 2 - ((y0 + y1) / 2) * cam.k;
   };
+  // ─── The physics' own loop: a slice, then a message to itself, until settled ───
+  const chan = new MessageChannel();
+  let queued = false;
+  const slice = () => {
+    queued = false;
+    if (stopped || !awake) return;
+    const t0 = performance.now();
+    let steps = 0, energy = 0;
+    do {
+      energy = step(g, S);
+      steps++;
+    } while (energy && performance.now() - t0 < S.frame_ms!);
+    const per = (performance.now() - t0) / steps;
+    stepMs = stepMs ? stepMs * 0.8 + per * 0.2 : per;
+    pick = grid(g);
+    dirty = true;
+    if (!energy && !press) {
+      awake = false;
+      settledIn = { steps: g.sim.steps - runStart.steps, ms: performance.now() - runStart.at };
+      return;
+    }
+    // Held by a hand, a sleeping run waits for the next move instead of spinning.
+    if (!energy) return;
+    queued = true;
+    chan.port2.postMessage(0);
+  };
+  chan.port1.onmessage = slice;
   const wake = () => {
     if (!awake) runStart = { steps: g.sim.steps, at: performance.now() };
     awake = true;
     dirty = true;
+    if (!queued && !stopped) (queued = true), chan.port2.postMessage(0);
   };
   const toWorld = (sx: number, sy: number): [number, number] => [(sx - cam.tx) / cam.k, (sy - cam.ty) / cam.k];
   const local = (e: { clientX: number; clientY: number }) => {
@@ -84,22 +121,6 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   let raf = 0;
   const tick = () => {
     if (stopped) return;
-    if (awake) {
-      const t0 = performance.now();
-      let steps = 0, energy = 0;
-      do {
-        energy = step(g, S);
-        steps++;
-      } while (energy && performance.now() - t0 < S.frame_ms!);
-      const per = (performance.now() - t0) / steps;
-      stepMs = stepMs ? stepMs * 0.8 + per * 0.2 : per;
-      if (!energy && !press) {
-        awake = false;
-        settledIn = { steps: g.sim.steps - runStart.steps, ms: performance.now() - runStart.at };
-      }
-      pick = grid(g);
-      dirty = true;
-    }
     if (dirty) {
       if (awake && !cam.moved && S.follow) fit();
       const s = size();
@@ -108,7 +129,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
         canvas.height = Math.round(s.height * s.dpr);
       }
       const easing = light.ease(g, hover, S);
-      paint(c, g, cam, S, light, colours, pick, s);
+      paint(c, g, cam, S, light, colours, pick, s, match);
       dirty = easing;
     }
     raf = requestAnimationFrame(tick);
@@ -211,8 +232,13 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       else warm(g, S);
       pick = grid(g);
       hover = -1;
+      remark();
       if (!cam.moved) fit();
       wake();
+    },
+    found(ids) {
+      foundIds = ids;
+      remark();
     },
     settings(next, then) {
       S = next;
@@ -250,6 +276,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     destroy() {
       stopped = true;
       cancelAnimationFrame(raf);
+      chan.port1.close();
       resize.disconnect();
       scheme.removeEventListener("change", recolour);
       canvas.removeEventListener("pointermove", onMove);
