@@ -339,6 +339,9 @@ test("stateAt: what was heard and held back by then; a refusal wins over a say",
   assert.deepEqual([...all.heard], [["words/a", "refused"]]);
   assert.deepEqual([...all.held], [["words/b", "held"], ["words/c", "shadow"]]);
   assert.equal(all.end, true);
+  // Counts are the run's own says, up to the playhead.
+  assert.deepEqual([...early.counts], [["words/a", 1]]);
+  assert.deepEqual([...all.counts], [["words/a", 2]]);
   assert.equal(stateAt([], -1).at, undefined);
 });
 

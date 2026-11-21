@@ -3,8 +3,8 @@
  *
  * - `playhead`: where the run is looked at, the event `here.event` names,
  *   else its last (following it live).
- * - `stateAt`: what the run had heard, refused and held back by then, node
- *   by node, and whether that is its end.
+ * - `stateAt`: what the run had heard, refused and held back by then, and
+ *   how often it said each node, node by node; and whether that is its end.
  * - `tickOf`: an event's mark on the timeline.
  * - `holdsOf`: a profile's answer (`profile.read.hears`) as holds, for a
  *   profile looked at without a run.
@@ -25,6 +25,8 @@ export interface Replay {
   heard: Map<string, Heard>;
   /** Each node a gate held back by then. */
   held: Map<string, Hold>;
+  /** How often the run said each node by then. */
+  counts: Map<string, number>;
   /** At the run's last event: what follows is live, and the verdicts are the run's. */
   end: boolean;
 }
@@ -42,15 +44,17 @@ export function playhead(events: ExchangeEvent[], event?: string): number {
 export function stateAt(events: ExchangeEvent[], index: number): Replay {
   const heard = new Map<string, Heard>();
   const held = new Map<string, Hold>();
+  const counts = new Map<string, number>();
   const upto = Math.min(index, events.length - 1);
   for (let i = 0; i <= upto; i++) {
     const e = events[i]!;
     if (!e.node) continue;
+    if (e.kind === "say") counts.set(e.node, (counts.get(e.node) ?? 0) + 1);
     if (e.kind === "refuse") heard.set(e.node, "refused");
     else if (e.kind === "say" && !heard.has(e.node)) heard.set(e.node, "said");
     else if (e.kind === "gated") held.set(e.node, (e.detail as { trial?: boolean } | undefined)?.trial ? "shadow" : "held");
   }
-  return { index: upto, ...(upto >= 0 ? { at: events[upto] } : {}), heard, held, end: upto === events.length - 1 };
+  return { index: upto, ...(upto >= 0 ? { at: events[upto] } : {}), heard, held, counts, end: upto === events.length - 1 };
 }
 
 /** The timeline's mark for an event. */

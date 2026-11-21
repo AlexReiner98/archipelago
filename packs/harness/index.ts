@@ -5,8 +5,8 @@
  * - Center (the view "Harness"): the tree of places and nodes (canvas.ts),
  *   lit by what the run looked at heard, refused and did up to the
  *   playhead, with the timeline under it (timeline.ts). The bar picks the
- *   run (`here.run`, else the newest) and a profile (`harness.profile`,
- *   else the run's own).
+ *   run (`here.run`, else the newest), or every run (`harness.all`), or a
+ *   profile (`harness.profile`): counts are the run's, or all time.
  * - Right: the run's events, one line each (events.ts): the wider side,
  *   as an opened line needs the room.
  * - Left: the node looked at (node.ts).
@@ -19,7 +19,7 @@ import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import type { ActionInvoke, ActionList } from "../../spec/action.ts";
-import type { AgentTree, NodeInfo } from "../../spec/agent.ts";
+import type { AgentTree, NodeInfo, RunInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
@@ -30,7 +30,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { read as token, sheet, verdictGlyph } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
 import { Events, short } from "./events.ts";
-import { hooks, PROFILE, type VerdictRead } from "./hooks.ts";
+import { ALL, hooks, PROFILE, type VerdictRead } from "./hooks.ts";
 import { KEEP_STYLE, keepParts } from "./keep.ts";
 import { packHues, radial, treeOf, type Grouping } from "./layout.ts";
 import { nodePane } from "./node.ts";
@@ -114,7 +114,16 @@ const harness: Pack = {
     const invoke = ctx.get<ActionInvoke>("action.invoke");
     const graphLive = ctx.get<GraphWatch>("graph.watch");
     const profiles = ctx.get<ProfileRead>("profile.read");
-    ctx.effect(() => ctx.get<HereDeclare>("here.declare").declare({ key: PROFILE, scope: "page", doc: "The profile the harness view shows: its holds over the tree." }));
+    const declare = ctx.get<HereDeclare>("here.declare");
+    ctx.effect(() => declare.declare({ key: PROFILE, scope: "page", doc: "The profile the harness view shows: its holds over the tree." }));
+    ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the harness view looks at every run, with all-time totals, not one run." }));
+    // A run picked anywhere (here, the node's runs, Activity) is looked at alone, with its own profiles.
+    ctx.effect(() =>
+      here.watch(KEYS.run, () => {
+        if (here.get(ALL)) set.set(ALL, undefined);
+        if (here.get(PROFILE)) set.set(PROFILE, undefined);
+      }),
+    );
 
     const hk = hooks({
       here,
@@ -163,7 +172,7 @@ const harness: Pack = {
 
     const Center = () => {
       const nodes = hk.useNodes();
-      const { runs, run, pinned, info } = hk.useRun();
+      const { runs, run, pinned, all, info } = hk.useRun();
       const fires = useRef<Fire | undefined>(undefined);
       const following = useRef(true);
       const onNew = useRef<((e: ExchangeEvent) => void) | undefined>(undefined);
@@ -176,12 +185,14 @@ const harness: Pack = {
       following.current = !event || !events.some((e) => e.id === event);
       const state = useMemo(() => stateAt(events, index), [events, index]);
       const verdictsOfRun = hk.useVerdictsOfRun(run);
-      const rings = useMemo(() => (state.end ? new Map(verdictsOfRun.map((x) => [x.node, x.verdict])) : undefined), [state.end, verdictsOfRun]);
+      const rings = useMemo(() => (run && state.end ? new Map(verdictsOfRun.map((x) => [x.node, x.verdict])) : undefined), [state.end, verdictsOfRun]);
       const hearing = hk.useHearing(profile, nodes);
       const held = useMemo(() => (hearing ? holdsOf(hearing) : state.held), [hearing, state.held]);
       const profileList = hk.useProfileList();
       const membership = useMembership(profileList, nodes);
-      const counts = hk.useCounts();
+      const records = hk.useRecords();
+      // All runs: each node's all-time count. One run: what that run said, up to the playhead.
+      const counts = useMemo(() => (all ? new Map(records.map((r) => [r.node, r.said])) : state.counts), [all, records, state.counts]);
       const statuses = hk.useStatuses();
       const review = kp.useReview();
       const [by, setBy] = useState<Grouping>("place");
@@ -231,21 +242,32 @@ const harness: Pack = {
 
       const pick = (id: string | undefined) => set.set(KEYS.node, id);
       const sum = { held: 0, failed: 0, quiet: 0 };
-      for (const x of verdictsOfRun) sum[x.verdict]++;
+      if (all) for (const r of records) (sum.held += r.held), (sum.failed += r.failed), (sum.quiet += r.quiet);
+      else for (const x of verdictsOfRun) sum[x.verdict]++;
       return html`
         <div class="hv-view">
           <div class="hv-bar">
-            <select class="hv-select" value=${pinned ?? ""} title="The run shown" onChange=${(e: Event) => {
-              set.set(KEYS.run, (e.target as HTMLSelectElement).value || undefined);
+            <select class="hv-select" value=${all ? "*" : (pinned ?? "")} title="The run shown, or every run" onChange=${(e: Event) => {
+              const val = (e.target as HTMLSelectElement).value;
               set.set(KEYS.event, undefined);
+              set.set(PROFILE, undefined);
+              if (val === "*") return set.set(ALL, true);
+              set.set(KEYS.run, val || undefined);
+              set.set(ALL, undefined);
             }}>
+              <option value="*">all runs</option>
               <option value="">newest${runs[0] ? ` · ${short(runs[0].title ?? runs[0].run.slice(0, 8), 40)}` : ""}</option>
               ${runs.map((r) => html`<option value=${r.run}>${r.ended ? "○" : "●"} ${short(r.title ?? r.run.slice(0, 8), 40)} · ${clock(r.started)}</option>`)}
             </select>
             ${info && !info.ended && html`<span class="live" title="The run hasn't ended">●</span>`}
-            <span class="hv-n" title="This run's verdicts: held, failed, quiet"><span class="m-held">${token(verdictGlyph("held"))} ${sum.held}</span> <span class="m-failed">${token(verdictGlyph("failed"))} ${sum.failed}</span> <span class="m-quiet">${token(verdictGlyph("quiet"))} ${sum.quiet}</span></span>
-            <select class="hv-select" value=${profile ?? ""} title="The profile whose holds the tree shows" onChange=${(e: Event) => set.set(PROFILE, (e.target as HTMLSelectElement).value || undefined)}>
-              <option value="">the run's profiles</option>
+            <span class="hv-n" title=${all ? "Every run's verdicts, node by run: held, failed, quiet" : "This run's verdicts: held, failed, quiet"}><span class="m-held">${token(verdictGlyph("held"))} ${sum.held}</span> <span class="m-failed">${token(verdictGlyph("failed"))} ${sum.failed}</span> <span class="m-quiet">${token(verdictGlyph("quiet"))} ${sum.quiet}</span></span>
+            <select class="hv-select" value=${profile ?? ""} title="A profile: what it holds back, over every run's totals" onChange=${(e: Event) => {
+              const val = (e.target as HTMLSelectElement).value;
+              set.set(KEYS.event, undefined);
+              set.set(PROFILE, val || undefined);
+              set.set(ALL, val ? true : undefined);
+            }}>
+              <option value="">${all ? "no profile" : "the run's profiles"}</option>
               ${profileList.map((p) => html`<option value=${p.id}>${p.status === "on" ? "●" : p.status === "off" ? "○" : "◌"} ${p.title}</option>`)}
             </select>
             <span class="hv-by" title="How the tree hangs its nodes">
@@ -258,7 +280,7 @@ const harness: Pack = {
           <div style="position:relative;min-height:0;display:grid">
             <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />
           </div>
-          <${Timeline}
+          ${run && html`<${Timeline}
             events=${events}
             index=${index}
             following=${following.current}
@@ -273,14 +295,14 @@ const harness: Pack = {
               setPlaying(false);
               set.set(KEYS.event, undefined);
             }}
-          />
+          />`}
         </div>
       `;
     };
 
     const RunFill = () => {
       const nodes = hk.useNodes();
-      const { run, info } = hk.useRun();
+      const { run, info, runs, all } = hk.useRun();
       const events = hk.useEvents(run);
       const event = hk.useHere<string>(KEYS.event);
       const picked = hk.useHere<string>(KEYS.node);
@@ -288,11 +310,23 @@ const harness: Pack = {
       const verdictsOfRun = hk.useVerdictsOfRun(run);
       const titles = useMemo(() => new Map(nodes.map((n) => [n.id, n.title])), [nodes]);
       const inProfiles = hk.useRunProfiles(info);
+      if (all) return html`<${Runs} runs=${runs} />`;
       return html`<${Events} info=${info} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} node=${picked} profiles=${inProfiles} onPick=${(e: ExchangeEvent) => {
         set.set(KEYS.event, e.id);
         if (e.node) set.set(KEYS.node, e.node);
       }} />`;
     };
+
+    /** Every run, newest first: a click looks at it alone. */
+    const Runs = ({ runs }: { runs: RunInfo[] }) => html`
+      <div class="hv-pane">
+        <div class="hv-head"><span class="t">Runs</span><span class="hv-dim">${runs.length}</span></div>
+        <div class="hv-body">
+          ${runs.map((r) => html`<div class="hv-row" title=${r.title ?? r.run} onClick=${() => set.set(KEYS.run, r.run)}>
+            <span class="hv-m">${r.ended ? "○" : "●"}</span><span class="x">${r.title ?? r.run.slice(0, 8)}</span><span class="n">${clock(r.started)}</span>
+          </div>`)}
+        </div>
+      </div>`;
 
     const NodeFill = () => html`<${node.Pane} nodes=${hk.useNodes()} review=${kp.useReview()} />`;
 

@@ -5,7 +5,7 @@
  * - A node the run said is lit blue, one it refused with red; one a profile
  *   held back is struck and faint, one only a shadow would have is dashed.
  * - Its dot has its pack's hue, hollow while its item is a trial, larger
- *   the more it is said across runs (the count after its name). A mark after
+ *   the more it is said (the count after its name: in the run, or all time). A mark after
  *   the name gives its standing by the keep pack: ↑ promote, ↓ retire, ⊝ held
  *   back by a check.
  * - A ring gives its verdict, once the run is looked at to its end.

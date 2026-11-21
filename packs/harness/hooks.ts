@@ -54,6 +54,8 @@ export interface Caps {
 
 /** The page key that holds the profile looked at (the harness pack's own). */
 export const PROFILE = "harness.profile";
+/** The page key set when every run is looked at, not one (the harness pack's own). */
+export const ALL = "harness.all";
 
 export function hooks(c: Caps) {
   const useHere = <T extends Json>(key: string): T | undefined => {
@@ -82,12 +84,13 @@ export function hooks(c: Caps) {
     return runs;
   };
 
-  /** The run looked at: the one pinned in `here.run`, else the newest. */
+  /** The run looked at: none when every run is (`harness.all`), else the one pinned in `here.run`, else the newest. */
   const useRun = () => {
     const runs = useRuns();
     const pinned = useHere<string>("here.run");
-    const run = pinned ?? runs[0]?.run;
-    return { runs, run, pinned, info: runs.find((r) => r.run === run) };
+    const all = useHere<boolean>(ALL) === true;
+    const run = all ? undefined : (pinned ?? runs[0]?.run);
+    return { runs, run, pinned, all, info: runs.find((r) => r.run === run) };
   };
 
   /** A run's events in order, kept live; `onNew` hears each one appended after the first read. */
@@ -145,8 +148,8 @@ export function hooks(c: Caps) {
   };
 
   const useVerdictsOfRun = (run: string | undefined) => useVerdictData(() => (run ? c.verdicts.run(run) : Promise.resolve([])), [run], run) ?? [];
-  /** How often each node was said, across runs. */
-  const useCounts = () => useVerdictData(() => c.verdicts.records({ limit: 500 }).then((p) => new Map(p.items.map((r) => [r.node, r.said]))), []) ?? new Map<string, number>();
+  /** Each node's record across every run. */
+  const useRecords = () => useVerdictData(() => c.verdicts.records({ limit: 500 }).then((p) => p.items), []) ?? [];
 
   const useItem = (id?: string): Item | null => {
     const [item, setItem] = useState<Item | null>(null);
@@ -265,7 +268,7 @@ export function hooks(c: Caps) {
     return hearing;
   };
 
-  return { useHere, useNodes, useRun, useEvents, useVerdictData, useVerdictsOfRun, useCounts, useItem, useStatuses, useHas, useProfileList, useRunProfiles, useHearing };
+  return { useHere, useNodes, useRun, useEvents, useVerdictData, useVerdictsOfRun, useRecords, useItem, useStatuses, useHas, useProfileList, useRunProfiles, useHearing };
 }
 
 export type Hooks = ReturnType<typeof hooks>;

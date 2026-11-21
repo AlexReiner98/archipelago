@@ -14,11 +14,19 @@ the two beside show while the view does
 
 ## Picking
 
-- **Run:** `here.run`, else the newest. ● not ended, ○ ended.
-- **Profile:** `harness.profile` (this pack's own page key), else the run's
-  own. A profile picked shows over the tree what a run in only that
-  profile would not hear (`profile.read.hears`), whatever run is shown.
-- **Playhead:** `here.event`. Unset, the view follows the run's end live.
+One run, or every run. The counts and the ✓ ✕ ○ tally follow the choice.
+
+- **A run:** `here.run`, else the newest. ● not ended, ○ ended. The counts
+  are what that run said, up to the playhead; the tally, its verdicts; its
+  holds, its own `gated` events. Picking a run anywhere (the node's runs,
+  Activity) looks at it alone.
+- **All runs, or a profile:** `harness.all` (this pack's own page key). The
+  counts and the tally are all time; the right pane lists the runs. A
+  profile picked (`harness.profile`) is looked at this way, and shows over
+  the tree what a run in only that profile would not hear
+  (`profile.read.hears`).
+- **Playhead:** `here.event`, in one run. Unset, the view follows the run's
+  end live.
 
 ## The tree ([layout.ts](layout.ts), [canvas.ts](canvas.ts))
 
@@ -38,7 +46,7 @@ from one "decided" bough as well, retired ones struck.
 | ring | its verdict in the run (blue held, red failed, dashed quiet), once looked at to the end |
 | dot hue | its pack: the map's words purple, what grow learned gold |
 | hollow dot | its item is a trial |
-| dot size, number | how often it was said, across runs |
+| dot size, number | how often it was said: in the run, or all time |
 | ↑ ↓ ⊝ | the keep pack's standing: promote, retire, held back by a check |
 
 A step of the playhead runs a light from the root to its node (red for a
