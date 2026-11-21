@@ -179,7 +179,7 @@ const views_: Pack<Config> = {
       return list();
     };
 
-    const Name = () => html`<span class="vw-name"><b>archipelago</b> next</span>`;
+    const Name = () => html`<span class="vw-name"><b>archipelago</b></span>`;
 
     /** The one control in the bar: the view shown, opening the list. */
     const Picker = () => {
