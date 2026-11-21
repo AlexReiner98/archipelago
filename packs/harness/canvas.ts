@@ -9,8 +9,8 @@
  *   the name gives its standing by the keep pack: ↑ promote, ↓ retire, ⊝ held
  *   back by a check.
  * - A ring gives its verdict, once the run is looked at to its end.
- * - `fire` runs a light from the root to a node said (red when refused), or
- *   a spark on the bough of an act's place. Under reduced motion only the
+ * - `fire` runs a light from the root to a node said (red when refused); its
+ *   name lights when the light gets there, not before. Or it runs a spark on the bough of an act's place. Under reduced motion only the
  *   names light.
  *
  * Drag to move, wheel to zoom, double-click to fit. A click picks a node.
@@ -50,6 +50,7 @@ export const CANVAS_STYLE = sheet(`
 .rx-trial .rx-name { font-style:italic; }
 .rx-said .rx-name { fill:${C.say}; } .rx-said .rx-dot { fill-opacity:1; }
 .rx-refused .rx-name { fill:${C.fail}; }
+.rx-wait.rx-said .rx-name, .rx-wait.rx-refused .rx-name { fill:var(--fg); } .rx-wait.rx-said .rx-dot { fill-opacity:.85; }
 .rx-held { opacity:.38; } .rx-held .rx-name { text-decoration:line-through; }
 .rx-shadow .rx-dot { stroke:var(--dim); stroke-dasharray:1.5 1; stroke-width:1.2; }
 .rx-retired .rx-name { text-decoration:line-through; fill:var(--dim); }
@@ -90,6 +91,18 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
     node.classList.toggle("rx-hot-fail", tone === "fail");
     lit.set(id, setTimeout(() => (node.classList.remove("rx-lit", "rx-hot-fail"), lit.delete(id)), S.linger * 1000));
   };
+  // A node a light is on its way to keeps its name unlit until the light gets there.
+  const waiting = new Map<string, number>();
+  const wait = (id: string) => {
+    waiting.set(id, (waiting.get(id) ?? 0) + 1);
+    svg.querySelector(`[data-id="${CSS.escape(id)}"]`)?.classList.add("rx-wait");
+  };
+  const arrive = (id: string) => {
+    const n = (waiting.get(id) ?? 1) - 1;
+    if (n > 0) return void waiting.set(id, n);
+    waiting.delete(id);
+    svg.querySelector(`[data-id="${CSS.escape(id)}"]`)?.classList.remove("rx-wait");
+  };
   const tick = (now: number) => {
     const { k } = get();
     for (let i = fx.length - 1; i >= 0; i--) {
@@ -116,13 +129,14 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
       const head = el("circle", { class: `rx-head k-${l.tone}`, r: S.head });
       const rings = glow(l.tone);
       let reached = false;
+      wait(l.at);
       fx.push({
         start: performance.now(),
         els: [trail, head, ...rings],
         step: (age, k) => {
           const u = Math.min(1, age / S.pulse);
           const flash = u < 1 ? 1 : 1 - (age - S.pulse) / S.flashTime;
-          if (u >= 1 && !reached) (reached = true), light(l.at, l.tone);
+          if (u >= 1 && !reached) (reached = true), arrive(l.at), light(l.at, l.tone);
           if (flash <= 0) return false;
           const [hx, hy] = pointAt(pts, u);
           const upto = pts.slice(0, Math.floor(u * (pts.length - 1)) + 1);
@@ -168,6 +182,8 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
       fx.forEach((f) => f.els.forEach((e) => e.remove()));
       fx.length = 0;
       lit.forEach((t) => clearTimeout(t));
+      for (const id of waiting.keys()) svg.querySelector(`[data-id="${CSS.escape(id)}"]`)?.classList.remove("rx-wait");
+      waiting.clear();
     },
   };
 }

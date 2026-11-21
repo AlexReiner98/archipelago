@@ -54,5 +54,9 @@ own.
   21 Nov 2026).
 - **The hash** names the view shown (`#map`, `#i_…`), so a link opens it.
   An older `#map/map` link opens that kind.
+- **A view whose pack reloads** (a hot update, a pack switched off and on)
+  is gone for a moment: it stays picked with its hash, and shows again as
+  soon as its fill does. Only if it is still gone after 2 s does home stand
+  in, the hash kept, so a reload opens it. Picking another view drops it.
 - **`here.view`** set by something else (an agent, a panel) shows the
   view of that kind. `views.view` (page) says which view shows.

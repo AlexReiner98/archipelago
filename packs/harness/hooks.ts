@@ -93,28 +93,24 @@ export function hooks(c: Caps) {
     return { runs, run, pinned, all, info: runs.find((r) => r.run === run) };
   };
 
-  /** A run's events in order, kept live; `onNew` hears each one appended after the first read. */
-  const useEvents = (run?: string, onNew?: { current?: (e: ExchangeEvent) => void }): ExchangeEvent[] => {
+  /** A run's events in order, kept live. */
+  const useEvents = (run?: string): ExchangeEvent[] => {
     const [events, setEvents] = useState<ExchangeEvent[]>([]);
     useEffect(() => {
       setEvents([]);
       if (!run) return;
       let gone = false;
-      let ready = false;
       const bySeq = new Map<number, ExchangeEvent>();
       const show = () => !gone && setEvents([...bySeq.values()].sort((a, b) => a.seq - b.seq));
       const stop = c.live.watch({ run }, (e) => {
-        const fresh = !bySeq.has(e.seq);
         bySeq.set(e.seq, e);
         show();
-        if (ready && fresh) onNew?.current?.(e);
       });
       void (async () => {
         for (let p = await c.read.events(run, { limit: 500 }); ; p = await c.read.events(run, { limit: 500, after: p.next })) {
           for (const e of p.items) bySeq.set(e.seq, e);
           if (!p.next || gone) break;
         }
-        ready = true;
         show();
       })();
       return () => {

@@ -87,14 +87,24 @@ const views_: Pack<Config> = {
     let settled = false;
     /** Home was shown because nothing was picked: while so, home follows the list as packs and items arrive. */
     let auto = false;
-    const pick = (v: View, chosen = true) => {
+    /**
+     * The view picked whose fill went away for a moment (its pack reloading, a hot update): it stays
+     * picked, with its hash, and shows again as soon as its fill is back. Only if it is still gone after
+     * AWAY does home stand in, the hash kept, so a reload still opens it.
+     */
+    let away: string | undefined;
+    const AWAY = 2000;
+    let awayTimer: ReturnType<typeof setTimeout> | undefined;
+    ctx.effect(() => () => clearTimeout(awayTimer));
+    const pick = (v: View, chosen = true, keepHash = false) => {
       auto = !chosen;
+      if (!keepHash) (away = undefined), clearTimeout(awayTimer);
       // A view picked, from anywhere (the list, the command line, a link, an agent), closes the list.
       open = false;
       show.show(v);
       // Only a choice goes in the URL: home shown on its own leaves it bare, so a reload opens home again.
       if (chosen && location.hash.slice(1) !== v.id) history.replaceState(null, "", `#${v.id}`);
-      else if (!chosen && location.hash) history.replaceState(null, "", location.pathname + location.search);
+      else if (!chosen && !keepHash && location.hash) history.replaceState(null, "", location.pathname + location.search);
       tell();
     };
     /** How long the first view waits for home's own pack before taking what there is. */
@@ -120,10 +130,25 @@ const views_: Pack<Config> = {
         else pick(all.find((v) => v.home)!, false);
         return;
       }
+      const back = away ? all.find((v) => v.id === away) : undefined;
+      if (back) return pick(back);
       const now = show.shown();
       const fresh = now && all.find((v) => v.id === now.id);
       const home = all.find((v) => v.home)!;
-      if (!fresh || (auto && home.id !== now?.id)) pick(home, false);
+      if (now && !fresh && !auto) {
+        // The view picked is gone for now: keep it, and its hash; home stands in only if it stays gone.
+        if (away !== now.id) {
+          away = now.id;
+          clearTimeout(awayTimer);
+          awayTimer = setTimeout(() => {
+            if (!away || list().some((v) => v.id === away)) return;
+            const wanted = away;
+            pick(list().find((v) => v.home)!, false, true);
+            away = wanted;
+          }, AWAY);
+        }
+        tell();
+      } else if (!fresh || (auto && home.id !== now?.id)) pick(home, false, !!away);
       else if (JSON.stringify(fresh) !== JSON.stringify(now)) pick(fresh, !auto); // an agent changed it
       else tell();
     };
@@ -137,7 +162,8 @@ const views_: Pack<Config> = {
     ctx.effect(
       () =>
         here.watch(KEYS.view, (c) => {
-          if (!settled || typeof c.value !== "string" || c.value === show.shown()?.center) return;
+          // While the view picked is away, the frame shows another center fill for the moment: not a pick.
+          if (!settled || away || typeof c.value !== "string" || c.value === show.shown()?.center) return;
           const kind = list().find((v) => v.kind && v.center === c.value);
           if (kind) pick(kind);
         }) as () => void,

@@ -16,7 +16,7 @@
  * `here.node`. Everything it shows, and its styles, go when it unloads.
  */
 import { h } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import type { ActionInvoke, ActionList } from "../../spec/action.ts";
 import type { AgentTree, NodeInfo, RunInfo } from "../../spec/agent.ts";
@@ -175,9 +175,7 @@ const harness: Pack = {
       const { runs, run, pinned, all, info } = hk.useRun();
       const fires = useRef<Fire | undefined>(undefined);
       const following = useRef(true);
-      const onNew = useRef<((e: ExchangeEvent) => void) | undefined>(undefined);
-      onNew.current = (e) => following.current && fires.current?.(e);
-      const events = hk.useEvents(run, onNew);
+      const events = hk.useEvents(run);
       const event = hk.useHere<string>(KEYS.event);
       const picked = hk.useHere<string>(KEYS.node);
       const profile = hk.useHere<string>(PROFILE);
@@ -219,9 +217,19 @@ const harness: Pack = {
       const placed = useMemo(() => radial(tree), [tree]);
       const hues = useMemo(() => packHues(nodes.map((n) => n.pack)), [nodes]);
 
-      // A step of the playhead lights its event; a jump lights only where it lands.
+      // Lights fire once the tree is drawn, so a name a light is on its way to stays unlit until it gets there.
+      // Following: each event that comes after the first read. Else a step of the playhead lights its event;
+      // a jump lights only where it lands.
       const at = state.at;
-      useEffect(() => {
+      const seen = useRef<{ run?: string; seq: number }>({ seq: 0 });
+      useLayoutEffect(() => {
+        const last = events[events.length - 1]?.seq ?? 0;
+        const was = seen.current;
+        seen.current = { run, seq: last };
+        if (was.run !== run || !was.seq || !following.current) return;
+        for (const e of events) if (e.seq > was.seq) fires.current?.(e);
+      }, [events, run]);
+      useLayoutEffect(() => {
         if (at && !following.current) fires.current?.(at);
       }, [at?.id]);
       // Playing: a step every STEP ms, from the start when at the end.
