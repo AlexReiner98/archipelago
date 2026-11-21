@@ -9,7 +9,8 @@ moves. Three fills,
 linked through `here`; the two beside show while the view does
 (`when: { "here.view": "harness/view" }`), and start folded to rails (the
 frame's `folded` config in `app/boot.ts`), so the landing is the tree and
-the agents only. Picking a node opens the node pane.
+the agents only. Picking a node opens the node pane; a click on the
+background, picking none, folds it.
 
 | Fill | Region | Shows |
 |---|---|---|
@@ -152,8 +153,10 @@ its record against the thresholds, its checks, Keep and Retire
 (`keep.apply`). A node the map writes a file from shows the file and its
 rule (`written.rule`).
 
-Picking a node takes `harness/node` out of the frame's page key
-`frame.folded`, if the frame folded it.
+The node pane is open while a node is picked and folds to its rail when
+none is (a click on the tree's background, from anywhere): the pack
+takes `harness/node` out of the frame's page key `frame.folded`, or puts
+it back (`foldForNode`).
 
 Injects `slot.fill`, `here.*`, `agent.tree`, `exchange.read`,
 `exchange.watch`, `verdict.read`, `action.list`, `action.invoke`,

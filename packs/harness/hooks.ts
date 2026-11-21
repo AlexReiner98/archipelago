@@ -89,6 +89,19 @@ export function groupsOf(runs: RunInfo[], placements: Map<string, ProfileInfo[]>
   return out;
 }
 
+/**
+ * The frame's folded fills with the node pane folded when no node is picked
+ * and open when one is; undefined when nothing changes (or the frame keeps
+ * no folds).
+ */
+export function foldForNode(folded: unknown, node: string | undefined, pane = "harness/node"): string[] | undefined {
+  if (!Array.isArray(folded)) return undefined;
+  const has = folded.includes(pane);
+  if (node && has) return folded.filter((k) => k !== pane);
+  if (!node && !has) return [...folded, pane];
+  return undefined;
+}
+
 export function hooks(c: Caps) {
   const useHere = <T extends Json>(key: string): T | undefined => {
     const [v, setV] = useState<T | undefined>(c.here.get<T>(key));

@@ -11,7 +11,7 @@ import { asText, expand, fold, pretty } from "../packs/harness/expand.ts";
 import type { NodeInfo, RunInfo } from "../spec/agent.ts";
 import { HUES } from "../spec/style.ts";
 import { colourOf, colours, keepLast, liveRuns, LIVE_MOST } from "../packs/harness/live.ts";
-import { groupsOf } from "../packs/harness/hooks.ts";
+import { foldForNode, groupsOf } from "../packs/harness/hooks.ts";
 import { DECIDED, dotsBox, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 import { placementOf, placementText } from "../packs/harness/agents.ts";
@@ -519,4 +519,12 @@ test("switchFocus: where the page has no view transitions, the change happens at
   assert.equal(changed, 1);
   assert.equal(transitionName(7), "hv-agent-7");
   assert.notEqual(transitionName(0), transitionName(1));
+});
+
+test("foldForNode: the node pane opens when a node is picked and folds when none is; nothing when the frame keeps no folds", () => {
+  assert.deepEqual(foldForNode(["harness/node", "harness/run"], "words/x"), ["harness/run"]);
+  assert.deepEqual(foldForNode(["harness/run"], undefined), ["harness/run", "harness/node"]);
+  assert.equal(foldForNode(["harness/run"], "words/x"), undefined, "already open");
+  assert.equal(foldForNode(["harness/node"], undefined), undefined, "already folded");
+  assert.equal(foldForNode(undefined, "words/x"), undefined);
 });

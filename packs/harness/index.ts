@@ -36,7 +36,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
 import { Events, short } from "./events.ts";
-import { ALL, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
+import { ALL, foldForNode, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
 import { colourOf, colours, liveRuns, LiveEvents } from "./live.ts";
 import { AGENTS_STYLE, placementOf, ProfileMenu } from "./agents.ts";
 import { focusOf, switchFocus, Trees, TREES_STYLE, treesAndRows } from "./trees.ts";
@@ -50,7 +50,7 @@ import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
-/** The frame's page key for its folded fills (packs/frame/fold.ts): picking a node opens the node pane. */
+/** The frame's page key for its folded fills (packs/frame/fold.ts): the node pane is open while a node is picked. */
 const FOLDED = "frame.folded";
 
 /** How long a step lasts when the run plays, in ms. */
@@ -138,6 +138,13 @@ const harness: Pack = {
     ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the harness view looks at every run, with all-time totals, not one run." }));
     ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The harness view's dials: how each agent's tree is coloured by what it is told, those moved from where they start." }));
     ctx.effect(() => declare.declare({ key: LIVE, scope: "page", doc: "True: the harness view looks at every live run at once, a colour each." }));
+    // The node pane is open while a node is picked, from anywhere, and folds to its rail when none is (a click on the background).
+    ctx.effect(() =>
+      here.watch(KEYS.node, (c) => {
+        const next = foldForNode(here.get(FOLDED), c.value as string | undefined);
+        if (next) set.set(FOLDED, next);
+      }),
+    );
     // A run picked anywhere (here, the node's runs, Activity) is looked at alone, with its own profiles.
     ctx.effect(() =>
       here.watch(KEYS.run, () => {
@@ -326,12 +333,7 @@ const harness: Pack = {
       }, [playing, run]);
       useEffect(() => setPlaying(false), [run]);
 
-      const pick = (id: string | undefined) => {
-        set.set(KEYS.node, id);
-        // Picking a node opens the node pane if the frame folded it.
-        const folded = here.get<string[]>(FOLDED);
-        if (id && Array.isArray(folded) && folded.includes("harness/node")) set.set(FOLDED, folded.filter((k) => k !== "harness/node"));
-      };
+      const pick = (id: string | undefined) => set.set(KEYS.node, id);
       const sum = { held: 0, failed: 0, quiet: 0 };
       if (all) for (const r of records) (sum.held += r.held), (sum.failed += r.failed), (sum.quiet += r.quiet);
       else for (const x of verdictsOfRun) sum[x.verdict]++;
