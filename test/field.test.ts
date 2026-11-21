@@ -80,3 +80,36 @@ test("collide leaves no particle on another, and part_of keeps a tree together",
   for (let i = 0; i < 200; i++) any += Math.hypot(g.x[i]! - g.x[599 - i]!, g.y[i]! - g.y[599 - i]!);
   assert.ok(part / parts < (any / 200) / 3, `${(part / parts).toFixed(0)} against ${(any / 200).toFixed(0)}`);
 });
+
+test("the legend's filter: what it hides, and how it counts", async () => {
+  const { shown, facets, toggle } = await import("../packs/field/filter.ts");
+  const input: FieldIn = {
+    items: [
+      { id: "a", title: "a", type: "work", status: "todo", closed: false, kind: "feature" },
+      { id: "b", title: "b", type: "work", status: "done", closed: true },
+      { id: "c", title: "c", type: "question", status: "open", closed: false },
+      { id: "d", title: "d", type: "record", status: "current", closed: false },
+    ],
+    links: [
+      { id: "l1", type: "part_of", from: "b", to: "a" },
+      { id: "l2", type: "about", from: "c", to: "a" },
+    ],
+  };
+  const ids = (h: Parameters<typeof shown>[1]) => [...shown(input, h).items].sort().join("");
+  assert.equal(ids({}), "abcd");
+  assert.equal(ids({ types: ["work"] }), "cd");
+  assert.equal(ids({ statuses: ["work:done"] }), "acd");
+  assert.equal(ids({ kinds: ["work:no kind"] }), "acd");
+  assert.equal(ids({ closed: true }), "acd");
+  assert.equal(ids({ lone: true }), "abc");
+  // A link shows only with both ends, and its type not hidden.
+  assert.deepEqual([...shown(input, { types: ["question"] }).links], ["l1"]);
+  assert.deepEqual([...shown(input, { links: ["part_of"] }).links], ["l2"]);
+  const f = facets(input, { closed: true });
+  assert.deepEqual([f.items.shown, f.items.n], [3, 4]);
+  assert.deepEqual(f.types.find((t) => t.name === "work")?.statuses.map((s) => [s.name, s.n, s.shown]), [["done", 1, 0], ["todo", 1, 1]]);
+  assert.deepEqual([f.lone.n, f.closed.shown], [1, 0]);
+  // Switching twice is no change, and an emptied list goes.
+  assert.deepEqual(toggle(toggle({}, "types", "work"), "types", "work"), {});
+  assert.deepEqual(toggle({ lone: true }, "lone"), {});
+});

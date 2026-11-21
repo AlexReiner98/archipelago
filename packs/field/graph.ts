@@ -9,7 +9,7 @@ import type { Id } from "../../spec/common.ts";
 
 /** What the field draws: items and the links among them. No item belongs to a group: clusters come from the links. */
 export interface FieldIn {
-  items: { id: Id; title: string; type: string; status: string; closed: boolean }[];
+  items: { id: Id; title: string; type: string; status: string; closed: boolean; kind?: string }[];
   links: { id: Id; type: string; from: Id; to: Id }[];
 }
 
@@ -48,6 +48,8 @@ export interface G {
   a: Int32Array;
   b: Int32Array;
   kind: Int32Array;
+  /** Each link's id. */
+  linkId: Id[];
   /** Each particle's neighbours, as compressed rows. */
   adjStart: Int32Array;
   adj: Int32Array;
@@ -95,6 +97,7 @@ export function build(input: FieldIn, last: G | null): G {
     a: new Int32Array(m),
     b: new Int32Array(m),
     kind: new Int32Array(m),
+    linkId: links.map((l) => l.id),
     adjStart: new Int32Array(n + 1),
     adj: new Int32Array(2 * m),
     incident: Array.from({ length: n }, () => []),
@@ -189,9 +192,12 @@ export function sizes(g: G, S: Settings): void {
   for (let i = 0; i < g.n; i++) g.r[i] = S.node_size! * (1 + S.node_grow! * Math.log1p(g.degree[i]!));
 }
 
-export function bounds(g: G): [number, number, number, number] {
+/** The box round the particles; with `shown`, round those shown only (all of them if none is). */
+export function bounds(g: G, shown: Uint8Array | null = null): [number, number, number, number] {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  if (shown && !shown.includes(1)) shown = null;
   for (let i = 0; i < g.n; i++) {
+    if (shown && !shown[i]) continue;
     const x = g.x[i]!, y = g.y[i]!, r = g.r[i]!;
     if (x - r < x0) x0 = x - r;
     if (y - r < y0) y0 = y - r;
@@ -221,7 +227,8 @@ export function hue(k: number): string {
 /** A hashed grid of particles, for what is near a point. */
 export interface Grid {
   each(x0: number, y0: number, x1: number, y1: number, fn: (i: number) => void): void;
-  nearest(x: number, y: number, slack: number): number;
+  /** The particle under (x, y), within slack; `ok` leaves some out (hidden ones). */
+  nearest(x: number, y: number, slack: number, ok?: (i: number) => boolean): number;
 }
 export function grid(g: G, cellOf?: number): Grid {
   const [x0, y0, x1, y1] = bounds(g);
@@ -244,10 +251,11 @@ export function grid(g: G, cellOf?: number): Grid {
   };
   return {
     each,
-    nearest(x, y, slack) {
+    nearest(x, y, slack, ok) {
       let best = -1, bd = Infinity;
       const reach = cell;
       each(x - reach, y - reach, x + reach, y + reach, (i) => {
+        if (ok && !ok(i)) return;
         const d = Math.hypot(g.x[i]! - x, g.y[i]! - y) - g.r[i]!;
         if (d < slack && d < bd) {
           bd = d;

@@ -28,8 +28,15 @@ particle, it only lights what it finds and fades the rest (`query_fade`).
 - **It settles to the end.** The physics runs on its own loop (a message
   channel), in slices of `frame_ms`, until no behaviour has work left;
   animation frames only paint. A tab in the background settles as fast.
-- **Reading it.** A legend gives each type's colour and count, what faded
-  means (closed), a link, and the ring. The most linked items
+- **The legend is the filter** ([legend.ts](legend.ts), [filter.ts](filter.ts)).
+  Each type (with its colour), each of a type's statuses and kinds, open
+  and closed, items with no links, and each link type is a switch, with how
+  many the map has and how many show. Hidden items are not drawn and hold
+  their place, so the picture does not move; "lay out only what is shown"
+  settles a layout of what is left instead. What is hidden is `field.hide`
+  (page scope), so an agent can set it; the browser remembers it. Folded,
+  the legend is one line of type switches.
+- **Reading it.** Closed items are drawn faded. The most linked items
   (`label_hubs`) are named at any zoom. The run line says how far the run
   is. How particles, links and words are drawn keeps its values in
   `DRAW` ([paint.ts](paint.ts)), out of the panel.

@@ -25,7 +25,9 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import type { LinkInfo } from "../../spec/types.ts";
 import type { Dial } from "./behaviour.ts";
 import { field, type Field } from "./engine.ts";
-import { typeColours, type FieldIn, type Settings } from "./graph.ts";
+import type { FieldIn, Settings } from "./graph.ts";
+import { facets as facetsOf, shown, type Hide } from "./filter.ts";
+import { Legend, LEGEND_STYLE } from "./legend.ts";
 import { DRAW } from "./paint.ts";
 import { Panel, PANEL_STYLE, type Section } from "./panel.ts";
 import { BEHAVIOURS, RUN, defaults } from "./step.ts";
@@ -51,6 +53,8 @@ interface FindIndex {
 const DIALS = "field.dials";
 const QUERY = "find.query";
 const REMEMBER = "archipelago.field.dials";
+const HIDE = "field.hide";
+const REMEMBER_HIDE = "archipelago.field.hide";
 
 /** Where the field starts: what it draws, and where particles first lie. */
 const START: Dial[] = [
@@ -67,15 +71,9 @@ const STYLE = `
 .fl-side { width:min(380px, 40%); flex:none; border-left:1px solid var(--line); overflow:auto; scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--dim) 55%, transparent) transparent; }
 .fl-tip { position:absolute; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:3px 7px; max-width:320px; box-shadow:0 2px 8px rgb(0 0 0 / 12%); }
 .fl-tip .s { color:var(--dim); font-size:11px; }
-.fl-key { position:absolute; left:8px; bottom:6px; color:var(--dim); font-size:11px; background:color-mix(in srgb, var(--bg) 88%, transparent); padding:4px 8px; border-radius:3px; border:1px solid var(--line); display:flex; flex-wrap:wrap; gap:2px 12px; max-width:calc(100% - 32px); pointer-events:none; }
-.fl-key span { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
-.fl-key b { color:var(--fg); font-weight:600; }
-.fl-key i { display:inline-block; width:9px; height:9px; border-radius:50%; }
-.fl-key i.shut { opacity:0.3; background:var(--dim); }
-.fl-key i.ring { background:transparent; border:2px solid var(--pick); width:7px; height:7px; }
-.fl-key svg { width:20px; height:8px; }
 .fl-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); pointer-events:none; }
 ${PANEL_STYLE}
+${LEGEND_STYLE}
 `;
 
 const fieldPack: Pack = {
@@ -99,6 +97,15 @@ const fieldPack: Pack = {
     if (here.get(DIALS) === undefined) {
       const r = remembered();
       if (Object.keys(r).length) set.set(DIALS, r);
+    }
+    ctx.get<HereDeclare>("here.declare").declare({ key: HIDE, scope: "page", doc: "What the field's legend hides: types, type:status, type:kind, open, closed, links, lone; relay to lay out only what is shown." });
+    if (here.get(HIDE) === undefined) {
+      try {
+        const h = JSON.parse(localStorage.getItem(REMEMBER_HIDE) ?? "null");
+        if (h && typeof h === "object") set.set(HIDE, h);
+      } catch {
+        // Nothing kept.
+      }
     }
 
     const useHere = <T extends Json>(key: string): T | undefined => {
@@ -152,7 +159,7 @@ const fieldPack: Pack = {
       const shape = useMemo(() => JSON.stringify([result.items.map((r) => [r.id, r.fields.title, r.fields.status]), result.links.map((l) => l.id)]), [result]);
       const input = useMemo<FieldIn>(
         () => ({
-          items: result.items.map((r) => ({ id: r.id, title: String(r.fields.title ?? r.id), type: r.type, status: String(r.fields.status ?? ""), closed: index.closed(r) })),
+          items: result.items.map((r) => ({ id: r.id, title: String(r.fields.title ?? r.id), type: r.type, status: String(r.fields.status ?? ""), closed: index.closed(r), kind: typeof r.fields.kind === "string" ? r.fields.kind : "" })),
           links: result.links.map((l) => ({ id: l.id, type: l.type, from: l.from, to: l.to })),
         }),
         [shape],
@@ -170,8 +177,29 @@ const fieldPack: Pack = {
           engine.current = null;
         };
       }, []);
-      useEffect(() => engine.current?.input(input), [input]);
-      useEffect(() => engine.current?.found(found), [found, input]);
+      // What the legend hides: drawn nowhere and holding its place, or (relay) left out of the layout.
+      const hide = (useHere<Json>(HIDE) ?? {}) as Hide;
+      const hideKey = JSON.stringify(hide);
+      const vis = useMemo(() => shown(input, hide), [input, hideKey]);
+      const facets = useMemo(() => facetsOf(input, hide), [input, hideKey]);
+      const hiding = Object.keys(hide).some((k) => k !== "relay");
+      const laid = useMemo<FieldIn>(
+        () => (hide.relay && hiding ? { items: input.items.filter((it) => vis.items.has(it.id)), links: input.links.filter((l) => vis.links.has(l.id)) } : input),
+        [input, hide.relay && hiding ? hideKey : ""],
+      );
+      const setHide = (next: Hide | undefined) => {
+        const v = next && Object.keys(next).length ? next : undefined;
+        try {
+          if (v) localStorage.setItem(REMEMBER_HIDE, JSON.stringify(v));
+          else localStorage.removeItem(REMEMBER_HIDE);
+        } catch {
+          // This browser keeps nothing: the filter still holds for the page.
+        }
+        set.set(HIDE, v as Json | undefined);
+      };
+      useEffect(() => engine.current?.input(laid), [laid]);
+      useEffect(() => engine.current?.show(hiding && !hide.relay ? vis : null), [vis, laid]);
+      useEffect(() => engine.current?.found(found), [found, laid]);
 
       const last = useRef<Settings>(S);
       useEffect(() => {
@@ -191,7 +219,7 @@ const fieldPack: Pack = {
       useEffect(() => {
         const k = `${S.field_limit}`;
         if (k !== lastStart.current) (lastStart.current = k), engine.current?.reseed();
-      }, [input]);
+      }, [laid]);
 
       const setDial = (key: string, v: number | undefined) => {
         const next: Settings = { ...over };
@@ -209,13 +237,6 @@ const fieldPack: Pack = {
         }
         set.set(DIALS, Object.keys(next).length ? next : undefined);
       };
-
-      // The legend: each type's colour and count, then what faded, lines and the ring mean.
-      const legend = useMemo(() => {
-        const count = new Map<string, number>();
-        for (const it of input.items) count.set(it.type, (count.get(it.type) ?? 0) + 1);
-        return typeColours(input.items.map((it) => it.type)).map((t) => ({ ...t, n: count.get(t.name) ?? 0 }));
-      }, [input]);
 
       return html`
         <div class="fl">
@@ -241,13 +262,7 @@ const fieldPack: Pack = {
             <div class="fl-canvas">
               <canvas ref=${box} title="Click a particle to open it; drag a particle to move it; drag the sea to pan; wheel to zoom; double-click the sea to fit"></canvas>
               ${tip && html`<div class="fl-tip" style=${`left:${tip.x + 14}px; top:${tip.y + 12}px`}><div>${tip.title}</div><div class="s">${tip.sub}</div></div>`}
-              ${input.items.length > 0 &&
-              html`<div class="fl-key">
-                ${legend.map((t) => html`<span key=${t.name}><i style=${`background:${t.colour}`}></i><b>${t.name}</b> ${t.n}</span>`)}
-                <span><i class="shut"></i> closed</span>
-                <span><svg viewBox="0 0 20 8"><path d="M0 4H20" stroke="currentColor" stroke-width="1" /></svg> a link</span>
-                <span><i class="ring"></i> pointed at, with its links</span>
-              </div>`}
+              ${input.items.length > 0 && html`<${Legend} facets=${facets} hide=${hide} set=${setHide} />`}
               ${!result.items.length && html`<div class="fl-empty">${index.ready() ? "Nothing matches." : "Reading the map…"}</div>`}
             </div>
             ${picked && html`<div class="fl-side"><${Slot} name="map.side" /></div>`}

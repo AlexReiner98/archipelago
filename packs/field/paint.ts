@@ -103,7 +103,9 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
  * `match`: what the find line finds (1) and not (0), or null when it has no
  * words; what it does not find is drawn at `query_fade`.
  */
-export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, light: Light, ink: Ink, grid: Grid, size: { width: number; height: number; dpr: number }, match: Uint8Array | null = null): void {
+export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, light: Light, ink: Ink, grid: Grid, size: { width: number; height: number; dpr: number }, match: Uint8Array | null = null, vis: Uint8Array | null = null, lvis: Uint8Array | null = null): void {
+  // What the legend hides (vis per particle, lvis per link) is not drawn at all.
+  const hid = (i: number) => !!vis && !vis[i];
   const { width, height, dpr } = size;
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   c.globalAlpha = 1;
@@ -125,6 +127,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     for (let e = 0; e < g.m; e++) {
       if (g.kind[e] !== kind) continue;
       const a = g.a[e]!, b = g.b[e]!;
+      if (lvis && !lvis[e]) continue;
       if (match && (match[a]! && match[b]! ? 1 : 0) !== lit) continue;
       if (Math.max(g.x[a]!, g.x[b]!) < vx0 || Math.min(g.x[a]!, g.x[b]!) > vx1 || Math.max(g.y[a]!, g.y[b]!) < vy0 || Math.min(g.y[a]!, g.y[b]!) > vy1) continue;
       c.moveTo(g.x[a]!, g.y[a]!);
@@ -138,6 +141,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   c.strokeStyle = ink.accent;
   c.lineWidth = (S.link_width! * S.hover_links!) / cam.k;
   for (const i of shining) for (const e of g.incident[i]!) {
+    if (hid(i) || (lvis && !lvis[e])) continue;
     const j = g.a[e] === i ? g.b[e]! : g.a[e]!;
     if (j < i && shining.has(j)) continue;
     const s = Math.min(shine[i]!, shine[j]!);
@@ -155,7 +159,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
       if (!match && !hit) continue;
       c.globalAlpha = (shut ? S.closed_fade! : 1) * faint * (match && !hit ? S.query_fade! : 1);
       for (let i = 0; i < g.n; i++) {
-        if (g.typeIx[i] !== ty || g.closed[i] !== shut || !inView(i, g.r[i]!)) continue;
+        if (g.typeIx[i] !== ty || g.closed[i] !== shut || hid(i) || !inView(i, g.r[i]!)) continue;
         if (match && match[i] !== hit) continue;
         c.beginPath();
         c.arc(g.x[i]!, g.y[i]!, g.r[i]!, 0, 2 * Math.PI);
@@ -168,6 +172,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   for (let i = 0; i < g.n; i++) rmax = Math.max(rmax, g.r[i]!);
   const gap = S.collide_gap ?? 1;
   for (const i of shining) {
+    if (hid(i)) continue;
     const want = g.r[i]! * (1 + shine[i]! * (i === focus ? S.hover_grow! : S.hover_grow! / 3));
     let room = want;
     const reach = want + rmax + gap;
@@ -209,10 +214,10 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   const big: number[] = [];
   // What the find line finds, and the most linked (label_hubs), are named whatever their size.
   const hub = hubs(g, S.label_hubs!);
-  for (let i = 0; i < g.n; i++) if ((g.r[i]! * cam.k >= S.label_px! || match?.[i] || hub[i]) && inView(i, 0)) big.push(i);
+  for (let i = 0; i < g.n; i++) if (!hid(i) && (g.r[i]! * cam.k >= S.label_px! || match?.[i] || hub[i]) && inView(i, 0)) big.push(i);
   // The lit ones first, so the particle pointed at and its neighbours are always named; then what is found; then hubs.
   big.sort((p, q) => shine[q]! - shine[p]! || (match ? match[q]! - match[p]! : 0) || hub[q]! - hub[p]! || g.r[q]! - g.r[p]! || p - q);
-  for (const i of shining) if (!big.includes(i) && inView(i, 0)) big.unshift(i);
+  for (const i of shining) if (!hid(i) && !big.includes(i) && inView(i, 0)) big.unshift(i);
   let shown = 0;
   c.font = "11px ui-sans-serif, system-ui, sans-serif";
   for (const i of big) {
