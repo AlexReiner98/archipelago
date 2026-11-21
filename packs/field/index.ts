@@ -176,6 +176,8 @@ const fieldPack: Pack = {
         () => ({
           items: result.items.map((r) => ({ id: r.id, title: String(r.fields.title ?? r.id), type: r.type, status: String(r.fields.status ?? ""), closed: index.closed(r), kind: typeof r.fields.kind === "string" ? r.fields.kind : "" })),
           links: result.links.map((l) => ({ id: l.id, type: l.type, from: l.from, to: l.to })),
+          // Every type on the map, in one order: each keeps its colour whatever the legend hides.
+          types: [...new Set(result.items.map((r) => r.type))].sort(),
         }),
         [shape],
       );
@@ -189,7 +191,7 @@ const fieldPack: Pack = {
       const laid = useMemo<FieldIn>(() => {
         if (!Object.keys(hide).length) return input;
         const vis = shown(input, hide);
-        return { items: input.items.filter((it) => vis.items.has(it.id)), links: input.links.filter((l) => vis.links.has(l.id)) };
+        return { items: input.items.filter((it) => vis.items.has(it.id)), links: input.links.filter((l) => vis.links.has(l.id)), types: input.types };
       }, [input, hideKey]);
       const setHide = (next: Hide | undefined) => {
         const v = next && Object.keys(next).length ? (next as Json) : undefined;

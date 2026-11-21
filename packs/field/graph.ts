@@ -10,6 +10,11 @@ import type { Id } from "../../spec/common.ts";
 /** What the field draws: items and the links among them. No item belongs to a group: clusters come from the links. */
 export interface FieldIn {
   items: { id: Id; title: string; type: string; status: string; closed: boolean; kind?: string }[];
+  /**
+   * The order types take their colours in: the whole map's types, so a
+   * type keeps its colour whatever a filter leaves out. Absent, the items'.
+   */
+  types?: string[];
   links: { id: Id; type: string; from: Id; to: Id }[];
 }
 
@@ -64,7 +69,7 @@ export function build(input: FieldIn, last: G | null, pal: string[] = []): G {
   const items = input.items;
   const n = items.length;
   const at = new Map(items.map((it, i) => [it.id, i]));
-  const types = typeColours(items.map((it) => it.type), pal);
+  const types = typeColours(input.types ?? items.map((it) => it.type), pal);
   const typeNames = types.map((t) => t.name);
   const typeIx = new Map(typeNames.map((t, k) => [t, k]));
   const links = input.links.filter((l) => at.has(l.from) && at.has(l.to) && l.from !== l.to);

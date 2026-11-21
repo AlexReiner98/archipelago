@@ -144,3 +144,19 @@ test("titles: no two overlap, none leaves the view, none covers a particle, the 
   const big = place([{ i: 0, x: 200, y: 150, r: 50, w: 80, h: 14, inside: true }], { ...at, covers: () => true });
   assert.equal(big[0]?.within, true);
 });
+
+test("a type keeps its colour whatever the filter hides", async () => {
+  const { facets } = await import("../packs/field/filter.ts");
+  const item = (id: string, type: string) => ({ id, title: id, type, status: "", closed: false });
+  const whole: FieldIn = { items: [item("a", "actor"), item("b", "branch"), item("w", "work")], links: [], types: ["actor", "branch", "work"] };
+  const pal = ["red", "blue", "yellow"];
+  const colourOf = (g: ReturnType<typeof build>, type: string) => g.types[g.typeIx[g.idIx.get(type === "work" ? "w" : "b")!]!]!.colour;
+  const all = build(whole, null, pal);
+  // The filter leaves out actor: work and branch keep their colours.
+  const less = build({ ...whole, items: whole.items.filter((it) => it.type !== "actor") }, null, pal);
+  assert.equal(colourOf(less, "work"), colourOf(all, "work"));
+  assert.equal(colourOf(less, "branch"), colourOf(all, "branch"));
+  // The legend gives the same colours.
+  const f = facets(whole, { types: ["actor"] }, pal);
+  assert.equal(f.types.find((t) => t.name === "work")?.colour, colourOf(all, "work"));
+});
