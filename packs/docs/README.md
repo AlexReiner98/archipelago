@@ -1,7 +1,8 @@
 # docs
 
 What each running pack is for and what it adds, read from the packs
-themselves, never typed apart from them. The reference behind it holds
+themselves, never typed apart from them; and the Guide, read from the
+repository's own Markdown. The reference behind it holds
 what each loaded pack injects and provides (with the spec contract and
 edition of each key), the actions it declared and their inputs, the kinds
 of item it defines, the places its nodes speak at, the slots it declares
@@ -10,11 +11,15 @@ and fills, its config, its `about`, and whether it is built in.
 | File | Runs | What it is |
 |---|---|---|
 | [read.ts](read.ts) | both | `reference(runtime, sources)`: one entry per loaded pack, from the runtime's fibers, `action.list`, `types.read`, `agent.tree`, `slot.read` and the spec's capability lists; `activityOf` a run's events per pack |
-| [index.ts](index.ts) | server | The pack `docs`: provides `docs.read` (`packs()`, `watch(on)`), with items per kind (`graph.read`) and the newest run (`exchange.read`) |
+| [index.ts](index.ts) | server | The pack `docs`: provides `docs.read` (`packs()`, `watch(on)`, `guide()`, `chapter(path)`), with items per kind (`graph.read`) and the newest run (`exchange.read`) |
+| [files.ts](files.ts) | server | The guide's chapters from the files: `guide(root)` in order, `read(root, path)` one of them |
+| [markdown.ts](markdown.ts) | both | Markdown into blocks (`parse`, `inline`, `chapter`), and where a link points (`resolve`, `slug`) |
 | [tool.ts](tool.ts) | server | The pack `docs-tool`: the MCP tool `packs` (`mcp.host`), so agents read the same reference. No input: a line per pack; `pack`: its whole entry |
 | [view.ts](view.ts) | page | The pack `docs`: the read-only Packs view (`#docs`) |
 | [page.ts](page.ts) | page | A pack's own page: its sections, fills of `docs.page` |
 | [cards.ts](cards.ts) | page | What the view shows: one card per folder, its counts, the lists, what uses what, a state in words, an action's input in words |
+| [guide.ts](guide.ts) | page | The pack `guide`: the Guide view (`#guide`), and a section on each pack's page in Packs that opens its README |
+| [prose.ts](prose.ts) | page | Markdown blocks drawn as Preact, never set as markup |
 
 ## The Packs view
 
@@ -50,6 +55,31 @@ are any.
 - **Entries.** Each card holds its entries in each runtime's config tree
   (`entries`: id, side, off), read from `loader.tree`'s status by position,
   so a switch knows what to turn.
+
+## The Guide
+
+What a new person reads, from the files as the running server holds them,
+so it can't drift from them (`docs.read.guide()`, `docs.read.chapter(path)`).
+
+- **In order:** the path that [guide/README.md](../../guide/README.md)
+  lists (what Archipelago is, first run, concepts, writing a pack,
+  profiles and the harness, the spec), then the spec's contract docs in
+  the order [spec/README.md](../../spec/README.md) links them, then every
+  pack folder's README by name. Only those files can be read.
+- **No walls of text:** a chapter's lead is open; each `##` section is
+  folded to its first lines (one short paragraph starts open), and a click
+  opens it. Contents are one line each; at 640 px or less they are one
+  picker.
+- **Links stay in the Guide:** a link to another chapter opens it at its
+  heading (`guide.open`, a `here` key: `path#anchor`); one out of the
+  repository opens a tab; another file of the repository is named, not
+  opened.
+- **Linked with Packs:** a pack's README opens its page in Packs
+  (`docs.pack`); a pack's page there has a section, a fill of `docs.page`,
+  that opens its README here.
+- **Tested:** [test/guide.test.ts](../../test/guide.test.ts) holds the
+  order, the Markdown read, and that every link in every chapter resolves,
+  its heading included.
 
 ## How it reads
 

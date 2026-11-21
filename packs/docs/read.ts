@@ -59,6 +59,21 @@ export const KEY = "docs.read";
 export interface DocsRead {
   packs(): Promise<PackDoc[]>;
   watch(on: () => void): Dispose;
+  /** The guide's chapters in order: the path, the spec's contracts, then every pack folder's README (files.ts). */
+  guide(): Promise<GuideEntry[]>;
+  /** One chapter's Markdown as the file holds it now; a path the guide doesn't list is refused. */
+  chapter(path: string): Promise<string>;
+}
+
+/** A chapter of the guide: a Markdown file of this repository. */
+export interface GuideEntry {
+  /** The file, from the repository's root: `guide/first-run.md`, `packs/docs/README.md`. */
+  path: string;
+  title: string;
+  /** On the path a new person reads in order, a contract of the spec, or a pack's own README. */
+  part: "path" | "spec" | "pack";
+  /** For a pack's README: its folder, which is its card in the Packs view. */
+  pack?: string;
 }
 
 export interface PackDoc {
