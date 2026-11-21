@@ -65,7 +65,7 @@ const title = (r: RunInfo) => r.title ?? r.run.slice(0, 8);
 
 export const Legend = ({ runs, colour, acting, onOpen }: { runs: RunInfo[]; colour: Map<string, Token>; acting: Set<string>; onOpen(run: string): void }) => html`
   <div class="hv-legend">
-    ${!runs.length && html`<span class="none">No run is live.</span>`}
+    ${!runs.length && html`<span class="none">No run is live</span>`}
     ${runs.map((r) => html`<div class=${`r ${acting.has(r.run) ? "" : "quiet"}`} title=${`${r.title ?? r.run}\n${acting.has(r.run) ? "" : "Nothing since live opened · "}Look at it alone`} onClick=${() => onOpen(r.run)}>
       <span class="d" style=${`color:${v(colour.get(r.run) ?? "fg")}`}>●</span><span class="x">${short(title(r), 40)}</span>
     </div>`)}
@@ -90,7 +90,7 @@ export const LiveEvents = ({ runs, events, colour, titles, onPick }: LiveEventsP
     <div class="hv-pane">
       <div class="hv-head"><span class="t">Live</span><span class="hv-dim">${runs.length} runs</span></div>
       <div class="hv-body" ref=${body}>
-        ${!events.length && html`<div class="hv-empty">${runs.length ? "Their events show here as they come." : "No run is live."}</div>`}
+        ${!events.length && html`<div class="hv-empty" title=${runs.length ? "Their events show here as they come." : "A run is live from its start to its end."}>${runs.length ? "Nothing yet" : "No run is live"}</div>`}
         ${events.map((e) => {
           const r = byRun.get(e.run);
           const c = v(colour.get(e.run) ?? "dim");

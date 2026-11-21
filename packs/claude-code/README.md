@@ -122,6 +122,10 @@ SessionStart, which Claude Code runs only as a command:
 [hook.ts](hook.ts) forwards it. If the adapter isn't running, every hook
 says nothing and the agent carries on.
 
+`ARCHIPELAGO_TOKEN`, when set, goes with every post as `Authorization:
+Bearer`, for a server that takes a token. A map with no run yet shows what
+to copy, this server's own ([connect](../connect/README.md)).
+
 hook.ts adds `git_remote`: origin of the session's folder as
 `host/owner/name`, read where the session runs (no credentials leave). The
 run begins with it as its `remote` fact, so a server that can't see the

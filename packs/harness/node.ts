@@ -149,7 +149,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
     const info = nodes.find((n) => n.id === id);
     const record = hk.useVerdictData(() => (id ? verdicts.record(id) : Promise.resolve(undefined)), [id]);
     const list = hk.useVerdictData(() => (id ? verdicts.verdicts(id, { limit: 30 }).then((p) => p.items) : Promise.resolve([])), [id]);
-    if (!id) return html`<div class="hv-pane"><div class="hv-head"><span class="t">Node</span></div><div class="hv-empty">Pick a node.</div></div>`;
+    if (!id) return html`<div class="hv-pane"><div class="hv-head"><span class="t">Node</span></div><div class="hv-empty" title="Click a node in the tree: what it says, where, and how it went.">No node picked</div></div>`;
     return html`
       <div class="hv-pane">
         <div class="hv-head"><span class="t hv-cut" title=${info?.title ?? id}>${info?.title ?? id}</span></div>

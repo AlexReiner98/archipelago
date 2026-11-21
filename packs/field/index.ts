@@ -23,7 +23,7 @@ import htm from "htm";
 import type { Id, Json } from "../../spec/common.ts";
 import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
-import type { SlotFill } from "../../spec/slot.ts";
+import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
 import { onStyle, shape as shapeOf, SHAPES, sheet, side as sideOf, SIDES } from "../../spec/style.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import type { LinkInfo, TypeInfo } from "../../spec/types.ts";
@@ -59,6 +59,8 @@ interface FindIndex {
 }
 
 const DIALS = "field.dials";
+/** The slot under the empty state, on a map with no items. */
+const EMPTY = "field.empty";
 const QUERY = "find.query";
 const REMEMBER = "archipelago.field.dials";
 const HIDE = "field.hide";
@@ -78,7 +80,10 @@ const STYLE = sheet(`
 .fl-canvas canvas { width:100%; height:100%; display:block; cursor:grab; touch-action:none; }
 .fl-tip { position:absolute; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:3px 7px; max-width:320px; box-shadow:0 2px 8px rgb(0 0 0 / 12%); }
 .fl-tip .s { color:var(--dim); font-size:11px; }
-.fl-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); pointer-events:none; }
+.fl-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); pointer-events:none; padding:var(--space-5); }
+.fl-none { display:flex; flex-direction:column; align-items:center; gap:var(--space-5); }
+.fl-say { display:flex; gap:var(--space-3); align-items:baseline; white-space:nowrap; pointer-events:auto; }
+.fl-say::before { content:var(--glyph-circle-fresh); color:var(--mark-fresh); }
 ${PANEL_STYLE}
 ${LEGEND_STYLE}
 `);
@@ -103,7 +108,7 @@ const recall = (key: string): Json | undefined => {
 const fieldPack: Pack = {
   id: "field",
   about: "The Field view: the whole map as particles, settled by gather, repel, springs, flow and collide.",
-  inject: ["find.index", "here.read", "here.set", "here.declare", "slot.fill"],
+  inject: ["find.index", "here.read", "here.set", "here.declare", "slot.fill", "slot.declare", "slot.read"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");
     const here = ctx.get<HereRead>("here.read");
@@ -116,6 +121,9 @@ const fieldPack: Pack = {
       if (v && Object.keys(v).length) set.set(key, v);
     }
 
+
+    const Slot = ctx.get<SlotRead>("slot.read").Slot;
+    ctx.get<SlotDeclare>("slot.declare").declare({ name: EMPTY, merge: "many", doc: "Under Field's empty state, on a map with no items: what to do first (the connect pack fills it)." });
 
     /** The engine on the page now: the canvas makes it, the dials in `left` ask it. */
     let engineNow: Field | null = null;
@@ -269,7 +277,10 @@ const fieldPack: Pack = {
           <canvas ref=${box}></canvas>
           ${tip && html`<div class="fl-tip" style=${`left:${tip.x + 14}px; top:${tip.y + 12}px`}><div>${tip.title}</div><div class="s">${tip.sub}</div></div>`}
           ${input.items.length > 0 && html`<${Legend} facets=${facets} hide=${hide} set=${setHide} dials=${() => html`<${Dials} />`} />`}
-          ${!result.items.length && html`<div class="fl-empty">${index.ready() ? "Nothing to draw." : "Reading the map…"}</div>`}
+          ${!result.items.length && html`<div class="fl-empty">${index.ready()
+            ? html`<div class="fl-none"><div class="fl-say" title="Items come as agents and people add them.">Nothing on the map yet</div><${Slot} name=${EMPTY} /></div>`
+            : html`<div class="fl-say">Reading the map…</div>`}</div>`}
+          ${result.items.length > 0 && !laid.items.length && html`<div class="fl-empty"><div class="fl-say" title=${q.trim() ? "Find finds nothing here: change its words." : "The legend hides everything: open its filter."}>Nothing shown</div></div>`}
         </div>
       `;
     };

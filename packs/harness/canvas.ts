@@ -66,7 +66,8 @@ export const CANVAS_STYLE = sheet(`
 .rx-trail.k-say { stroke:${C.say}; fill:none; } .rx-trail.k-fail { stroke:${C.fail}; fill:none; } .rx-trail.k-write { stroke:${C.write}; fill:none; }
 .rx-key { position:absolute; left:10px; bottom:10px; padding:var(--space-3); background:color-mix(in srgb, var(--bg) 88%, transparent); border:1px solid var(--line); border-radius:var(--radius); font-size:var(--text-s); color:var(--dim); display:grid; grid-template-columns:auto 1fr; gap:var(--space-1) var(--space-3); align-items:center; pointer-events:none; }
 .rx-key svg { width:14px; height:10px; }
-.rx-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); pointer-events:none; }
+.rx-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--dim); pointer-events:none; white-space:nowrap; }
+.rx-empty::before { content:var(--glyph-circle-fresh); color:var(--mark-fresh); margin-right:var(--space-3); }
 `);
 
 /** Runs a light for an event; with a colour (a run's, when many are shown), in it rather than the event's tone. */
@@ -378,7 +379,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
         <circle class="rx-root" r=${S.root} />
         <g ref=${fxGroup}></g>
       </g></svg>
-      ${tree.order.length === 1 && html`<div class="rx-empty">No nodes to show.</div>`}
+      ${tree.order.length === 1 && html`<div class="rx-empty">No nodes</div>`}
       ${showKey && html`<${Key} hues=${hues} />`}
     </div>
   `;

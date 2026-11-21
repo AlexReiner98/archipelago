@@ -70,7 +70,8 @@ const STYLE = sheet(`
 .av-btn:hover { border-color:var(--dim); }
 .av-btn:disabled { opacity:.5; cursor:default; }
 .av-err { padding:0 var(--space-4) 0 calc(var(--space-4) + 2.6em); color:var(--failed); font-size:var(--text-s); white-space:normal; }
-.av-empty { padding:var(--space-4); color:var(--dim); }
+.av-empty { padding:var(--space-4); color:var(--dim); display:flex; gap:var(--space-3); align-items:baseline; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.av-empty::before { content:var(--glyph-circle-fresh); color:var(--mark-fresh); flex:none; }
 .av-more { margin:var(--space-3) var(--space-4); }
 .as { display:flex; gap:var(--space-5); align-items:baseline; white-space:nowrap; min-width:0; flex:1; }
 .as > span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
@@ -281,7 +282,7 @@ const activity: Pack = {
             ${hidden > 0 || quiet ? html`<button class="av-btn" onClick=${() => setQuiet(!quiet)} title="Runs that changed nothing">${quiet ? "hide quiet runs" : `+ ${hidden} quiet`}</button>` : ""}
           </div>
           <div class="av-body">
-            ${shown.length === 0 && html`<div class="av-empty">No runs or changes yet. When an agent changes the map, it shows here.</div>`}
+            ${shown.length === 0 && html`<div class="av-empty" title="When an agent runs or changes the map, it shows here, each change with its undo.">No runs or changes yet</div>`}
             ${shown.map((g) => html`<${GroupRows} key=${g.key} g=${g} now=${store.now} lit=${!!g.run && g.run.run === pinned} />`)}
             ${store.next && html`<button class="av-btn av-more" onClick=${() => void more()}>older changes</button>`}
           </div>
