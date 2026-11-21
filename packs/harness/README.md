@@ -1,7 +1,7 @@
 # harness
 
 The harness view: what the map says to an agent, what the agent does, and
-whether each thing said works. Fills `shell.main` with three panes, linked
+whether each thing said works. Fills the region `center` with three panes, linked
 through `here`.
 
 | Pane | Shows |

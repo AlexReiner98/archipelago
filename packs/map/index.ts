@@ -1,5 +1,5 @@
 /**
- * The map pack, page side: the canvas of a query, in the shell as the view
+ * The map pack, page side: the canvas of a query, in the region `center` as the view
  * "Map". One flat plane: the query is the whole surface (`find.query`,
  * drawn through `find.index`), each item one line with the mark of its
  * state, links as right-angled wires (layout.ts).
@@ -287,7 +287,7 @@ const map: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "shell.main", name: "map", title: "Map", view: View });
+    ctx.get<SlotFill>("slot.fill").fill({ slot: "center", name: "map", title: "Map", view: View });
   },
 };
 

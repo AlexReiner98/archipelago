@@ -86,6 +86,8 @@ export const SPACE: Tokens = {
   "space-4": "10px",
   "space-5": "16px",
   radius: "3px",
+  "frame-left": "260px",
+  "frame-right": "360px",
 };
 
 /** Each shape at each side: hollow, half, full, and full again (a later closed status is told by its colour). */

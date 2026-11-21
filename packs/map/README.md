@@ -1,6 +1,6 @@
 # map
 
-Page side: the canvas of a query, the view "Map" in the shell. One flat
+Page side: the canvas of a query, the view "Map" in the region `center`. One flat
 plane; the query (`find.query`) is the whole surface.
 
 - An item is one line with the mark of its state; links are right-angled

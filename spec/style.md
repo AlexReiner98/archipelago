@@ -33,6 +33,7 @@ and font, and the page still reads.
 | Controls | `control` `control-fg` `control-line` |
 | Type | `font` `mono` `text-xs` `text-s` `text-m` `text` `text-l` `leading` `bold` |
 | Space | `space-1` … `space-5` `radius` |
+| Frame | `frame-left` `frame-right`: the widths of those regions (edition 7, [frame](frame.md)) |
 | Glyphs | `glyph-<shape>-<side>`, `glyph-<verdict>` |
 
 ## Marks

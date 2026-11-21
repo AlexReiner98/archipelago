@@ -105,6 +105,9 @@ export const TOKENS = {
   "space-4": "10px",
   "space-5": "16px",
   radius: "3px",
+  // The frame's regions (edition 7).
+  "frame-left": "260px",
+  "frame-right": "360px",
   // Marks.
   ...plainGlyphs,
 } as const satisfies Record<string, string>;
@@ -142,5 +145,5 @@ export function read(name: Token, el?: Element): string {
   return /^".*"$/.test(value) ? value.slice(1, -1) : value;
 }
 
-/** The token vocabulary, edition 6. */
+/** The token vocabulary, edition 6; the frame's widths, edition 7. */
 export const terms: Term[] = [{ term: "style", doc: "Tokens as CSS custom properties on the page's root: colours, type, space and marks.", since: 6 }];

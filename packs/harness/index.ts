@@ -1,6 +1,6 @@
 /**
  * The harness view: what the map says to an agent, what the agent does,
- * and whether each thing said works. Three panes in `shell.main`, linked
+ * and whether each thing said works. Three panes in the region `center`, linked
  * through `here`:
  *
  * - Tree: every node that can be said, by place or by pack, each with its
@@ -646,7 +646,7 @@ const harness: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "shell.main", name: "view", title: "Harness", view: View });
+    ctx.get<SlotFill>("slot.fill").fill({ slot: "center", name: "view", title: "Harness", view: View });
   },
 };
 
