@@ -175,7 +175,8 @@ test("every pack in this repository says what it is for, in one sentence", async
   for (const dir of await readdir(root)) {
     for (const file of await readdir(new URL(`${dir}/`, root)).catch(() => [] as string[])) {
       if (!file.endsWith(".ts")) continue;
-      const src = await readFile(new URL(`${dir}/${file}`, root), "utf8");
+      // Line ends as LF, whatever the checkout wrote (CRLF on Windows).
+      const src = (await readFile(new URL(`${dir}/${file}`, root), "utf8")).replace(/\r\n/g, "\n");
       // A pack object: its id at the top level of an object literal, two spaces in.
       for (const m of src.matchAll(/^ {2}id: "([a-z-]+)",\n(?! {2}about: "[A-Z][^"\n]*\.",\n)/gm)) missing.push(`${dir}/${file} (${m[1]})`);
       packs += [...src.matchAll(/^ {2}id: "[a-z-]+",\n {2}about: /gm)].length;
