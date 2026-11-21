@@ -50,12 +50,12 @@ const start = (run: string, cwd: string) => ({ run, agent: { id: "e_agent", kind
 test("a remote the start gave is used where git can't see the folder (a hosted server)", async () => {
   const { errors, run, read, loader } = await setup({ "C:/here": { url: "https://github.com/a/other.git", branch: "main" } });
   // The folder is on another machine: git finds nothing, the hook's remote is the repository.
-  const a = await run.begin({ ...start("r1", "C:/elsewhere"), facts: { remote: "github.com/AlexReiner98/archipelago-next" } });
-  assert.equal(a.facts?.remote, "github.com/AlexReiner98/archipelago-next");
+  const a = await run.begin({ ...start("r1", "C:/elsewhere"), facts: { remote: "github.com/example/archipelago-next" } });
+  assert.equal(a.facts?.remote, "github.com/example/archipelago-next");
   const [item] = await read.get([String(a.facts?.repo)]);
-  assert.equal(item?.fields.remote, "github.com/AlexReiner98/archipelago-next");
+  assert.equal(item?.fields.remote, "github.com/example/archipelago-next");
   // Given wins over the folder's own origin, and a url is read as a remote.
-  const b = await run.begin({ ...start("r2", "C:/here"), facts: { remote: "git@GitHub.com:AlexReiner98/archipelago-next.git" } });
+  const b = await run.begin({ ...start("r2", "C:/here"), facts: { remote: "git@GitHub.com:example/archipelago-next.git" } });
   assert.equal(b.facts?.repo, a.facts?.repo);
   assert.equal(b.facts?.branch, "main");
   // Not a remote: git reads the folder as before.
@@ -77,22 +77,22 @@ test("given remotes: urls and host/owner/name; nothing else", () => {
 });
 
 test("remotes read alike from https, ssh and scp forms", () => {
-  assert.equal(normalRemote("https://github.com/AlexReiner98/archipelago-next.git"), "github.com/AlexReiner98/archipelago-next");
-  assert.equal(normalRemote("git@github.com:AlexReiner98/archipelago-next.git"), "github.com/AlexReiner98/archipelago-next");
-  assert.equal(normalRemote("ssh://git@GitHub.com/AlexReiner98/Aperture"), "github.com/AlexReiner98/Aperture");
+  assert.equal(normalRemote("https://github.com/example/archipelago-next.git"), "github.com/example/archipelago-next");
+  assert.equal(normalRemote("git@github.com:example/archipelago-next.git"), "github.com/example/archipelago-next");
+  assert.equal(normalRemote("ssh://git@GitHub.com/example/Studio"), "github.com/example/Studio");
   assert.equal(normalRemote("https://user:token@github.com/a/b.git"), "github.com/a/b");
   assert.equal(normalRemote(""), undefined);
 });
 
 test("a run's facts carry its remote, branch and repo item; worktrees of one remote share the item", async () => {
-  const url = "https://github.com/AlexReiner98/archipelago-next.git";
+  const url = "https://github.com/example/archipelago-next.git";
   const { errors, run, read, loader } = await setup({
     "C:/main": { url, branch: "main" },
-    "C:/worktree": { url: "git@github.com:AlexReiner98/archipelago-next.git", branch: "lane" },
+    "C:/worktree": { url: "git@github.com:example/archipelago-next.git", branch: "lane" },
     "C:/plain": {},
   });
   const a = await run.begin(start("r1", "C:/main"));
-  assert.equal(a.facts?.remote, "github.com/AlexReiner98/archipelago-next");
+  assert.equal(a.facts?.remote, "github.com/example/archipelago-next");
   assert.equal(a.facts?.branch, "main");
   const [item] = await read.get([String(a.facts?.repo)]);
   assert.equal(item?.type, "repo");

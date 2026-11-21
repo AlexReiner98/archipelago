@@ -1,13 +1,13 @@
 /**
  * slot: UI composition. See slot.md.
  *
- * Panels are Preact function components (Alex, 20 Nov 2026). The graph is
+ * Panels are Preact function components (20 Nov 2026). The graph is
  * not drawn with components: it is one scene surface that packs fill with
  * layers (scene.ts).
  */
 import type { JsonSchema } from "./action.ts";
 import type { FunctionComponent } from "preact";
-import type { Capability, Dispose, PackId } from "./common.ts";
+import type { Capability, Dispose, Json, PackId } from "./common.ts";
 
 /**
  * A component: what a pack puts in a slot. A Preact function component,
@@ -38,10 +38,17 @@ export interface SlotDef {
 }
 
 export interface FillDef<P = Record<string, unknown>> {
+  /** A region (`REGIONS`) or a slot a pack declared. */
   slot: string;
   /** Unique within the pack, stable across reloads. */
   name: string;
+  /** What a frame shows for it: a tab, a heading. */
   title?: string;
+  /**
+   * Shown only while `here` matches, every key: a value matches that
+   * value, `true` matches any value set. Edition 7.
+   */
+  when?: Record<string, Json>;
   view: View<P>;
 }
 
@@ -50,8 +57,25 @@ export interface FillInfo extends Omit<FillDef, "view"> {
   pack: PackId;
 }
 
-/** The one slot the spec declares: the renderer mounts the fill of `root`. */
+/** The renderer mounts the fill of `root`: the frame. */
 export const ROOT = "root";
+
+/**
+ * The six regions of the page (frame.md, edition 7): places with no role.
+ * Reserved like `root` and declared by the broker, each `many`. A frame
+ * fills `root` and decides how a region's fills share it.
+ */
+export const REGIONS = ["top", "left", "center", "right", "bottom", "over"] as const;
+export type Region = (typeof REGIONS)[number];
+
+/**
+ * Where fills show, as config of the broker (edition 7), keyed by
+ * `pack/name`: a region or slot moves the fill there, `"off"` hides it.
+ */
+export type Arrange = Record<string, string>;
+
+/** A fill's key in `Arrange` and in `here.view`. */
+export const fillKey = (f: { pack: PackId; name: string }): string => `${f.pack}/${f.name}`;
 
 /** `slot.declare`. */
 export interface SlotDeclare {
@@ -67,11 +91,19 @@ export interface SlotFill {
 
 /** `slot.read`: what the renderer reads, and a view of the UI's own structure. */
 export interface SlotRead {
-  /** What shows in a slot now, in order (one entry for `one`). */
+  /**
+   * What shows in a slot now, in order (one entry for `one`): arranged
+   * into it, and its `when` matching.
+   */
   fills(slot: string): (FillDef & FillInfo)[];
+  /**
+   * Draws a slot's fills in order, and redraws when they change. The one
+   * every pack and frame uses for a hole in its own UI (edition 7).
+   */
+  Slot: View<{ name: string }>;
   /** Every slot declared now, with the pack that declared it. */
   slots(): (SlotDef & { pack: PackId })[];
-  /** Calls `on` when a slot's fills change. */
+  /** Calls `on` when a slot's fills change, `when` included. */
   watch(slot: string, on: () => void): Dispose;
 }
 
@@ -84,5 +116,5 @@ export interface Capabilities {
 export const capabilities: Capability[] = [
   { key: "slot.declare", since: 1, doc: "Declares a place in the UI that packs can fill." },
   { key: "slot.fill", since: 1, doc: "Puts a component in a slot." },
-  { key: "slot.read", since: 1, doc: "What fills each slot now, in order, and when that changes." },
+  { key: "slot.read", since: 1, doc: "What fills each slot now, in order, and when that changes; the shared Slot." },
 ];

@@ -14,7 +14,8 @@
 import type { Id } from "../../spec/common.ts";
 import type { Dial } from "./behaviour.ts";
 import { bounds, build, grid, seed, sizes, type FieldIn, type G, type Grid, type Settings } from "./graph.ts";
-import { ink, Light, paint, type Cam, type Ink } from "./paint.ts";
+import { onStyle } from "../../spec/style.ts";
+import { ink, Light, paint, palette, type Cam, type Ink } from "./paint.ts";
 import { step, warm } from "./step.ts";
 
 export interface Stats {
@@ -56,6 +57,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   const cam: Cam & { moved: boolean } = { k: 1, tx: 0, ty: 0, moved: false };
   const light = new Light();
   let colours: Ink = ink(canvas);
+  let pal = palette(canvas);
   let hover = -1, dirty = true, awake = false, stopped = false;
   let foundIds: Set<Id> | null = null, match: Uint8Array | null = null;
   const remark = () => {
@@ -235,8 +237,15 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   });
   resize.observe(canvas);
   const scheme = matchMedia("(prefers-color-scheme: dark)");
-  const recolour = () => ((colours = ink(canvas)), (dirty = true));
+  // The style's tokens again, on a new theme or a new style: the inks, and each type's hue.
+  const recolour = () => {
+    colours = ink(canvas);
+    pal = palette(canvas);
+    g.types.forEach((t, k) => (t.colour = pal[k] ?? t.colour));
+    dirty = true;
+  };
   scheme.addEventListener("change", recolour);
+  const unstyle = onStyle(recolour);
   canvas.addEventListener("pointermove", onMove);
   canvas.addEventListener("pointerdown", onDown);
   canvas.addEventListener("pointerup", onUp);
@@ -248,7 +257,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   return {
     input(next, warmTo) {
       const first = !g.n;
-      g = build(next, g.n ? g : null);
+      g = build(next, g.n ? g : null, pal);
       seed(g, S);
       if (first) g.sim = { alpha: 1, steps: 0 };
       else warm(g, S, warmTo);
@@ -300,6 +309,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       chan.port1.close();
       resize.disconnect();
       scheme.removeEventListener("change", recolour);
+      unstyle();
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointerup", onUp);

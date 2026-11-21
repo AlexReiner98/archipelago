@@ -4,6 +4,7 @@ import type { Caller, Dispose } from "../spec/common.ts";
 import { byPosition } from "../spec/common.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader, move, type Entry } from "../runtime/loader.ts";
+import type { LoaderTree } from "../spec/loader.ts";
 
 const BASE = "mem:/packs/";
 
@@ -143,7 +144,7 @@ test("an entry's intercept reaches providers as the actor and run, updated in pl
     },
   };
   const { loader } = setup({ "who.ts": who, "asker.ts": asker });
-  const actor = { id: "e_alex", kind: "person" };
+  const actor = { id: "e_owner", kind: "person" };
   await loader.apply([
     { id: "who", pack: "who.ts" },
     { id: "page", intercept: { actor }, children: [{ id: "asker", pack: "asker.ts" }] },
@@ -173,7 +174,23 @@ test("a module that fails to import is reported and the rest still load", async 
       ["gone", "failed"],
     ],
   );
-  assert.deepEqual(rt.keys(), ["demo.words"]);
+  assert.deepEqual(rt.keys(), ["loader.tree", "demo.words"], "the loader's own key, and the pack's");
+});
+
+test("loader.tree: a pack reads the tree and the template, edits it, and hears each change", async () => {
+  const { rt, loader } = setup({ "words.ts": words, "speaker.ts": speaker });
+  await loader.apply([
+    { id: "words", pack: "words.ts" },
+    { id: "a", pack: "speaker.ts", config: { words: ["a"] } },
+  ]);
+  const lt = rt.root.get<LoaderTree>("loader.tree");
+  let heard = 0;
+  lt.watch(() => heard++);
+  await lt.edit((t) => (t.find((e) => e.id === "a")!.disabled = true, t));
+  assert.equal(heard, 1);
+  assert.equal(lt.tree().find((e) => e.id === "a")!.disabled, true);
+  assert.equal(lt.base().find((e) => e.id === "a")!.disabled, undefined, "the template is as the host started it");
+  assert.deepEqual(lt.status().map((s) => [s.id, s.state]), [["words", "active"], ["a", "off"]]);
 });
 
 test("status says off for a disabled entry, and waiting with what it misses", async () => {

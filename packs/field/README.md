@@ -1,6 +1,6 @@
 # field
 
-Page side: the map as particles, the view "Field" in the shell, beside
+Page side: the map as particles, the view "Field" in the frame's `center`, beside
 "Map". Each item is a particle in its type's colour, and links are faint
 lines. It always lays out the whole map,
 open and closed, up to `field_limit` items: the find line never moves a
@@ -20,7 +20,7 @@ particle, it only lights what it finds and fades the rest (`query_fade`).
   `{ name, doc, on, dials, apply, move?, busy?, firm? }`
   ([behaviour.ts](behaviour.ts)).
 - **Every number is a dial.** Each behaviour's dials, then the start, the
-  run, are in the panel on the left, in sections that
+  run, are in the frame's `left` while Field shows, in sections that
   start closed and say how many of their dials are changed; springs are
   grouped by link type. Each dial says what it does on hover, and ↺ puts
   it back. Their values are `field.dials`
@@ -43,7 +43,7 @@ particle, it only lights what it finds and fades the rest (`query_fade`).
   `DRAW` ([paint.ts](paint.ts)), out of the panel.
 - **Hover** lights a particle, its links and its neighbours, dims the rest,
   and names them ([paint.ts](paint.ts)). A click sets `here.item`; the
-  item page opens beside (`map.side`). Drag a particle to move it (it
+  item page opens in `right` (find and item fill for Field as for Map). Drag a particle to move it (it
   settles again when let go), drag the sea to pan, wheel to zoom,
   double-click the sea to fit. While it settles the view eases after the
   picture (`follow_ms`) instead of jumping to fit it. ([engine.ts](engine.ts))

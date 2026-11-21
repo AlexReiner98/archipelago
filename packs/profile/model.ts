@@ -3,7 +3,7 @@
  * profile holds, and whether a run hears a node. index.ts keeps the model
  * from the graph and wires it to the agent pack.
  *
- * Decided with Alex (20 Nov 2026, "How does a run find its profiles,
+ * Decided (20 Nov 2026, "How does a run find its profiles,
  * safely?", all five):
  * - Places link to profiles: a run is in a profile when one of its fact
  *   values is the id of an item linked to it by `uses` (a repo, a hub), or

@@ -143,7 +143,7 @@ export class Refused extends Error {
 export type Edition = number;
 
 /** The edition these files are. */
-export const EDITION: Edition = 5;
+export const EDITION: Edition = 7;
 
 /**
  * A capability: one key in the Cordis context, and what it means. A pack

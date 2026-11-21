@@ -1,6 +1,6 @@
 # written
 
-The map writes the skills and memory files the harness loads (Alex, 20 Nov
+The map writes the skills and memory files the harness loads (20 Nov
 2026: adopting the map means putting your skills into it). Adopting a file
 makes it a node on the map, said at the place the harness loads it; from
 then on the file is written from the node's words, so a change through

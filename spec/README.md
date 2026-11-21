@@ -2,7 +2,7 @@
 
 The interfaces packs talk through. Any pack can be replaced; these can't
 be changed silently. Each contract is a TypeScript module (the types) and a
-short doc. This is **edition 1, in draft**, while Alex shapes it.
+short doc. This is **edition 1, in draft**, while its owner shapes it.
 
 | Contract | Capabilities | What it is |
 |---|---|---|
@@ -11,22 +11,29 @@ short doc. This is **edition 1, in draft**, while Alex shapes it.
 | [agent](agent.md) | `agent.node` `agent.tree` `agent.run` | Say, refuse, act. Places, nodes, runs |
 | [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event per say, refusal and act |
 | [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` | UI composition: places in the UI that packs fill |
+| [frame](frame.md) | (regions) | The page's six regions; a frame is a pack |
+| [loader](loader.md) | `loader.tree` | The config tree: read, watch, edit |
 | [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | Large graphs: one WebGL2 surface, filled with layers |
 | [here](here.md) | `here.declare` `here.read` `here.set` | Shared ephemeral state: what is being looked at |
 | [types](types.md) | `types.define` `types.read` | Bases, flavours that add fields, and kinds of link |
 | [profile](profile.md) | `profile.read` | Which runs a node is for |
 | [changeset](changeset.md) | (a format) | A change in full: header and facts `[op, id, field, value]` |
+| [style](style.md) | (tokens) | The look views share: colours, type, space and marks |
 
 [common.ts](common.ts) holds the shared words; [index.ts](index.ts) puts
 every capability's key and type in one map for a runtime to declare.
 
-Decided with Alex: panels are Preact, the graph is one WebGL2 scene
+Decided: panels are Preact, the graph is one WebGL2 scene
 surface, and the spec owns the six places of edition 1 and edition 2's
 `skill:` and `memory:`, where the map speaks through the files it writes.
 Edition 3 adds the place `compact` and the person's acts, `decision` and
 `notice` ([agent](agent.md)). Edition 4 says a node's same words once per
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
 ([agent](agent.md)), and the read side of profiles ([profile](profile.md)).
+Edition 6 adds the style tokens every view draws with ([style](style.md)).
+Edition 7 adds the page's six regions, a fill's `when`, the broker's
+`arrange`, the shared `Slot` and `here.view` ([frame](frame.md)), and
+`loader.tree`, the config tree as a capability ([loader](loader.md)).
 
 ## Packs ask for capabilities
 

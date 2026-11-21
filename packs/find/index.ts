@@ -23,6 +23,7 @@ import type { SlotFill } from "../../spec/slot.ts";
 import type { LinkInfo, TypeInfo, TypesRead } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { closed, run, type Index, type Result, type Row, type Wire } from "./query.ts";
+import { sheet } from "../../spec/style.ts";
 
 export { parse, run, closed } from "./query.ts";
 export type { Result, Row, Wire } from "./query.ts";
@@ -48,11 +49,11 @@ export interface FindIndex {
   watch(on: () => void): Dispose;
 }
 
-const STYLE = `
-.fd { display:flex; align-items:center; gap:6px; flex:1; min-width:0; }
-.fd input { flex:1; min-width:0; font:inherit; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:2px 6px; }
+const STYLE = sheet(`
+.fd { display:flex; align-items:center; gap:var(--space-3); flex:1; min-width:0; }
+.fd input { flex:1; min-width:0; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-1) var(--space-3); }
 .fd .n { color:var(--dim); white-space:nowrap; font-variant-numeric:tabular-nums; }
-`;
+`);
 
 const find: Pack = {
   id: "find",
@@ -193,7 +194,10 @@ const find: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "map.bar", name: "find", title: "Find", view: Line });
+    // Wherever the query is drawn: Map, and Field (which lights what it finds).
+    const fill = ctx.get<SlotFill>("slot.fill");
+    fill.fill({ slot: "top", name: "find", title: "Find", when: { "here.view": "map/map" }, view: Line });
+    fill.fill({ slot: "top", name: "find-field", title: "Find", when: { "here.view": "field/field" }, view: Line });
   },
 };
 

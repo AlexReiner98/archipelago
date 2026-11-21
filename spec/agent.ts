@@ -1,13 +1,13 @@
 /**
  * agent: say, refuse, act. See agent.md.
  *
- * The spec owns the place vocabulary. Edition 1 has six places (Alex,
- * 20 Nov 2026): the ones an adapter can both reach and speak at. Edition 2
- * adds `skill:` and `memory:` (Alex, 20 Nov 2026), where the map speaks
- * through the files it writes. Edition 3 (Alex, 20 Nov 2026) adds `compact`
- * and the person's acts, `decision` and `notice`. Edition 4 (Alex, 20 Nov
+ * The spec owns the place vocabulary. Edition 1 has six places (20 Nov
+ * 2026): the ones an adapter can both reach and speak at. Edition 2
+ * adds `skill:` and `memory:` (20 Nov 2026), where the map speaks
+ * through the files it writes. Edition 3 (20 Nov 2026) adds `compact`
+ * and the person's acts, `decision` and `notice`. Edition 4 (20 Nov
  * 2026) adds a node's `repeat` and a moment's `again`: the same words are
- * said once per context. Edition 5 (Alex, 20 Nov 2026) adds a run's
+ * said once per context. Edition 5 (20 Nov 2026) adds a run's
  * `facts`, which any pack can add to (`agent.facts`), and a gate where a
  * pack says "not this node for this run" (`agent.gate`).
  */
@@ -33,11 +33,11 @@ export const PLACES: (Term & { refusable: boolean })[] = [
   { term: "tool_result:<name>", since: 1, refusable: false, doc: "A tool has returned; what it returned is the moment's input." },
   { term: "file:<path>", since: 1, refusable: true, doc: "A tool is about to touch that file; reached with its tool:." },
   { term: "reply_end", since: 1, refusable: true, doc: "The agent is about to finish its reply; refusing keeps it going." },
-  // Edition 2 (Alex, 20 Nov 2026): skills and memory are written by the map,
+  // Edition 2 (20 Nov 2026): skills and memory are written by the map,
   // so the map speaks there through the files the harness loads.
   { term: "skill:<name>", since: 2, refusable: false, doc: "The harness loads a skill's text, which the map wrote; what it loaded is the moment's input." },
   { term: "memory:<scope>/<path>", since: 2, refusable: false, doc: "The harness loads a memory file (scope: project, local, user, auto, managed; `~` for home), which the map wrote; what it loaded is the moment's input." },
-  // Edition 3 (Alex, 20 Nov 2026): every way an agent and the map meet is modelled.
+  // Edition 3 (20 Nov 2026): every way an agent and the map meet is modelled.
   { term: "compact", since: 3, refusable: false, doc: "The harness is about to compact the run's context: what was said before is gone from it, so a node said again after is a re-saying. The moment's input says what started it (`trigger`)." },
 ];
 

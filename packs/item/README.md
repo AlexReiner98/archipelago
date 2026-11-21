@@ -1,6 +1,6 @@
 # item
 
-Page side: one page per item, in `map.side`, for the item `here.item`
+Page side: one page per item, in the region `right` while Map or Field shows, for the item `here.item`
 names. Title and status, the fields it has (each one line, by its kind),
 its note, and its links one line each; a link opens the item at its other
 end. `inside` and `around` set the query to draw it with its parts or its

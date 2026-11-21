@@ -49,7 +49,7 @@ function setup() {
   return { rt, loader, errors, as };
 }
 
-const tree = (file?: string, seed = [{ title: "Spec", kind: "reflex", at: ["file:spec/**"], words: "Ask Alex first." }]): Entry[] => [
+const tree = (file?: string, seed = [{ title: "Spec", kind: "reflex", at: ["file:spec/**"], words: "Ask Owner first." }]): Entry[] => [
   { id: "graph", pack: "graph.ts", config: { db: file } },
   { id: "action", pack: "action.ts" },
   { id: "exchange", pack: "exchange.ts" },
@@ -69,21 +69,21 @@ test("a seeded node speaks its words; an edit through words.set is what the next
   assert.ok(node?.source && node.id === `words/${node.source}`);
 
   const first = await p.run.reach({ run: "r1", places: ["tool:Edit", "file:spec/agent.ts"], time: T });
-  assert.deepEqual(first.said.map((s) => s.text), ["Ask Alex first."]);
+  assert.deepEqual(first.said.map((s) => s.text), ["Ask Owner first."]);
 
-  const person = as({ id: "person:alex", kind: "person" });
-  const out = await person.invoke.invoke({ action: "words.set", input: { node: node.source, words: "spec/ is Alex's." }, authority: { of: "human", basis: "test" }, reason: "edit" });
+  const person = as({ id: "person:owner", kind: "person" });
+  const out = await person.invoke.invoke({ action: "words.set", input: { node: node.source, words: "spec/ is Owner's." }, authority: { of: "human", basis: "test" }, reason: "edit" });
   assert.ok(out.ok);
   assert.ok(out.ok && out.committed);
   if (out.ok) {
-    assert.deepEqual(out.committed!.header.actor, { id: "person:alex", kind: "person" });
+    assert.deepEqual(out.committed!.header.actor, { id: "person:owner", kind: "person" });
     assert.equal(out.committed!.header.pack.id, "words");
     assert.equal(out.committed!.header.action, "words.set");
-    assert.deepEqual(out.committed!.facts, [["-", node.source, "words", "Ask Alex first."], ["+", node.source, "words", "spec/ is Alex's."]]);
+    assert.deepEqual(out.committed!.facts, [["-", node.source, "words", "Ask Owner first."], ["+", node.source, "words", "spec/ is Owner's."]]);
   }
 
   const next = await p.run.reach({ run: "r1", places: ["file:spec/agent.ts"], time: T });
-  assert.deepEqual(next.said.map((s) => s.text), ["spec/ is Alex's."]);
+  assert.deepEqual(next.said.map((s) => s.text), ["spec/ is Owner's."]);
   await loader.apply([]);
 });
 

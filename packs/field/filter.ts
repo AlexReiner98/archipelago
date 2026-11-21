@@ -65,7 +65,7 @@ export function shown(input: FieldIn, hide: Hide): { items: Set<Id>; links: Set<
 }
 
 /** The map's types, statuses, kinds, sides and link types, each counted in all and as shown. */
-export function facets(input: FieldIn, hide: Hide): Facets {
+export function facets(input: FieldIn, hide: Hide, pal: string[] = []): Facets {
   const { items, links } = shown(input, hide);
   const count = <K>(m: Map<K, Count>, key: K, name: string, on: boolean) => {
     let c = m.get(key);
@@ -94,7 +94,7 @@ export function facets(input: FieldIn, hide: Hide): Facets {
   }
   const linkCounts = new Map<string, Count>();
   for (const l of input.links) count(linkCounts, l.type, l.type, links.has(l.id));
-  const colours = typeColours(input.items.map((it) => it.type));
+  const colours = typeColours(input.items.map((it) => it.type), pal);
   const byN = (a: Count, b: Count) => b.n - a.n || (a.name < b.name ? -1 : 1);
   return {
     types: colours.map(({ name, colour }) => ({

@@ -14,7 +14,7 @@ import { askText } from "../packs/grow/index.ts";
 
 const BASE = "mem:/packs/";
 const probe: Pack = { id: "probe", inject: ["agent.run", "agent.tree", "action.invoke"], apply() {} };
-const ALEX = { id: "person:owner", kind: "person" as const };
+const OWNER = { id: "person:owner", kind: "person" as const };
 const AGENT = { id: "claude-code", kind: "agent" as const };
 
 async function setup() {
@@ -26,8 +26,8 @@ async function setup() {
   const tree: Entry[] = ["graph", "action", "exchange", "agent", "words", "since", "probe"].map((id) => ({ id, pack: `${id}.ts` }));
   await loader.apply(tree);
   await rt.settle();
-  const as = (actor: typeof ALEX | typeof AGENT, run?: string) => loader.fiber("probe")!.ctx.intercept({ actor, ...(run ? { run } : {}) });
-  const add = (actor: typeof ALEX | typeof AGENT, title: string, run?: string) =>
+  const as = (actor: typeof OWNER | typeof AGENT, run?: string) => loader.fiber("probe")!.ctx.intercept({ actor, ...(run ? { run } : {}) });
+  const add = (actor: typeof OWNER | typeof AGENT, title: string, run?: string) =>
     as(actor, run).get<ActionInvoke>("action.invoke").invoke({ action: "words.add", input: { title, at: ["tool:Nothing"], words: title }, authority: { of: "human", basis: "test" }, reason: `add ${title}` });
   const agentRun = () => as(AGENT, "r1").get<AgentRun>("agent.run");
   const prompt = async () => (await agentRun().reach({ run: "r1", places: ["prompt"], time: new Date().toISOString(), input: "go on" })).said.map((s) => s.text);
@@ -38,18 +38,18 @@ test("at a prompt, the run hears what a person changed on the map since it last 
   const s = await setup();
   try {
     assert.ok(s.tree().nodes().some((n) => n.id === "since/heard" && n.at.includes("prompt")));
-    await s.add(ALEX, "Before the run");
+    await s.add(OWNER, "Before the run");
     await new Promise((r) => setTimeout(r, 5));
     await s.agentRun().begin({ run: "r1", agent: AGENT, harness: "test", reaches: ["prompt"] });
     assert.deepEqual(await s.prompt(), [], "nothing since it began");
 
     await new Promise((r) => setTimeout(r, 5));
-    await s.add(ALEX, "Alex's new node");
+    await s.add(OWNER, "Owner's new node");
     await s.add(AGENT, "The run's own node", "r1");
     await s.add(AGENT, "Another agent's node", "r2");
     const said = await s.prompt();
     assert.equal(said.length, 1);
-    assert.match(said[0]!, /^Since you last heard, a person changed the map:\n- added a node "Alex's new node": add Alex's new node$/);
+    assert.match(said[0]!, /^Since you last heard, a person changed the map:\n- added a node "Owner's new node": add Owner's new node$/);
 
     assert.deepEqual(await s.prompt(), [], "heard once");
     assert.deepEqual(s.errors, []);
@@ -67,8 +67,8 @@ test("its wording is a node item on the map, said by this node only, and words.s
     assert.ok(heard[0]!.source, "the node points at its wording on the map");
     await s.agentRun().begin({ run: "r1", agent: AGENT, harness: "test", reaches: ["prompt"] });
     await new Promise((r) => setTimeout(r, 5));
-    await s.add(ALEX, "A change");
-    const reword = await s.as(ALEX).get<ActionInvoke>("action.invoke").invoke({
+    await s.add(OWNER, "A change");
+    const reword = await s.as(OWNER).get<ActionInvoke>("action.invoke").invoke({
       action: "words.set",
       input: { node: heard[0]!.source!, words: "While you were away:\n{changes}" },
       authority: { of: "human", basis: "test" },
@@ -94,7 +94,7 @@ test("what it tells is brief: the last few, and how many came before", () => {
     id: `c${i}`,
     seq: i,
     committed: "",
-    header: { actor: ALEX, authority: { of: "human" as const, basis: "" }, pack: { id: "items" }, action: "items.set", reason: `step ${i}`, time: "" },
+    header: { actor: OWNER, authority: { of: "human" as const, basis: "" }, pack: { id: "items" }, action: "items.set", reason: `step ${i}`, time: "" },
     facts: [["+", `i${i}`, "status", "done"] as ["+", string, string, string]],
   }));
   const titles = new Map(sets.map((c, i) => [`i${i}`, `Task ${i}`]));

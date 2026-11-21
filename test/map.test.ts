@@ -4,7 +4,8 @@ import type { TypeInfo } from "../spec/types.ts";
 import { COMMON } from "../spec/types.ts";
 import { parse, run, type Row, type Wire } from "../packs/find/query.ts";
 import { layout, order, SIZE } from "../packs/map/layout.ts";
-import { mark, side } from "../packs/map/marks.ts";
+import { markToken, side } from "../packs/map/marks.ts";
+import { MARKS } from "../packs/style/tokens.ts";
 
 const base = (name: string, open: string[], closed: string[]): TypeInfo => ({ name, base: name, statuses: { open, closed }, fields: COMMON, trial: false, pack: name });
 const TYPES = new Map([
@@ -141,7 +142,9 @@ test("marks come from the base and the status's side, never the type's name", ()
   const w = TYPES.get("work")!;
   const bug = TYPES.get("bug")!;
   assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => side(w, s)), ["fresh", "moving", "done", "gone"]);
-  assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => mark(bases, w, s)), ["□", "◧", "■", "■"]);
-  assert.equal(mark(bases, bug, "done"), mark(bases, w, "done"), "a flavour is marked as its base");
-  assert.equal(mark(bases, TYPES.get("question")!, "open"), "◇");
+  const drawn = (t: string) => MARKS[t as keyof typeof MARKS];
+  assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => markToken(bases, w, s)), ["glyph-square-fresh", "glyph-square-moving", "glyph-square-done", "glyph-square-gone"]);
+  assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => drawn(markToken(bases, w, s))), ['"□"', '"◧"', '"■"', '"■"'], "the style draws each side");
+  assert.equal(markToken(bases, bug, "done"), markToken(bases, w, "done"), "a flavour is marked as its base");
+  assert.equal(drawn(markToken(bases, TYPES.get("question")!, "open")), '"◇"');
 });

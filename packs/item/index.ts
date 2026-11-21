@@ -17,6 +17,7 @@ import { KEYS } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
 import type { FieldDef, TypeInfo } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
+import { glyph, onStyle, read, shape, sheet, side } from "../../spec/style.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -38,35 +39,25 @@ interface FindIndex {
 const QUERY = "find.query";
 const SHOWN = new Set(["title", "note", "status"]);
 
-const STYLE = `
-.ip { padding:6px 0 12px; }
-.ip-head { display:flex; gap:6px; align-items:center; padding:4px 10px 6px; }
-.ip-head .t { flex:1; min-width:0; font:600 14px ui-sans-serif, system-ui, sans-serif; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.ip-x { font:inherit; background:none; border:0; color:var(--dim); cursor:pointer; padding:0 4px; }
+const STYLE = sheet(`
+.ip { padding:var(--space-3) 0 var(--space-5); }
+.ip-head { display:flex; gap:var(--space-3); align-items:center; padding:var(--space-2) var(--space-4) var(--space-3); }
+.ip-head .t { flex:1; min-width:0; font-weight:var(--bold); font-size:var(--text-l); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ip-x { font:inherit; background:none; border:0; color:var(--dim); cursor:pointer; padding:0 var(--space-2); }
 .ip-x:hover { color:var(--fg); }
-.ip-mk { width:1.1em; text-align:center; flex:none; color:var(--dim); }
-.ip-mk.s-moving { color:var(--pick); } .ip-mk.s-done { color:var(--held); } .ip-mk.s-gone { color:var(--quiet); }
-.ip-row { display:flex; gap:8px; align-items:baseline; padding:1px 10px; white-space:nowrap; min-height:20px; }
+.ip-mk { width:1.1em; text-align:center; flex:none; }
+.ip-mk.s-fresh { color:var(--mark-fresh); } .ip-mk.s-moving { color:var(--mark-moving); } .ip-mk.s-done { color:var(--mark-done); } .ip-mk.s-gone { color:var(--mark-gone); }
+.ip-row { display:flex; gap:var(--space-3); align-items:baseline; padding:1px var(--space-4); white-space:nowrap; min-height:20px; }
 .ip-row .k { color:var(--dim); width:8.5em; flex:none; overflow:hidden; text-overflow:ellipsis; }
 .ip-row .v { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
-.ip-group { padding:8px 10px 2px; color:var(--dim); font-size:11px; }
-.ip-note { margin:4px 10px; padding:3px 6px; border-left:2px solid var(--line); white-space:pre-wrap; }
+.ip-group { padding:var(--space-3) var(--space-4) var(--space-1); color:var(--dim); font-size:var(--text-s); }
+.ip-note { margin:var(--space-2) var(--space-4); padding:var(--space-1) var(--space-3); border-left:2px solid var(--line); white-space:pre-wrap; }
 .ip-link { cursor:pointer; }
 .ip-link:hover { background:color-mix(in srgb, var(--line) 50%, transparent); }
 .ip-dim { color:var(--dim); }
-.ip-btn { font:inherit; background:none; border:1px solid var(--line); color:var(--dim); border-radius:3px; padding:0 6px; cursor:pointer; }
-.ip-btn:hover { color:var(--fg); border-color:var(--dim); }
-`;
-
-/** Marks, by base and status side (the same rule the canvas draws by). */
-const SHAPES = [["□", "◧", "■", "■"], ["◇", "◈", "◆", "◆"], ["○", "◐", "●", "●"], ["△", "◭", "▲", "▲"]];
-const sideOf = (t: TypeInfo | undefined, s: Json | undefined) => {
-  if (!t || typeof s !== "string") return 0;
-  const o = t.statuses.open.indexOf(s);
-  if (o >= 0) return o === 0 ? 0 : 1;
-  return t.statuses.closed.indexOf(s) <= 0 ? 2 : 3;
-};
-const SIDES = ["fresh", "moving", "done", "gone"];
+.ip-btn { font:inherit; background:var(--control); border:1px solid var(--control-line); color:var(--control-fg); border-radius:var(--radius); padding:0 var(--space-3); cursor:pointer; }
+.ip-btn:hover { border-color:var(--dim); }
+`);
 
 /** A value as one line, by its field's kind. */
 export function shown(def: FieldDef | undefined, v: Json): string {
@@ -99,13 +90,15 @@ const item: Pack = {
     const markOf = (r: Row | undefined) => {
       const t = r && index.type(r.type);
       const bases = index.types().filter((x) => x.base === x.name).map((x) => x.name);
-      const s = sideOf(t, r?.fields.status);
-      return { glyph: SHAPES[Math.max(0, bases.indexOf(t?.base ?? "")) % SHAPES.length]![s]!, side: SIDES[s]! };
+      const at = side(t, r?.fields.status);
+      return { glyph: read(glyph(shape(bases, t), at)), side: at };
     };
 
     const Page = () => {
       const idx = useIndex();
       const id = useHere<string>(KEYS.item);
+      const [, restyle] = useState(0);
+      useEffect(() => onStyle(() => restyle((n) => n + 1)), []);
       if (!id) return null;
       const row = idx.item(id);
       const close = html`<button class="ip-x" title="Close" onClick=${() => set.set(KEYS.item, undefined)}>×</button>`;
@@ -156,7 +149,10 @@ const item: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "map.side", name: "page", title: "Item", view: Page });
+    // Beside the views that open an item: Map, and Field.
+    const fill = ctx.get<SlotFill>("slot.fill");
+    fill.fill({ slot: "right", name: "page", title: "Item", when: { "here.item": true, "here.view": "map/map" }, view: Page });
+    fill.fill({ slot: "right", name: "page-field", title: "Item", when: { "here.item": true, "here.view": "field/field" }, view: Page });
   },
 };
 

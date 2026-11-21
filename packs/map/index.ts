@@ -1,5 +1,5 @@
 /**
- * The map pack, page side: the canvas of a query, in the shell as the view
+ * The map pack, page side: the canvas of a query, in the region `center` as the view
  * "Map". One flat plane: the query is the whole surface (`find.query`,
  * drawn through `find.index`), each item one line with the mark of its
  * state, links as right-angled wires (layout.ts).
@@ -24,11 +24,12 @@ import htm from "htm";
 import type { Id, Json } from "../../spec/common.ts";
 import type { HereRead, HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
-import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
+import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import type { LinkInfo, TypeInfo } from "../../spec/types.ts";
 import { layout, SIZE, type Out } from "./layout.ts";
 import { mark, side } from "./marks.ts";
+import { onStyle, sheet } from "../../spec/style.ts";
 
 export { mark, side } from "./marks.ts";
 
@@ -57,23 +58,17 @@ interface FindIndex {
 
 const QUERY = "find.query";
 
-const STYLE = `
-.mp { display:grid; grid-template-rows:auto 1fr; height:100%; min-height:0; }
-.mp-bar { display:flex; gap:8px; align-items:center; padding:5px 10px; border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; }
-.mp-bar select, .mp-bar button { font:inherit; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:1px 4px; cursor:pointer; }
-.mp-bar .dim { color:var(--dim); }
-.mp-body { display:flex; min-height:0; }
+const STYLE = sheet(`
+.mp { display:flex; height:100%; min-height:0; }
 .mp-canvas { flex:1; min-width:0; position:relative; overflow:hidden; cursor:grab; user-select:none; }
 .mp-canvas.panning { cursor:grabbing; }
 .mp-canvas svg { width:100%; height:100%; display:block; }
-.mp-side { width:min(380px, 40%); flex:none; border-left:1px solid var(--line); overflow:auto; }
 .mp-card rect { fill:var(--panel); stroke:var(--line); }
 .mp-card { cursor:pointer; }
-.mp-card text { font:12px ui-sans-serif, system-ui, sans-serif; fill:var(--fg); dominant-baseline:central; }
-.mp-card .mk { fill:var(--dim); font-size:13px; }
-.mp-card.s-moving .mk { fill:var(--pick); }
-.mp-card.s-done .mk { fill:var(--held); }
-.mp-card.s-gone .mk { fill:var(--quiet); }
+.mp-card text { font:var(--text-m) var(--font); fill:var(--fg); dominant-baseline:central; }
+.mp-card .mk { font-size:var(--text); }
+.mp-card.s-fresh .mk { fill:var(--mark-fresh); } .mp-card.s-moving .mk { fill:var(--mark-moving); }
+.mp-card.s-done .mk { fill:var(--mark-done); } .mp-card.s-gone .mk { fill:var(--mark-gone); }
 .mp-card.s-done text.t, .mp-card.s-gone text.t { fill:var(--dim); }
 .mp-card.s-gone text.t { text-decoration:line-through; }
 .mp-card.pick rect { stroke:var(--pick); stroke-width:2; }
@@ -84,34 +79,20 @@ const STYLE = `
 .mp-wire.waits_on { stroke-dasharray:7 3 1.5 3; }
 .mp-wire.about { stroke:var(--line); }
 .mp-wire.lit { stroke:var(--pick); stroke-width:2.2; }
-.mp-key { position:absolute; left:8px; bottom:6px; color:var(--dim); font-size:11px; background:color-mix(in srgb, var(--bg) 88%, transparent); padding:3px 8px; border-radius:3px; border:1px solid var(--line); display:grid; grid-template-columns:auto 1fr; column-gap:10px; row-gap:1px; pointer-events:none; }
-.mp-key .b { color:var(--fg); }
-.mp-key .row { display:flex; gap:10px; white-space:nowrap; align-items:center; }
-.mp-key .row > span { display:inline-flex; align-items:center; gap:3px; }
-.mp-key .m { display:inline-block; width:1.1em; text-align:center; }
-.mp-key .m.s-moving { color:var(--pick); } .mp-key .m.s-done { color:var(--held); } .mp-key .m.s-gone { color:var(--quiet); }
-.mp-key svg { width:22px; height:8px; vertical-align:middle; }
-.mp-key .sw { display:inline-block; width:16px; height:9px; border-radius:2px; border:1px solid var(--line); background:var(--panel); }
-.mp-key .sw.pick { border:2px solid var(--pick); width:14px; height:7px; }
-.mp-key .sw.near { background:var(--lit); }
 .mp-card.hover rect { stroke:var(--pick); }
 .mp-wire.hot { stroke:var(--pick); stroke-width:2.2; }
 .mp-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); }
-`;
+`);
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 const map: Pack = {
   id: "map",
-  inject: ["find.index", "here.read", "here.set", "slot.declare", "slot.fill", "slot.read"],
+  inject: ["find.index", "here.read", "here.set", "slot.fill"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
-    const slots = ctx.get<SlotRead>("slot.read");
-    const declare = ctx.get<SlotDeclare>("slot.declare");
-    declare.declare({ name: "map.bar", merge: "many", doc: "The map's top line: find goes here." });
-    declare.declare({ name: "map.side", merge: "one", doc: "Beside the canvas: the item page goes here." });
 
     const useHere = <T extends Json>(key: string): T | undefined => {
       const [v, setV] = useState<T | undefined>(here.get<T>(key));
@@ -122,48 +103,6 @@ const map: Pack = {
       const [, tick] = useState(0);
       useEffect(() => index.watch(() => tick((x) => x + 1)) as () => void, []);
       return index;
-    };
-    const Slot = ({ name }: { name: string }) => {
-      const [, tick] = useState(0);
-      useEffect(() => {
-        const stop = slots.watch(name, () => tick((x) => x + 1));
-        tick((x) => x + 1);
-        return stop as () => void;
-      }, [name]);
-      return html`${slots.fills(name).map((f) => html`<${f.view} key=${`${f.pack}/${f.name}`} />`)}`;
-    };
-
-    /** Every mark the canvas draws: each base with each of its statuses, then each kind of link. */
-    const Key = () => {
-      const all = index.types();
-      const bases = all.filter((t) => t.base === t.name);
-      const names = bases.map((t) => t.name);
-      const known = new Set(["depends_on", "part_of", "waits_on", "bears_on", "about"]);
-      const kinds = index.links().map((l) => l.name);
-      return html`
-        <div class="mp-key">
-          ${bases.map(
-            (t) => html`
-              <span class="b">${t.name}</span>
-              <span class="row">
-                ${[...t.statuses.open, ...t.statuses.closed].map(
-                  (st) => html`<span><span class=${`m s-${side(t, st)}`}>${mark(names, t, st)}</span>${st}</span>`,
-                )}
-              </span>
-            `,
-          )}
-          <span class="b">lit</span>
-          <span class="row">
-            <span><span class="sw pick"></span> hovered or open</span>
-            <span><span class="sw near"></span> linked to it</span>
-            <span><svg viewBox="0 0 22 8"><path class="mp-wire lit" d="M0 4H22" /></svg> its links</span>
-          </span>
-          <span class="b">links</span>
-          <span class="row">
-            ${kinds.map((k) => html`<span><svg viewBox="0 0 22 8"><path class=${`mp-wire ${known.has(k) ? k : ""}`} d="M0 4H22" /></svg> ${k}</span>`)}
-          </span>
-        </div>
-      `;
     };
 
     const Canvas = ({ result, drawn }: { result: Result; drawn: Out }) => {
@@ -258,7 +197,6 @@ const map: Pack = {
             })}
           </g></svg>
           ${!result.items.length && html`<div class="mp-empty">${index.ready() ? "Nothing matches." : "Reading the map…"}</div>`}
-          <${Key} />
         </div>
       `;
     };
@@ -266,8 +204,9 @@ const map: Pack = {
     const View = () => {
       const idx = useIndex();
       const q = useHere<string>(QUERY) ?? "";
-      const picked = useHere<string>(KEYS.item);
       const result = idx.run(q);
+      const [, restyle] = useState(0);
+      useEffect(() => onStyle(() => restyle((n) => n + 1)), []);
       const drawn = useMemo(() => layout(result), [JSON.stringify([result.items.map((r) => r.id), result.links.map((l) => [l.id, l.from, l.to])])]);
       useEffect(() => {
         const esc = (e: KeyboardEvent) => e.key === "Escape" && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) && set.set(KEYS.item, undefined);
@@ -276,13 +215,7 @@ const map: Pack = {
       }, []);
       return html`
         <div class="mp">
-          <div class="mp-bar">
-            <${Slot} name="map.bar" />
-          </div>
-          <div class="mp-body">
-            <${Canvas} result=${result} drawn=${drawn} />
-            ${picked && html`<div class="mp-side"><${Slot} name="map.side" /></div>`}
-          </div>
+          <${Canvas} result=${result} drawn=${drawn} />
         </div>
       `;
     };
@@ -293,7 +226,7 @@ const map: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "shell.main", name: "map", title: "Map", view: View });
+    ctx.get<SlotFill>("slot.fill").fill({ slot: "center", name: "map", title: "Map", view: View });
   },
 };
 

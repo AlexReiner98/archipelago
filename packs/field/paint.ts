@@ -5,6 +5,7 @@
  * and its links over the faded rest; then titles in screen space, each with a halo of the sea round its letters.
  */
 import type { Dial } from "./behaviour.ts";
+import { HUES, read } from "../../spec/style.ts";
 import { neighbours, type G, type Grid, type Settings } from "./graph.ts";
 
 /** The drawing's own dials. */
@@ -38,11 +39,14 @@ export interface Ink {
   line: string;
   accent: string;
 }
-/** The page's colours, read from the shell's tokens. */
+/** The page's colours, from the style tokens (their plain values when no style is loaded). */
 export function ink(el: Element): Ink {
-  const css = getComputedStyle(el);
-  const v = (name: string, d: string) => css.getPropertyValue(name).trim() || d;
-  return { sea: v("--bg", "#fbfbfa"), text: v("--fg", "#1d1d1b"), muted: v("--dim", "#77756f"), line: v("--dim", "#77756f"), accent: v("--pick", "#2f6fdf") };
+  return { sea: read("bg", el), text: read("fg", el), muted: read("dim", el), line: read("dim", el), accent: read("pick", el) };
+}
+
+/** The style's hues, for types in order; a type past the sixth gets its own (graph.ts hue). */
+export function palette(el?: Element): string[] {
+  return HUES.map((h) => read(h, el));
 }
 
 export interface Cam {

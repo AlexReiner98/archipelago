@@ -31,7 +31,7 @@ Edition 3 adds the person's side of a run:
 ## Places
 
 A place is a moment in a run where the map can speak. The spec owns the
-vocabulary (decided by Alex), and each place says the edition it came in.
+vocabulary, and each place says the edition it came in.
 Edition 1 has the six places an adapter can both reach and speak at, which
 is what the harness view and verdicts need:
 
@@ -44,7 +44,7 @@ is what the harness view and verdicts need:
 | `tool_result:<name>` | a tool has returned (its result is the input) | no | PostToolUse |
 | `reply_end` | the agent is about to finish its reply | yes (it keeps going) | Stop |
 
-Edition 2 adds two places (Alex, 20 Nov 2026: skills and memory are
+Edition 2 adds two places (20 Nov 2026: skills and memory are
 something the map writes). The map speaks there through the files the
 harness loads, once it writes them; what the harness loaded is the moment's
 input. Nothing can be refused there: the text is already loaded.
@@ -54,7 +54,7 @@ input. Nothing can be refused there: the text is already loaded.
 | `skill:<name>` | the harness loads a skill's text (`skill:<plugin>:<name>` for a plugin's) | no | the transcript, read at the next hook |
 | `memory:<scope>/<path>` | the harness loads a memory file; scope `project`, `local`, `user`, `auto` or `managed`, the path with `/` and `~` for home | no | the transcript's `instructions` attachment |
 
-Edition 3 (Alex, 20 Nov 2026: every way an agent and the map meet is
+Edition 3 (20 Nov 2026: every way an agent and the map meet is
 modelled) adds one place:
 
 | Place | Reached when | Can refuse | Claude Code |
@@ -82,7 +82,7 @@ moment and the run.
 
 ## Said once per context
 
-Edition 4 (Alex, 20 Nov 2026). Words already in the agent's context add
+Edition 4 (20 Nov 2026). Words already in the agent's context add
 nothing said again, and cost the same each time. So by default a node's
 **same words** are said once per context: the agent pack holds back a say
 whose node and text it already said in the run since the last `compact`.
@@ -133,7 +133,7 @@ recorded as a `miss` so whoever wrote the node sees it.
 
 ## Facts
 
-Edition 5 (Alex, 20 Nov 2026). A run carries **facts**: what is so about
+Edition 5 (20 Nov 2026). A run carries **facts**: what is so about
 it, by name (`RunInfo.facts`). They are open-ended, so whatever reads them
 (a profile's match) matches on names, never on fixed fields.
 

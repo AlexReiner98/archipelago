@@ -14,7 +14,7 @@ import type { Stats } from "./engine.ts";
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
 export const PANEL_STYLE = `
-.fl-panel { width:290px; flex:none; border-right:1px solid var(--line); overflow:auto; font-size:12px; background:var(--bg); scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--dim) 55%, transparent) transparent; scrollbar-gutter:stable; }
+.fl-panel { height:100%; min-width:0; overflow:auto; font-size:12px; background:var(--bg); scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--dim) 55%, transparent) transparent; scrollbar-gutter:stable; }
 .fl-panel::-webkit-scrollbar { width:8px; }
 .fl-panel::-webkit-scrollbar-track { background:transparent; }
 .fl-panel::-webkit-scrollbar-thumb { background:color-mix(in srgb, var(--dim) 55%, transparent); border-radius:4px; border:2px solid var(--bg); }

@@ -1,8 +1,10 @@
 # harness
 
 The harness view: what the map says to an agent, what the agent does, and
-whether each thing said works. Fills `shell.main` with three panes, linked
-through `here`.
+whether each thing said works. Three panes, each a fill, linked through
+`here`: the tree in `left`, the run in `center` (the view "Harness"), and
+the node in `right`. The tree and the node show only while the run does
+(`when: { "here.view": "harness/view" }`).
 
 | Pane | Shows |
 |---|---|
@@ -10,7 +12,8 @@ through `here`.
 | Run | One run live: map → agent on the left, agent → map on the right, one line per event |
 | Node | Its words, places, pack, kind, record, and its verdict per run |
 
-Marks: ✓ held, ✕ failed, ○ quiet, · not said; ⊘ a refusal, ● an act, ✕ an
+Marks (the style's verdict glyphs, spec/style.md): ✓ held, ✕ failed,
+○ quiet, · not said; ⊘ a refusal, ● an act, ✕ an
 act that didn't work. A red edge on an event: it failed the node picked.
 
 - A click on a node sets `here.node`; the run lights its firings. A click on

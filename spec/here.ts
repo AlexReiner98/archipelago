@@ -29,6 +29,8 @@ export const KEYS = {
   node: "here.node",
   /** The exchange event being looked at: an event id. */
   event: "here.event",
+  /** The fill shown in the region `center`, as `pack/name`: the frame sets it (edition 7). */
+  view: "here.view",
 } as const;
 
 export interface Change {

@@ -1,6 +1,6 @@
 /**
  * The reflex tree, page side: every node the map says to agents as one
- * circular tree grown from its root, in the shell as the view "Reflex tree".
+ * circular tree grown from its root, in the region `center` as the view "Reflex tree".
  * The shape is layout.ts's; this draws it and lights it.
  *
  * - Grouped by place (the default) or by pack. Nodes said nowhere are left
@@ -36,6 +36,7 @@ import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { profileHooks } from "./profiles.ts";
 import { branchAt, lightOf, packHues, pointAt, radial, route, STYLE, treeOf, type Grouping, type Placed, type Tree } from "./layout.ts";
+import { read as token, sheet, v, verdictGlyph } from "../../spec/style.ts";
 
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
@@ -56,16 +57,16 @@ const S = STYLE;
 const C = S.colors;
 const NS = "http://www.w3.org/2000/svg";
 
-const SHEET = `
+const SHEET = sheet(`
 .rx { display:grid; grid-template-rows:auto 1fr; height:100%; min-height:0; }
-.rx-bar { display:flex; gap:10px; align-items:center; padding:5px 10px; border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; overflow:hidden; }
-.rx-bar .t { font-weight:600; }
+.rx-bar { display:flex; gap:var(--space-4); align-items:center; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; overflow:hidden; }
+.rx-bar .t { font-weight:var(--bold); }
 .rx-bar .dim, .rx-dim { color:var(--dim); }
 .rx-bar .sp { flex:1; }
-.rx-bar button { font:inherit; background:none; border:1px solid var(--line); color:var(--dim); padding:0 6px; border-radius:3px; cursor:pointer; }
+.rx-bar button { font:inherit; background:var(--control); border:1px solid var(--control-line); color:var(--dim); padding:0 var(--space-3); border-radius:var(--radius); cursor:pointer; }
 .rx-bar button.on { color:var(--fg); border-color:var(--dim); }
 .rx-n { font-variant-numeric:tabular-nums; }
-.rx-sel { font:inherit; background:var(--panel); color:var(--dim); border:1px solid var(--line); border-radius:3px; padding:0 4px; max-width:180px; }
+.rx-sel { font:inherit; background:var(--control); color:var(--dim); border:1px solid var(--control-line); border-radius:var(--radius); padding:0 var(--space-2); max-width:180px; }
 .rx-sel option { background:var(--panel); color:var(--fg); }
 .rx-say { color:${C.say}; } .rx-fail { color:${C.fail}; } .rx-write { color:${C.write}; }
 .rx-canvas { position:relative; overflow:hidden; cursor:grab; user-select:none; min-height:0; }
@@ -79,7 +80,7 @@ const SHEET = `
 .rx-trial .rx-dot { fill:none !important; stroke-width:1.2; }
 .rx-ring { fill:none; stroke-width:1.6; stroke:none; }
 .rx-ring.v-held { stroke:${C.say}; } .rx-ring.v-failed { stroke:${C.fail}; } .rx-ring.v-quiet { stroke:var(--quiet); stroke-dasharray:1.5 1.5; }
-.rx-name { fill:var(--fg); font:600 ${S.nameText}px ui-sans-serif, system-ui, sans-serif; dominant-baseline:middle; pointer-events:none; }
+.rx-name { fill:var(--fg); font:var(--bold) ${S.nameText}px var(--font); dominant-baseline:middle; pointer-events:none; }
 .rx-bough .rx-name { fill:var(--dim); font-weight:500; }
 .rx-trial .rx-name { font-style:italic; }
 .rx-pick .rx-name { fill:var(--pick); }
@@ -91,14 +92,14 @@ const SHEET = `
 .rx-glow, .rx-head { pointer-events:none; }
 .k-say { fill:${C.say}; } .k-fail { fill:${C.fail}; } .k-write { fill:${C.write}; }
 .rx-trail.k-say { stroke:${C.say}; fill:none; } .rx-trail.k-fail { stroke:${C.fail}; fill:none; } .rx-trail.k-write { stroke:${C.write}; fill:none; }
-.rx-key { position:absolute; left:10px; bottom:10px; padding:6px 8px; background:color-mix(in srgb, var(--bg) 88%, transparent); border:1px solid var(--line); border-radius:4px; font-size:11px; color:var(--dim); display:grid; grid-template-columns:auto 1fr; gap:2px 6px; align-items:center; pointer-events:none; }
+.rx-key { position:absolute; left:10px; bottom:10px; padding:var(--space-3) var(--space-3); background:color-mix(in srgb, var(--bg) 88%, transparent); border:1px solid var(--line); border-radius:var(--radius); font-size:var(--text-s); color:var(--dim); display:grid; grid-template-columns:auto 1fr; gap:var(--space-1) var(--space-3); align-items:center; pointer-events:none; }
 .rx-key svg { width:14px; height:10px; }
-.rx-card { position:absolute; right:10px; top:10px; max-width:min(340px, 45%); padding:6px 10px; background:var(--panel); border:1px solid var(--line); border-radius:4px; }
-.rx-card .t { font-weight:600; }
+.rx-card { position:absolute; right:10px; top:10px; max-width:min(340px, 45%); padding:var(--space-3) var(--space-4); background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); }
+.rx-card .t { font-weight:var(--bold); }
 .rx-card .kv { color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .rx-card a { color:var(--pick); }
 .rx-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); pointer-events:none; }
-`;
+`);
 
 const clock = (t?: string) => (t ? new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "");
 
@@ -306,7 +307,7 @@ const reflex: Pack = {
         <svg viewBox="0 0 14 10"><circle class="rx-ring v-held" cx="7" cy="5" r="3.5" /></svg><span>held in the run shown</span>
         <svg viewBox="0 0 14 10"><circle class="rx-ring v-failed" cx="7" cy="5" r="3.5" /></svg><span>failed in the run shown</span>
         <svg viewBox="0 0 14 10"><circle class="rx-ring v-quiet" cx="7" cy="5" r="3.5" /></svg><span>quiet: said, nothing followed</span>
-        <svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:none;stroke:var(--fg);stroke-width:1.2`} /></svg><span>a trial node</span>
+        <svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:none;stroke:${v("fg")};stroke-width:1.2`} /></svg><span>a trial node</span>
         ${[...hues].map(([p, c]) => html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3.5" style=${`fill:${c}`} /></svg><span>${p === "words" ? "the map's words" : p === "grow" ? "learned (grow)" : p}</span>`)}
       </div>
     `;
@@ -530,7 +531,7 @@ const reflex: Pack = {
             ${run
               ? html`<span class="dim" title=${run}>run ${run.slice(0, 8)} ${clock(info?.started)}${info && !info.ended ? html` <span class="rx-say">● live</span>` : ""}${pinned ? "" : " (newest)"}</span>`
               : html`<span class="dim">no run yet</span>`}
-            <span class="rx-n"><span class="rx-say">✓ ${sum.held}</span> <span class="rx-fail">✕ ${sum.failed}</span> <span class="dim">○ ${sum.quiet}</span></span>
+            <span class="rx-n"><span class="rx-say">${token(verdictGlyph("held"))} ${sum.held}</span> <span class="rx-fail">${token(verdictGlyph("failed"))} ${sum.failed}</span> <span class="dim">${token(verdictGlyph("quiet"))} ${sum.quiet}</span></span>
             <button disabled=${!run} onClick=${play} title="Play the run shown again, its events in order">${playing ? "Stop" : "Replay"}</button>
           </div>
           <div style="position:relative;min-height:0;display:grid">
@@ -547,7 +548,7 @@ const reflex: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    ctx.get<SlotFill>("slot.fill").fill({ slot: "shell.main", name: "view", title: "Reflex tree", view: View });
+    ctx.get<SlotFill>("slot.fill").fill({ slot: "center", name: "view", title: "Reflex tree", view: View });
   },
 };
 
