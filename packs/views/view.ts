@@ -28,6 +28,9 @@ import type { FindIndex, FindOffer } from "../find/index.ts";
 import { SHOWN, shower } from "./apply.ts";
 import { byHash, search, sections, TYPE, views, type Config, type View } from "./pick.ts";
 
+/** The command line's open state (the command pack's `command.open`), read by name: a key, not an import. */
+const COMMAND_OPEN = "command.open";
+
 // htm ships CommonJS types; in the page its module export is the function itself.
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -86,6 +89,8 @@ const views_: Pack<Config> = {
     let auto = false;
     const pick = (v: View, chosen = true) => {
       auto = !chosen;
+      // A view picked, from anywhere (the list, the command line, a link, an agent), closes the list.
+      open = false;
       show.show(v);
       if (location.hash.slice(1) !== v.id) history.replaceState(null, "", `#${v.id}`);
       tell();
@@ -206,14 +211,21 @@ const views_: Pack<Config> = {
           run: () => pick(v),
         })),
     });
+    // Escape closes the list wherever the focus is; so does the command line opening over it.
+    const escape = (e: KeyboardEvent) => {
+      if (open && e.key === "Escape") (e.preventDefault(), setOpen(false));
+    };
+    ctx.effect(() => here.watch(COMMAND_OPEN, (c) => c.value && open && setOpen(false)) as () => void);
     ctx.effect(() => {
       const style = document.createElement("style");
       style.textContent = STYLE;
       document.head.append(style);
       addEventListener("hashchange", fromHash);
+      addEventListener("keydown", escape);
       return () => {
         style.remove();
         removeEventListener("hashchange", fromHash);
+        removeEventListener("keydown", escape);
       };
     });
     const fill = ctx.get<SlotFill>("slot.fill");
