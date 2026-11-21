@@ -28,6 +28,7 @@ export const DRAW: Dial[] = [
   { key: "dim_ms", label: "light eases in", min: 0, max: 1000, step: 10, value: 140, then: "paint", doc: "How long the dimming and lighting take to ease in or out, in ms." },
   { key: "dim_hold_ms", label: "light stays", min: 0, max: 2000, step: 10, value: 200, then: "paint", doc: "How long the light stays once the pointer leaves a particle, so crossing a gap does not blink." },
   { key: "fit_pad", label: "fit margin", min: 0, max: 200, step: 5, value: 40, then: "paint", doc: "Room round the picture when it is fitted, in screen px." },
+  { key: "follow_ms", label: "camera eases", min: 0, max: 5000, step: 50, value: 1000, then: "paint", doc: "While it settles, how slowly the view follows the picture, in ms (about two thirds of the way in this time; 0: it snaps)." },
   { key: "follow", label: "fit while settling", min: 0, max: 1, step: 1, value: 1, choices: ["no", "yes"], then: "paint", doc: "Whether the view keeps fitting the picture while it settles, until you move it." },
 ];
 

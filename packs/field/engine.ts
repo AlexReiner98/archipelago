@@ -66,13 +66,35 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   let stepMs = 0, runStart = { steps: 0, at: 0 }, settledIn: Stats["settledIn"];
   const size = () => ({ width: canvas.clientWidth, height: canvas.clientHeight, dpr: devicePixelRatio || 1 });
 
-  const fit = () => {
+  /** The camera that fits the whole picture now. */
+  const fitted = (): Cam => {
     const [x0, y0, x1, y1] = bounds(g), { width, height } = size();
     const pad = S.fit_pad!;
     const w = Math.max(1, width - 2 * pad), h = Math.max(1, height - 2 * pad);
-    cam.k = Math.min(w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0));
-    cam.tx = width / 2 - ((x0 + x1) / 2) * cam.k;
-    cam.ty = height / 2 - ((y0 + y1) / 2) * cam.k;
+    const k = Math.min(w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0));
+    return { k, tx: width / 2 - ((x0 + x1) / 2) * k, ty: height / 2 - ((y0 + y1) / 2) * k };
+  };
+  const fit = () => Object.assign(cam, fitted());
+  /**
+   * While it settles, the camera follows the fitted one smoothly: it closes
+   * a share of the gap each frame (`follow_ms`), zooming by ratio about the
+   * picture's middle, so the picture never jumps. True while still moving.
+   */
+  let lastFollow = 0;
+  const follow = (): boolean => {
+    const now = performance.now(), dt = lastFollow ? Math.min(100, now - lastFollow) : 16;
+    lastFollow = now;
+    const to = fitted();
+    const a = S.follow_ms! > 0 ? 1 - Math.exp(-dt / S.follow_ms!) : 1;
+    const { width, height } = size();
+    // Where the middle of the view looks, in the world, eased; then the zoom, eased by ratio.
+    const mx = (width / 2 - cam.tx) / cam.k, my = (height / 2 - cam.ty) / cam.k;
+    const tmx = (width / 2 - to.tx) / to.k, tmy = (height / 2 - to.ty) / to.k;
+    const k = cam.k * Math.pow(to.k / cam.k, a), nx = mx + (tmx - mx) * a, ny = my + (tmy - my) * a;
+    cam.k = k;
+    cam.tx = width / 2 - nx * k;
+    cam.ty = height / 2 - ny * k;
+    return Math.abs(Math.log(to.k / k)) > 0.002 || Math.hypot(tmx - nx, tmy - ny) * k > 0.5;
   };
   // ─── The physics' own loop: a slice, then a message to itself, until settled ───
   const chan = new MessageChannel();
@@ -118,11 +140,12 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   };
 
   // ─── The loop ───
-  let raf = 0;
+  let raf = 0, following = false;
   const tick = () => {
     if (stopped) return;
-    if (dirty) {
-      if (awake && !cam.moved && S.follow) fit();
+    if (dirty || following) {
+      following = !cam.moved && !!S.follow && (awake || following) ? follow() : false;
+      if (!following) lastFollow = 0;
       const s = size();
       if (canvas.width !== Math.round(s.width * s.dpr) || canvas.height !== Math.round(s.height * s.dpr)) {
         canvas.width = Math.round(s.width * s.dpr);
@@ -130,7 +153,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       }
       const easing = light.ease(g, hover, S);
       paint(c, g, cam, S, light, colours, pick, s, match);
-      dirty = easing;
+      dirty = easing || following;
     }
     raf = requestAnimationFrame(tick);
   };

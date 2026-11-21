@@ -34,7 +34,8 @@ particle, it only lights what it finds and fades the rest (`query_fade`).
   and names them ([paint.ts](paint.ts)). A click sets `here.item`; the
   item page opens beside (`map.side`). Drag a particle to move it (it
   settles again when let go), drag the sea to pan, wheel to zoom,
-  double-click the sea to fit. ([engine.ts](engine.ts))
+  double-click the sea to fit. While it settles the view eases after the
+  picture (`follow_ms`) instead of jumping to fit it. ([engine.ts](engine.ts))
 - It only shows: nothing here writes to the map.
 
 On 2000 items and about 2700 links the forces settle in about 460 steps at
