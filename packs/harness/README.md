@@ -16,6 +16,14 @@ Marks (the style's verdict glyphs, spec/style.md): ✓ held, ✕ failed,
 ○ quiet, · not said; ⊘ a refusal, ● an act, ✕ an
 act that didn't work. A red edge on an event: it failed the node picked.
 
+- A click on a run's row opens it in place ([expand.ts](expand.ts)), and
+  again closes it. It shows everything the exchange holds for the event,
+  in its own column: for the map to the agent, the node, place, pack and
+  what was said or refused, whole; for the agent to the map, the act's
+  kind and who did it, its input and output field by field (a tool call's
+  arguments, a `tell`'s words, a prompt or reply in full; an MCP result as
+  its text, JSON indented), and whether it worked. Each part folds past a
+  dozen lines.
 - A click on a node sets `here.node`; the run lights its firings. A click on
   an event sets `here.event` and `here.node`; the tree lights its node. The
   run is `here.run`, or the newest.

@@ -35,6 +35,7 @@ import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import type { HereRead, HereSet } from "../../spec/here.ts";
 import type { ProfileRead } from "../../spec/profile.ts";
 import { profileHook } from "./profiles.ts";
+import { expand, fold, type Part } from "./expand.ts";
 import { KEEP_STYLE, keepParts, type Review } from "./keep.ts";
 import { KEYS } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
@@ -109,6 +110,14 @@ const STYLE = sheet(`
 .hv-ev .p { color:var(--dim); flex:none; max-width:40%; overflow:hidden; text-overflow:ellipsis; }
 .hv-ev .s { color:var(--dim); flex:none; font-variant-numeric:tabular-nums; width:2.5em; text-align:right; }
 .hv-ev.broke { box-shadow:inset -3px 0 0 var(--failed); }
+.hv-ev > div.hv-cell { display:block; padding:0; }
+.hv-cell > .hv-line { display:flex; gap:var(--space-3); align-items:baseline; padding:1px var(--space-4); white-space:nowrap; min-width:0; }
+.hv-tw { color:var(--dim); width:.8em; flex:none; font-size:var(--text-xs); }
+.hv-open { margin:0 var(--space-4) var(--space-2) calc(var(--space-4) + 3.5em); padding:var(--space-1) 0 var(--space-1) var(--space-3); border-left:2px solid var(--line); cursor:default; white-space:normal; }
+.hv-part { display:grid; grid-template-columns:6.5em minmax(0,1fr); gap:var(--space-3); padding:1px 0; }
+.hv-part .k { color:var(--dim); font-size:var(--text-s); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hv-part pre { margin:0; font:var(--text-s)/var(--leading) var(--mono); white-space:pre-wrap; overflow-wrap:anywhere; max-width:70ch; }
+.hv-fold { font:inherit; font-size:var(--text-xs); background:none; border:0; color:var(--pick); cursor:pointer; padding:0; }
 .hv-kv { display:flex; gap:var(--space-3); padding:1px var(--space-4); white-space:nowrap; }
 .hv-kv .k { color:var(--dim); width:4.5em; flex:none; }
 .hv-kv .v { overflow:hidden; text-overflow:ellipsis; }
@@ -393,12 +402,37 @@ const harness: Pack = {
       `;
     };
 
+    /** One part of an opened row, its text folded past a dozen lines. */
+    const PartRow = ({ p }: { p: Part }) => {
+      const [all, setAll] = useState(false);
+      const f = fold(p.text);
+      return html`<div class="hv-part">
+        <span class="k" title=${p.label}>${p.label}</span>
+        <div><pre>${all ? p.text : f.head}</pre>${f.more > 0 && html`<button class="hv-fold" onClick=${() => setAll(!all)}>${all ? "fold" : `+${f.more} lines`}</button>`}</div>
+      </div>`;
+    };
+
+    /** A row opened in place: everything the exchange holds for it. Clicks inside don't close it. */
+    const Opened = ({ e }: { e: ExchangeEvent }) => html`
+      <div class="hv-open" onClick=${(ev: Event) => ev.stopPropagation()}>
+        ${expand(e).map((p, i) => html`<${PartRow} key=${i} p=${p} />`)}
+      </div>`;
+
     const RunPane = ({ runs, run, events, verdictsOfRun, titles }: { runs: RunInfo[]; run?: string; events: ExchangeEvent[]; verdictsOfRun: RunVerdict[]; titles: Map<string, string> }) => {
       const node = useHere<string>(KEYS.node);
       const event = useHere<string>(KEYS.event);
       const pinned = useHere<string>(KEYS.run);
       const body = useRef<HTMLDivElement>(null);
       const atEnd = useRef(true);
+      const [opened, setOpened] = useState<Set<string>>(new Set());
+      useEffect(() => setOpened(new Set()), [run]);
+      const toggle = (id: string) =>
+        setOpened((o) => {
+          const n = new Set(o);
+          if (n.has(id)) n.delete(id);
+          else n.add(id);
+          return n;
+        });
       const verdictOf = useMemo(() => new Map(verdictsOfRun.map((v) => [v.node, v])), [verdictsOfRun]);
       const broke = useMemo(() => new Set(node ? (verdictOf.get(node)?.failed_by ?? []) : []), [node, verdictOf]);
       const sum = { held: 0, failed: 0, quiet: 0 };
@@ -456,11 +490,16 @@ const harness: Pack = {
                 : html`<span class="hv-m m-failed">!</span>`;
               const resaid = (e.detail as { resaid?: boolean } | undefined)?.resaid ? "re-said after compaction · " : "";
               const what = e.kind === "act" ? actLine(e, info?.cwd) : e.node ? `${resaid}${titles.get(e.node) ?? e.node}: ${short(e.text)}` : e.kind === "begin" ? beginLine(e) : e.kind === "end" ? "run ended" : e.kind === "compact" ? `context compacted (${String((e.detail as { trigger?: string } | undefined)?.trigger ?? "auto")}): what follows is said again` : short(e.text);
-              const cell = html`<div title=${`#${e.seq} ${e.kind}${e.place ? ` @${e.place}` : ""}${e.node ? ` ${e.node}` : ""}\n${e.text ?? actLine(e)}`}>
-                <span class="s">${e.seq}</span>${mark}${e.place && html`<span class="p">${e.place}</span>`}<span class="x">${what}</span>
+              const isOpen = opened.has(e.id);
+              const cell = html`<div class="hv-cell">
+                <div class="hv-line" title=${`#${e.seq} ${e.kind}${e.place ? ` @${e.place}` : ""}${e.node ? ` ${e.node}` : ""}\n${e.text ?? actLine(e)}`}>
+                  <span class="s">${e.seq}</span><span class="hv-tw">${isOpen ? "▾" : "▸"}</span>${mark}${e.place && html`<span class="p">${e.place}</span>`}<span class="x">${what}</span>
+                </div>
+                ${isOpen && html`<${Opened} e=${e} />`}
               </div>`;
               return html`
                 <div data-ev=${e.id} class=${`hv-ev ${lit ? "hv-lit" : ""} ${event === e.id ? "hv-pick" : ""} ${broke.has(e.seq) ? "broke" : ""}`} onClick=${() => {
+                  toggle(e.id);
                   set.set(KEYS.event, e.id);
                   set.set(KEYS.node, e.node);
                 }}>
