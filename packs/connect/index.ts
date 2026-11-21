@@ -12,7 +12,9 @@
  * Config: `hook` and `mcp`, the adapter's urls as Claude Code reaches them;
  * `command`, how each hook runs (default: this checkout's
  * packs/claude-code/hook.ts, with `hook`); `token`, the action that makes a
- * token (absent: the server takes none); `name`, the MCP server's name.
+ * token (absent: the server takes none); `name`, the MCP server's name;
+ * `save`, on a guest map, where the guest goes to keep it (the page then
+ * shows a quiet "save").
  * Injects action.register.
  */
 import { dirname, join } from "node:path";
@@ -28,6 +30,7 @@ export interface ConnectConfig {
   command?: string;
   token?: string;
   name?: string;
+  save?: string;
 }
 
 export const SETUP = "connect.setup";
@@ -47,7 +50,7 @@ const connect: Pack = {
     const register = ctx.get<ActionRegister>("action.register");
     const hook = config.hook ?? "http://127.0.0.1:5181/hook";
     const mcp = config.mcp ?? "http://127.0.0.1:5181/mcp";
-    const made: Setup = setup({ hook, mcp, command: config.command ?? localCommand(hook), token: !!config.token, name: config.name });
+    const made: Setup = setup({ hook, mcp, command: config.command ?? localCommand(hook), token: !!config.token, name: config.name, save: config.save });
 
     register.register({
       name: SETUP,

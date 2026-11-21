@@ -62,6 +62,12 @@ test("where a token is taken, the texts hold its placeholder until the person's 
   assert.equal(withToken(s.mcp, undefined), s.mcp);
 });
 
+test("a guest map's setup says where to save it; any other says nothing", () => {
+  const base = { hook: "h", mcp: "m", command: "c", token: false };
+  assert.equal(setup({ ...base, save: "/signup?save=1" }).save, "/signup?save=1");
+  assert.ok(!("save" in setup(base)));
+});
+
 test("the local command runs this checkout's hook script", () => {
   const c = localCommand("http://127.0.0.1:5181/hook");
   assert.match(c, /^node ".*\/packs\/claude-code\/hook\.ts" http:\/\/127\.0\.0\.1:5181\/hook$/);

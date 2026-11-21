@@ -25,6 +25,8 @@ export interface Where {
   token: boolean;
   /** The name the MCP server is added under. */
   name?: string;
+  /** On a guest map: where the guest goes to keep it (sign-up). */
+  save?: string;
 }
 
 export interface Setup {
@@ -36,6 +38,8 @@ export interface Setup {
   token: boolean;
   hookUrl: string;
   mcpUrl: string;
+  /** On a guest map: where the guest goes to keep it. */
+  save?: string;
 }
 
 const quote = (s: string) => (/[\s"]/.test(s) ? `"${s.replaceAll('"', '\\"')}"` : s);
@@ -49,7 +53,7 @@ export function setup(w: Where): Setup {
     EVENTS.map((e) => [e, [{ ...(MATCHED.has(e) ? { matcher: "*" } : {}), hooks: [{ type: "command", command: w.command, timeout: 5 }] }]]),
   );
   const settings = { ...(w.token ? { env: { ARCHIPELAGO_TOKEN: TOKEN } } : {}), hooks };
-  return { mcp, hooks: JSON.stringify(settings, null, 2), token: w.token, hookUrl: w.hook, mcpUrl: w.mcp };
+  return { mcp, hooks: JSON.stringify(settings, null, 2), token: w.token, hookUrl: w.hook, mcpUrl: w.mcp, ...(w.save ? { save: w.save } : {}) };
 }
 
 /** A text with the person's token put in. */

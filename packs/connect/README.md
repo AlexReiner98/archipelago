@@ -15,7 +15,7 @@ first run begins ─▶ ◐ First run · <its name>  open ─▶ Harness, on tha
 |---|---|---|
 | [setup.ts](setup.ts) | both | The MCP line and the hooks, from where the server is. Plain data |
 | [index.ts](index.ts) | server | `connect.setup`, and `connect.token` when a token action is named. Injects `action.register` |
-| [view.ts](view.ts) | page | Fills Field's `field.empty` and `over`. Injects `action.invoke`, `exchange.read`, `exchange.watch`, `here.set`, `slot.fill` |
+| [view.ts](view.ts) | page | Fills Field's `field.empty`, `over`, and `top` on a guest map. Injects `action.invoke`, `exchange.read`, `exchange.watch`, `here.set`, `slot.fill` |
 
 ## What is copied
 
@@ -47,6 +47,7 @@ shows it as dots. With no token action, nothing asks for one.
 | `command` | this checkout's `packs/claude-code/hook.ts`, with `hook` | How each hook runs |
 | `token` | none | The action that makes a token |
 | `name` | `archipelago` | The MCP server's name |
+| `save` | none | On a guest map: where the guest goes to keep it. The page then shows a quiet "save" in `top` |
 
 [app/tree.ts](../../app/tree.ts) sets `hook` and `mcp` from the page's port.
 A host in front sets its own address, command and token action.

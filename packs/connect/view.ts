@@ -8,6 +8,8 @@
  *   puts it in what is copied; the line on the page keeps it hidden.
  * - When the first run begins, a line in `over` says so, live, with the
  *   run's name: a click opens it in the harness view.
+ * - On a guest map (the server's setup names `save`), a quiet "save" in
+ *   `top` leads to where the guest signs up to keep it.
  *
  * Injects action.invoke, exchange.read, exchange.watch, here.set,
  * slot.fill. Nothing here writes to the map.
@@ -51,6 +53,8 @@ const STYLE = sheet(`
 .cn-landed { position:fixed; left:50%; bottom:calc(var(--space-5) * 3); transform:translateX(-50%); max-width:calc(100vw - 2 * var(--space-5)); display:flex; gap:var(--space-4); align-items:baseline; white-space:nowrap;
   background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:var(--space-3) var(--space-4); box-shadow:0 2px 8px rgb(0 0 0 / 12%); }
 .cn-landed .x { overflow:hidden; text-overflow:ellipsis; min-width:0; font-weight:var(--bold); }
+.cn-save { color:var(--dim); text-decoration:none; font-size:var(--text-s); }
+.cn-save:hover { color:var(--pick); }
 .cn-landed .f { flex:none; color:var(--dim); }
 .cn-landed .m::before { content:var(--glyph-circle-moving); color:var(--mark-moving); }
 .cn-landed .go { flex:none; color:var(--pick); cursor:pointer; }
@@ -79,11 +83,18 @@ const connectView: Pack = {
      */
     let had: boolean | undefined;
     let landed: RunInfo | undefined;
+    /** What this server says to copy, and where a guest saves the map: read once. */
+    let made: Setup | undefined;
+    let failed: string | undefined;
     const subs = new Set<() => void>();
     const tell = () => subs.forEach((f) => f());
     exchange.runs({ limit: 1 }).then(
       (p) => ((had = p.items.length > 0), tell()),
       () => ((had = false), tell()),
+    );
+    invoke.invoke({ action: SETUP, input: {}, authority: { of: "human", basis: "opened the map" }, reason: "Show how to connect Claude Code" }).then(
+      (o) => (o.ok ? (made = o.output as unknown as Setup) : (failed = o.refused.message), tell()),
+      (e) => ((failed = String(e?.message ?? e)), tell()),
     );
     ctx.effect(() =>
       live.watch({ kinds: ["begin"] }, async (e) => {
@@ -101,7 +112,7 @@ const connectView: Pack = {
         subs.add(f);
         return () => void subs.delete(f);
       }, []);
-      return { had, landed };
+      return { had, landed, made, failed };
     };
 
     const Copy = ({ text, off }: { text: string; off?: boolean }) => {
@@ -120,17 +131,10 @@ const connectView: Pack = {
 
     /** The next step on a map with no run: the MCP line, the hooks, and the wait for the first run. */
     const Connect = () => {
-      const { had } = useFirst();
-      const [setup, setSetup] = useState<Setup | undefined>(undefined);
+      const { had, made: setup, failed } = useFirst();
       const [token, setToken] = useState<string | undefined>(undefined);
-      const [err, setErr] = useState<string | undefined>(undefined);
-      useEffect(() => {
-        if (had !== false) return;
-        invoke.invoke({ action: SETUP, input: {}, authority: { of: "human", basis: "looked at a map with no run" }, reason: "Show how to connect Claude Code" }).then(
-          (o) => (o.ok ? setSetup(o.output as unknown as Setup) : setErr(o.refused.message)),
-          (e) => setErr(String(e?.message ?? e)),
-        );
-      }, [had]);
+      const [tokenErr, setErr] = useState<string | undefined>(undefined);
+      const err = tokenErr ?? failed;
       if (had !== false || (!setup && !err)) return null;
       const make = async () => {
         const o = await invoke.invoke<{ token: string }>({ action: MAKE_TOKEN, input: { name: "claude-code" }, authority: { of: "human", basis: "asked for a token on the page" }, reason: "A token for Claude Code" });
@@ -174,6 +178,13 @@ const connectView: Pack = {
       </div>`;
     };
 
+    /** On a guest map (the server names `save`): a quiet way to keep it, which leads to sign-up. */
+    const Save = () => {
+      const { made } = useFirst();
+      if (!made?.save) return null;
+      return html`<a class="cn-save" href=${made.save} title="This map is a guest's: sign up to keep it">save</a>`;
+    };
+
     ctx.effect(() => {
       const style = document.createElement("style");
       style.textContent = STYLE;
@@ -183,6 +194,7 @@ const connectView: Pack = {
     const fill = ctx.get<SlotFill>("slot.fill");
     fill.fill({ slot: "field.empty", name: "connect", view: Connect });
     fill.fill({ slot: "over", name: "landed", view: Landed });
+    fill.fill({ slot: "top", name: "save", view: Save });
   },
 };
 
