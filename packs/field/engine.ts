@@ -17,13 +17,18 @@ import { bounds, build, grid, seed, sizes, type FieldIn, type G, type Grid, type
 import { onStyle } from "../../spec/style.ts";
 import { ink, Light, paint, palette, type Cam, type Ink } from "./paint.ts";
 import { step, warm } from "./step.ts";
+import { FAINT, FOUND } from "./filter.ts";
 
 export interface Stats {
   n: number;
   m: number;
   steps: number;
   alpha: number;
-  state: "settling" | "settled";
+  /** Settled: the pushes balance; stopped: it hit steps_most first. */
+  state: "settling" | "settled" | "stopped";
+  /** How far particles moved in the last step, on average, and the mean push left. */
+  moved?: number;
+  push?: number;
   /** The mean time of a step over the last frames, in ms. */
   ms: number;
   /** Steps and time from the last seed or warm to settled. */
@@ -31,14 +36,16 @@ export interface Stats {
 }
 
 export interface Field {
-  /** A new map to lay out; `warmTo` is how warm the run gets (else alpha_warm). */
-  input(next: FieldIn, warmTo?: number): void;
-  /** What the find line finds, lit over the rest, or null for none: it never moves a particle. */
-  found(ids: Set<Id> | null): void;
+  /** A new map to lay out; `warmTo` is how warm the run gets (else alpha_warm); `refit`: the view follows the new picture again. */
+  input(next: FieldIn, warmTo?: number, refit?: boolean): void;
+  /** How each item is drawn while the find line has words (filter.ts FOUND, NEAR, FAINT), or null for none. */
+  found(levels: Map<Id, number> | null): void;
   settings(S: Settings, then: Dial["then"] | "none"): void;
   reseed(): void;
   fit(): void;
   stats(): Stats;
+  /** The graph as it is now (read it, never change it): the Packs view's check runs on a copy. */
+  graph(): G;
   /** Where each particle is now, by id: for tests and for whoever asks. */
   places(): Map<Id, [number, number]>;
   destroy(): void;
@@ -59,17 +66,17 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   let colours: Ink = ink(canvas);
   let pal = palette(canvas);
   let hover = -1, dirty = true, awake = false, stopped = false;
-  let foundIds: Set<Id> | null = null, match: Uint8Array | null = null;
+  let levels: Map<Id, number> | null = null, match: Uint8Array | null = null;
   const remark = () => {
-    match = foundIds ? Uint8Array.from(g.id, (id) => (foundIds!.has(id) ? 1 : 0)) : null;
+    match = levels ? Uint8Array.from(g.id, (id) => levels!.get(id) ?? FAINT) : null;
     dirty = true;
   };
   let stepMs = 0, runStart = { steps: 0, at: 0 }, settledIn: Stats["settledIn"];
   const size = () => ({ width: canvas.clientWidth, height: canvas.clientHeight, dpr: devicePixelRatio || 1 });
 
-  /** The camera that fits the whole picture now. */
+  /** The camera that fits the picture now: while the find line has words, what it finds (what is near may run past the edges). */
   const fitted = (): Cam => {
-    const [x0, y0, x1, y1] = bounds(g), { width, height } = size();
+    const [x0, y0, x1, y1] = bounds(g, match ? (i) => match![i] === FOUND : undefined), { width, height } = size();
     const pad = S.fit_pad!;
     const w = Math.max(1, width - 2 * pad), h = Math.max(1, height - 2 * pad);
     const k = Math.min(w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0));
@@ -81,12 +88,14 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
    * a share of the gap each frame (`follow_ms`), zooming by ratio about the
    * picture's middle, so the picture never jumps. True while still moving.
    */
-  let lastFollow = 0;
+  let lastFollow = 0, jump = false;
   const follow = (): boolean => {
     const now = performance.now(), dt = lastFollow ? Math.min(100, now - lastFollow) : 16;
     lastFollow = now;
     const to = fitted();
-    const a = S.follow_ms! > 0 ? 1 - Math.exp(-dt / S.follow_ms!) : 1;
+    // After a jump to what the find line keeps, the camera eases faster (find_follow_ms) until it gets there.
+    const ms = jump ? S.find_follow_ms! : S.follow_ms!;
+    const a = ms > 0 ? 1 - Math.exp(-dt / ms) : 1;
     const { width, height } = size();
     // Where the middle of the view looks, in the world, eased; then the zoom, eased by ratio.
     const mx = (width / 2 - cam.tx) / cam.k, my = (height / 2 - cam.ty) / cam.k;
@@ -95,7 +104,9 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     cam.k = k;
     cam.tx = width / 2 - nx * k;
     cam.ty = height / 2 - ny * k;
-    return Math.abs(Math.log(to.k / k)) > 0.002 || Math.hypot(tmx - nx, tmy - ny) * k > 0.5;
+    const moving = Math.abs(Math.log(to.k / k)) > 0.002 || Math.hypot(tmx - nx, tmy - ny) * k > 0.5;
+    if (!moving && !awake) jump = false;
+    return moving;
   };
   // ─── The physics' own loop: a slice, then a message to itself, until settled ───
   const chan = new MessageChannel();
@@ -137,7 +148,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   };
   const under = (sx: number, sy: number) => {
     const [wx, wy] = toWorld(sx, sy);
-    return pick.nearest(wx, wy, 4 / cam.k);
+    return pick.nearest(wx, wy, S.hover_px! / cam.k);
   };
 
   // ─── The loop ───
@@ -264,7 +275,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   canvas.addEventListener("dblclick", onDbl);
 
   return {
-    input(next, warmTo) {
+    input(next, warmTo, refit) {
       const first = !g.n;
       g = build(next, g.n ? g : null, pal);
       seed(g, S);
@@ -274,10 +285,11 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       hover = -1;
       remark();
       if (first && !cam.moved) fit();
+      if (refit) (cam.moved = false), (jump = true);
       wake();
     },
-    found(ids) {
-      foundIds = ids;
+    found(next) {
+      levels = next;
       remark();
     },
     settings(next, then) {
@@ -306,8 +318,11 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       dirty = true;
     },
     stats() {
-      const state = awake ? "settling" : "settled";
-      return { n: g.n, m: g.m, steps: g.sim.steps, alpha: g.sim.alpha, state, ms: stepMs, settledIn };
+      const state = awake ? "settling" : g.sim.settled === false ? "stopped" : "settled";
+      return { n: g.n, m: g.m, steps: g.sim.steps, alpha: g.sim.alpha, state, ms: stepMs, settledIn, moved: g.sim.moved, push: g.sim.push };
+    },
+    graph() {
+      return g;
     },
     places() {
       return new Map(g.id.map((id, i) => [id, [g.x[i]!, g.y[i]!]]));

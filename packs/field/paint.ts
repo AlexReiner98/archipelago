@@ -8,14 +8,26 @@ import type { Dial } from "./behaviour.ts";
 import { HUES, read } from "../../spec/style.ts";
 import { neighbours, type G, type Grid, type Settings } from "./graph.ts";
 import { place, type Want } from "./labels.ts";
+import { FAINT, FOUND } from "./filter.ts";
+import { CIRCLE, edge, fill, outline, reach } from "./shapes.ts";
+import { arrow, placeWires, wireName, type WireWant } from "./wires.ts";
 
 /** The drawing's own dials. */
 export const DRAW: Dial[] = [
   { key: "node_size", label: "particle size", min: 0.5, max: 12, step: 0.1, value: 3, then: "size", doc: "A particle's radius with no links, in world units." },
   { key: "node_grow", label: "grow with links", min: 0, max: 4, step: 0.05, value: 1.4, then: "size", doc: "How much a particle grows with its links: radius × (1 + this × log(1 + links))." },
+  { key: "shapes", label: "shapes", min: 0, max: 1, step: 1, value: 1, choices: ["circles", "by base"], then: "warm", doc: "Each particle in its base's mark shape (square, diamond, circle, triangle), hollow while its status is the first open one, half while later open, full once closed; collide packs them by their edges. Circles: every particle round and full." },
+  { key: "hollow_line", label: "hollow outline", min: 0.1, max: 0.9, step: 0.01, value: 0.4, then: "paint", doc: "A hollow or half particle's outline, as a share of its size." },
+  { key: "hollow_px", label: "hollow from", min: 0, max: 20, step: 0.5, value: 3, then: "paint", doc: "A particle smaller than this on screen (radius, px) is drawn full whatever its status: a hollow speck would vanish." },
   { key: "closed_fade", label: "closed fade", min: 0, max: 1, step: 0.01, value: 0.28, then: "paint", doc: "How faint a closed item (done, dropped, decided) is drawn." },
   { key: "link_alpha", label: "link strength", min: 0, max: 1, step: 0.01, value: 0.18, then: "paint", doc: "How strong a link's line is." },
   { key: "link_width", label: "link width", min: 0.1, max: 4, step: 0.1, value: 0.6, then: "paint", doc: "A link's width, in screen px." },
+  { key: "arrows", label: "arrows", min: 0, max: 1, step: 1, value: 1, choices: ["no", "yes"], then: "paint", doc: "Each link has an arrowhead at the end it points to (A depends_on B points at B)." },
+  { key: "arrow_px", label: "arrow size", min: 2, max: 20, step: 0.5, value: 6, then: "paint", doc: "An arrowhead's length, in screen px (its width is two thirds of that)." },
+  { key: "arrow_from_px", label: "arrows from", min: 0, max: 200, step: 2, value: 24, then: "paint", doc: "A link shorter than this on screen, in px, has no arrowhead." },
+  { key: "link_names", label: "link names", min: 0, max: 1, step: 1, value: 1, choices: ["no", "yes"], then: "paint", doc: "A link long enough on screen has its type's name along its middle: a lit one, or one whose ends are both big enough to be titled ('titles from')." },
+  { key: "link_name_from_px", label: "link names from", min: 20, max: 400, step: 5, value: 90, then: "paint", doc: "A link shorter than this on screen, in px, is not named." },
+  { key: "link_name_most", label: "link names at most", min: 0, max: 200, step: 5, value: 40, then: "paint", doc: "At most this many link names at once: the lit first, then the longest." },
   { key: "label_px", label: "titles from", min: 2, max: 40, step: 0.5, value: 9, then: "paint", doc: "A particle's title shows once its radius reaches this on screen, in px." },
   { key: "label_hubs", label: "always name hubs", min: 0, max: 100, step: 1, value: 15, then: "paint", doc: "The this-many most linked items are named at any zoom, so the picture reads before you zoom in." },
   { key: "label_most", label: "titles at most", min: 0, max: 600, step: 10, value: 120, then: "paint", doc: "At most this many titles at once." },
@@ -26,7 +38,8 @@ export const DRAW: Dial[] = [
   { key: "label_cover_px", label: "titles avoid", min: 0, max: 20, step: 0.5, value: 2, then: "paint", doc: "A title never covers another particle this many screen px across or more (0: it covers none at all)." },
   { key: "label_halo", label: "title halo", min: 0, max: 8, step: 0.5, value: 3, then: "paint", doc: "A ring of the sea round every letter, in screen px, so words read over particles and links." },
   { key: "label_fade", label: "title fade-in", min: 0.1, max: 20, step: 0.1, value: 3, then: "paint", doc: "A title fades in as its particle grows on screen from 'titles from' to this much more." },
-  { key: "query_fade", label: "find fades rest to", min: 0, max: 1, step: 0.01, value: 0.12, then: "paint", doc: "While the find line has words, how faint what it does not find is drawn (it never moves)." },
+  { key: "query_fade", label: "find fades rest to", min: 0, max: 1, step: 0.01, value: 0.12, then: "paint", doc: "While the find line has words, how faint the outer ring it keeps (find_faint) is drawn." },
+  { key: "hover_px", label: "hover reach", min: 0, max: 40, step: 1, value: 12, then: "paint", doc: "How far from a particle's edge the pointer still picks it, to light or click, in screen px (the nearest wins)." },
   { key: "hover_dim", label: "hover dims rest to", min: 0, max: 1, step: 0.01, value: 0.15, then: "paint", doc: "How faint the rest is while one particle is pointed at." },
   { key: "hover_grow", label: "hover grows", min: 0, max: 3, step: 0.05, value: 0.6, then: "paint", doc: "How much the particle pointed at grows (its neighbours a third of that), only into free room." },
   { key: "hover_ring", label: "hover ring", min: 0, max: 6, step: 0.1, value: 1.5, then: "paint", doc: "The accent ring round the particle pointed at, in screen px (0: none)." },
@@ -97,6 +110,36 @@ export class Light {
   }
 }
 
+/**
+ * One particle, in the fill and alpha set now: its shape, hollow or half by
+ * its status when shapes are on and it is big enough on screen. Hollow is a
+ * ring: the shape with its middle the sea. Half is one shape whose right
+ * half is that ring and whose left half stays solid, as ◐ (one fill, the
+ * hole punched only on the right, so it never reads as two shapes).
+ */
+function particle(c: CanvasRenderingContext2D, g: G, i: number, r: number, S: Settings, k: number, sea: string): void {
+  const shape = S.shapes ? g.shape[i]! : CIRCLE, x = g.x[i]!, y = g.y[i]!;
+  c.beginPath();
+  outline(c, shape, x, y, r);
+  c.fill();
+  const how = S.shapes && r * k >= S.hollow_px! ? fill(g.side[i]!) : 2;
+  if (how === 2) return;
+  const colour = c.fillStyle, inner = r * (1 - S.hollow_line!);
+  c.fillStyle = sea;
+  if (how === 1) {
+    const R = reach(shape) * r;
+    c.save();
+    c.beginPath();
+    c.rect(x, y - R, R, 2 * R);
+    c.clip();
+  }
+  c.beginPath();
+  outline(c, shape, x, y, inner);
+  c.fill();
+  if (how === 1) c.restore();
+  c.fillStyle = colour;
+}
+
 /** Which particles are among the `most` most linked, worked out once per graph and count. */
 const hubCache = new WeakMap<G, { most: number; hub: Uint8Array }>();
 function hubs(g: G, most: number): Uint8Array {
@@ -142,8 +185,9 @@ function fit(c: CanvasRenderingContext2D, s: string, px: number): string {
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
 /**
- * `match`: what the find line finds (1) and not (0), or null when it has no
- * words; what it does not find is drawn at `query_fade`.
+ * `match`: how each particle is drawn while the find line has words (filter.ts
+ * FOUND, NEAR, FAINT), or null when it has none; FAINT is drawn at `query_fade`,
+ * and only FOUND is always named.
  */
 export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, light: Light, ink: Ink, grid: Grid, size: { width: number; height: number; dpr: number }, match: Uint8Array | null = null, clear: [number, number, number, number][] = []): void {
   const { width, height, dpr } = size;
@@ -161,20 +205,39 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   // Links, faint, one path per kind (and per found or not); part_of in the muted ink.
   c.lineWidth = S.link_width! / cam.k;
   const partOf = g.linkKinds.indexOf("part_of");
-  const fade = (i: number) => (match && !match[i] ? S.query_fade! : 1);
+  const fade = (i: number) => (match && match[i] === FAINT ? S.query_fade! : 1);
+  const full = (i: number) => (match ? (match[i] !== FAINT ? 1 : 0) : 1);
+  // An arrowhead at a link's `to`, its tip on that particle's edge: added to a path, filled after the lines.
+  const alen = S.arrow_px! / cam.k, awide = (S.arrow_px! * 2) / 3 / cam.k, afrom = S.arrow_from_px! / cam.k;
+  const head = (path: Path2D, e: number) => {
+    const a = g.a[e]!, b = g.b[e]!, dx = g.x[a]! - g.x[b]!, dy = g.y[a]! - g.y[b]!;
+    if (Math.hypot(dx, dy) < afrom) return;
+    const back = g.r[b]! * (S.shapes ? edge(g.shape[b]!, Math.atan2(dy, dx)) : 1);
+    const p = arrow(g.x[a]!, g.y[a]!, g.x[b]!, g.y[b]!, back, alen, awide);
+    path.moveTo(p[0], p[1]);
+    path.lineTo(p[2], p[3]);
+    path.lineTo(p[4], p[5]);
+    path.closePath();
+  };
   for (let kind = 0; kind < g.linkKinds.length; kind++) for (const lit of match ? [0, 1] : [1]) {
     c.beginPath();
+    const heads = new Path2D();
     for (let e = 0; e < g.m; e++) {
       if (g.kind[e] !== kind) continue;
       const a = g.a[e]!, b = g.b[e]!;
-      if (match && (match[a]! && match[b]! ? 1 : 0) !== lit) continue;
+      if (match && (full(a) && full(b) ? 1 : 0) !== lit) continue;
       if (Math.max(g.x[a]!, g.x[b]!) < vx0 || Math.min(g.x[a]!, g.x[b]!) > vx1 || Math.max(g.y[a]!, g.y[b]!) < vy0 || Math.min(g.y[a]!, g.y[b]!) > vy1) continue;
       c.moveTo(g.x[a]!, g.y[a]!);
       c.lineTo(g.x[b]!, g.y[b]!);
+      if (S.arrows) head(heads, e);
     }
     c.globalAlpha = S.link_alpha! * faint * (kind === partOf ? 1.4 : 1) * (lit ? 1 : S.query_fade!);
     c.strokeStyle = kind === partOf ? ink.muted : ink.line;
     c.stroke();
+    // Heads a little stronger than their line, so a faint link still says which way it goes.
+    c.globalAlpha = Math.min(1, c.globalAlpha * 2);
+    c.fillStyle = c.strokeStyle;
+    c.fill(heads);
   }
   // The links between lit particles, strong, as lit as their fainter end.
   c.strokeStyle = ink.accent;
@@ -189,19 +252,24 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     c.moveTo(g.x[i]!, g.y[i]!);
     c.lineTo(g.x[j]!, g.y[j]!);
     c.stroke();
+    if (S.arrows) {
+      const one = new Path2D();
+      head(one, e);
+      c.fillStyle = ink.accent;
+      c.fill(one);
+    }
   }
   // Particles: the colour set once per type and openness, each circle filled on its own.
   for (let ty = 0; ty < g.types.length; ty++) {
     c.fillStyle = g.types[ty]!.colour;
     for (const [shut, hit] of [[1, 0], [0, 0], [1, 1], [0, 1]] as const) {
       if (!match && !hit) continue;
-      c.globalAlpha = (shut ? S.closed_fade! : 1) * faint * (match && !hit ? S.query_fade! : 1);
       for (let i = 0; i < g.n; i++) {
         if (g.typeIx[i] !== ty || g.closed[i] !== shut || !inView(i, g.r[i]!)) continue;
-        if (match && match[i] !== hit) continue;
-        c.beginPath();
-        c.arc(g.x[i]!, g.y[i]!, g.r[i]!, 0, 2 * Math.PI);
-        c.fill();
+        if (match && full(i) !== hit) continue;
+        // What the find line finds is drawn whole, closed or not: a plan's done steps still read.
+        c.globalAlpha = (shut && match?.[i] !== FOUND ? S.closed_fade! : 1) * faint * (match && !hit ? S.query_fade! : 1);
+        particle(c, g, i, g.r[i]!, S, cam.k, ink.sea);
       }
     }
   }
@@ -221,15 +289,14 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     const rr = Math.max(g.r[i]!, room);
     c.globalAlpha = shine[i]!;
     c.fillStyle = g.types[g.typeIx[i]!]!.colour;
-    c.beginPath();
-    c.arc(g.x[i]!, g.y[i]!, rr, 0, 2 * Math.PI);
-    c.fill();
+    particle(c, g, i, rr, S, cam.k, ink.sea);
     if (i === focus && S.hover_ring! > 0) {
       const lw = Math.min(S.hover_ring! / cam.k, rr / 2);
       c.strokeStyle = ink.accent;
       c.lineWidth = lw;
+      c.lineJoin = "round";
       c.beginPath();
-      c.arc(g.x[i]!, g.y[i]!, rr - lw / 2, 0, 2 * Math.PI);
+      outline(c, S.shapes ? g.shape[i]! : CIRCLE, g.x[i]!, g.y[i]!, rr + lw / 2);
       c.stroke();
     }
   }
@@ -243,12 +310,13 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   const hub = hubs(g, S.label_hubs!);
   const lit = light.dim > 0.5;
   const rank = (i: number) =>
-    (i === focus ? 64 : 0) + (shine[i]! > 0 ? 32 : 0) + (match?.[i] ? 16 : 0) + (light.named.has(g.id[i]!) ? 8 : 0) + (hub[i] ? 4 : 0) + (g.closed[i] ? 0 : 2);
+    (i === focus ? 64 : 0) + (shine[i]! > 0 ? 32 : 0) + (match?.[i] === FOUND ? 16 : 0) + (light.named.has(g.id[i]!) ? 8 : 0) + (hub[i] ? 4 : 0) + (g.closed[i] ? 0 : 2);
   const wants: number[] = [];
   for (let i = 0; i < g.n; i++) {
     if (!inView(i, 0)) continue;
-    // While one is pointed at, only it and its neighbours are named; while the find line has words, what it finds.
-    if (lit ? !(shine[i]! > 0.5) : match ? !match[i] : !(g.r[i]! * cam.k >= S.label_px! || hub[i])) continue;
+    // While one is pointed at, only it and its neighbours are named; while the find line has words, what it finds,
+    // then what is near it as room allows, never the faint edge.
+    if (lit ? !(shine[i]! > 0.5) : match ? !(match[i] === FOUND || (full(i) && (g.r[i]! * cam.k >= S.label_px! || hub[i]))) : !(g.r[i]! * cam.k >= S.label_px! || hub[i])) continue;
     wants.push(i);
   }
   wants.sort((p, q) => rank(q) - rank(p) || g.r[q]! - g.r[p]! || p - q);
@@ -286,9 +354,9 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   c.strokeStyle = ink.sea;
   for (const { i, box, within } of placed) {
     const rs = g.r[i]! * cam.k;
-    const grow = shine[i]! > 0 || match?.[i] || hub[i] ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
+    const grow = shine[i]! > 0 || match?.[i] === FOUND || hub[i] ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
     // A closed item's title is muted, like its particle.
-    const shut = g.closed[i] && !(shine[i]! > 0) && !within;
+    const shut = g.closed[i] && !(shine[i]! > 0) && !within && match?.[i] !== FOUND;
     c.globalAlpha = grow * Math.max(faint * fade(i), shine[i]!) * (shut ? 0.75 : 1);
     c.fillStyle = shut ? ink.muted : ink.text;
     const lines = texts.get(i)!, mid = (box[0] + box[2]) / 2;
@@ -298,6 +366,40 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
       if (S.label_halo! > 0) (c.lineWidth = S.label_halo!), c.strokeText(line, x, y);
       c.fillText(line, x, y);
     });
+  }
+  c.textAlign = "left";
+
+  // Link names, along their middles, over nothing named: the lit first, then the longest on screen.
+  if (!S.link_names || S.link_name_most! <= 0) return;
+  c.font = "9px ui-sans-serif, system-ui, sans-serif";
+  const sx = (i: number) => g.x[i]! * cam.k + cam.tx, sy = (i: number) => g.y[i]! * cam.k + cam.ty;
+  const wires: WireWant[] = [];
+  for (let e = 0; e < g.m; e++) {
+    const a = g.a[e]!, b = g.b[e]!;
+    if (match && !(full(a) && full(b))) continue;
+    const on = shine[a]! > 0.5 && shine[b]! > 0.5;
+    if (lit && !on) continue;
+    if (!inView(a, 0) && !inView(b, 0)) continue;
+    // Not lit: named only at the zoom where both ends' titles show, so the whole map is not buried in link names.
+    if (!on && Math.min(g.r[a]!, g.r[b]!) * cam.k < S.label_px!) continue;
+    wires.push({ e, x1: sx(a), y1: sy(a), x2: sx(b), y2: sy(b), w: c.measureText(wireName(g.linkKinds[g.kind[e]!]!)).width + 4, h: 11, lit: on });
+  }
+  const taken = [...clear, ...placed.map((p) => p.box as [number, number, number, number])];
+  // The particles' own room at each end, so a name sits clear of both.
+  const named = placeWires(wires, { width, height, from: S.link_name_from_px!, most: S.link_name_most!, ends: 12, taken });
+  c.textAlign = "center";
+  c.lineWidth = S.label_halo!;
+  for (const w of named) {
+    const a = g.a[w.e]!, b = g.b[w.e]!;
+    c.globalAlpha = Math.max(faint, Math.min(shine[a]!, shine[b]!)) * 0.9;
+    c.fillStyle = ink.muted;
+    c.save();
+    c.translate(w.x, w.y);
+    c.rotate(w.angle);
+    const t = wireName(g.linkKinds[g.kind[w.e]!]!);
+    if (S.label_halo! > 0) c.strokeText(t, 0, 0);
+    c.fillText(t, 0, 0);
+    c.restore();
   }
   c.textAlign = "left";
 }

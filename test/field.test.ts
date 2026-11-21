@@ -8,6 +8,8 @@ import assert from "node:assert/strict";
 import { build, seed, type FieldIn } from "../packs/field/graph.ts";
 import { BEHAVIOURS, RUN, defaults, step } from "../packs/field/step.ts";
 import { DRAW } from "../packs/field/paint.ts";
+import { CHECK, descends } from "../packs/field/descends.ts";
+import { FIND } from "../packs/field/filter.ts";
 
 /** A seeded random, so the map is the same each run. */
 function rand(s: number) {
@@ -34,23 +36,23 @@ const dials = () => [
   ...BEHAVIOURS.flatMap((b) => b.dials({ links: ["part_of", "depends_on", "about"] })),
   ...RUN,
   ...DRAW,
+  ...FIND,
 ];
 const settings = () => defaults(dials() as never);
 
-function settle(input: FieldIn, S = settings(), most = 4000) {
+function settle(input: FieldIn, S = settings()) {
   const g = build(input, null);
   seed(g, S);
   const t0 = performance.now();
-  let forces = 0;
-  while (step(g, S) && g.sim.steps < most) if (g.sim.alpha >= S.alpha_min!) forces++;
-  return { g, forces, steps: g.sim.steps, ms: performance.now() - t0 };
+  while (step(g, S));
+  return { g, steps: g.sim.steps, ms: performance.now() - t0 };
 }
 
 test("every number a behaviour reads is one of its dials", () => {
   for (const b of BEHAVIOURS) {
     const keys = new Set(b.dials({ links: ["part_of"] }).map((d) => d.key));
     assert.ok(keys.has(`w_${b.name}`), `${b.name} has its weight`);
-    const src = String(b.apply) + String(b.move ?? "");
+    const src = String(b.apply) + String(b.energy);
     for (const m of src.matchAll(/S\.(\w+)/g)) {
       const k = m[1]!;
       const known = keys.has(k) || dials().some((d) => d.key === k);
@@ -59,14 +61,32 @@ test("every number a behaviour reads is one of its dials", () => {
   }
 });
 
-test("2000 items settle in about 460 steps, a few ms each, the same way twice", () => {
-  const input = sample();
+test("a run settles where the pushes balance, not where it cooled, and the same way twice", () => {
+  const input = sample(600, 15);
   const a = settle(input);
-  console.log(`settled: ${a.forces} force steps, ${a.steps} in all, ${a.ms.toFixed(0)} ms (${(a.ms / a.steps).toFixed(1)} ms a step)`);
-  assert.ok(a.forces > 400 && a.forces < 520, `${a.forces} force steps`);
+  console.log(`settled: ${a.steps} steps, ${a.ms.toFixed(0)} ms (${(a.ms / a.steps).toFixed(1)} ms a step), moving ${a.g.sim.moved!.toFixed(3)} a step`);
+  assert.equal(a.g.sim.settled, true, "it settled before steps_most");
+  assert.ok(a.g.sim.moved! < settings().settle_move!, "nothing moves enough to see");
   assert.ok(a.ms / a.steps < 40, `${(a.ms / a.steps).toFixed(1)} ms a step`);
   const small = sample(300, 8);
   assert.deepEqual([...settle(small).g.x], [...settle(small).g.x], "the same answer settles the same way");
+});
+
+test("the rule: every behaviour's push is its energy's slope, and the energy only falls", () => {
+  const S = settings();
+  const g = build(sample(200, 8), null);
+  seed(g, S);
+  for (let k = 0; k < 30; k++) step(g, S);
+  const gather = BEHAVIOURS.find((b) => b.name === "gather")!;
+  for (const b of BEHAVIOURS) {
+    const v = descends(b, g, S, gather);
+    assert.ok(v.slope <= CHECK.slope_off, `${b.name}: its push is off its energy's slope by ${(v.slope * 100).toFixed(1)}%`);
+    assert.equal(v.rises, 0, `${b.name}: its energy rose at step ${v.firstRise}`);
+    assert.ok(v.to < v.from, `${b.name}: its energy fell`);
+  }
+  // A behaviour that breaks the rule is caught: a push with no energy behind it.
+  const spin = { ...gather, name: "spin", energy: () => 0, apply: (gg: typeof g, f: { x: Float32Array; y: Float32Array }) => { for (let i = 0; i < gg.n; i++) (f.x[i]! -= gg.y[i]! * 0.01), (f.y[i]! += gg.x[i]! * 0.01); } };
+  assert.equal(descends(spin, g, S, gather).ok, false, "a push that is no energy's slope fails");
 });
 
 test("collide leaves no particle on another, and part_of keeps a tree together", () => {
@@ -159,4 +179,78 @@ test("a type keeps its colour whatever the filter hides", async () => {
   // The legend gives the same colours.
   const f = facets(whole, { types: ["actor"] }, pal);
   assert.equal(f.types.find((t) => t.name === "work")?.colour, colourOf(all, "work"));
+});
+
+test("find keeps what it finds, the next steps in full, then a faint edge", async () => {
+  const { around, FOUND, NEAR, FAINT } = await import("../packs/field/filter.ts");
+  // A chain a - b - c - d - e, and f alone.
+  const item = (id: string) => ({ id, title: id, type: "work", status: "", closed: false });
+  const input: FieldIn = {
+    items: ["a", "b", "c", "d", "e", "f"].map(item),
+    links: [["a", "b"], ["b", "c"], ["c", "d"], ["d", "e"]].map(([from, to], k) => ({ id: `l${k}`, type: "depends_on", from: from!, to: to! })),
+  };
+  const level = around(input, new Set(["b"]), 1, 1);
+  assert.deepEqual(Object.fromEntries(level), { b: FOUND, a: NEAR, c: NEAR, d: FAINT });
+  assert.equal(level.has("e") || level.has("f"), false, "past the faint edge, nothing stays");
+  assert.deepEqual([...around(input, new Set(["b"]), 0, 0).keys()], ["b"], "0 and 0: only what it finds");
+  assert.equal(around(input, new Set(["zz"]), 1, 1).size, 0, "an id not drawn is never kept");
+});
+
+test("shapes: each has the area of its circle, and its edge is where it reaches", async () => {
+  const { edge, reach, edgeSlope, CIRCLE } = await import("../packs/field/shapes.ts");
+  const { SHAPES } = await import("../spec/style.ts");
+  for (let s = 0; s < SHAPES.length; s++) {
+    // The area under the edge, all the way round, is π (a unit circle's).
+    let area = 0;
+    const steps = 3600;
+    for (let k = 0; k < steps; k++) area += (edge(s, (k / steps) * 2 * Math.PI) ** 2 * Math.PI) / steps;
+    assert.ok(Math.abs(area - Math.PI) < 0.01, `${SHAPES[s]}: area ${area.toFixed(3)}`);
+    let most = 0;
+    for (let k = 0; k < steps; k++) most = Math.max(most, edge(s, (k / steps) * 2 * Math.PI));
+    assert.ok(Math.abs(most - reach(s)) < 1e-3, `${SHAPES[s]} reaches ${reach(s).toFixed(3)}`);
+    // The slope is edge's own.
+    const th = 0.3, h = 1e-5;
+    assert.ok(Math.abs((edge(s, th + h) - edge(s, th - h)) / (2 * h) - edgeSlope(s, th)) < 1e-4, `${SHAPES[s]}'s slope`);
+  }
+  assert.equal(edge(CIRCLE, 1.234), 1);
+  // A square's flat side is nearer than its corner.
+  const square = SHAPES.indexOf("square");
+  assert.ok(edge(square, 0) < edge(square, Math.PI / 4));
+});
+
+test("flow: what an item waits on is ranked before it, and a plan settles left to right", async () => {
+  const { ranks } = await import("../packs/field/behaviours/flow.ts");
+  const item = (id: string) => ({ id, title: id, type: "work", status: "todo", closed: false });
+  // d waits on c and b; c and b wait on a; x waits on itself through y (a loop).
+  const dep = (from: string, to: string, k: number) => ({ id: `d${k}`, type: "depends_on", from, to });
+  const input: FieldIn = {
+    items: ["a", "b", "c", "d", "x", "y", "lone"].map(item),
+    links: [dep("b", "a", 0), dep("c", "a", 1), dep("d", "b", 2), dep("d", "c", 3), dep("x", "y", 4), dep("y", "x", 5), { id: "p", type: "part_of", from: "lone", to: "a" }],
+  };
+  const g = build(input, null);
+  const r = ranks(g, g.linkKinds.map((t) => t === "depends_on"));
+  const rank = (id: string) => r.rank[g.idIx.get(id)!];
+  assert.deepEqual(["a", "b", "c", "d"].map(rank), [0, 1, 1, 2]);
+  assert.equal(rank("lone"), -1, "no order link: no rank");
+  assert.ok(rank("x")! >= 0 && rank("y")! >= 0, "a loop is cut, not lost");
+  const { g: laid } = settle(input);
+  const x = (id: string) => laid.x[laid.idIx.get(id)!]!;
+  assert.ok(x("a") < x("b") && x("a") < x("c") && x("b") < x("d") && x("c") < x("d"), "left to right in order");
+});
+
+test("link names: none over a title or each other, the lit first, upright", async () => {
+  const { placeWires, arrow, wireName } = await import("../packs/field/wires.ts");
+  const w = (e: number, x1: number, y1: number, x2: number, y2: number, lit = false) => ({ e, x1, y1, x2, y2, w: 50, h: 11, lit });
+  const at = { width: 400, height: 300, from: 60, most: 10, ends: 10, taken: [[150, 140, 250, 160]] as [number, number, number, number][] };
+  const placed = placeWires([w(0, 0, 50, 300, 50), w(1, 0, 52, 300, 52), w(2, 100, 150, 300, 150), w(3, 10, 200, 40, 200), w(4, 300, 250, 100, 250, true)], at);
+  const ids = placed.map((p) => p.e);
+  assert.equal(ids[0], 4, "the lit first");
+  assert.ok(ids.includes(0) && !ids.includes(1), "a name over another is left out");
+  assert.ok(!ids.includes(2), "none over a title");
+  assert.ok(!ids.includes(3), "a link too short is not named");
+  assert.ok(placed.every((p) => Math.abs(p.angle) <= Math.PI / 2), "upright");
+  // An arrow's tip sits on the far end's edge, pointing at it.
+  const [tx, ty] = arrow(0, 0, 100, 0, 10, 6, 4);
+  assert.deepEqual([tx, ty], [90, 0]);
+  assert.equal(wireName("depends_on"), "depends on");
 });

@@ -13,6 +13,12 @@ const gather: Behaviour = {
     weight("gather"),
     { key: "gather_k", label: "pull", min: 0, max: 0.05, step: 0.0005, value: 0.004, doc: "How hard each particle is pulled toward the middle, by its distance from it." },
   ],
+  // Half the pull times each particle's distance from the middle, squared.
+  energy(g, S) {
+    let u = 0;
+    for (let i = 0; i < g.n; i++) u += g.x[i]! ** 2 + g.y[i]! ** 2;
+    return (S.gather_k! * u) / 2;
+  },
   apply(g, f, S) {
     const k = S.gather_k!;
     for (let i = 0; i < g.n; i++) {

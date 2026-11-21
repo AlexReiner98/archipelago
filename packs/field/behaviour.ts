@@ -1,8 +1,11 @@
 /**
- * What a behaviour is, and what a dial is. Each behaviour adds a push to
- * every particle's force; the step sums them, each times its weight, and
- * moves the particles. A behaviour may also move particles outright after
- * the step (`move`), for a search no force expresses.
+ * What a behaviour is, and what a dial is. Each behaviour lowers an energy
+ * of its own (`energy`), and its push on every particle is that energy's
+ * downhill slope (`apply`); the step sums them, each times its weight, and
+ * moves the particles. So the run's whole energy falls step by step and the
+ * run ends when the push left is small: it settles, never only cools.
+ * `descends` (descends.ts) checks a behaviour keeps to this, and the field's
+ * test holds every behaviour to it.
  *
  * Every number a behaviour reads is one of its dials: the panel shows each,
  * so nothing is hard-coded. Its first dial is its weight, `w_<name>`.
@@ -47,12 +50,14 @@ export interface Behaviour {
   /** Whether it runs when nobody has said. */
   on: boolean;
   dials(c: DialContext): Dial[];
-  /** A firm behaviour's push is not cooled with the run (collide). */
-  firm?: boolean;
+  /**
+   * The energy it lowers, for where the particles are now (before its
+   * weight). Its push is this energy's downhill slope. Read by checks, not
+   * by the run, so it may be slower than `apply` (all pairs, say).
+   */
+  energy(g: G, S: Settings): number;
+  /** Adds its push to every particle's force: the downhill slope of `energy`. */
   apply(g: G, f: Force, S: Settings, sim: Sim): void;
-  move?(g: G, S: Settings, sim: Sim): void;
-  /** Whether its search still has work once the forces sleep. */
-  busy?(sim: Sim): boolean;
 }
 
 /** The weight dial every behaviour has first. */

@@ -3,6 +3,8 @@
  * type, so what is part of a thing sits close to it. A stiffness of 0
  * leaves that type out of the structure: still drawn, pulling nothing.
  * A hub's springs are each weaker, so its many links don't pull it apart.
+ * Its energy is a quarter of each stiffness times how far the link is
+ * from its length, squared; each end feels the same pull.
  */
 import { weight, type Behaviour } from "../behaviour.ts";
 
@@ -34,6 +36,18 @@ const springs: Behaviour = {
       ];
     }),
   ],
+  energy(g, S) {
+    const len = g.linkKinds.map((t) => S[lengthKey(t)] ?? OTHER[0]);
+    const stiff = g.linkKinds.map((t) => S[stiffKey(t)] ?? OTHER[1]);
+    let u = 0;
+    for (let e = 0; e < g.m; e++) {
+      const kind = g.kind[e]!, k = stiff[kind]!, a = g.a[e]!, b = g.b[e]!;
+      if (!k) continue;
+      const d = Math.hypot(g.x[b]! - g.x[a]!, g.y[b]! - g.y[a]!, g.z[b]! - g.z[a]!);
+      u += (k * (d - len[kind]!) ** 2) / 4 / Math.pow(Math.min(g.degree[a]!, g.degree[b]!), S.springs_hub!);
+    }
+    return u;
+  },
   apply(g, f, S) {
     const len = g.linkKinds.map((t) => S[lengthKey(t)] ?? OTHER[0]);
     const stiff = g.linkKinds.map((t) => S[stiffKey(t)] ?? OTHER[1]);
@@ -44,15 +58,13 @@ const springs: Behaviour = {
       const a = g.a[e]!, b = g.b[e]!;
       const dx = g.x[b]! - g.x[a]!, dy = g.y[b]! - g.y[a]!, dz = g.z[b]! - g.z[a]!;
       const d = Math.hypot(dx, dy, dz) || 1e-6;
-      const da = g.degree[a]!, db = g.degree[b]!;
-      const pull = (k * (d - len[kind]!)) / d / Math.pow(Math.min(da, db), hub);
-      const share = da / (da + db);
-      f.x[a]! += dx * pull * (1 - share);
-      f.y[a]! += dy * pull * (1 - share);
-      f.z[a]! += dz * pull * (1 - share);
-      f.x[b]! -= dx * pull * share;
-      f.y[b]! -= dy * pull * share;
-      f.z[b]! -= dz * pull * share;
+      const pull = (k * (d - len[kind]!)) / d / 2 / Math.pow(Math.min(g.degree[a]!, g.degree[b]!), hub);
+      f.x[a]! += dx * pull;
+      f.y[a]! += dy * pull;
+      f.z[a]! += dz * pull;
+      f.x[b]! -= dx * pull;
+      f.y[b]! -= dy * pull;
+      f.z[b]! -= dz * pull;
     }
   },
 };
