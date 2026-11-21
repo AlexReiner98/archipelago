@@ -123,15 +123,7 @@ const map: Pack = {
       useEffect(() => index.watch(() => tick((x) => x + 1)) as () => void, []);
       return index;
     };
-    const Slot = ({ name }: { name: string }) => {
-      const [, tick] = useState(0);
-      useEffect(() => {
-        const stop = slots.watch(name, () => tick((x) => x + 1));
-        tick((x) => x + 1);
-        return stop as () => void;
-      }, [name]);
-      return html`${slots.fills(name).map((f) => html`<${f.view} key=${`${f.pack}/${f.name}`} />`)}`;
-    };
+    const Slot = slots.Slot;
 
     /** Every mark the canvas draws: each base with each of its statuses, then each kind of link. */
     const Key = () => {

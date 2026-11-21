@@ -14,7 +14,7 @@ the live run both follow. Types: [here.ts](here.ts).
 
 ## Keys
 
-The spec declares four so that packs that have never met agree on them:
+The spec declares five so that packs that have never met agree on them:
 
 | Key | Holds |
 |---|---|
@@ -22,6 +22,7 @@ The spec declares four so that packs that have never met agree on them:
 | `here.run` | the run being looked at |
 | `here.node` | the node being looked at |
 | `here.event` | the exchange event being looked at |
+| `here.view` | the fill shown in the region `center`, as `pack/name` (edition 7, [frame](frame.md)) |
 
 A pack declares any others under its own name, with a scope:
 
