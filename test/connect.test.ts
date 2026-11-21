@@ -6,7 +6,11 @@ import { Loader, type Entry } from "../runtime/loader.ts";
 import action from "../packs/action/index.ts";
 import graph from "../packs/graph/index.ts";
 import connect, { localCommand, MAKE_TOKEN, SETUP } from "../packs/connect/index.ts";
-import { EVENTS, setup, TOKEN, withToken, type Setup } from "../packs/connect/setup.ts";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { createServer } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { EVENTS, install, setup, TOKEN, withToken, type Setup } from "../packs/connect/setup.ts";
 import { runName } from "../packs/connect/view.ts";
 
 const BASE = "mem:/packs/";
@@ -96,6 +100,48 @@ test("connect.token makes a token for a person, and refuses an agent", async () 
   const refused = await call(agent, MAKE_TOKEN);
   assert.equal(refused.ok, false);
   assert.equal(!refused.ok && refused.refused.code, "person_only");
+});
+
+test("with a served script, the hooks are one command; a token path goes to the page, not to an action", async () => {
+  const { person } = await setupTree({ hook: "https://map.example/hook", mcp: "https://map.example/mcp", token: "/account/token", script: "https://map.example/hook.ts" });
+  const s = (await call(person, SETUP)) as { ok: true; output: unknown };
+  const out = s.output as Setup;
+  assert.equal(out.token, true);
+  assert.equal(out.tokenAt, "/account/token");
+  assert.ok(out.install?.startsWith('node -e "') && out.install.includes("https://map.example/hook.ts") && out.install.includes(TOKEN));
+  assert.equal((await call(person, MAKE_TOKEN)).ok, false, "no connect.token when the host makes tokens");
+  assert.throws(() => install("https://x/hook.ts?a=$(rm)", "https://x/hook", false));
+});
+
+test("the install command fetches the script and merges the hooks, keeping what was there, once", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "connect-"));
+  const home = join(dir, "home");
+  mkdirSync(join(home, ".claude"), { recursive: true });
+  writeFileSync(join(home, ".claude", "settings.json"), JSON.stringify({ model: "x", hooks: { Stop: [{ hooks: [{ type: "command", command: "other-tool" }] }] } }));
+  const server = createServer((_q, r) => r.end("// the hook script"));
+  await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
+  const port = (server.address() as { port: number }).port;
+  try {
+    const cmd = withToken(install(`http://127.0.0.1:${port}/hook.ts`, "https://map.example/hook", true), "tok_1");
+    const js = cmd.slice('node -e "'.length, -1);
+    const env = { ...process.env, HOME: home, USERPROFILE: home };
+    for (let k = 0; k < 2; k++) {
+      await new Promise<void>((ok, no) => {
+        import("node:child_process").then(({ execFile }) => execFile(process.execPath, ["-e", js], { env }, (e) => (e ? no(e) : ok())));
+      });
+    }
+    assert.equal(readFileSync(join(home, ".archipelago", "hook.ts"), "utf8"), "// the hook script");
+    const c = JSON.parse(readFileSync(join(home, ".claude", "settings.json"), "utf8"));
+    assert.equal(c.model, "x");
+    assert.deepEqual(Object.keys(c.hooks).sort(), [...EVENTS].sort());
+    assert.equal(c.hooks.Stop.length, 2, "the other tool's hook stays, and ours is there once");
+    assert.equal(c.hooks.PreToolUse[0].matcher, "*");
+    assert.match(c.hooks.Stop[1].hooks[0].command, /^node ".*\/\.archipelago\/hook\.ts" https:\/\/map\.example\/hook$/);
+    assert.equal(c.env.ARCHIPELAGO_TOKEN, "tok_1");
+  } finally {
+    server.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("a run is named by its title, else its folder, else its id", () => {

@@ -27,6 +27,13 @@ first run begins ─▶ ◐ First run · <its name>  open ─▶ Harness, on tha
   as a command hook, `command`. Where the server takes a token, its `env`
   sets `ARCHIPELAGO_TOKEN`, which the hook script sends.
 
+Where a hook script is served (`script`), the hooks row is instead one
+command, the same in bash, PowerShell and cmd: `node -e "…"` fetches the
+script to `~/.archipelago/hook.ts` and merges a hook per event into
+`~/.claude/settings.json`, replacing an earlier one of its own and keeping
+everything else, with the token in its `env`. Run again, it changes
+nothing. An address that isn't safe inside the command is refused.
+
 Each row is one line on the page, cut to fit; the copy is the whole text.
 
 ## Tokens
@@ -45,7 +52,8 @@ shows it as dots. With no token action, nothing asks for one.
 | `hook` | `http://127.0.0.1:5181/hook` | The adapter's `/hook`, as Claude Code reaches it |
 | `mcp` | `http://127.0.0.1:5181/mcp` | The adapter's `/mcp` |
 | `command` | this checkout's `packs/claude-code/hook.ts`, with `hook` | How each hook runs |
-| `token` | none | The action that makes a token |
+| `token` | none | The action that makes a token, or a path on the page's origin: the page posts `{name}` there with its cookie and gets `{name, token}` (a host's gateway that keeps tokens) |
+| `script` | none | Where a hook script is served (`<origin>/hook.ts`): the hooks row is then one command |
 | `name` | `archipelago` | The MCP server's name |
 | `save` | none | On a guest map: where the guest goes to keep it. The page then shows a quiet "save" in `top` |
 

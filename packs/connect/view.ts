@@ -137,13 +137,25 @@ const connectView: Pack = {
       const err = tokenErr ?? failed;
       if (had !== false || (!setup && !err)) return null;
       const make = async () => {
+        if (setup?.tokenAt) {
+          // The host keeps tokens: ask it, on this origin, with this page's cookie.
+          try {
+            const r = await fetch(setup.tokenAt, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "claude-code" }) });
+            const out = (await r.json().catch(() => ({}))) as { token?: unknown; error?: unknown };
+            if (r.ok && typeof out.token === "string") setToken(out.token);
+            else setErr(typeof out.error === "string" ? out.error : `No token came back (${r.status}).`);
+          } catch (e) {
+            setErr(String((e as Error)?.message ?? e));
+          }
+          return;
+        }
         const o = await invoke.invoke<{ token: string }>({ action: MAKE_TOKEN, input: { name: "claude-code" }, authority: { of: "human", basis: "asked for a token on the page" }, reason: "A token for Claude Code" });
         if (o.ok && typeof o.output?.token === "string") setToken(o.output.token);
         else setErr(o.ok ? "No token came back." : o.refused.message);
       };
       const needs = !!setup?.token && !token;
       const mcp = setup ? withToken(setup.mcp, token) : "";
-      const hooks = setup ? withToken(setup.hooks, token) : "";
+      const hooks = setup ? withToken(setup.install ?? setup.hooks, token) : "";
       return html`<div class="cn">
         <div class="cn-head">
           <span class="t" title="Each Claude Code session then reports here: the hooks record every run, and the MCP server lets the agent read and change the map.">Connect Claude Code</span>
@@ -153,9 +165,13 @@ const connectView: Pack = {
           <div class="cn-row" title=${`Run in a terminal:\n${hidden(setup.mcp, token)}`}>
             <span class="k">MCP</span><span class=${`v${needs ? " off" : ""}`}>${hidden(setup.mcp, token)}</span><${Copy} text=${mcp} off=${needs} />
           </div>
-          <div class="cn-row" title=${`Merge into ~/.claude/settings.json: every event goes to\n${setup.hookUrl}`}>
-            <span class="k">Hooks</span><span class=${`v${needs ? " off" : ""}`}>~/.claude/settings.json · ${EVENTS.length} hooks</span><${Copy} text=${hooks} off=${needs} />
-          </div>`}
+          ${setup.install
+            ? html`<div class="cn-row" title=${`Run in a terminal: it saves the hook script to ~/.archipelago/hook.ts and adds ${EVENTS.length} hooks to ~/.claude/settings.json, keeping the rest. Every event goes to\n${setup.hookUrl}`}>
+                <span class="k">Hooks</span><span class=${`v${needs ? " off" : ""}`}>node -e … · ${EVENTS.length} hooks into ~/.claude/settings.json</span><${Copy} text=${hooks} off=${needs} />
+              </div>`
+            : html`<div class="cn-row" title=${`Merge into ~/.claude/settings.json: every event goes to\n${setup.hookUrl}`}>
+                <span class="k">Hooks</span><span class=${`v${needs ? " off" : ""}`}>~/.claude/settings.json · ${EVENTS.length} hooks</span><${Copy} text=${hooks} off=${needs} />
+              </div>`}`}
         ${err && html`<div class="cn-err" title=${err}>${err}</div>`}
         <div class="cn-wait" title="Start Claude Code in any repository: its run shows here as it begins."><span class="k cn-mark"></span><span>Waiting for the first run</span></div>
       </div>`;

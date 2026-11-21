@@ -14,7 +14,10 @@
  * packs/claude-code/hook.ts, with `hook`); `token`, the action that makes a
  * token (absent: the server takes none); `name`, the MCP server's name;
  * `save`, on a guest map, where the guest goes to keep it (the page then
- * shows a quiet "save").
+ * shows a quiet "save"); `script`, where a hook script is served, so the
+ * hooks are one command. `token` may be a path instead of an action: the
+ * page then posts `{name}` to it on its own origin, with its cookie, and
+ * gets `{name, token}` (a host's gateway that keeps the tokens).
  * Injects action.register.
  */
 import { dirname, join } from "node:path";
@@ -31,6 +34,7 @@ export interface ConnectConfig {
   token?: string;
   name?: string;
   save?: string;
+  script?: string;
 }
 
 export const SETUP = "connect.setup";
@@ -50,7 +54,9 @@ const connect: Pack = {
     const register = ctx.get<ActionRegister>("action.register");
     const hook = config.hook ?? "http://127.0.0.1:5181/hook";
     const mcp = config.mcp ?? "http://127.0.0.1:5181/mcp";
-    const made: Setup = setup({ hook, mcp, command: config.command ?? localCommand(hook), token: !!config.token, name: config.name, save: config.save });
+    // A token is made by an action (an action name), or by the host in front (a path the page posts to).
+    const tokenAt = config.token?.startsWith("/") ? config.token : undefined;
+    const made: Setup = setup({ hook, mcp, command: config.command ?? localCommand(hook), token: !!config.token, name: config.name, save: config.save, script: config.script, tokenAt });
 
     register.register({
       name: SETUP,
@@ -63,7 +69,7 @@ const connect: Pack = {
     });
 
     const tokenAction = config.token;
-    if (!tokenAction) return;
+    if (!tokenAction || tokenAt) return;
     register.register({
       name: MAKE_TOKEN,
       title: "Make a token for Claude Code",
