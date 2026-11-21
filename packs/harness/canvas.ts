@@ -26,7 +26,7 @@ import htm from "htm";
 import type { NodeInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { sheet, v } from "../../spec/style.ts";
-import { branchAt, lightOf, pointAt, route, STYLE, type Placed, type Tree } from "./layout.ts";
+import { branchAt, dotsBox, lightOf, pointAt, route, STYLE, type Placed, type Tree } from "./layout.ts";
 import { tintOf, wayOf, type Dials } from "./tint.ts";
 import type { Verdict } from "./hooks.ts";
 import type { Heard, Hold } from "./replay.ts";
@@ -47,7 +47,9 @@ export const CANVAS_STYLE = sheet(`
 .rx-branch { transition:stroke var(--rx-fade), stroke-opacity var(--rx-fade); }
 .rx-branch.tint { stroke:var(--tint) !important; stroke-opacity:1 !important; filter:drop-shadow(0 0 2px var(--tint)); }
 .rx-name { transition:fill var(--rx-fade), opacity var(--rx-fade); }
-.rx-small .rx-name { opacity:0; }
+.rx-small .rx-name { opacity:0; font-size:15px; paint-order:stroke; stroke:var(--bg); stroke-width:3px; stroke-linejoin:round; }
+.rx-small .rx-branch { stroke-width:2px !important; }
+.rx-small .rx-dot { r:3.5px; }
 .rx-small .rx-lit .rx-name, .rx-small .rx-said .rx-name, .rx-small .rx-refused .rx-name, .rx-small .rx-pick .rx-name { opacity:1; }
 .rx-dot { fill:var(--fg); fill-opacity:.85; }
 .rx-bough .rx-dot { fill-opacity:.5; }
@@ -284,14 +286,15 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   const [fits, refit] = useState(0);
   const now = useRef({ tree, placed, k: view.k, dials });
   now.current = { tree, placed, k: view.k, dials };
-  const bounds = placed.box;
+  // Small, names mostly hidden: fit the dots, so the tree fills its cell.
+  const bounds = small ? dotsBox(placed) : placed.box;
 
   useEffect(() => {
     const W = box.current?.clientWidth || 900;
     const H = box.current?.clientHeight || 700;
     const k = Math.min(3, Math.max(0.1, Math.min(W / bounds.width, H / bounds.height)));
     setView({ k, x: bounds.x - (W / k - bounds.width) / 2, y: bounds.y - (H / k - bounds.height) / 2 });
-  }, [placed, fits]);
+  }, [placed, fits, small]);
   // Fit again when the canvas changes size: it is first measured before the page has laid it out.
   useEffect(() => {
     let last = "";

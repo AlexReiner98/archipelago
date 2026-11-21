@@ -58,8 +58,9 @@ Live mode and the agents are one idea: each live run is an agent, in the
 colour live mode gives it, with a tree of its own in a grid (one, two, then
 three across), in the order of their colours so a tree keeps its place. Its
 tree holds only the nodes it hears (`profile.read.hears`), hung as the big
-tree is, with how many of all it hears. Small, a tree names only what is
-lit, what the agent was told, and what is picked. Faint until it does
+tree is, with how many of all it hears. Small, a tree fits its dots to fill its cell
+(`dotsBox`), and names only what is lit, what the agent was told, and
+what is picked. Faint until it does
 something while watched (one that stopped without ending stays live). A
 click on its name looks at it alone.
 

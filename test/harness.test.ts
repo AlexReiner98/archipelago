@@ -11,7 +11,7 @@ import { asText, expand, fold, pretty } from "../packs/harness/expand.ts";
 import type { NodeInfo, RunInfo } from "../spec/agent.ts";
 import { HUES } from "../spec/style.ts";
 import { colours, keepLast, liveRuns } from "../packs/harness/live.ts";
-import { DECIDED, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
+import { DECIDED, dotsBox, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 import { placementOf, placementText } from "../packs/harness/agents.ts";
 import { DIALS, dialsOf, tintOf, wayOf } from "../packs/harness/tint.ts";
@@ -472,4 +472,11 @@ test("landsLive: nothing picked watches every live run; a run, every run or live
   assert.equal(landsLive(undefined, "r1", false), false);
   assert.equal(landsLive(undefined, undefined, true), false);
   assert.equal(landsLive(false, undefined, false), false, "the last active, asked for");
+});
+
+test("dotsBox: a small tree fits its dots, tighter than its bounds with names", () => {
+  const placed = radial(treeOf(NODES));
+  const d = dotsBox(placed, 10);
+  for (const p of placed.xy.values()) assert.ok(p.x >= d.x && p.x <= d.x + d.width && p.y >= d.y && p.y <= d.y + d.height);
+  assert.ok(d.width * d.height < placed.box.width * placed.box.height);
 });

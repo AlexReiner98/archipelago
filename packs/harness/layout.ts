@@ -393,6 +393,13 @@ export function pointAt(points: [number, number][], u: number): [number, number]
   return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
 }
 
+/** The bounds of the dots only, past them by `margin`: what a small tree fits, its names mostly hidden. */
+export function dotsBox(placed: Placed, margin = 40): Placed["box"] {
+  let x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+  for (const p of placed.xy.values()) (x0 = Math.min(x0, p.x)), (y0 = Math.min(y0, p.y)), (x1 = Math.max(x1, p.x)), (y1 = Math.max(y1, p.y));
+  return { x: x0 - margin, y: y0 - margin, width: x1 - x0 + 2 * margin, height: y1 - y0 + 2 * margin };
+}
+
 /** Each pack's hue: the map's words are the owner's, what grow learned its own, every other pack the next hue. */
 export function packHues(packs: string[], style = STYLE): Map<string, string> {
   let next = 0;
