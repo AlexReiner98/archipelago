@@ -7,7 +7,7 @@
  *
  * It is a section of the style pack's own page in the Packs view (the
  * slot `docs.page`), not a view in the list: a reference for whoever
- * builds a pack, out of the way of everyone else (Alex, 21 Nov 2026).
+ * builds a pack, out of the way of everyone else (21 Nov 2026).
  */
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";

@@ -1,4 +1,4 @@
-# Archipelago (next)
+# Archipelago
 
 Software that agents and people build together, live, out of interchangeable
 packs, around a shared map of the work.
