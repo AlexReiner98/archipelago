@@ -1,7 +1,7 @@
 /**
  * slot: UI composition. See slot.md.
  *
- * Panels are Preact function components (Alex, 20 Nov 2026). The graph is
+ * Panels are Preact function components (20 Nov 2026). The graph is
  * not drawn with components: it is one scene surface that packs fill with
  * layers (scene.ts).
  */

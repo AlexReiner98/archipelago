@@ -143,7 +143,7 @@ test("an entry's intercept reaches providers as the actor and run, updated in pl
     },
   };
   const { loader } = setup({ "who.ts": who, "asker.ts": asker });
-  const actor = { id: "e_alex", kind: "person" };
+  const actor = { id: "e_owner", kind: "person" };
   await loader.apply([
     { id: "who", pack: "who.ts" },
     { id: "page", intercept: { actor }, children: [{ id: "asker", pack: "asker.ts" }] },

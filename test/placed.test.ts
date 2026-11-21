@@ -40,16 +40,16 @@ test("skill names come from SKILL.md paths", () => {
 test("a profile's skill moves from home into the folders of the runs it holds it for, once the profile is on; unloading puts it back", async () => {
   const root = await mkdtemp(join(tmpdir(), "placed-"));
   const home = join(root, "home");
-  const aperture = join(root, "Aperture");
+  const studio = join(root, "Studio");
   const arch = join(root, "archipelago-next");
   const skill = join(home, ".claude", "skills", "rhino", "SKILL.md");
-  const exclude = join(aperture, ".git", "info", "exclude");
+  const exclude = join(studio, ".git", "info", "exclude");
   await mkdir(dirname(skill), { recursive: true });
   await mkdir(dirname(exclude), { recursive: true });
   await mkdir(arch, { recursive: true });
   await writeFile(skill, "# Rhino\n", "utf8");
   await writeFile(exclude, "# git ls-files --others --exclude-from=.git/info/exclude\n", "utf8");
-  const git = async (cwd: string, args: string[]) => (cwd === aperture && args[0] === "rev-parse" ? ".git/info/exclude" : undefined);
+  const git = async (cwd: string, args: string[]) => (cwd === studio && args[0] === "rev-parse" ? ".git/info/exclude" : undefined);
 
   const rt = new Runtime();
   const errors: unknown[] = [];
@@ -74,17 +74,17 @@ test("a profile's skill moves from home into the folders of the runs it holds it
     };
     const adopted = (await act("written.adopt", { paths: [skill] })) as { adopted: { node: string }[] };
     const node = adopted.adopted[0]!.node;
-    const rA = String((await act("items.create", { type: "record", title: "Aperture repo" })).id);
+    const rA = String((await act("items.create", { type: "record", title: "Studio repo" })).id);
     const rB = String((await act("items.create", { type: "record", title: "Archipelago repo" })).id);
-    const pA = String((await act("items.create", { type: "profile", title: "Aperture" })).id);
+    const pA = String((await act("items.create", { type: "profile", title: "Studio" })).id);
     const pB = String((await act("items.create", { type: "profile", title: "Archipelago" })).id);
     await act("items.link", { type: "in_profile", from: node, to: pA });
     await act("items.link", { type: "uses", from: rA, to: pA });
     await act("items.link", { type: "uses", from: rB, to: pB });
     const start = (run: string, cwd: string, repo: string) => ctx(run).get<AgentRun>("agent.run").begin({ run, agent: { id: "e_agent", kind: "agent" }, harness: "test", reaches: [], cwd, facts: { repo } });
-    await start("rA", aperture, rA);
+    await start("rA", studio, rA);
     await start("rB", arch, rB);
-    const copyA = join(aperture, ".claude", "skills", "rhino", "SKILL.md");
+    const copyA = join(studio, ".claude", "skills", "rhino", "SKILL.md");
     const copyB = join(arch, ".claude", "skills", "rhino", "SKILL.md");
 
     // In shadow nothing moves.
@@ -94,7 +94,7 @@ test("a profile's skill moves from home into the folders of the runs it holds it
 
     await act("items.set", { id: pA, fields: { status: "on" } });
     await act("items.set", { id: pB, fields: { status: "on" } });
-    await until(async () => (await text(copyA)) === "# Rhino\n" && (await text(skill)) === undefined, "the skill moved to Aperture");
+    await until(async () => (await text(copyA)) === "# Rhino\n" && (await text(skill)) === undefined, "the skill moved to Studio");
     assert.equal(await text(copyB), undefined, "Archipelago's runs don't get it");
     assert.match(String(await text(exclude)), /^\/\.claude\/skills\/rhino\/$/m);
 

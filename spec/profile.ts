@@ -1,7 +1,7 @@
 /**
  * profile: which runs a node is for. See profile.md.
  *
- * Edition 5 (Alex, 20 Nov 2026). The spec owns only the read side, so the
+ * Edition 5 (20 Nov 2026). The spec owns only the read side, so the
  * pack that keeps profiles can be replaced: what a profile is on the map,
  * its links and the terms it matches with are that pack's.
  */

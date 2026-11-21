@@ -90,7 +90,7 @@ async function setup() {
     tree: () => p.get<AgentTree>("agent.tree"),
     node: () => p.get<AgentNode>("agent.node"),
     agent: () => toolRun().agent,
-    invoke: () => p.intercept({ actor: { id: "person:alex", kind: "person" } }).get<ActionInvoke>("action.invoke"),
+    invoke: () => p.intercept({ actor: { id: "person:owner", kind: "person" } }).get<ActionInvoke>("action.invoke"),
     async close() {
       await loader.apply([]);
       await rm(dir, { recursive: true, force: true });
@@ -199,7 +199,7 @@ test("get and query read every base the same way, bounded, with walks along link
     const task = await make("work", "Serve the map", hub);
     const q = await make("question", "Which tools?", task);
     const r = await make("record", "Ten old tools", q);
-    const who = await make("actor", "Alex");
+    const who = await make("actor", "Owner");
     await s.call("act", { action: "items.link", input: { type: "waits_on", from: task, to: who, fields: { for: "a look" } } });
 
     const got = await s.call("get", { ids: [task, "i_none"] });
@@ -208,7 +208,7 @@ test("get and query read every base the same way, bounded, with walks along link
     assert.equal(t.title, "Serve the map");
     assert.deepEqual(got.json.missing, ["i_none"]);
     const waits = t.links.find((l: any) => l.type === "waits_on");
-    assert.deepEqual([waits.to.id, waits.to.title, waits.for], [who, "Alex", "a look"]);
+    assert.deepEqual([waits.to.id, waits.to.title, waits.for], [who, "Owner", "a look"]);
     assert.ok(t.links.some((l: any) => l.type === "part_of" && l.from?.id === q));
 
     const inside = await s.call("query", { find: `in:${hub}` });

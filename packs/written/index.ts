@@ -1,6 +1,6 @@
 /**
  * The written pack: the map writes the skills and memory files the harness
- * loads (Alex, 20 Nov 2026: "Skills and memory are something the map
+ * loads (20 Nov 2026: "Skills and memory are something the map
  * writes"). Adopting a file makes it a node on the map, said at the place
  * the harness loads it (`skill:<name>`, `memory:<scope>/<path>`); from then
  * on the file is written from that node's words, so a change through
