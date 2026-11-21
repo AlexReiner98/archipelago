@@ -89,6 +89,8 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }
       config: { port: PAGE + 1, ...access, onListen: (p: number) => console.log(`claude-code adapter on http://127.0.0.1:${p}`) },
     },
     { id: "mcp", pack: "packs/mcp/index.ts" },
+    { id: "docs", pack: "packs/docs/index.ts" },
+    { id: "docs-tool", pack: "packs/docs/tool.ts" },
     { id: "archive", pack: "packs/archive/index.ts", config: { dir: join(data, "archives") } },
     {
       id: "bridge",

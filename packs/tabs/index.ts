@@ -28,6 +28,7 @@ const STYLE = sheet(`
 
 const tabs: Pack = {
   id: "tabs",
+  about: "The page's name and the tabs between views.",
   inject: ["slot.fill", "slot.read", "here.read", "here.set"],
   apply(ctx: Context) {
     const read = ctx.get<SlotRead>("slot.read");

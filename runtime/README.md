@@ -19,6 +19,7 @@ stripping) and in the browser (the dev server strips types).
 ```ts
 export default {
   id: "verdict",
+  about: "Judges whether each node worked.",        // one plain sentence: what a person reads about it
   inject: ["exchange.watch", "action.register"],   // stays inactive until each is provided
   apply(ctx, config) {
     const watch = ctx.get("exchange.watch");       // only keys it injected

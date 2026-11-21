@@ -12,6 +12,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 
 const here: Pack = {
   id: "here",
+  about: "Remembers what you are looking at, so every view can follow it.",
   apply(ctx: Context) {
     const defs = new Map<string, KeyDef>(Object.values(KEYS).map((key) => [key, { key, scope: "page" }]));
     const values = new Map<string, Json>();

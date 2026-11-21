@@ -23,6 +23,7 @@ const isFact = (f: Json): f is Fact =>
 
 const interchange: Pack = {
   id: "interchange",
+  about: "Brings in a whole map from elsewhere, as one change that can be undone.",
   inject: ["action.register"],
   apply(ctx: Context) {
     ctx.get<ActionRegister>("action.register").register({

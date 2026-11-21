@@ -35,6 +35,7 @@ const by = { pack: "history" };
 
 const history: Pack<HistoryConfig> = {
   id: "history",
+  about: "Keeps every change to the map, and undoes any of them.",
   inject: ["graph.stage", "action.register"],
   async apply(ctx: Context, config: HistoryConfig = {}) {
     if (config.db) {

@@ -8,7 +8,8 @@
  *   verdict, words, loaded, profile (which runs a node is for), written,
  *   placed (a profile's skills written where its runs are), grow, since ("since
  *   you last heard", at each prompt), the Claude Code adapter (5181), the
- *   map's agent tools on its MCP server (mcp), the old maps kept read only
+ *   map's agent tools on its MCP server (mcp), the reference read from the
+ *   running packs (docs, and its `packs` tool, docs-tool), the old maps kept read only
  *   (archive, from <data>/archives), and
  *   the bridge (5182) the page reaches them through.
  *

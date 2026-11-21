@@ -39,6 +39,7 @@ const KNOWN = new Set(["depends_on", "part_of", "waits_on", "bears_on", "about"]
 
 const legend: Pack = {
   id: "legend",
+  about: "The Map's legend: what each mark and line means.",
   inject: ["find.index", "slot.fill"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");

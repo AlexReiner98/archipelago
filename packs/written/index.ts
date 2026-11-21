@@ -99,6 +99,7 @@ const writes = (i: Item | null | undefined): i is Item => !!i && i.type === NODE
 
 const written: Pack<WrittenConfig> = {
   id: "written",
+  about: "Writes the skills and memory files agents load, from the map.",
   inject: ["graph.read", "graph.watch", "action.register"],
   async apply(ctx: Context, config: WrittenConfig = {}) {
     const graph = ctx.get<GraphRead>("graph.read");

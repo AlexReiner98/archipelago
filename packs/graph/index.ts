@@ -38,6 +38,7 @@ function touches(filter: WatchFilter, change: Committed, typeOf: (id: string) =>
 
 const graph: Pack<GraphConfig> = {
   id: "graph",
+  about: "Stores the map: its items and the links between them.",
   async apply(ctx: Context, config: GraphConfig = {}) {
     // The JSON graph's key: a tree still naming it must fail, not run on an empty graph in memory.
     if ("file" in config) throw new Error("graph: config.file was the JSON graph, now config.db (SQLite); move it with node scripts/graph.ts from-json, then import");

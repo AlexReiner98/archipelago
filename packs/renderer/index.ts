@@ -26,6 +26,7 @@ export interface RendererConfig {
 
 const renderer: Pack<RendererConfig> = {
   id: "renderer",
+  about: "Draws the page's views.",
   inject: ["here.read"],
   apply(ctx: Context, config: RendererConfig = {}) {
     const here = ctx.get<HereRead>("here.read");

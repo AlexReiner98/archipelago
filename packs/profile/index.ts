@@ -64,6 +64,7 @@ async function allPages<T>(read: (after?: string) => Promise<{ items: T[]; next?
 
 const profile: Pack = {
   id: "profile",
+  about: "Profiles: which agent sessions each node is meant for.",
   inject: ["graph.read", "graph.watch", "types.define", "agent.tree", "agent.gate", "exchange.watch", "action.register", "action.invoke"],
   async apply(ctx: Context) {
     const graph = ctx.get<GraphRead>("graph.read");

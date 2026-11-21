@@ -105,6 +105,7 @@ async function journalWriter(file: string): Promise<(e: ExchangeEvent) => Promis
 
 const exchange: Pack<ExchangeConfig> = {
   id: "exchange",
+  about: "Records everything said to agents and everything they do, in order.",
   async apply(ctx: Context, config: ExchangeConfig = {}) {
     const record = new Log();
     if (config.journal) await readJournal(config.journal, record);

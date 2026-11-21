@@ -19,6 +19,7 @@ export const SET = "page.set";
 
 const page: Pack = {
   id: "page",
+  about: "Turns the page's packs on and off, as a change that can be undone.",
   inject: ["types.define", "graph.read", "action.register"],
   apply(ctx: Context) {
     ctx.get<TypesDefine>("types.define").flavour(PAGE);

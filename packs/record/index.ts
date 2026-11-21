@@ -20,6 +20,7 @@ export const RECORD: BaseDef = {
 
 const record: Pack = {
   id: "record",
+  about: "Records: what was found, said or decided.",
   inject: ["types.define"],
   apply(ctx: Context) {
     ctx.get<TypesDefine>("types.define").base(RECORD);

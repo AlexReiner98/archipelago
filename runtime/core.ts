@@ -23,6 +23,8 @@ import { META, byPosition } from "../spec/common.ts";
 export interface Pack<C = any> {
   /** The pack's id, as its manifest names it. */
   id: PackId;
+  /** What it is for, in one plain sentence: what a person reads about it. */
+  about?: string;
   /** The capability keys it needs. Until each is provided, it stays inactive. */
   inject?: readonly string[];
   /**
@@ -258,14 +260,15 @@ export class Context {
    * Instantiates a pack as a child fiber (Algorithm 4, `use`). The child is
    * an effect of this fiber, so unloading this one unloads it.
    */
-  plugin<C>(pack: Pack<C>, config?: C, options: { position?: () => number[]; disabled?: boolean } = {}): Fiber {
+  plugin<C>(pack: Pack<C>, config?: C, options: { position?: () => number[]; disabled?: boolean; source?: string } = {}): Fiber {
     const parent = this.fiber;
     const index = parent.childCount++;
     const fiber = new Fiber(this.runtime, pack, config, parent, this.meta, () =>
       options.position ? options.position() : [...parent.position(), index],
     );
     fiber.disabled = !!options.disabled;
-    fiber.dispose = this.effect(() => {
+    fiber.source = options.source;
+    fiber.dispose =this.effect(() => {
       this.runtime.fibers.add(fiber);
       fiber.refresh();
       return () => fiber.retire();
@@ -284,6 +287,8 @@ export class Fiber {
   readonly ctx: Context;
   readonly position: () => number[];
   config: unknown;
+  /** The module URL the loader imported its pack from, when it was loaded from one. */
+  source?: string;
   state: State = "inactive";
   /** The bindings it was loaded with; ⊥ (null) while not loaded. */
   committed: Map<string, Binding> | null = null;

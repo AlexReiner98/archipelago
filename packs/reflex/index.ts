@@ -105,6 +105,7 @@ const clock = (t?: string) => (t ? new Date(t).toLocaleTimeString([], { hour: "2
 
 const reflex: Pack = {
   id: "reflex",
+  about: "The Reflex tree: everything the map says to agents, as one tree that lights up as they work.",
   inject: ["slot.fill", "here.read", "here.set", "agent.tree", "exchange.read", "exchange.watch", "verdict.read", "graph.read", "graph.watch", "profile.read"],
   apply(ctx: Context) {
     const here = ctx.get<HereRead>("here.read");

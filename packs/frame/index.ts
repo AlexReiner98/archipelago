@@ -53,6 +53,7 @@ function useRegions(read: SlotRead) {
 
 const frame: Pack = {
   id: "frame",
+  about: "The page's layout: a top, a bottom, two sides, a center, and a layer over them.",
   inject: ["slot.fill", "slot.read", "here.read", "here.set"],
   apply(ctx: Context) {
     const read = ctx.get<SlotRead>("slot.read");

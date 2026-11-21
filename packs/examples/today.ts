@@ -23,6 +23,7 @@ const STYLE = sheet(`
 
 const today: Pack = {
   id: "today",
+  about: "An example to copy: a panel of what is being worked on now.",
   inject: ["find.index", "here.set", "slot.fill"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");

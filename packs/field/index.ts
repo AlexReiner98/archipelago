@@ -96,6 +96,7 @@ const recall = (key: string): Json | undefined => {
 
 const fieldPack: Pack = {
   id: "field",
+  about: "The Field view: the whole map as particles, settled by gather, repel, springs and collide.",
   inject: ["find.index", "here.read", "here.set", "here.declare", "slot.fill"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");

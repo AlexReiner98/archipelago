@@ -25,6 +25,7 @@ html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:
 
 const column: Pack = {
   id: "column",
+  about: "An example to copy: a page layout of your own.",
   inject: ["slot.fill", "slot.read"],
   apply(ctx: Context) {
     const read = ctx.get<SlotRead>("slot.read");

@@ -38,6 +38,7 @@ function missing(schema: Record<string, Json>, input: Json): string[] {
 
 const action: Pack = {
   id: "action",
+  about: "Runs every change to the map, whoever asks for it, as one change that can be undone.",
   inject: ["graph.commit"],
   apply(ctx: Context) {
     const commit = ctx.get<GraphCommit>("graph.commit");

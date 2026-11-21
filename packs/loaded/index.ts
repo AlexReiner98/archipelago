@@ -58,6 +58,7 @@ function loadedText(input: Json | undefined): string | undefined {
 
 const loaded: Pack = {
   id: "loaded",
+  about: "Records the skills and memory files an agent loads, so they are judged like anything said to it.",
   inject: ["graph.read", "graph.watch", "agent.node", "action.register"],
   async apply(ctx: Context) {
     const graph = ctx.get<GraphRead>("graph.read");

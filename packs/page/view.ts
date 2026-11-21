@@ -12,6 +12,7 @@ import { overlay, TYPE, type Changes } from "./overlay.ts";
 
 const page: Pack = {
   id: "page",
+  about: "Turns the page's packs on and off, as a change that can be undone.",
   inject: ["find.index", "loader.tree"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");

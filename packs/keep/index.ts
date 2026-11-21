@@ -101,6 +101,7 @@ const decidedOf = (i: Item): Decided | undefined => {
 
 const keep: Pack<KeepConfig> = {
   id: "keep",
+  about: "Keeps the trial nodes that helped agents, and retires the ones that didn't.",
   inject: ["verdict.read", "agent.tree", "agent.gate", "graph.read", "graph.watch", "graph.stage", "action.register", "action.invoke", "action.list"],
   async apply(ctx: Context, config: KeepConfig = {}) {
     const t: Thresholds = {

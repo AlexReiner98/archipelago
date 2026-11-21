@@ -55,6 +55,7 @@ const exists = async (dir: string) => {
 
 const placed: Pack<PlacedConfig> = {
   id: "placed",
+  about: "Loads a profile's skills only where they apply.",
   inject: ["written.place", "profile.read", "exchange.read", "exchange.watch", "agent.tree"],
   async apply(ctx: Context, config: PlacedConfig = {}) {
     const git = config.git ?? realGit;

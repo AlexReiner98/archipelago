@@ -16,6 +16,7 @@ export const DEPTH = 8;
 
 const hub: Pack = {
   id: "hub",
+  about: "Finds the larger work an agent's task is part of.",
   inject: ["agent.facts", "graph.read"],
   apply(ctx: Context) {
     const graph = ctx.get<GraphRead>("graph.read");

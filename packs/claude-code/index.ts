@@ -138,6 +138,7 @@ async function lastReply(input: HookInput): Promise<string | undefined> {
 
 const claudeCode: Pack<ClaudeCodeConfig> = {
   id: "claude-code",
+  about: "Connects Claude Code: its sessions report here and hear what the map says.",
   inject: ["agent.run", "action.invoke", "action.list", "exchange.read"],
   async apply(ctx: Context, config: ClaudeCodeConfig = {}) {
     const actor: Actor = config.agent ?? { id: "claude-code", kind: "agent" };
