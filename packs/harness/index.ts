@@ -7,8 +7,9 @@
  *   playhead, with the timeline under it (timeline.ts). The bar picks the
  *   run (`here.run`, else the newest) and a profile (`harness.profile`,
  *   else the run's own).
- * - Left: the run's events, one line each (events.ts).
- * - Right: the node looked at (node.ts).
+ * - Right: the run's events, one line each (events.ts): the wider side,
+ *   as an opened line needs the room.
+ * - Left: the node looked at (node.ts).
  *
  * The playhead is `here.event`: unset, the view follows the run's end
  * live. A click on a node sets `here.node`; on an event, `here.event` and
@@ -70,9 +71,9 @@ const STYLE = sheet(`
 .hv-dir { color:var(--dim); flex:none; width:1em; text-align:center; }
 .hv-later { opacity:.4; }
 .hv-ev.broke { box-shadow:inset -3px 0 0 var(--failed); }
-.hv-open { margin:0 var(--space-4) var(--space-2) calc(var(--space-4) + 3.5em); padding:var(--space-1) 0 var(--space-1) var(--space-3); border-left:2px solid var(--line); cursor:default; white-space:normal; }
-.hv-part { display:grid; grid-template-columns:6.5em minmax(0,1fr); gap:var(--space-3); padding:1px 0; }
-.hv-part .k { color:var(--dim); font-size:var(--text-s); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hv-open { margin:0 var(--space-2) var(--space-2) var(--space-3); padding:var(--space-1) 0 var(--space-1) var(--space-3); border-left:2px solid var(--line); cursor:default; white-space:normal; }
+.hv-part { padding:2px 0; min-width:0; }
+.hv-part .k { display:block; color:var(--dim); font-size:var(--text-xs); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .hv-part pre { margin:0; font:var(--text-s)/var(--leading) var(--mono); white-space:pre-wrap; overflow-wrap:anywhere; max-width:70ch; }
 .hv-fold { font:inherit; font-size:var(--text-xs); background:none; border:0; color:var(--pick); cursor:pointer; padding:0; }
 .hv-kv { display:flex; gap:var(--space-3); padding:1px var(--space-4); white-space:nowrap; }
@@ -276,7 +277,7 @@ const harness: Pack = {
       `;
     };
 
-    const Left = () => {
+    const RunFill = () => {
       const nodes = hk.useNodes();
       const { run, info } = hk.useRun();
       const events = hk.useEvents(run);
@@ -292,7 +293,7 @@ const harness: Pack = {
       }} />`;
     };
 
-    const Right = () => html`<${node.Pane} nodes=${hk.useNodes()} review=${kp.useReview()} />`;
+    const NodeFill = () => html`<${node.Pane} nodes=${hk.useNodes()} review=${kp.useReview()} />`;
 
     ctx.effect(() => {
       const style = document.createElement("style");
@@ -300,12 +301,13 @@ const harness: Pack = {
       document.head.append(style);
       return () => style.remove();
     });
-    // Three fills that show together: the tree is the view, the run and the node stand beside it while it shows.
+    // Three fills that show together: the tree is the view, the node and the run stand beside it while it shows.
+    // The run takes the right, the wider side: an opened line needs the room.
     const fill = ctx.get<SlotFill>("slot.fill");
     const whileShown = { "here.view": "harness/view" };
-    fill.fill({ slot: "left", name: "run", when: whileShown, view: Left });
+    fill.fill({ slot: "left", name: "node", when: whileShown, view: NodeFill });
     fill.fill({ slot: "center", name: "view", title: "Harness", view: Center });
-    fill.fill({ slot: "right", name: "node", when: whileShown, view: Right });
+    fill.fill({ slot: "right", name: "run", when: whileShown, view: RunFill });
   },
 };
 

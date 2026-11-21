@@ -1,5 +1,5 @@
 /**
- * The harness view's right pane: the node looked at (`here.node`). Its
+ * The harness view's left pane: the node looked at (`here.node`). Its
  * words, edited through `words.set` when made from a map item; a trial's
  * miss and its retiring (`words.retire`); its standing by the keep pack;
  * a written file's rule (`written.rule`); its places, pack and kind; its

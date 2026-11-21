@@ -9,8 +9,8 @@ the two beside show while the view does
 | Fill | Region | Shows |
 |---|---|---|
 | Harness (`harness/view`) | `center` | The bar (run, profile, grouping), the tree, the timeline |
-| Run (`harness/run`) | `left` | The run's profiles, then one line per event, → to the agent, ← from it |
-| Node (`harness/node`) | `right` | Its words, standing, places, pack, kind, record, and its verdict per run |
+| Node (`harness/node`) | `left` | Its words, standing, places, pack, kind, record, and its verdict per run |
+| Run (`harness/run`) | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room |
 
 ## Picking
 
@@ -58,8 +58,8 @@ a step at a time, "● live" (or "■ end") follows the end again.
 The line at the playhead is picked; those after it are faint. A click
 opens a line in place ([expand.ts](expand.ts)): for the map to the agent,
 the node, place, pack and what was said, whole; for the agent to the map,
-the act's input and output field by field. Each part folds past a dozen
-lines. A red edge: the event failed the node picked.
+the act's input and output field by field, each label over its value.
+Each part folds past a dozen lines. A red edge: the event failed the node picked.
 
 ## The node ([node.ts](node.ts), [keep.ts](keep.ts))
 
