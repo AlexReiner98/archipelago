@@ -124,6 +124,18 @@ const map: Pack = {
         setView({ x: -20 / k, y: -20 / k, k });
       }, [shape, fits]);
 
+      // An item looked at from elsewhere (a jump) is brought into view when it is off the plane's edge.
+      useEffect(() => {
+        const b = picked ? drawn.boxes.get(picked) : undefined;
+        const W = box.current?.clientWidth || 800;
+        const H = box.current?.clientHeight || 600;
+        if (!b) return;
+        setView((v) => {
+          const inside = b.x >= v.x && b.y >= v.y && b.x + SIZE.w <= v.x + W / v.k && b.y + SIZE.h <= v.y + H / v.k;
+          return inside ? v : { k: v.k, x: b.x + SIZE.w / 2 - W / 2 / v.k, y: b.y + SIZE.h / 2 - H / 2 / v.k };
+        });
+      }, [picked, drawn]);
+
       const toWorld = (e: { clientX: number; clientY: number }) => {
         const r = box.current!.getBoundingClientRect();
         return { x: view.x + (e.clientX - r.left) / view.k, y: view.y + (e.clientY - r.top) / view.k };
