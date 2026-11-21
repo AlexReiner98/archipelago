@@ -1,9 +1,9 @@
 /**
- * The field's panel: a section per behaviour, with its switch and every one
- * of its dials, then the start, the run and the drawing. Each dial says
- * what it does on hover and goes back to where it started with ↺. Above
- * them, how the run is going: particles, links, step, time per step,
- * crossings, and whether it settles, untangles or is settled.
+ * The field's panel: how the run is going, then a section per behaviour,
+ * with its switch and every one of its dials, then the start, the run and
+ * the drawing. Sections start closed; each names how many of its dials
+ * differ from where they started. Each dial says what it does on hover and
+ * goes back to where it started with ↺.
  */
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
@@ -15,27 +15,34 @@ import type { Stats } from "./engine.ts";
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
 export const PANEL_STYLE = `
-.fl-panel { width:270px; flex:none; border-right:1px solid var(--line); overflow:auto; font-size:12px; background:var(--bg); }
-.fl-run { padding:6px 10px; border-bottom:1px solid var(--line); color:var(--dim); font-variant-numeric:tabular-nums; display:grid; grid-template-columns:auto 1fr; column-gap:8px; }
+.fl-panel { width:290px; flex:none; border-right:1px solid var(--line); overflow:auto; font-size:12px; background:var(--bg); }
+.fl-run { padding:6px 10px; border-bottom:1px solid var(--line); color:var(--dim); font-variant-numeric:tabular-nums; display:grid; grid-template-columns:auto 1fr; column-gap:10px; row-gap:1px; }
 .fl-run b { color:var(--fg); font-weight:600; }
-.fl-run .st-settling { color:var(--pick); } .fl-run .st-untangling { color:var(--pick); } .fl-run .st-settled { color:var(--held); }
+.fl-run .st-settling, .fl-run .st-untangling { color:var(--pick); } .fl-run .st-settled { color:var(--held); }
 .fl-acts { display:flex; gap:6px; padding:6px 10px; border-bottom:1px solid var(--line); }
-.fl-acts button { font:inherit; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:1px 6px; cursor:pointer; }
+.fl-acts button { font:inherit; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:1px 8px; cursor:pointer; }
+.fl-acts button:hover { border-color:var(--dim); }
 .fl-sec { border-bottom:1px solid var(--line); }
 .fl-sec > summary { padding:5px 10px; cursor:pointer; display:flex; gap:6px; align-items:center; list-style:none; }
 .fl-sec > summary::-webkit-details-marker { display:none; }
-.fl-sec > summary .nm { font-weight:600; }
-.fl-sec > summary .doc { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0; }
-.fl-sec.off > summary .nm { color:var(--dim); text-decoration:line-through; }
-.fl-dial { display:grid; grid-template-columns:96px 1fr 44px 14px; gap:4px; align-items:center; padding:1px 10px 1px 18px; }
+.fl-sec > summary::before { content:"▸"; color:var(--dim); width:8px; font-size:10px; }
+.fl-sec[open] > summary::before { content:"▾"; }
+.fl-sec > summary:hover .nm { color:var(--pick); }
+.fl-sec > summary .nm { font-weight:600; flex:1; }
+.fl-sec > summary .mv { color:var(--pick); font-size:11px; }
+.fl-sec.off > summary .nm { color:var(--dim); }
+.fl-sec .doc { color:var(--dim); padding:0 10px 4px 24px; }
+.fl-grp { color:var(--fg); padding:4px 10px 1px 24px; font-size:11px; }
+.fl-dial { display:grid; grid-template-columns:112px 1fr 46px 12px; gap:4px; align-items:center; padding:1px 10px 1px 24px; }
+.fl-dial.in { padding-left:34px; grid-template-columns:102px 1fr 46px 12px; }
 .fl-dial .lb { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .fl-dial.moved .lb { color:var(--fg); }
-.fl-dial input[type=range] { width:100%; margin:0; accent-color:var(--pick); }
-.fl-dial input[type=number] { width:44px; font:inherit; font-size:11px; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:0 2px; }
-.fl-dial .rs { cursor:pointer; color:var(--dim); visibility:hidden; }
+.fl-dial input[type=range] { width:100%; min-width:0; margin:0; accent-color:var(--pick); }
+.fl-dial input[type=number] { width:46px; box-sizing:border-box; font:inherit; font-size:11px; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:0 2px; }
+.fl-dial .rs { cursor:pointer; color:var(--pick); visibility:hidden; border:0; background:none; padding:0; font:inherit; }
 .fl-dial.moved .rs { visibility:visible; }
-.fl-dial select { font:inherit; font-size:11px; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; grid-column:2 / 4; }
-.fl-sec .pad { height:4px; }
+.fl-dial select { font:inherit; font-size:11px; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; grid-column:2 / 4; min-width:0; }
+.fl-sec .pad { height:5px; }
 `;
 
 export interface Section {
@@ -53,43 +60,45 @@ const DialRow = ({ d, value, set }: { d: Dial; value: number; set: (key: string,
   const moved = value !== d.value;
   const title = `${d.doc} (${d.key}; starts at ${d.choices ? d.choices[d.value] : d.value})`;
   return html`
-    <div class=${`fl-dial${moved ? " moved" : ""}`} title=${title}>
+    <div class=${`fl-dial${moved ? " moved" : ""}${d.group ? " in" : ""}`} title=${title}>
       <span class="lb">${d.label}</span>
       ${d.choices
-        ? html`<select value=${String(value)} onChange=${(e: Event) => set(d.key, Number((e.target as HTMLSelectElement).value))}>
+        ? html`<select aria-label=${d.label} value=${String(value)} onChange=${(e: Event) => set(d.key, Number((e.target as HTMLSelectElement).value))}>
             ${d.choices.map((c, i) => html`<option value=${String(d.min + i * d.step)}>${c}</option>`)}
           </select>`
         : html`
-            <input type="range" min=${d.min} max=${d.max} step=${d.step} value=${value} onInput=${(e: Event) => set(d.key, Number((e.target as HTMLInputElement).value))} />
-            <input type="number" min=${d.min} max=${d.max} step=${d.step} value=${fmt(value, d.step)} onChange=${(e: Event) => {
+            <input type="range" aria-label=${d.label} min=${d.min} max=${d.max} step=${d.step} value=${value} onInput=${(e: Event) => set(d.key, Number((e.target as HTMLInputElement).value))} />
+            <input type="number" aria-label=${`${d.label} value`} min=${d.min} max=${d.max} step=${d.step} value=${fmt(value, d.step)} onChange=${(e: Event) => {
               const v = Number((e.target as HTMLInputElement).value);
               if (Number.isFinite(v)) set(d.key, v);
             }} />
           `}
-      <span class="rs" title="Back to where it started" onClick=${() => set(d.key, undefined)}>↺</span>
+      <button class="rs" title="Back to where it started" aria-label=${`Reset ${d.label}`} onClick=${() => set(d.key, undefined)}>↺</button>
     </div>
   `;
 };
 
-const RunLine = ({ stats }: { stats: () => Stats | undefined }) => {
+const RunLine = ({ stats, counting, found }: { stats: () => Stats | undefined; counting: boolean; found: number | null }) => {
   const [s, setS] = useState(stats());
   useEffect(() => {
     const t = setInterval(() => setS(stats()), 250);
     return () => clearInterval(t);
   }, []);
-  if (!s) return html`<div class="fl-run">…</div>`;
+  if (!s) return html`<div class="fl-run"><span>state</span><span>starting…</span></div>`;
   return html`
     <div class="fl-run">
       <span>state</span><b class=${`st-${s.state}`}>${s.state}</b>
-      <span>drawn</span><span><b>${s.n}</b> particles · ${s.m} links</span>
-      <span>step</span><span><b>${s.steps}</b> · ${s.ms.toFixed(1)} ms each · warmth ${s.alpha.toFixed(3)}</span>
-      <span>crossings</span><b>${s.crossings}</b>
+      <span>drawn</span><span><b>${s.n}</b> items · ${s.m} links</span>
+      ${found !== null && html`<span>found</span><span><b>${found}</b> lit by the find line</span>`}
+      <span>step</span><span><b>${s.steps}</b> · ${s.ms.toFixed(1)} ms each</span>
+      <span>warmth</span><span>${s.alpha.toFixed(3)}</span>
+      <span>crossings</span>${counting ? html`<b>${s.crossings}</b>` : html`<span>not counted (untangle is off)</span>`}
       ${s.settledIn && html`<span>last settle</span><span>${s.settledIn.steps} steps in ${(s.settledIn.ms / 1000).toFixed(1)} s</span>`}
     </div>
   `;
 };
 
-export function Panel({ sections, S, set, reset, stats, reseed, fit }: {
+export function Panel({ sections, S, set, reset, stats, reseed, fit, found }: {
   sections: Section[];
   S: Settings;
   set: (key: string, v: number | undefined) => void;
@@ -97,10 +106,13 @@ export function Panel({ sections, S, set, reset, stats, reseed, fit }: {
   stats: () => Stats | undefined;
   reseed: () => void;
   fit: () => void;
+  found: number | null;
 }) {
+  const untangle = sections.find((s) => s.behaviour?.name === "untangle")?.behaviour;
+  const isOn = (b: Behaviour) => (S[`on_${b.name}`] ?? (b.on ? 1 : 0)) > 0 && (S[`w_${b.name}`] ?? 1) > 0;
   return html`
     <div class="fl-panel">
-      <${RunLine} stats=${stats} />
+      <${RunLine} stats=${stats} counting=${!!untangle && isOn(untangle)} found=${found} />
       <div class="fl-acts">
         <button onClick=${reseed} title="Start every particle from its seed again and settle">Settle again</button>
         <button onClick=${fit} title="Fit the picture to the view (also: double-click the sea)">Fit</button>
@@ -110,14 +122,21 @@ export function Panel({ sections, S, set, reset, stats, reseed, fit }: {
         const b = sec.behaviour;
         const onKey = b ? `on_${b.name}` : "";
         const on = b ? (S[onKey] ?? (b.on ? 1 : 0)) > 0 : true;
+        const moved = sec.dials.filter((d) => (S[d.key] ?? d.value) !== d.value).length;
+        let group: string | undefined;
         return html`
-          <details key=${sec.key} class=${`fl-sec${on ? "" : " off"}`} open=${on && !!b}>
+          <details key=${sec.key} class=${`fl-sec${on ? "" : " off"}`}>
             <summary title=${sec.doc}>
-              ${b && html`<input type="checkbox" checked=${on} title=${`Turn ${b.name} ${on ? "off" : "on"}`} onClick=${(e: Event) => e.stopPropagation()} onChange=${(e: Event) => set(onKey, (e.target as HTMLInputElement).checked ? 1 : 0)} />`}
+              ${b && html`<input type="checkbox" checked=${on} aria-label=${`${b.name} on`} title=${`Turn ${b.name} ${on ? "off" : "on"}`} onClick=${(e: Event) => e.stopPropagation()} onChange=${(e: Event) => set(onKey, (e.target as HTMLInputElement).checked ? 1 : 0)} />`}
               <span class="nm">${sec.title}</span>
-              <span class="doc">${sec.doc}</span>
+              ${moved > 0 && html`<span class="mv" title="Dials changed from where they started">${moved} changed</span>`}
             </summary>
-            ${sec.dials.map((d) => html`<${DialRow} key=${d.key} d=${d} value=${S[d.key] ?? d.value} set=${set} />`)}
+            <div class="doc">${sec.doc}</div>
+            ${sec.dials.map((d) => {
+              const head = d.group && d.group !== group ? html`<div class="fl-grp" key=${`g-${d.group}`}>${d.group}</div>` : null;
+              group = d.group;
+              return html`${head}<${DialRow} key=${d.key} d=${d} value=${S[d.key] ?? d.value} set=${set} />`;
+            })}
             <div class="pad"></div>
           </details>
         `;

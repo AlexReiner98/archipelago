@@ -29,8 +29,8 @@ const springs: Behaviour = {
     ...links.flatMap((type) => {
       const [len, k] = START[type] ?? OTHER;
       return [
-        { key: lengthKey(type), label: `${type} length`, min: 2, max: 200, step: 1, value: len, doc: `How long a ${type} link wants to be.` },
-        { key: stiffKey(type), label: `${type} stiffness`, min: 0, max: 1, step: 0.01, value: k, doc: `How hard a ${type} link pulls to its length (0: it pulls nothing).` },
+        { key: lengthKey(type), label: "length", group: type, min: 2, max: 200, step: 1, value: len, doc: `How long a ${type} link wants to be.` },
+        { key: stiffKey(type), label: "stiffness", group: type, min: 0, max: 1, step: 0.01, value: k, doc: `How hard a ${type} link pulls to its length (0: it pulls nothing).` },
       ];
     }),
   ],

@@ -15,6 +15,7 @@ export const DRAW: Dial[] = [
   { key: "link_alpha", label: "link strength", min: 0, max: 1, step: 0.01, value: 0.18, then: "paint", doc: "How strong a link's line is." },
   { key: "link_width", label: "link width", min: 0.1, max: 4, step: 0.1, value: 0.6, then: "paint", doc: "A link's width, in screen px." },
   { key: "label_px", label: "titles from", min: 2, max: 40, step: 0.5, value: 9, then: "paint", doc: "A particle's title shows once its radius reaches this on screen, in px." },
+  { key: "label_hubs", label: "always name hubs", min: 0, max: 100, step: 1, value: 15, then: "paint", doc: "The this-many most linked items are named at any zoom, so the picture reads before you zoom in." },
   { key: "label_most", label: "titles at most", min: 0, max: 600, step: 10, value: 160, then: "paint", doc: "At most this many titles at once." },
   { key: "label_halo", label: "title halo", min: 0, max: 8, step: 0.5, value: 3, then: "paint", doc: "A ring of the sea round every letter, in screen px, so words read over particles and links." },
   { key: "label_fade", label: "title fade-in", min: 0.1, max: 20, step: 0.1, value: 3, then: "paint", doc: "A title fades in as its particle grows on screen from 'titles from' to this much more." },
@@ -82,6 +83,18 @@ export class Light {
     }
     return moving;
   }
+}
+
+/** Which particles are among the `most` most linked, worked out once per graph and count. */
+const hubCache = new WeakMap<G, { most: number; hub: Uint8Array }>();
+function hubs(g: G, most: number): Uint8Array {
+  const had = hubCache.get(g);
+  if (had && had.most === most) return had.hub;
+  const hub = new Uint8Array(g.n);
+  const order = Array.from({ length: g.n }, (_, i) => i).sort((p, q) => g.degree[q]! - g.degree[p]! || p - q);
+  for (const i of order.slice(0, most)) hub[i] = 1;
+  hubCache.set(g, { most, hub });
+  return hub;
 }
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
@@ -194,10 +207,11 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     c.fillText(text, x, y);
   };
   const big: number[] = [];
-  // What the find line finds is named whatever its size.
-  for (let i = 0; i < g.n; i++) if ((g.r[i]! * cam.k >= S.label_px! || match?.[i]) && inView(i, 0)) big.push(i);
-  // The lit ones first, so the particle pointed at and its neighbours are always named; then what is found.
-  big.sort((p, q) => shine[q]! - shine[p]! || (match ? match[q]! - match[p]! : 0) || g.r[q]! - g.r[p]! || p - q);
+  // What the find line finds, and the most linked (label_hubs), are named whatever their size.
+  const hub = hubs(g, S.label_hubs!);
+  for (let i = 0; i < g.n; i++) if ((g.r[i]! * cam.k >= S.label_px! || match?.[i] || hub[i]) && inView(i, 0)) big.push(i);
+  // The lit ones first, so the particle pointed at and its neighbours are always named; then what is found; then hubs.
+  big.sort((p, q) => shine[q]! - shine[p]! || (match ? match[q]! - match[p]! : 0) || hub[q]! - hub[p]! || g.r[q]! - g.r[p]! || p - q);
   for (const i of shining) if (!big.includes(i) && inView(i, 0)) big.unshift(i);
   let shown = 0;
   c.font = "11px ui-sans-serif, system-ui, sans-serif";
@@ -218,7 +232,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     if (!box) continue;
     taken.push(box);
     shown++;
-    const grow = shine[i]! > 0 || match?.[i] ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
+    const grow = shine[i]! > 0 || match?.[i] || hub[i] ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
     say(text, box[0] + 2, sy, grow * Math.max(faint * fade(i), shine[i]!));
   }
 }

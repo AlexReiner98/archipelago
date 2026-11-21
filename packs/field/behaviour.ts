@@ -17,6 +17,8 @@ export interface Dial {
   step: number;
   value: number;
   doc: string;
+  /** A heading the panel puts it under, within its section (springs: the link type). */
+  group?: string;
   /** Named stops, for a dial that picks one of a few ways. */
   choices?: string[];
   /**

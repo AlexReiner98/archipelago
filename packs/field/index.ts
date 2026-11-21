@@ -25,7 +25,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import type { LinkInfo } from "../../spec/types.ts";
 import type { Dial } from "./behaviour.ts";
 import { field, type Field } from "./engine.ts";
-import type { FieldIn, Settings } from "./graph.ts";
+import { typeColours, type FieldIn, type Settings } from "./graph.ts";
 import { DRAW } from "./paint.ts";
 import { Panel, PANEL_STYLE, type Section } from "./panel.ts";
 import { BEHAVIOURS, RUN, defaults } from "./step.ts";
@@ -67,6 +67,13 @@ const STYLE = `
 .fl-side { width:min(380px, 40%); flex:none; border-left:1px solid var(--line); overflow:auto; }
 .fl-tip { position:absolute; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:3px 7px; max-width:320px; box-shadow:0 2px 8px rgb(0 0 0 / 12%); }
 .fl-tip .s { color:var(--dim); font-size:11px; }
+.fl-key { position:absolute; left:8px; bottom:6px; color:var(--dim); font-size:11px; background:color-mix(in srgb, var(--bg) 88%, transparent); padding:4px 8px; border-radius:3px; border:1px solid var(--line); display:flex; flex-wrap:wrap; gap:2px 12px; max-width:calc(100% - 32px); pointer-events:none; }
+.fl-key span { display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+.fl-key b { color:var(--fg); font-weight:600; }
+.fl-key i { display:inline-block; width:9px; height:9px; border-radius:50%; }
+.fl-key i.shut { opacity:0.3; background:var(--dim); }
+.fl-key i.ring { background:transparent; border:2px solid var(--pick); width:7px; height:7px; }
+.fl-key svg { width:20px; height:8px; }
 .fl-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); pointer-events:none; }
 ${PANEL_STYLE}
 `;
@@ -204,6 +211,13 @@ const fieldPack: Pack = {
         set.set(DIALS, Object.keys(next).length ? next : undefined);
       };
 
+      // The legend: each type's colour and count, then what faded, lines and the ring mean.
+      const legend = useMemo(() => {
+        const count = new Map<string, number>();
+        for (const it of input.items) count.set(it.type, (count.get(it.type) ?? 0) + 1);
+        return typeColours(input.items.map((it) => it.type)).map((t) => ({ ...t, n: count.get(t.name) ?? 0 }));
+      }, [input]);
+
       return html`
         <div class="fl">
           <div class="fl-bar"><${Slot} name="map.bar" /></div>
@@ -223,10 +237,18 @@ const fieldPack: Pack = {
               stats=${() => engine.current?.stats()}
               reseed=${() => engine.current?.reseed()}
               fit=${() => engine.current?.fit()}
+              found=${found ? found.size : null}
             />
             <div class="fl-canvas">
               <canvas ref=${box} title="Click a particle to open it; drag a particle to move it; drag the sea to pan; wheel to zoom; double-click the sea to fit"></canvas>
               ${tip && html`<div class="fl-tip" style=${`left:${tip.x + 14}px; top:${tip.y + 12}px`}><div>${tip.title}</div><div class="s">${tip.sub}</div></div>`}
+              ${input.items.length > 0 &&
+              html`<div class="fl-key">
+                ${legend.map((t) => html`<span key=${t.name}><i style=${`background:${t.colour}`}></i><b>${t.name}</b> ${t.n}</span>`)}
+                <span><i class="shut"></i> closed</span>
+                <span><svg viewBox="0 0 20 8"><path d="M0 4H20" stroke="currentColor" stroke-width="1" /></svg> a link</span>
+                <span><i class="ring"></i> pointed at, with its links</span>
+              </div>`}
               ${!result.items.length && html`<div class="fl-empty">${index.ready() ? "Nothing matches." : "Reading the map…"}</div>`}
             </div>
             ${picked && html`<div class="fl-side"><${Slot} name="map.side" /></div>`}

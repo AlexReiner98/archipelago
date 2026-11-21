@@ -11,7 +11,7 @@ const gather: Behaviour = {
   on: true,
   dials: () => [
     weight("gather"),
-    { key: "gather_k", label: "pull", min: 0, max: 0.05, step: 0.0005, value: 0.01, doc: "How hard each particle is pulled toward the middle, by its distance from it." },
+    { key: "gather_k", label: "pull", min: 0, max: 0.05, step: 0.0005, value: 0.004, doc: "How hard each particle is pulled toward the middle, by its distance from it." },
   ],
   apply(g, f, S) {
     const k = S.gather_k!;

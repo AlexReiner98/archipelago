@@ -68,8 +68,8 @@ export function build(input: FieldIn, last: G | null): G {
   const items = input.items;
   const n = items.length;
   const at = new Map(items.map((it, i) => [it.id, i]));
-  const typeNames = [...new Set(items.map((it) => it.type))].sort();
-  const types = typeNames.map((name, k) => ({ name, colour: hue(k) }));
+  const types = typeColours(items.map((it) => it.type));
+  const typeNames = types.map((t) => t.name);
   const typeIx = new Map(typeNames.map((t, k) => [t, k]));
   const links = input.links.filter((l) => at.has(l.from) && at.has(l.to) && l.from !== l.to);
   const linkKinds = [...new Set(links.map((l) => l.type))];
@@ -210,6 +210,11 @@ export function neighbours(g: G, i: number): Set<number> {
   const s = new Set([i]);
   for (let p = g.adjStart[i]!; p < g.adjStart[i + 1]!; p++) s.add(g.adj[p]!);
   return s;
+}
+
+/** The types among these, sorted, each with its colour: what the particles and the legend use. */
+export function typeColours(names: string[]): { name: string; colour: string }[] {
+  return [...new Set(names)].sort().map((name, k) => ({ name, colour: hue(k) }));
 }
 
 /** Type colours: evenly round the hue wheel, lightness alternating so neighbours in the list differ. */
