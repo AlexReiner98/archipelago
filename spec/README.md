@@ -2,20 +2,25 @@
 
 The interfaces packs talk through. Any pack can be replaced; these can't
 be changed silently. Each contract is a TypeScript module (the types) and a
-short doc. This is **edition 1, in draft**, while Alex shapes it.
+short doc.
+
+<!-- contracts: written by scripts/contracts.ts from the spec -->
+This is **edition 5**. A capability that came after edition 1 shows the edition it came in.
 
 | Contract | Capabilities | What it is |
 |---|---|---|
-| [graph](graph.md) | `graph.read` `graph.watch` `graph.stage` `graph.commit` | Bounded reads, live watch, the write chain |
-| [action](action.md) | `action.register` `action.list` `action.invoke` | The one way anyone changes anything |
-| [agent](agent.md) | `agent.node` `agent.tree` `agent.run` | Say, refuse, act. Places, nodes, runs |
-| [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event per say, refusal and act |
-| [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` | UI composition: places in the UI that packs fill |
-| [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | Large graphs: one WebGL2 surface, filled with layers |
-| [here](here.md) | `here.declare` `here.read` `here.set` | Shared ephemeral state: what is being looked at |
-| [types](types.md) | `types.define` `types.read` | Bases, flavours that add fields, and kinds of link |
-| [profile](profile.md) | `profile.read` | Which runs a node is for |
-| [changeset](changeset.md) | (a format) | A change in full: header and facts `[op, id, field, value]` |
+| [graph](graph.md) | `graph.read` `graph.watch` `graph.stage` `graph.commit` | The graph pack stores items and links and is the truth. |
+| [action](action.md) | `action.register` `action.list` `action.invoke` | Every change goes through a declared action, whether a person or an agent makes it. |
+| [agent](agent.md) | `agent.node` `agent.tree` `agent.run` `agent.facts` (5) `agent.gate` (5) | Everything the map says to an agent and everything the agent does passes through one service. |
+| [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event for each thing that passes between the map and an agent. |
+| [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` | How the UI is put together out of packs. |
+| [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | How large graphs are drawn. |
+| [here](here.md) | `here.declare` `here.read` `here.set` | What is being looked at, now. |
+| [types](types.md) | `types.define` `types.read` | What kinds of item and link the map holds. |
+| [profile](profile.md) | `profile.read` (5) | Not every node fits every run. |
+| [changeset](changeset.md) | (a format) | A change, written in full. |
+
+<!-- /contracts -->
 
 [common.ts](common.ts) holds the shared words; [index.ts](index.ts) puts
 every capability's key and type in one map for a runtime to declare.

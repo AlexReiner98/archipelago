@@ -9,8 +9,8 @@ packs, around a shared map of the work.
   [Cordis](https://arxiv.org/abs/2608.25512): revertible effects and reactive
   dependencies.
 - **The contracts are the product.** Any pack can be replaced. The interfaces
-  packs talk through (`agent`, `graph`, `slot`, `here`) are versioned and owned
-  by the spec, in [spec/](spec/README.md).
+  packs talk through are versioned and owned by the spec, which lists them in
+  [spec/](spec/README.md).
 - **No gates.** Every change applies at once, and anything can be undone.
 - **The map teaches the harness.** Everything the map says to an agent, and
   what the agent does in return, is recorded and judged. What works is kept
