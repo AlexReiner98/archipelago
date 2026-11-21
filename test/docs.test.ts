@@ -7,7 +7,7 @@ import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
 import docs, { KEY, type DocsRead } from "../packs/docs/index.ts";
 import tool, { brief } from "../packs/docs/tool.ts";
-import { addsOf, matches, merged, ordered, stateWords } from "../packs/docs/cards.ts";
+import { addsOf, groupOf, grouped, matches, merged, stateWords, usedBy } from "../packs/docs/cards.ts";
 import { aboutOf, keyDoc, reference, shownConfig, type PackDoc } from "../packs/docs/read.ts";
 import type { TypesRead } from "../spec/types.ts";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
@@ -173,29 +173,74 @@ test("aboutOf: a README's first sentence, in plain words, wiring cut", () => {
 
 const doc = (over: Partial<PackDoc>): PackDoc => ({ id: "p", side: "server", state: "active", position: [0], inject: [], provides: [], actions: [], places: [], ...over });
 
-test("cards: what a pack adds and its state, in plain words; problems first; one card per pack", () => {
+const key = (k: string) => ({ key: k });
+
+test("cards: what a pack adds, each thing opening where it is; its state in words", () => {
+  const map = doc({ id: "map", slots: { declares: [{ name: "map.bar", merge: "many" }], fills: [{ slot: "shell.main", name: "view", title: "Map" }] } });
+  const find = doc({ id: "find", slots: { declares: [], fills: [{ slot: "map.bar", name: "find", title: "Find" }, { slot: "root", name: "x" }] } });
   const p = doc({
     actions: [{ name: "items.create", title: "Make an item", input: {} }],
     types: [{ name: "work" }, { name: "branch", base: "work" }, { name: "part_of", base: "link" }],
     places: [{ place: "tool:Bash", nodes: 2 }, { place: "prompt", nodes: 1 }],
-    slots: { declares: [], fills: [{ slot: "shell.main", name: "view", title: "Map" }, { slot: "map.bar", name: "find", title: "Find" }, { slot: "root", name: "shell" }] },
+    provides: [key("p.read")],
   });
-  assert.deepEqual(addsOf(p), { actions: ["Make an item"], kinds: ["work", "branch (a kind of work)", "part_of (link)"], views: ["Map"], parts: ["Find"], says: 3 });
+  const user = doc({ id: "user", inject: [key("p.read")] });
+  const all = [map, find, p, user];
+  assert.deepEqual(addsOf(p, all), {
+    views: [],
+    parts: [],
+    kinds: [{ title: "work", query: "type:work" }, { title: "branch (a kind of work)", query: "type:branch" }, { title: "part_of (link)" }],
+    actions: ["Make an item"],
+    says: 3,
+    usedBy: ["user"],
+  });
+  assert.deepEqual(addsOf(map, all).views, [{ title: "Map", view: "map" }]);
+  // A part opens the view it is in: the pack that declared its slot.
+  assert.deepEqual(addsOf(find, all).parts, [{ title: "Find", view: "map" }]);
+  assert.deepEqual(usedBy(user, all), []);
   assert.equal(stateWords(p), undefined);
   assert.equal(stateWords(doc({ state: "waiting", missing: ["graph.read"] })), "Waiting for another pack to load.");
   assert.equal(stateWords(doc({ state: "off" })), "Turned off.");
   assert.ok(matches(p, "make item"));
   assert.ok(matches(p, "branch"));
   assert.ok(!matches(p, "tool:bash"));
-  const w = doc({ id: "w", state: "waiting" });
-  assert.deepEqual(ordered([p, w]).map((d) => d.id), ["w", "p"]);
-  // A pack with a server half and a page half is one card: the page half's views, a problem in either.
-  const server = [doc({ id: "docs", about: "What each pack is for." }), doc({ id: "graph" })];
-  const page = [doc({ id: "docs", side: "page", slots: { declares: [], fills: [{ slot: "shell.main", name: "view", title: "Packs" }] } }), doc({ id: "shell", side: "page", state: "failed", error: "boom" })];
+});
+
+test("groups: problems, views, agents, kinds, core, other, by what each pack adds", () => {
+  const all = [
+    doc({ id: "w", state: "waiting" }),
+    doc({ id: "map", slots: { declares: [], fills: [{ slot: "shell.main", name: "view", title: "Map" }] } }),
+    doc({ id: "words", places: [{ place: "prompt", nodes: 1 }], types: [{ name: "node", base: "record" }] }),
+    doc({ id: "mcp", inject: [key("mcp.host")] }),
+    doc({ id: "work", types: [{ name: "work" }] }),
+    doc({ id: "graph", provides: [key("graph.read")] }),
+    doc({ id: "user", inject: [key("graph.read")] }),
+  ];
+  assert.deepEqual(all.map((d) => groupOf(d, all)), ["trouble", "views", "agents", "agents", "kinds", "core", "other"]);
+  assert.deepEqual(grouped(all).map((g) => [g.group.title, g.docs.map((d) => d.id)]), [
+    ["Needs attention", ["w"]],
+    ["Views", ["map"]],
+    ["Talks to agents", ["words", "mcp"]],
+    ["Kinds of item", ["work"]],
+    ["Core", ["graph"]],
+    ["Other", ["user"]],
+  ]);
+  // Filtered, a pack keeps the group it has among all.
+  assert.deepEqual(grouped([all[5]!], all).map((g) => g.group.id), ["core"]);
+});
+
+test("merged: a pack with a server half and a page half is one card", () => {
+  const server = [doc({ id: "docs", about: "What each pack is for." }), doc({ id: "bridge" }), doc({ id: "graph" })];
+  const page = [
+    doc({ id: "docs", side: "page", slots: { declares: [], fills: [{ slot: "shell.main", name: "view", title: "Packs" }] } }),
+    doc({ id: "bridge", side: "page", provides: [key("graph.read")] }),
+    doc({ id: "shell", side: "page", state: "failed", error: "boom" }),
+  ];
   const all = merged(server, page);
-  assert.deepEqual(all.map((d) => d.id), ["docs", "graph", "shell"]);
-  assert.deepEqual(addsOf(all[0]!).views, ["Packs"]);
+  assert.deepEqual(all.map((d) => d.id), ["docs", "bridge", "graph", "shell"]);
+  assert.deepEqual(addsOf(all[0]!).views, [{ title: "Packs", view: "docs" }]);
   assert.equal(all[0]!.about, "What each pack is for.");
-  assert.equal(stateWords(all[2]!), "Failed to start: boom");
+  assert.deepEqual(all[1]!.provides.map((k) => k.key), ["graph.read"]);
+  assert.equal(stateWords(all[3]!), "Failed to start: boom");
   assert.equal(JSON.stringify(shownConfig({ deep: { password: 1, x: undefined } })), '{"deep":{"password":"•••"}}');
 });
