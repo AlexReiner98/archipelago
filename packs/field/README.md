@@ -15,13 +15,15 @@ find line has words, only what it finds and what lies near it.
   energy of its own (`energy`), and its push is that energy's downhill
   slope (`apply`) ([behaviour.ts](behaviour.ts)). [step.ts](step.ts) sums
   the pushes of the behaviours that are on, each times its weight, and
-  moves the particles. So the run's whole energy falls step by step, and
-  the run ends when particles move less than `settle_move` a step: where
-  the pushes balance, not where it cooled. Warmth only caps how far a
-  particle may move in a step, and friction eases from `friction` to
-  `friction_cool` as it cools, so a run that is nearly there stops
-  trembling. The run line says `settled`, or `stopped` when it hit
-  `steps_most` first.
+  moves each particle by its push over its mass (one plus `mass_links`
+  times its links: a hub feels all its springs at once, and would shake as
+  light as a leaf). So the run's whole energy falls step by step, and the
+  run ends when the mean push left on a particle is under `settle_push`:
+  where the pushes balance, not where it cooled or slowed. Friction is low
+  (fast down long gentle slopes), and when the particles as a whole move
+  against the push every speed drops to nothing (`uphill_stop`), so it
+  never swings. Warmth only caps how far a particle may move in a step.
+  The run line says `settled`, or `stopped` when it hit `steps_most` first.
 - **The rule is checked, not trusted.** [descends.ts](descends.ts) checks a
   behaviour: its push against its energy's measured slope at a few
   particles, and its energy step by step with gather, warmth held. The
@@ -91,6 +93,7 @@ find line has words, only what it finds and what lies near it.
 - It only shows: nothing here writes to the map.
 
 On the live map's copy (943 items, about 1,900 links) a run settles in about
-1,800 to 3,000 steps at about 5 ms each (node); 600 sample items settle in
-about 2,600 steps (`test/field.test.ts`). The physics is ported from the old
+1,350 steps at about 5 ms each (node), and its 391 open items in about 1,100
+in the browser; 600 sample items settle in about 2,300 steps
+(`test/field.test.ts`). The physics is ported from the old
 map's Field layout (14 Nov 2026), without its islands, untangle and plane.

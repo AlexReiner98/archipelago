@@ -76,7 +76,7 @@ export function descends(b: Behaviour, g0: G, S: Settings, gather: Behaviour, at
   }
   // Descent: warmth held, nothing settles it early.
   const list = b === gather ? [b] : [gather, b];
-  const run = { ...only, steps_most: Infinity, settle_move: 0, alpha_decay: 0 };
+  const run = { ...only, steps_most: Infinity, settle_push: 0, alpha_decay: 0 };
   g.sim = { alpha: 1, steps: 0 };
   const from = energy(g, run, list);
   let last = from, rises = 0, firstRise = -1;

@@ -66,7 +66,7 @@ test("a run settles where the pushes balance, not where it cooled, and the same 
   const a = settle(input);
   console.log(`settled: ${a.steps} steps, ${a.ms.toFixed(0)} ms (${(a.ms / a.steps).toFixed(1)} ms a step), moving ${a.g.sim.moved!.toFixed(3)} a step`);
   assert.equal(a.g.sim.settled, true, "it settled before steps_most");
-  assert.ok(a.g.sim.moved! < settings().settle_move!, "nothing moves enough to see");
+  assert.ok(a.g.sim.push! < settings().settle_push!, "the pushes balance");
   assert.ok(a.ms / a.steps < 40, `${(a.ms / a.steps).toFixed(1)} ms a step`);
   const small = sample(300, 8);
   assert.deepEqual([...settle(small).g.x], [...settle(small).g.x], "the same answer settles the same way");
