@@ -16,6 +16,7 @@ short doc. This is **edition 1, in draft**, while Alex shapes it.
 | [types](types.md) | `types.define` `types.read` | Bases, flavours that add fields, and kinds of link |
 | [profile](profile.md) | `profile.read` | Which runs a node is for |
 | [changeset](changeset.md) | (a format) | A change in full: header and facts `[op, id, field, value]` |
+| [style](style.md) | (tokens) | The look views share: colours, type, space and marks |
 
 [common.ts](common.ts) holds the shared words; [index.ts](index.ts) puts
 every capability's key and type in one map for a runtime to declare.
@@ -27,6 +28,7 @@ Edition 3 adds the place `compact` and the person's acts, `decision` and
 `notice` ([agent](agent.md)). Edition 4 says a node's same words once per
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
 ([agent](agent.md)), and the read side of profiles ([profile](profile.md)).
+Edition 6 adds the style tokens every view draws with ([style](style.md)).
 
 ## Packs ask for capabilities
 

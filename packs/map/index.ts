@@ -29,6 +29,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import type { LinkInfo, TypeInfo } from "../../spec/types.ts";
 import { layout, SIZE, type Out } from "./layout.ts";
 import { mark, side } from "./marks.ts";
+import { onStyle, sheet } from "../../spec/style.ts";
 
 export { mark, side } from "./marks.ts";
 
@@ -57,10 +58,10 @@ interface FindIndex {
 
 const QUERY = "find.query";
 
-const STYLE = `
+const STYLE = sheet(`
 .mp { display:grid; grid-template-rows:auto 1fr; height:100%; min-height:0; }
-.mp-bar { display:flex; gap:8px; align-items:center; padding:5px 10px; border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; }
-.mp-bar select, .mp-bar button { font:inherit; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:1px 4px; cursor:pointer; }
+.mp-bar { display:flex; gap:var(--space-3); align-items:center; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; }
+.mp-bar select, .mp-bar button { font:inherit; background:var(--control); color:var(--control-fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:0 var(--space-3); cursor:pointer; }
 .mp-bar .dim { color:var(--dim); }
 .mp-body { display:flex; min-height:0; }
 .mp-canvas { flex:1; min-width:0; position:relative; overflow:hidden; cursor:grab; user-select:none; }
@@ -69,11 +70,10 @@ const STYLE = `
 .mp-side { width:min(380px, 40%); flex:none; border-left:1px solid var(--line); overflow:auto; }
 .mp-card rect { fill:var(--panel); stroke:var(--line); }
 .mp-card { cursor:pointer; }
-.mp-card text { font:12px ui-sans-serif, system-ui, sans-serif; fill:var(--fg); dominant-baseline:central; }
-.mp-card .mk { fill:var(--dim); font-size:13px; }
-.mp-card.s-moving .mk { fill:var(--pick); }
-.mp-card.s-done .mk { fill:var(--held); }
-.mp-card.s-gone .mk { fill:var(--quiet); }
+.mp-card text { font:var(--text-m) var(--font); fill:var(--fg); dominant-baseline:central; }
+.mp-card .mk { font-size:var(--text); }
+.mp-card.s-fresh .mk { fill:var(--mark-fresh); } .mp-card.s-moving .mk { fill:var(--mark-moving); }
+.mp-card.s-done .mk { fill:var(--mark-done); } .mp-card.s-gone .mk { fill:var(--mark-gone); }
 .mp-card.s-done text.t, .mp-card.s-gone text.t { fill:var(--dim); }
 .mp-card.s-gone text.t { text-decoration:line-through; }
 .mp-card.pick rect { stroke:var(--pick); stroke-width:2; }
@@ -84,12 +84,12 @@ const STYLE = `
 .mp-wire.waits_on { stroke-dasharray:7 3 1.5 3; }
 .mp-wire.about { stroke:var(--line); }
 .mp-wire.lit { stroke:var(--pick); stroke-width:2.2; }
-.mp-key { position:absolute; left:8px; bottom:6px; color:var(--dim); font-size:11px; background:color-mix(in srgb, var(--bg) 88%, transparent); padding:3px 8px; border-radius:3px; border:1px solid var(--line); display:grid; grid-template-columns:auto 1fr; column-gap:10px; row-gap:1px; pointer-events:none; }
+.mp-key { position:absolute; left:8px; bottom:6px; color:var(--dim); font-size:var(--text-s); background:color-mix(in srgb, var(--bg) 88%, transparent); padding:var(--space-2) var(--space-3); border-radius:var(--radius); border:1px solid var(--line); display:grid; grid-template-columns:auto 1fr; column-gap:10px; row-gap:1px; pointer-events:none; }
 .mp-key .b { color:var(--fg); }
 .mp-key .row { display:flex; gap:10px; white-space:nowrap; align-items:center; }
 .mp-key .row > span { display:inline-flex; align-items:center; gap:3px; }
 .mp-key .m { display:inline-block; width:1.1em; text-align:center; }
-.mp-key .m.s-moving { color:var(--pick); } .mp-key .m.s-done { color:var(--held); } .mp-key .m.s-gone { color:var(--quiet); }
+.mp-key .m.s-fresh { color:var(--mark-fresh); } .mp-key .m.s-moving { color:var(--mark-moving); } .mp-key .m.s-done { color:var(--mark-done); } .mp-key .m.s-gone { color:var(--mark-gone); }
 .mp-key svg { width:22px; height:8px; vertical-align:middle; }
 .mp-key .sw { display:inline-block; width:16px; height:9px; border-radius:2px; border:1px solid var(--line); background:var(--panel); }
 .mp-key .sw.pick { border:2px solid var(--pick); width:14px; height:7px; }
@@ -97,7 +97,7 @@ const STYLE = `
 .mp-card.hover rect { stroke:var(--pick); }
 .mp-wire.hot { stroke:var(--pick); stroke-width:2.2; }
 .mp-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); }
-`;
+`);
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
@@ -268,6 +268,8 @@ const map: Pack = {
       const q = useHere<string>(QUERY) ?? "";
       const picked = useHere<string>(KEYS.item);
       const result = idx.run(q);
+      const [, restyle] = useState(0);
+      useEffect(() => onStyle(() => restyle((n) => n + 1)), []);
       const drawn = useMemo(() => layout(result), [JSON.stringify([result.items.map((r) => r.id), result.links.map((l) => [l.id, l.from, l.to])])]);
       useEffect(() => {
         const esc = (e: KeyboardEvent) => e.key === "Escape" && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) && set.set(KEYS.item, undefined);

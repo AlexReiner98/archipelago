@@ -2,32 +2,32 @@
  * The shell pack, minimal: fills `root` with a page that has one header
  * line and one slot, `shell.main`, where views go. One view shows at a
  * time; the header has a tab for each, and the URL's hash (the filling
- * pack's id) says which. Its styles
- * (the page's colours, light and dark) are its effect and go with it.
+ * pack's id) says which. It keeps no colours: its sheet refers to the
+ * style tokens (spec/style.md), and goes with it.
  */
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
+import { sheet } from "../../spec/style.ts";
 
 // htm ships CommonJS types; in the page its module export is the function itself.
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
-const STYLE = `
-:root { --bg:#fbfbfa; --fg:#1d1d1b; --dim:#77756f; --line:#e4e2dc; --lit:#fff3c4; --pick:#2f6fdf; --held:#1f8a4c; --failed:#c8322d; --quiet:#9a978f; --panel:#fff; }
-@media (prefers-color-scheme: dark) { :root { --bg:#151514; --fg:#e8e6e1; --dim:#8d8a83; --line:#2c2b29; --lit:#4a3f12; --pick:#6c9cf2; --held:#4cc27e; --failed:#ef6b63; --quiet:#77746d; --panel:#1c1c1a; } }
-html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:13px/1.45 ui-sans-serif, system-ui, sans-serif; }
+const STYLE = sheet(`
+html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:var(--text)/var(--leading) var(--font); }
 #app { height:100%; }
 .shell { display:flex; flex-direction:column; height:100%; }
-.shell-head { padding:6px 12px; border-bottom:1px solid var(--line); color:var(--dim); white-space:nowrap; }
-.shell-head b { color:var(--fg); font-weight:600; }
-.shell-tab { margin-left:14px; color:var(--dim); text-decoration:none; padding-bottom:5px; border-bottom:2px solid transparent; }
+.shell-head { display:flex; align-items:baseline; gap:var(--space-5); padding:var(--space-3) var(--space-4) 0; border-bottom:1px solid var(--line); color:var(--dim); white-space:nowrap; }
+.shell-head .name { padding-bottom:var(--space-3); }
+.shell-head b { color:var(--fg); font-weight:var(--bold); }
+.shell-tab { color:var(--dim); text-decoration:none; padding-bottom:var(--space-2); border-bottom:2px solid transparent; }
 .shell-tab:hover { color:var(--fg); }
 .shell-tab.on { color:var(--fg); border-bottom-color:var(--pick); }
 .shell-main { flex:1; min-height:0; display:flex; }
 .shell-main > * { flex:1; min-width:0; }
-`;
+`);
 
 const shell: Pack = {
   id: "shell",
@@ -55,7 +55,7 @@ const shell: Pack = {
       return html`
         <div class="shell">
           <div class="shell-head">
-            <b>archipelago</b> next
+            <span class="name"><b>archipelago</b> next</span>
             ${views.length > 1 &&
             views.map(
               (f) => html`<a key=${keyOf(f)} class=${`shell-tab${f === shown ? " on" : ""}`} href=${`#${keyOf(f)}`}>${f.title ?? f.pack}</a>`,
