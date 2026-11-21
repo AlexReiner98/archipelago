@@ -19,3 +19,6 @@ by calling it. Packs in the page inject them as if they ran there.
 - A stream the browser closes for good (an answer that isn't the stream,
   such as a proxy's 502 while the server behind it restarts) is opened
   again, after `config.retry` ms (1000), doubling to 30 s.
+- The client also provides `bridge.link`, its own key: `state()` is
+  `open` while the stream is up and `down` once it errs, and `watch(on)`
+  hears each change. The status region shows it (packs/activity).
