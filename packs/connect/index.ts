@@ -14,7 +14,8 @@
  * packs/claude-code/hook.ts, with `hook`); `token`, the action that makes a
  * token (absent: the server takes none); `name`, the MCP server's name;
  * `save`, on a guest map, where the guest goes to keep it (the page then
- * shows a quiet "save"); `script`, where a hook script is served, so the
+ * shows a quiet "save"); `signin`, on a guest map, where someone with an
+ * account goes to sign in instead (a quiet "sign in" beside it); `script`, where a hook script is served, so the
  * hooks are one command. `token` may be a path instead of an action: the
  * page then posts `{name}` to it on its own origin, with its cookie, and
  * gets `{name, token}` (a host's gateway that keeps the tokens).
@@ -34,6 +35,7 @@ export interface ConnectConfig {
   token?: string;
   name?: string;
   save?: string;
+  signin?: string;
   script?: string;
 }
 
@@ -56,7 +58,7 @@ const connect: Pack = {
     const mcp = config.mcp ?? "http://127.0.0.1:5181/mcp";
     // A token is made by an action (an action name), or by the host in front (a path the page posts to).
     const tokenAt = config.token?.startsWith("/") ? config.token : undefined;
-    const made: Setup = setup({ hook, mcp, command: config.command ?? localCommand(hook), token: !!config.token, name: config.name, save: config.save, script: config.script, tokenAt });
+    const made: Setup = setup({ hook, mcp, command: config.command ?? localCommand(hook), token: !!config.token, name: config.name, save: config.save, signin: config.signin, script: config.script, tokenAt });
 
     register.register({
       name: SETUP,
