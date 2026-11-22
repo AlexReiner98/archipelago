@@ -4,15 +4,59 @@ The Claude Code adapter. Claude Code's hooks and an MCP server are mere
 callers of `agent.run` ([spec](../../spec/agent.md)): what a hook or tool
 tells the model is what the nodes say or refuse at a place, and what the
 agent does comes in as an act. Nothing past this pack knows which harness
-runs. Injects `agent.run`, `action.invoke`, `action.list` and
+runs. Injects `agent.run`, `agent.tree`, `action.invoke`, `action.list` and
 `exchange.read`, so it waits for an agent pack, an action pack and an
 exchange.
+
+## What the agent gets
+
+What the nodes say at a moment is one block (`context.ts`), each node's
+words under a short tag naming it, so the agent can weigh and cite them and
+a miss can be tied to a node:
+
+```
+[Branch up to date before merge]
+Before a branch is merged, bring it up to date with main: …
+
+[Since you last heard] A person retitled one item.
+```
+
+The tag is the node's title (from `agent.tree`), at most 48 characters, with
+no path or id in it: a path is cut to its last name, an id gives way to the
+node's kind. One line of words gets a one-line tag; longer words get the tag
+on its own line. A refusal's words are tagged the same way. A node that is
+no longer loaded when its words go out is said untagged.
+
+At `session_start` (and a subagent's) the standing words, the `instruction`
+nodes, come first, ordered by node id, not by when their packs loaded; what
+changes per run (any other node said there: the run's own facts, what
+changed since it last heard) comes after them. So the start of what the map
+says is the same from run to run with the same nodes. Elsewhere the order is
+the answer's (config-tree order).
+
+The Sensory interface's run pane shows, on an opened say or refusal, the
+whole block as the agent got it, rebuilt with the same `context.ts` from the
+moment's events (with the nodes' titles as loaded now). Words said at
+`skill:` and `memory:` places are not handed back, so they show none.
+
+### Reading the cache in a transcript
+
+Each assistant entry in a Claude Code transcript carries `message.usage`:
+`cache_read_input_tokens` is the part of the prompt read from the cache,
+`cache_creation_input_tokens` the part written to it. On a session's first
+entry the read is the system prompt and tools another session already
+cached (the same count across sessions of one setup); the first user
+message, where the SessionStart context sits, is written. The cache matches
+a prefix only up to a cache breakpoint, so the map's words count as read
+only when everything before such a breakpoint is the same as in a run that
+wrote it: stable standing words are what makes that possible, they don't
+promise it. The harness view's window (packs/transcript) shows these counts.
 
 ## Hooks to places
 
 | Hook | Calls | The hook answers |
 |---|---|---|
-| SessionStart | `begin` (once per session), reach `session_start` | what was said, as context |
+| SessionStart | `begin` (once per session), reach `session_start` | what was said, as context, standing words first |
 | UserPromptSubmit | reach `prompt`, then act `prompt` by the person | context, or block on a refusal |
 | PreToolUse | reach `tool:<name>` and `file:<path>` (from `file_path`, `notebook_path`, relative to the run's folder) | context, or deny on a refusal; a denied call is its own act, `ok: false` |
 | PostToolUse / PostToolUseFailure | act `tool`, then reach `tool_result:<name>` with the result | context |

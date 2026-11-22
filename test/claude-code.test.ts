@@ -15,6 +15,7 @@ import claudeCode from "../packs/claude-code/index.ts";
 import { handle, lastAssistantText, relativePath, toolPlaces, transcriptPath, unseenFailures, type HookInput, type RunPort } from "../packs/claude-code/mapping.ts";
 import { rpc } from "../packs/claude-code/mcp.ts";
 import { withRemote } from "../packs/claude-code/hook.ts";
+import { ordered, tagOf, taggedText, told, type Speakers } from "../packs/claude-code/context.ts";
 import mcpPack from "../packs/mcp/index.ts";
 import types from "../packs/types/index.ts";
 import type { ToolDef } from "../packs/mcp/host.ts";
@@ -369,10 +370,10 @@ test("hooks and MCP over HTTP reach the agent pack and land on the exchange, bot
     const hook = (event: string, more: object = {}) =>
       post("/hook", { hook_event_name: event, session_id: "sess-1", cwd: dir, transcript_path: transcript, ...more }).then((r) => r.json);
 
-    assert.deepEqual(await hook("SessionStart", { source: "startup" }), { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "Hello from the map." } });
+    assert.deepEqual(await hook("SessionStart", { source: "startup" }), { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "[hello] Hello from the map." } });
     await hook("UserPromptSubmit", { prompt: "edit the spec" });
     const pre = await hook("PreToolUse", { tool_name: "Edit", tool_input: { file_path: join(dir, "spec", "agent.ts") }, tool_use_id: "t1" });
-    assert.equal(pre.hookSpecificOutput.additionalContext, "The spec is versioned.");
+    assert.equal(pre.hookSpecificOutput.additionalContext, "[spec] The spec is versioned.");
     await hook("PostToolUse", { tool_name: "Edit", tool_input: { file_path: join(dir, "spec", "agent.ts") }, tool_response: { ok: true }, tool_use_id: "t1" });
     const denied = await hook("PreToolUse", { tool_name: "Read", tool_input: { file_path: join(dir, ".env") }, tool_use_id: "t2" });
     assert.equal(denied.hookSpecificOutput.permissionDecision, "deny");
@@ -659,4 +660,77 @@ test("an MCP client without hooks gets a session, and the session is its own rec
   } finally {
     await loader.apply([]);
   }
+});
+
+test("each node's words come under a short tag naming it: its title, never a path or an id", () => {
+  const who: Speakers = (id) =>
+    ({
+      "words/e_3bxzdaq4": { title: "Branch up to date before merge", kind: "instruction" },
+      "loaded/m1": { title: "project memory ~/repo/CLAUDE.md", kind: "memory" },
+      "words/e_untitled": { title: "e_untitled", kind: "reflex" },
+      "words/long": { title: "A very long title that goes on and on past what a tag should hold", kind: "reflex" },
+    })[id];
+  assert.equal(tagOf("words/e_3bxzdaq4", who), "Branch up to date before merge");
+  assert.equal(tagOf("loaded/m1", who), "project memory CLAUDE.md", "a path is cut to its last name");
+  assert.equal(tagOf("words/e_untitled", who), "reflex", "an id is no name: its kind stands in");
+  assert.ok(tagOf("words/long", who).length <= 48 && tagOf("words/long", who).endsWith("…"));
+  assert.equal(taggedText("words/e_3bxzdaq4", "Merge main first.", who), "[Branch up to date before merge] Merge main first.", "one line, one line");
+  assert.equal(taggedText("words/e_3bxzdaq4", "Merge main first.\n\n## Why\nIt deploys.", who), "[Branch up to date before merge]\nMerge main first.\n\n## Why\nIt deploys.");
+  assert.equal(taggedText("gone/x", "Words.", who), "Words.", "a node no longer loaded: its words as they are");
+  const said = [
+    { node: "words/b", text: "B." },
+    { node: "since/heard", text: "Since you last heard: 2 changes." },
+    { node: "words/a", text: "A." },
+  ];
+  const kinds: Speakers = (id) => ({ title: id.split("/")[1]!, kind: id.startsWith("words/") ? "instruction" : "reflex" });
+  assert.deepEqual(ordered(said, kinds, ["session_start"]).map((s) => s.node), ["words/a", "words/b", "since/heard"], "standing words first, by node, then what changes");
+  assert.deepEqual(ordered(said, kinds, ["prompt"]), said, "elsewhere, the answer's order");
+  assert.equal(told([], kinds), undefined);
+});
+
+test("two runs with the same nodes get the same leading text at session_start, whatever order the packs loaded in", async () => {
+  /** A pack of standing words, and one that says what changes per run. */
+  const standing = (id: string, names: string[]): Pack => ({
+    id,
+    inject: ["agent.node"],
+    apply(ctx) {
+      const n = ctx.get<AgentNode>("agent.node");
+      for (const name of names) n.node({ name, kind: "instruction", title: `Rule ${name}`, at: ["session_start"], speak: () => ({ say: `Always ${name}.` }) });
+    },
+  });
+  let runs = 0;
+  const changing: Pack = {
+    id: "changing",
+    inject: ["agent.node"],
+    apply(ctx) {
+      ctx.get<AgentNode>("agent.node").node({ name: "news", kind: "reflex", title: "Since you last heard", at: ["session_start"], speak: () => ({ say: `Run ${++runs}: something changed.` }) });
+    },
+  };
+  const start = async (order: string[], session: string): Promise<string> => {
+    const rt = new Runtime();
+    let port = 0;
+    const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "cc.ts": claudeCode, "one.ts": standing("one", ["b", "a"]), "two.ts": standing("two", ["c"]), "changing.ts": changing };
+    const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
+    await loader.apply([
+      { id: "graph", pack: "graph.ts" },
+      { id: "action", pack: "action.ts" },
+      { id: "exchange", pack: "exchange.ts" },
+      { id: "agent", pack: "agent.ts" },
+      ...order.map((id) => ({ id, pack: `${id}.ts` })),
+      { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    ]);
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/hook`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hook_event_name: "SessionStart", session_id: session, source: "startup" }) });
+      return ((await r.json()) as any).hookSpecificOutput.additionalContext as string;
+    } finally {
+      await loader.apply([]);
+    }
+  };
+  const first = await start(["changing", "two", "one"], "s-1");
+  const second = await start(["one", "changing", "two"], "s-2");
+  const lead = "[Rule a] Always a.\n\n[Rule b] Always b.\n\n[Rule c] Always c.";
+  assert.ok(first.startsWith(lead), first);
+  assert.ok(second.startsWith(lead), second);
+  assert.equal(first, `${lead}\n\n[Since you last heard] Run 1: something changed.`, "what changes per run comes after the standing words");
+  assert.notEqual(first, second, "only the tail differs");
 });

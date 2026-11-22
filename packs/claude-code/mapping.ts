@@ -43,6 +43,7 @@
  */
 import type { Act, AgentRun, Answer, Moment, Place, RunStart } from "../../spec/agent.ts";
 import type { Actor, Json, Time } from "../../spec/common.ts";
+import { refusalTold, told, type Speakers } from "./context.ts";
 
 export const HARNESS = "claude-code";
 
@@ -124,21 +125,19 @@ export function trim(value: Json | undefined, max = TEXT_MAX): Json | undefined 
   return value;
 }
 
-/** Everything said, as one block for the model, each line naming its node. */
-export function spoken(answer: Answer): string | undefined {
-  if (!answer.said.length) return undefined;
-  return answer.said.map((s) => s.text).join("\n\n");
+/** Everything said, as one block for the model, each node's words under its tag (context.ts). */
+export function spoken(answer: Answer, speakers?: Speakers, places?: Place[]): string | undefined {
+  return told(answer.said, speakers, places);
 }
 
-function context(event: string, answer: Answer): HookOutput {
-  const text = spoken(answer);
+function contextOf(event: string, answer: Answer, speakers?: Speakers, places?: Place[]): HookOutput {
+  const text = spoken(answer, speakers, places);
   return text ? { hookSpecificOutput: { hookEventName: event, additionalContext: text } } : {};
 }
 
-/** The refusal's words, with what else was said after them. */
-export function refusalText(answer: Answer): string {
-  const rest = spoken(answer);
-  return rest ? `${answer.refused!.text}\n\n${rest}` : answer.refused!.text;
+/** The refusal's words, with what else was said after them, each under its node's tag. */
+export function refusalText(answer: Answer, speakers?: Speakers): string {
+  return refusalTold(answer, speakers);
 }
 
 /** The run a hook belongs to, as the adapter knows it. */
@@ -178,6 +177,8 @@ export interface Options {
   note?: (load: Load) => Promise<void>;
   /** The home folder, written `~` in a memory file's place. */
   home?: string;
+  /** Who each node is (`agent.tree`): its title tags its words, its kind orders `session_start`. */
+  speakers?: Speakers;
 }
 
 /** Something Claude Code loaded into the run: a skill's text or a memory file. */
@@ -365,6 +366,9 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
     return agent.reach(m);
   };
   const act = (a: Omit<Act, "run" | "time">) => agent.act({ run, time: now(), ...a });
+  const who = options.speakers;
+  const context = (event: string, answer: Answer, places?: Place[]) => contextOf(event, answer, who, places);
+  const refusalText = (answer: Answer) => refusalTold(answer, who);
   // A subagent's loads are in its own transcript, which its hooks don't name until it stops.
   if (run === input.session_id) await reachLoads(input, port, options, reach);
 
@@ -391,11 +395,11 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
     }
     case "SessionStart": {
       const answer = await reach(["session_start"], input.source ? { source: input.source } : undefined);
-      return context("SessionStart", answer);
+      return context("SessionStart", answer, ["session_start"]);
     }
     case "SubagentStart": {
       const answer = await reach(["session_start"], { source: "subagent", ...(input.agent_type ? { agent_type: input.agent_type } : {}) });
-      return context("SubagentStart", answer);
+      return context("SubagentStart", answer, ["session_start"]);
     }
     case "SubagentStop": {
       const own: HookInput = { ...input, ...(typeof input.agent_transcript_path === "string" ? { transcript_path: input.agent_transcript_path } : {}) };

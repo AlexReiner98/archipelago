@@ -25,7 +25,8 @@ import type { Dispose } from "../../spec/common.ts";
 import { Refused } from "../../spec/common.ts";
 import type { McpHost, ToolDef, ToolResult, ToolRun } from "../mcp/host.ts";
 import { HOST } from "../mcp/host.ts";
-import type { AgentRun, Place } from "../../spec/agent.ts";
+import type { AgentRun, AgentTree, Place } from "../../spec/agent.ts";
+import type { Speakers } from "./context.ts";
 import type { Actor, Json, Time } from "../../spec/common.ts";
 import { META } from "../../spec/common.ts";
 import type { ExchangeRead } from "../../spec/exchange.ts";
@@ -139,11 +140,17 @@ async function lastReply(input: HookInput): Promise<string | undefined> {
 const claudeCode: Pack<ClaudeCodeConfig> = {
   id: "claude-code",
   about: "Connects Claude Code: its sessions report here and hear what the map says.",
-  inject: ["agent.run", "action.invoke", "action.list", "exchange.read"],
+  inject: ["agent.run", "agent.tree", "action.invoke", "action.list", "exchange.read"],
   async apply(ctx: Context, config: ClaudeCodeConfig = {}) {
     const actor: Actor = config.agent ?? { id: "claude-code", kind: "agent" };
     const actions = ctx.get<ActionList>("action.list");
     const read = ctx.get<ExchangeRead>("exchange.read");
+    const tree = ctx.get<AgentTree>("agent.tree");
+    /** Who a node is, as loaded now: its title tags its words, its kind orders session_start. */
+    const speakers: Speakers = (id) => {
+      const n = tree.nodes().find((x) => x.id === id);
+      return n && { title: n.title, kind: n.kind };
+    };
     /** The run's tool acts on the record, from `since` on. */
     const recorded = async (run: string, since?: Time): Promise<RecordedCall[]> => {
       const out: RecordedCall[] = [];
@@ -202,6 +209,7 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
         transcriptFrom,
         loadedSaid,
         home,
+        speakers,
         // A node to say the load, when a pack declares `loaded.note`; nothing is lost when none does.
         note: async (l: Load) => {
           if (!actions.list().some((a) => a.name === "loaded.note")) return;
@@ -239,7 +247,7 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
         if (!st.begun) {
           await st.agent.begin({ run: s.run, agent: s.actor, harness: s.client, reaches: MCP_REACHES, title: s.client });
           st.begun = true;
-          said.push(spoken(await st.agent.reach({ run: s.run, places: ["session_start"], time: now() })));
+          said.push(spoken(await st.agent.reach({ run: s.run, places: ["session_start"], time: now() }), speakers, ["session_start"]));
         }
         const place = `tool:${prefix}${tool.name}`;
         const input = trim(args) ?? null;
@@ -247,9 +255,9 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
         if (before.refused) {
           const { node, text, code } = before.refused;
           await st.agent.act({ run: s.run, place, time: now(), kind: "tool", by: "agent", input, output: { refused: node, text, ...(code ? { code } : {}) }, ok: false });
-          return { text: [refusalText(before), ...said].filter(Boolean).join("\n\n"), isError: true };
+          return { text: [refusalText(before, speakers), ...said].filter(Boolean).join("\n\n"), isError: true };
         }
-        said.push(spoken(before));
+        said.push(spoken(before, speakers));
         let out: ToolResult;
         try {
           out = await tool.call(args, run);
@@ -257,7 +265,7 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
           out = { text: `${tool.name} failed: ${(err as Error)?.message ?? String(err)}`, isError: true };
         }
         await st.agent.act({ run: s.run, place, time: now(), kind: "tool", by: "agent", input, output: trim(out.text) ?? null, ok: !out.isError });
-        said.push(spoken(await st.agent.reach({ run: s.run, places: [`tool_result:${prefix}${tool.name}`], time: now(), input: trim(out.text) ?? null })));
+        said.push(spoken(await st.agent.reach({ run: s.run, places: [`tool_result:${prefix}${tool.name}`], time: now(), input: trim(out.text) ?? null }), speakers));
         const words = said.filter(Boolean);
         return words.length ? { ...out, text: `${out.text}\n\n${words.join("\n\n")}` } : out;
       });
