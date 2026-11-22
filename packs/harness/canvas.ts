@@ -417,7 +417,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   const theirs = useMemo(() => givenOnly(tree), [tree]);
   const rest = tree.order.filter((t) => t.parent);
   return html`
-    <div class=${`rx-canvas${panning ? " panning" : ""}${small ? " rx-small" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${() => ((manual.current = false), (ask.current = true), refit((n) => n + 1))} title="Click a node to pick it; drag to move; wheel to zoom; double-click to fit">
+    <div class=${`rx-canvas${panning ? " panning" : ""}${small ? " rx-small" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${() => ((manual.current = false), (ask.current = true), refit((n) => n + 1))}>
       <svg ref=${svg}><g transform=${`scale(${view.k}) translate(${-view.x} ${-view.y})`}>
         <g>
           ${rest.map((t) => {
