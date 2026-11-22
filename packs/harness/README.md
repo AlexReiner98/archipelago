@@ -127,7 +127,9 @@ zoom, double-click to fit; a press picks a node by its name, or anywhere
 within 22 px of its dot (`HIT_PX`). The key ([key.ts](key.ts)) is always
 there, bottom left of one run's tree or the agent in focus: open, every
 mark with its words, or collapsed by its head ("key ▾") to one line of the
-marks that filter; the browser remembers which. The key doubles as a
+marks that filter; the browser remembers which. It lists only the marks
+the tree in sight shows (`marksIn`): a new user's key is who and how, and
+held-back, shadow, verdict and trial marks join it as they appear. The key doubles as a
 filter, open or collapsed: a click on a
 channel's row, on "the map's", or on Claude Code's orange hides those nodes
 from the trees (struck while hidden), and a second click shows them again

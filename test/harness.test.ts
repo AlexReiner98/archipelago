@@ -602,3 +602,20 @@ test("a channel's shape is bigger than a dot, and keeps a size on screen when zo
   assert.equal(shapeRadius(2.5, 0.25, false) * 0.25, 4, "4 px on screen at a quarter zoom");
   assert.equal(shapeRadius(2.5, 1, true), 5);
 });
+
+test("the key lists only the marks the tree shows; a hidden filter stays so it can come back", async () => {
+  const { marksIn } = await import("../packs/harness/key.ts");
+  const node = (o: Partial<NodeInfo>): NodeInfo => ({ id: `words/${o.name ?? "n"}`, name: "n", pack: "words", kind: "instruction", title: "t", at: ["prompt"], ...o });
+  const fresh = marksIn({ nodes: [node({})], heard: new Map(), held: new Map(), trial: () => false });
+  assert.deepEqual([...fresh].sort(), ["hook", "map", "pack:words"], "a new user's tree: who, how, which pack; no run marks yet");
+  const run = marksIn({
+    nodes: [node({ name: "a", source: "i_t" }), node({ name: "b", kind: "rule" }), { ...node({ name: "r#system", pack: "transcript", kind: "given" }), id: "transcript/r#system" }],
+    heard: new Map([["words/a", "said"]]),
+    held: new Map([["words/b", "shadow"]]),
+    rings: new Map([["words/a", "held"]]),
+    trial: (n) => n.source === "i_t",
+    off: new Set(["file"]),
+  });
+  for (const m of ["said", "acted", "shadow", "v-held", "trial", "map", "harness", "hook", "rule", "context", "file", "pack:words"]) assert.ok(run.has(m), m);
+  for (const m of ["refused", "held", "v-failed", "v-quiet", "pack:transcript"]) assert.ok(!run.has(m), m);
+});

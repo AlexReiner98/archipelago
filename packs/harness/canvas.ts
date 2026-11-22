@@ -22,7 +22,7 @@
  * map changing under it never moves it. A click picks a node,
  */
 import { channelDoc, channelOf, shapeOf, shapePath } from "./channels.ts";
-import { Key, shapeRadius, type KeyFilter } from "./key.ts";
+import { Key, marksIn, shapeRadius, type KeyFilter } from "./key.ts";
 export type { KeyFilter } from "./key.ts";
 import { givenOnly, isGiven } from "./given.ts";
 import { h } from "preact";
@@ -407,6 +407,11 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     return s;
   }, [picked, tree]);
   const statusOf = (n?: NodeInfo) => (n?.source ? statuses.get(n.source) : undefined);
+  // The marks this tree shows: the key lists only those.
+  const present = useMemo(
+    () => (showKey ? marksIn({ nodes: tree.order.flatMap((t) => (t.node ? [t.node] : [])), heard, held, ...(rings ? { rings } : {}), trial: (n) => statusOf(n) === "trial", ...(keyFilter ? { off: keyFilter.off } : {}) }) : undefined),
+    [showKey, tree, heard, held, rings, statuses, keyFilter?.off],
+  );
   // What the harness gave, and every bough that holds nothing else: grey, so the map's own stands out in colour.
   const theirs = useMemo(() => givenOnly(tree), [tree]);
   const rest = tree.order.filter((t) => t.parent);
@@ -471,7 +476,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
         <g ref=${fxGroup}></g>
       </g></svg>
       ${tree.order.length === 1 && html`<div class="rx-empty">No nodes to show.</div>`}
-      ${showKey && html`<${Key} hues=${hues} filter=${keyFilter} open=${keyOpen ?? true} onOpen=${onKeyOpen} />`}
+      ${showKey && html`<${Key} hues=${hues} filter=${keyFilter} open=${keyOpen ?? true} onOpen=${onKeyOpen} present=${present} />`}
     </div>
   `;
 };
