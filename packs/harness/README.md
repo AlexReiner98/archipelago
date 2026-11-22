@@ -119,7 +119,8 @@ from one "decided" bough as well, retired ones struck.
 A step of the playhead runs a light from the root to its node (red for a
 refusal), or sparks on the bough of an act's place (amber, red when it
 failed). Under reduced motion only the names light. Drag to move, wheel to
-zoom, double-click to fit; "key" shows the marks.
+zoom, double-click to fit; a press picks a node by its name, or anywhere
+within 22 px of its dot (`HIT_PX`); "key" shows the marks.
 
 Names are whole, never cut, and never show a path: a path is said as
 whose it is, after a dot (`nameOf`, `placeName`): its project's folder,

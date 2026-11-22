@@ -13,7 +13,7 @@ import { HUES } from "../spec/style.ts";
 import { colourOf, colours, keepLast, liveRuns, LIVE_MOST } from "../packs/harness/live.ts";
 import { groupsOf } from "../packs/harness/hooks.ts";
 import { DECIDED, dotsBox, nameOf, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
-import { fitKey, shouldFit } from "../packs/harness/canvas.ts";
+import { fitKey, HIT_PX, nearest, shouldFit } from "../packs/harness/canvas.ts";
 import { crowded, quadsOverlap, type Quad } from "../packs/harness/labels.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 import { placementOf, placementText } from "../packs/harness/agents.ts";
@@ -546,4 +546,12 @@ test("atFoot: new lines keep the list at its foot only when it is already there"
   assert.equal(atFoot(1000, 600, 400), true);
   assert.equal(atFoot(1000, 590, 400), true, "within a little slack");
   assert.equal(atFoot(1000, 300, 400), false, "scrolled up to read: it stays put");
+});
+
+test("nearest: a press picks the nearest node within reach of its dot; none further; the reach is generous", () => {
+  const pts = [{ id: "a", x: 0, y: 0 }, { id: "b", x: 30, y: 0 }];
+  assert.equal(nearest(pts, { x: 10, y: 0 }, HIT_PX), "a");
+  assert.equal(nearest(pts, { x: 20, y: 0 }, HIT_PX), "b");
+  assert.equal(nearest(pts, { x: 0, y: 40 }, HIT_PX), undefined);
+  assert.ok(HIT_PX >= 20);
 });

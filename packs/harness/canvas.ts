@@ -16,7 +16,8 @@
  * - Small (one agent's tree among many, trees.ts): names show only on what
  *   is lit, said or picked.
  *
- * Drag to move, wheel to zoom, double-click to fit. The camera fits once,
+ * Drag to move, wheel to zoom, double-click to fit. A press picks a node by
+ * its name, or within HIT_PX of its dot. The camera fits once,
  * when first laid out, and then only on a double-click (`shouldFit`): the
  * map changing under it never moves it. A click picks a node,
  */
@@ -59,6 +60,7 @@ export const CANVAS_STYLE = sheet(`
 .rx-ring { fill:none; stroke-width:1.6; stroke:none; }
 .rx-ring.v-held { stroke:${C.say}; } .rx-ring.v-failed { stroke:${C.fail}; } .rx-ring.v-quiet { stroke:var(--quiet); stroke-dasharray:1.5 1.5; }
 .rx-name { fill:var(--fg); font:var(--bold) ${S.nameText}px var(--font); dominant-baseline:middle; pointer-events:none; }
+.rx-node .rx-name { pointer-events:auto; cursor:pointer; }
 .rx-name .c { fill:var(--dim); font-weight:400; font-variant-numeric:tabular-nums; }
 .rx-name .up { fill:${C.say}; } .rx-name .down, .rx-name .gone { fill:${C.fail}; }
 .rx-bough .rx-name { fill:var(--dim); font-weight:500; }
@@ -249,6 +251,19 @@ export function shouldFit(s: { fitted: boolean; manual: boolean; asked: boolean 
   return s.asked || (!s.manual && !s.fitted);
 }
 
+/** How far round a dot, in screen px, a press still picks its node. */
+export const HIT_PX = 22;
+
+/** The nearest of the points within `r` of `p`, by id; none further. */
+export function nearest(points: { id: string; x: number; y: number }[], p: { x: number; y: number }, r: number): string | undefined {
+  let best: string | undefined, d = r;
+  for (const q of points) {
+    const dd = Math.hypot(q.x - p.x, q.y - p.y);
+    if (dd < d) (d = dd), (best = q.id);
+  }
+  return best;
+}
+
 export interface CanvasProps {
   tree: Tree;
   placed: Placed;
@@ -321,15 +336,18 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     return { x: view.x + (e.clientX - r.left) / view.k, y: view.y + (e.clientY - r.top) / view.k };
   };
   const hit = (p: { x: number; y: number }) => {
-    let best: string | undefined, d = 12 / view.k;
-    for (const t of tree.order) {
+    const pts = tree.order.flatMap((t) => {
       const id = t.node?.id ?? t.decided?.node;
-      if (!id) continue;
-      const q = placed.xy.get(t.id)!;
-      const dd = Math.hypot(q.x - p.x, q.y - p.y);
-      if (dd < d) (d = dd), (best = id);
-    }
-    return best;
+      const q = placed.xy.get(t.id);
+      return id && q ? [{ id, x: q.x, y: q.y }] : [];
+    });
+    return nearest(pts, p, HIT_PX / view.k);
+  };
+  /** A node's name is part of it: a press on the name picks it. */
+  const named = (target: EventTarget | null) => {
+    const g = (target as Element | null)?.closest?.("g.rx-node") as SVGGElement | null;
+    const t = g ? tree.byId.get(g.dataset.id ?? "") : undefined;
+    return t ? (t.node?.id ?? t.decided?.node) : undefined;
   };
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
@@ -341,7 +359,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   };
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
-    const on = hit(toWorld(e));
+    const on = named(e.target) ?? hit(toWorld(e));
     const start = { cx: e.clientX, cy: e.clientY, view };
     let moved = false;
     const el = box.current!;
