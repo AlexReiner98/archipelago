@@ -116,6 +116,7 @@ from one "decided" bough as well, retired ones struck.
 | dot hue | its pack: the map's words purple, what grow learned gold; never `hue-2`, too near Claude Code's orange |
 | hollow dot | its item is a trial |
 | orange dot, name and branch | given by the harness (Claude Code), not the map: read only (below) |
+| hollow orange dot | a given tool or MCP server no run counted used ([used](../used/README.md)) |
 | dot shape | drawn bigger than a plain dot, and never under 4 px on screen however far out the zoom (`shapeRadius`): its channel ([channels.ts](channels.ts)): ● hook, said at a moment by a hook; ◆ rule, a check that can refuse (a rule, the schema's refusal); ■ file, a skill or memory file the harness loads; ▲ context, there from the start (system prompt, tool definitions, MCP instructions, listings) |
 | dot size, number | how often it was said: in the run, or all time |
 | ↑ ↓ ⊝ | the keep pack's standing: promote, retire, held back by a check |
@@ -194,6 +195,12 @@ context a circle, everything else a triangle (context). Picked, the left bar sho
 and its text, read only and folded (`transcript.text`). "given · by the
 harness" in the ⋯ menu hides them. The run's `transcript` fact is a path,
 so it is never shown.
+
+A tool's definition or a server's instructions also shows, from the used
+pack, in how many of the newest runs it was given and used ("used in 3 of
+40 runs · 36k letters"; an MCP tool's server too), and is a hollow dot on
+the tree when none used it. ([use.ts](use.ts)). Without that pack it doesn't
+show.
 
 ## The node ([node.ts](node.ts), [keep.ts](keep.ts))
 

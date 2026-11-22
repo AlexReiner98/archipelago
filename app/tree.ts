@@ -81,6 +81,7 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }
     { id: "loaded", pack: "packs/loaded/index.ts" },
     { id: "transcript", pack: "packs/transcript/index.ts" },
     { id: "profile", pack: "packs/profile/index.ts" },
+    { id: "used", pack: "packs/used/index.ts" },
     { id: "written", pack: "packs/written/index.ts", disabled: !write },
     { id: "placed", pack: "packs/placed/index.ts", disabled: !write },
     { id: "grow", pack: "packs/grow/index.ts" },
