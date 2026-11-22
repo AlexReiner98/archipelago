@@ -82,6 +82,8 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }
     { id: "transcript", pack: "packs/transcript/index.ts" },
     { id: "profile", pack: "packs/profile/index.ts" },
     { id: "used", pack: "packs/used/index.ts" },
+    { id: "lean", pack: "packs/lean/index.ts" },
+    { id: "lean-write", pack: "packs/lean/write.ts", config: { ledger: join(data, "lean.json") }, disabled: !write },
     { id: "written", pack: "packs/written/index.ts", disabled: !write },
     { id: "placed", pack: "packs/placed/index.ts", disabled: !write },
     { id: "grow", pack: "packs/grow/index.ts" },

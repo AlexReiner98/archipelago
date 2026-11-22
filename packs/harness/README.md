@@ -199,8 +199,12 @@ so it is never shown.
 A tool's definition or a server's instructions also shows, from the used
 pack, in how many of the newest runs it was given and used ("used in 3 of
 40 runs · 36k letters"; an MCP tool's server too), and is a hollow dot on
-the tree when none used it. ([use.ts](use.ts)). Without that pack it doesn't
-show.
+the tree when none used it. With the lean pack, one a profile the run is in
+would leave out is marked as a shadow's hold ("would leave out · Focus"),
+and as held once it is written into the run's project settings; "leave
+out" records the profile's plan (`lean.set`) and "bring back" clears it
+([use.ts](use.ts), [lean](../lean/README.md)). Without those packs neither
+shows.
 
 ## The node ([node.ts](node.ts), [keep.ts](keep.ts))
 
