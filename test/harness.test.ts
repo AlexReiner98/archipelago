@@ -476,6 +476,8 @@ test("landsLive: nothing picked watches every live run; a run, every run or live
   assert.equal(landsLive(undefined, "r1", false), false);
   assert.equal(landsLive(undefined, undefined, true), false);
   assert.equal(landsLive(false, undefined, false), false, "the last active, asked for");
+  assert.equal(landsLive(undefined, undefined, false, false), false, "none live: the last active, so an ended first run is seen");
+  assert.equal(landsLive(true, undefined, false, false), true, "live asked for stays live");
 });
 
 test("dotsBox: a small tree fits its dots, tighter than its bounds with names", () => {

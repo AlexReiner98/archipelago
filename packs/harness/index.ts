@@ -127,7 +127,8 @@ ${CANVAS_STYLE}
 ${TIMELINE_STYLE}
 ${WINDOWBAR_STYLE}
 ${TREND_STYLE}
-.hv-onerun { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; min-width:0; }`);
+.hv-onerun { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; min-width:0; }
+.hv-onerun > .rx-canvas { grid-row:2; }`);
 
 const values = (v: string | string[] | undefined) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 

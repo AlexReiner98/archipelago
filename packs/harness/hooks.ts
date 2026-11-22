@@ -11,7 +11,7 @@ import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exch
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import type { HereRead } from "../../spec/here.ts";
 import type { Hearing, ProfileInfo, ProfileRead } from "../../spec/profile.ts";
-import { keepLast } from "./live.ts";
+import { keepLast, liveRuns } from "./live.ts";
 
 /** What `verdict.read` answers (the verdict pack's own key). */
 export type Verdict = "held" | "failed" | "quiet";
@@ -64,9 +64,13 @@ export const FOCUS = "harness.focus";
 /** How many events the live view keeps, newest last. */
 export const LIVE_KEEP = 300;
 
-/** Whether the view watches every live run: asked for, or nothing else picked (no run, not every run, not turned off). */
-export function landsLive(live: boolean | undefined, pinned: string | undefined, every: boolean): boolean {
-  return live === true || (live === undefined && !pinned && !every);
+/**
+ * Whether the view watches every live run: asked for, or nothing else picked
+ * (no run, not every run, not turned off) while some run is live. With none
+ * live it lands on the last active, so a first run that has ended is seen.
+ */
+export function landsLive(live: boolean | undefined, pinned: string | undefined, every: boolean, anyLive = true): boolean {
+  return live === true || (live === undefined && !pinned && !every && anyLive);
 }
 
 export interface ProfileRow {
@@ -140,7 +144,7 @@ export function hooks(c: Caps) {
     const pinned = useHere<string>("here.run");
     const said = useHere<boolean>(LIVE);
     const every = useHere<boolean>(ALL) === true;
-    const live = landsLive(said, pinned, every);
+    const live = landsLive(said, pinned, every, liveRuns(runs).length > 0);
     const all = !live && every;
     const run = all || live ? undefined : (pinned ?? runs[0]?.run);
     return { runs, run, pinned, all, live, info: runs.find((r) => r.run === run) };
