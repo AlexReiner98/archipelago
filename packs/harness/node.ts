@@ -200,7 +200,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
     // Its share of the run's window over time (trend.ts, packs/context).
     const playhead = hk.useHere<string>(KEYS.event);
     const win = useNodeWindow(invoke, hk.useHas(NODE), inView ?? run, id, playhead, record);
-    if (!id) return html`<div class="hv-pane"><div class="hv-head"><span class="t">Node</span></div><div class="hv-empty">Pick a node.</div></div>`;
+    if (!id) return html`<div class="hv-pane"><div class="hv-head"><span class="t">Node</span></div><div class="hv-empty" title="Click a node in the tree: what it says, where, and how it went.">No node picked</div></div>`;
     return html`
       <div class="hv-pane">
         <div class="hv-head"><span class="t hv-cut" title=${info?.title ?? id}>${info?.title ?? id}</span></div>

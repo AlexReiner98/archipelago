@@ -108,7 +108,8 @@ const STYLE = sheet(`
 .hv-words textarea { width:100%; box-sizing:border-box; min-height:84px; overflow:hidden; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-2) var(--space-3); resize:none; }
 .hv-words .ro { white-space:pre-wrap; padding:var(--space-2) var(--space-3); border-left:2px solid var(--line); }
 .hv-words .bar { display:flex; gap:var(--space-3); align-items:center; margin-top:var(--space-2); color:var(--dim); white-space:nowrap; }
-.hv-empty { padding:var(--space-4); color:var(--dim); }
+.hv-empty { padding:var(--space-4); color:var(--dim); display:flex; gap:var(--space-3); align-items:baseline; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.hv-empty::before { content:var(--glyph-circle-fresh); color:var(--mark-fresh); flex:none; }
 .hv-tag { flex:none; font-size:var(--text-xs); padding:0 var(--space-2); border-radius:var(--radius); border:1px dashed var(--pick); color:var(--pick); }
 .hv-prof { display:flex; gap:var(--space-4); padding:var(--space-1) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; overflow:hidden; }
 .hv-prof .part { color:var(--dim); }
@@ -490,7 +491,7 @@ const harness: Pack = {
       <div class="hv-pane">
         <div class="hv-head"><span class="t">Runs</span>${of && html`<span class="hv-cut" title="Only the runs this profile has in it">in ${of}</span>`}<span class="hv-dim">${runs ? runs.length : "…"}</span></div>
         <div class="hv-body">
-          ${runs && !runs.length && html`<div class="hv-empty" title="Of the last 50 runs, by profile.read.of">${of ? `No run in ${of}.` : "No run yet."}</div>`}
+          ${runs && !runs.length && html`<div class="hv-empty" title="Of the last 50 runs, by profile.read.of">${of ? `No run in ${of}` : "No run yet"}</div>`}
           ${(runs ?? []).map((r) => html`<div class="hv-row" title=${r.title ?? r.run} onClick=${() => set.set(KEYS.run, r.run)}>
             <span class="hv-m">${r.ended ? "○" : "●"}</span><span class="x">${r.title ?? r.run.slice(0, 8)}</span><span class="n">${clock(r.started)}</span>
           </div>`)}

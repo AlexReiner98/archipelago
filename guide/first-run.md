@@ -25,7 +25,11 @@ and the bridge between them run on 5280, 5281 and 5282. The map is kept in
 
 ## Connect Claude Code
 
-Start a session against it:
+A map with no run opens on Field with what to copy: the MCP line and the
+hooks for `~/.claude/settings.json`, for this server. Copy both, start
+Claude Code in any repository, and the first run shows as it begins.
+
+Or start one session against it, without touching your settings:
 
 ```
 claude --settings packs/claude-code/settings.json --mcp-config packs/claude-code/mcp.json

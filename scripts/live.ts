@@ -9,7 +9,8 @@
  *   node scripts/live.ts rollback                   move live back to the commit before the last promote
  *   node scripts/live.ts copy                       copy live's data to the dev server's (app/.data here)
  *
- * The worktree is ../archipelago-next-live beside this checkout, or
+ * The worktree is ../archipelago-live beside this checkout (an older
+ * ../archipelago-next-live is used while it is still there), or
  * ARCHIPELAGO_LIVE. Its data is <worktree>/app/.data: ignored, so checking
  * out another commit there leaves it as it is. Each promote is a line in
  * promotions.log there.
@@ -23,7 +24,8 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 const here = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const live = resolve(process.env.ARCHIPELAGO_LIVE ?? join(here, "..", "archipelago-next-live"));
+const older = join(here, "..", "archipelago-next-live");
+const live = resolve(process.env.ARCHIPELAGO_LIVE ?? (existsSync(older) ? older : join(here, "..", "archipelago-live")));
 const liveData = join(live, "app", ".data");
 const devData = join(here, "app", ".data");
 const promotions = join(liveData, "promotions.log");
@@ -89,7 +91,7 @@ function install(dir: string): boolean {
 
 /** Runs the tests at a commit, in a throwaway worktree that borrows this checkout's packages. */
 function test(sha: string): boolean {
-  const dir = join(tmpdir(), `archipelago-next-test-${short(sha)}`);
+  const dir = join(tmpdir(), `archipelago-test-${short(sha)}`);
   if (existsSync(dir)) {
     spawnSync("git", ["worktree", "remove", "--force", dir], { cwd: here });
     rmSync(dir, { recursive: true, force: true });

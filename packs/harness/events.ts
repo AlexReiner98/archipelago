@@ -150,7 +150,7 @@ export const Events = ({ info, events, index, end, verdicts, titles, speakers, n
         const el = ev.currentTarget as HTMLElement;
         stick.current = atFoot(el.scrollHeight, el.scrollTop, el.clientHeight);
       }}>
-        ${!info && html`<div class="hv-empty">No run yet.</div>`}
+        ${!info && html`<div class="hv-empty" title="A run shows here as its agent works: what the map said, and what it did.">No run yet</div>`}
         ${events.map((e, i) => {
           const isOpen = opened.has(e.id);
           const cls = ["hv-ev", i === index && !end ? "hv-pick hv-lit" : "", node && e.node === node ? "hv-lit" : "", i > index ? "hv-later" : "", broke.has(e.seq) ? "broke" : ""].join(" ");

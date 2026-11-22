@@ -115,7 +115,8 @@ export const CANVAS_STYLE = sheet(`
 .rx-key .rx-kmark { display:inline-flex; background:none; border:0; padding:0; cursor:pointer; }
 .rx-key .rx-kmark.off { opacity:.3; }
 .rx-key .rx-kmark:hover { filter:brightness(1.4); }
-.rx-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); pointer-events:none; }
+.rx-empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--dim); pointer-events:none; white-space:nowrap; }
+.rx-empty::before { content:var(--glyph-circle-fresh); color:var(--mark-fresh); margin-right:var(--space-3); }
 `);
 
 /**
@@ -468,7 +469,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
         <circle class="rx-root" r=${S.root} />
         <g ref=${fxGroup}></g>
       </g></svg>
-      ${tree.order.length === 1 && html`<div class="rx-empty">No nodes to show.</div>`}
+      ${tree.order.length === 1 && html`<div class="rx-empty">No nodes</div>`}
       ${showKey && html`<${Key} hues=${hues} filter=${keyFilter} open=${keyOpen ?? true} onOpen=${onKeyOpen} present=${present} />`}
     </div>
   `;

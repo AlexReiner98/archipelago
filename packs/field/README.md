@@ -86,6 +86,12 @@ find line has words, only what it finds and what lies near it.
 - The physics runs on its own loop (a message channel), in slices of
   `frame_ms`; animation frames only paint. A tab in the background settles
   as fast.
+- **Empty.** A map with no items shows a mark and one line, and under it
+  the slot `field.empty`, which other packs fill with what to do first
+  (the [connect](../connect/README.md) pack: connect Claude Code). A map
+  whose items are all hidden, or that find finds nothing in, says
+  "Nothing shown". A fit never zooms in past `fit_zoom_most`, so one item
+  shows at its size.
 - It only shows: nothing here writes to the map.
 
 On the live map's copy (943 items, about 1,900 links) a run settles in about

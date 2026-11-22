@@ -16,7 +16,8 @@
  *   node packs/claude-code/hook.ts [url]    (default http://127.0.0.1:5181/hook)
  *
  * ARCHIPELAGO_HOOK_URL sets the url, ARCHIPELAGO_HOOK_TIMEOUT_MS how long to
- * wait for the answer (default 3000).
+ * wait for the answer (default 3000). ARCHIPELAGO_TOKEN, when set, goes as
+ * `Authorization: Bearer`, for a server that takes a token.
  */
 import { execFileSync } from "node:child_process";
 
@@ -60,7 +61,7 @@ if (import.meta.main) {
     const chunks: Buffer[] = [];
     for await (const c of process.stdin) chunks.push(c as Buffer);
     const body = withRemote(Buffer.concat(chunks).toString("utf8"));
-    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body, signal: AbortSignal.timeout(timeout) });
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", ...(process.env.ARCHIPELAGO_TOKEN ? { authorization: `Bearer ${process.env.ARCHIPELAGO_TOKEN}` } : {}) }, body, signal: AbortSignal.timeout(timeout) });
     if (res.ok) process.stdout.write(await res.text());
   } catch {
     // The adapter is down or slow: say nothing.

@@ -96,6 +96,10 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }
       config: { port: PAGE + 1, ...access, onListen: (p: number) => console.log(`claude-code adapter on http://127.0.0.1:${p}`) },
     },
     { id: "mcp", pack: "packs/mcp/index.ts" },
+    // What a person copies to connect Claude Code: the adapter as this machine reaches it. A host in front sets its own.
+    { id: "connect", pack: "packs/connect/index.ts", config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp` } },
+    // A host's way in to its maps (packs/gate): off until a host in front names where it answers (`at`).
+    { id: "gate", pack: "packs/gate/index.ts" },
     { id: "docs", pack: "packs/docs/index.ts" },
     { id: "docs-tool", pack: "packs/docs/tool.ts" },
     { id: "words-tool", pack: "packs/words/tool.ts" },

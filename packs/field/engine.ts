@@ -79,7 +79,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     const [x0, y0, x1, y1] = bounds(g, match ? (i) => match![i] === FOUND : undefined), { width, height } = size();
     const pad = S.fit_pad!;
     const w = Math.max(1, width - 2 * pad), h = Math.max(1, height - 2 * pad);
-    const k = Math.min(w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0));
+    const k = Math.min(w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0), S.fit_zoom_most ?? Infinity);
     return { k, tx: width / 2 - ((x0 + x1) / 2) * k, ty: height / 2 - ((y0 + y1) / 2) * k };
   };
   const fit = () => Object.assign(cam, fitted());
