@@ -88,6 +88,11 @@ html.hv-switching { view-transition-name:none; }
 .hv-trees.many { grid-template-columns:minmax(180px,22%) minmax(0,1fr); }
 .hv-peeks { order:-1; min-height:0; overflow-y:auto; border-right:1px solid var(--line); scrollbar-width:thin; }
 .hv-peeks > .hv-tree { height:var(--peek, 140px); }
+.hv-side { display:flex; flex-direction:column; }
+.hv-side > .hv-pane { flex:1; min-height:0; }
+.hv-back { flex:none; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--line); }
+.hv-back button { font:inherit; background:none; border:0; padding:0; color:var(--dim); cursor:pointer; }
+.hv-back button:hover { color:var(--fg); }
 .hv-tree.peek { cursor:pointer; }
 .hv-rows { border-top:1px solid var(--line); padding:var(--space-1) 0; }
 .hv-rows .h { padding:var(--space-1) var(--space-4); color:var(--dim); font-size:var(--text-s); }

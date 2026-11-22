@@ -164,8 +164,9 @@ its record against the thresholds, its checks, Keep and Retire
 rule (`written.rule`).
 
 The node shows in the view's left bar while one is picked, in place of
-the previews (or, one run looked at, beside the tree), and gives way to
-them when none is: a click on the tree's background, from anywhere.
+the previews (or, one run looked at, beside the tree), under a way back:
+"‹ Agents" (or "× Close", one run looked at). It gives way to them when
+none is picked: that, or a click on the tree's background.
 
 Injects `slot.fill`, `here.*`, `agent.tree`, `exchange.read`,
 `exchange.watch`, `verdict.read`, `action.list`, `action.invoke`,
