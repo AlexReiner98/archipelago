@@ -721,3 +721,26 @@ test("how sure each number is: fitted, estimated, measured, marked in the bar", 
   assert.deepEqual(sources.map((s) => [s.key, s.fitted]), [["map", 0], ["harness", 30_000], ["agent", 9_000], ["unseen", undefined]], "what isn't counted apart is measured: no fitted share");
   assert.equal(sources[2]!.title, "the conversation");
 });
+
+test("the map's own row: each node it controls in the window, biggest first, named without a path", async () => {
+  const { mapShares } = await import("../packs/harness/windowbar.ts");
+  const part = (id: string, title: string, tokens: number, state: "said" | "listed" | "dropped" | "start", source: "map" | "harness" = "map") => ({ id, title, source, channel: "hook" as const, state, tokens, count: 1 });
+  const w = {
+    total: { tokens: 10_000, from: "usage" as const },
+    limit: { tokens: 200_000, from: "default" as const },
+    compactions: 1,
+    sources: { map: 600, harness: 9_000, agent: 0 },
+    channels: { hook: 600, rule: 0, file: 0, context: 9_000, talk: 0, act: 0 },
+    unseen: 400,
+    parts: [
+      part("words/a", "Stay on the branch", 100, "said"),
+      part("loaded/mem", "project memory C:/Users/pat/proj/CLAUDE.md", 400, "said"),
+      part("loaded/docs", "docs", 3, "listed"),
+      part("words/old", "Gone", 900, "dropped"),
+      part("transcript/r#system", "System prompt", 9_000, "start", "harness"),
+    ],
+  };
+  const shares = mapShares(w);
+  assert.deepEqual(shares.map((s) => [s.id, s.pack, s.tokens, s.state]), [["loaded/mem", "loaded", 400, "said"], ["words/a", "words", 100, "said"], ["loaded/docs", "loaded", 3, "listed"]], "the map's alone, dropped left out");
+  assert.ok(!shares[0]!.title.includes("Users"), "never a path");
+});

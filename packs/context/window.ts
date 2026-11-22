@@ -178,15 +178,16 @@ export function windowAt(p: WindowInput): Window {
   for (const e of upTo) {
     if ((e.kind !== "say" && e.kind !== "refuse") || !e.node) continue;
     const s = said.get(e.node) ?? { in: 0, out: 0, nIn: 0, nOut: 0, ...(e.place ? { place: e.place } : {}) };
-    if (after(e.time)) (s.in += e.size), s.nIn++;
-    else (s.out += e.size), s.nOut++;
+    // Tokens a say at a time, as the node's history counts them (trend.ts).
+    if (after(e.time)) (s.in += tokensOf(e.size)), s.nIn++;
+    else (s.out += tokensOf(e.size)), s.nOut++;
     said.set(e.node, s);
   }
   for (const [id, s] of said) {
     const n = info.get(id);
     const channel = n ? channelOf(n) : e2channel(s.place);
     const title = n?.title ?? id;
-    parts.push(s.nIn ? { id, title, source: "map", channel, state: "said", tokens: tokensOf(s.in), count: s.nIn, fitted: 0 } : { id, title, source: "map", channel, state: "dropped", tokens: tokensOf(s.out), count: s.nOut, fitted: 0 });
+    parts.push(s.nIn ? { id, title, source: "map", channel, state: "said", tokens: s.in, count: s.nIn, fitted: 0 } : { id, title, source: "map", channel, state: "dropped", tokens: s.out, count: s.nOut, fitted: 0 });
   }
   // A skill of the map's never loaded: only its name, in Claude Code's skill listing.
   if (p.given.some((g) => g.name === "skills" && by(g.first)))

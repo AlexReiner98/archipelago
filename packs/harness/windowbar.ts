@@ -7,6 +7,10 @@
  * acts). A click on a share filters the tree to it, through the key's
  * filter (key.ts): a second click shows everything again.
  *
+ * A third row is what the map controls alone, node by node, on a scale of
+ * its own (the map's whole share): each node it said, or listed, in its
+ * pack's hue, biggest first; a click picks the node (`mapShares`).
+ *
  * Also each node's state at the playhead (`windowMarks`): in the window,
  * only named in a listing, or dropped by a compaction, a mark of its own on
  * the tree (canvas.ts) and in the key.
@@ -19,7 +23,7 @@ import { LIMIT_MAX } from "../../spec/graph.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { CHANNELS, shapeOf, type Filter } from "./channels.ts";
 import type { KeyFilter } from "./key.ts";
-import type { Tree } from "./layout.ts";
+import { nameOf, type Tree } from "./layout.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -208,6 +212,9 @@ export const WINDOWBAR_STYLE = sheet(`
 .hv-win .row > button.plain { cursor:default; }
 .hv-win .row > button:hover:not(.plain) { filter:brightness(1.25); }
 .hv-win .row > button.off { opacity:.25; }
+.hv-win .t.mine { margin-top:var(--space-1); }
+.hv-win .row > button.listed { opacity:.45; }
+.hv-win .row > button.on { box-shadow:inset 0 0 0 1.5px var(--fg); }
 .hv-win .lg { display:flex; flex-wrap:nowrap; gap:var(--space-3); font-size:var(--text-xs); color:var(--dim); overflow:hidden; white-space:nowrap; min-width:0; }
 .hv-win .lg button { font:inherit; background:none; border:0; color:inherit; padding:0; cursor:pointer; white-space:nowrap; }
 .hv-win .lg button:hover { color:var(--fg); }
@@ -244,7 +251,53 @@ const Row = ({ shares, limit, filter, label }: { shares: Share[]; limit: number;
 };
 
 /** The bar: how full, then the two rows. Nothing while the window isn't read. */
-export const WindowBar = ({ w, filter }: { w?: WindowRead; filter?: KeyFilter }) => {
+/** One of the map's nodes in the window: its tokens, and its pack for its hue. */
+export interface MapShare {
+  id: string;
+  title: string;
+  pack: string;
+  tokens: number;
+  state: WindowState;
+}
+
+/** What the map controls in the window, node by node, biggest first: said or listed, never dropped. Named as the tree names them, never a path. */
+export function mapShares(w: WindowRead): MapShare[] {
+  return w.parts
+    .filter((p) => p.source === "map" && p.state !== "dropped" && p.tokens > 0)
+    .map((p) => ({ id: p.id, title: nameOf(p.title), pack: p.id.includes("/") ? p.id.slice(0, p.id.indexOf("/")) : p.id, tokens: p.tokens, state: p.state }))
+    .sort((a, b) => b.tokens - a.tokens || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/** How many of the biggest are named under the row; the rest are counted. */
+const NAMED = 4;
+
+/** The map's own row: its nodes on the scale of its whole share, each a click to pick it. */
+const MapRow = ({ w, hues, picked, onPick }: { w: WindowRead; hues?: Map<string, string>; picked?: string; onPick?(id: string): void }) => {
+  const shares = mapShares(w);
+  if (!shares.length) return "";
+  const all = shares.reduce((n, s) => n + s.tokens, 0);
+  const hue = (s: MapShare) => hues?.get(s.pack) ?? v("owner");
+  const tip = (s: MapShare) =>
+    `${s.title}: ${sure(s.tokens).text} tokens, ${pct(s.tokens, all).toFixed(1)}% of what the map put in, ${pct(s.tokens, w.total.tokens).toFixed(2)}% of the window\n${s.state === "listed" ? "Only named in a listing" : "Said, in the window now"}\n${SURE.estimated.tip}${onPick ? "\nA click picks it" : ""}`;
+  const click = (s: MapShare) => (e: Event) => {
+    e.stopPropagation();
+    onPick?.(s.id);
+  };
+  const rest = shares.length - NAMED;
+  return html`
+    <div class="t mine" title="What the map controls: its own nodes in the window, each by its size, on a scale of their own">
+      <span>the map's own</span><span><b>${sure(all).text}</b> · ${pct(all, w.total.tokens).toFixed(1)}% of the window · ${shares.length} node${shares.length === 1 ? "" : "s"}</span>
+    </div>
+    <div class="row" role="group" aria-label="the map's nodes">
+      ${shares.map((s) => html`<button key=${s.id} class=${`${onPick ? "" : "plain"}${s.state === "listed" ? " listed" : ""}${picked === s.id ? " on" : ""}`} style=${`width:${pct(s.tokens, all)}%;background:${hue(s)}`} title=${tip(s)} onClick=${click(s)}></button>`)}
+    </div>
+    <div class="lg">
+      ${shares.slice(0, NAMED).map((s) => html`<button key=${s.id} class=${onPick ? "" : "plain"} title=${tip(s)} onClick=${click(s)}><i style=${`background:${hue(s)}`}></i>${s.title} ${sure(s.tokens).text}</button>`)}
+      ${rest > 0 && html`<span title=${shares.slice(NAMED).map((s) => `${s.title} ${sure(s.tokens).text}`).join("\n")}>and ${rest} more</span>`}
+    </div>`;
+};
+
+export const WindowBar = ({ w, filter, hues, picked, onPick }: { w?: WindowRead; filter?: KeyFilter; hues?: Map<string, string>; picked?: string; onPick?(id: string): void }) => {
   if (!w) return "";
   const { sources, channels } = sharesOf(w);
   const full = pct(w.total.tokens, w.limit.tokens);
@@ -258,5 +311,6 @@ export const WindowBar = ({ w, filter }: { w?: WindowRead; filter?: KeyFilter })
     </div>
     <${Row} shares=${sources} limit=${w.limit.tokens} filter=${filter} label="by source" />
     <${Row} shares=${channels} limit=${w.limit.tokens} filter=${filter} label="by channel" />
+    <${MapRow} w=${w} hues=${hues} picked=${picked} onPick=${onPick} />
   </div>`;
 };

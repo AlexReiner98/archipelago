@@ -180,7 +180,15 @@ solid for what is fitted and faded for what is estimated. A click on a share fil
 it through the key's filter: only the map's, or only hooks; a second click
 shows everything again, and the other row stays as it was. The conversation
 filters to the talk nodes; what isn't counted apart has no nodes, so no
-filter. Live, the
+filter.
+
+A third row is what the map controls alone, node by node (`mapShares`):
+each of its nodes said, or only listed (faded), in the window at the
+playhead, in its pack's hue, biggest first, on a scale of its own (the
+map's whole share), headed by that share and its part of the window. The
+biggest four are named under it, named as the tree names them, never a
+path, and the rest counted; each a click to pick the node, outlined while
+picked. Live, the
 window is read again as events come, at most every 3 seconds; at a
 playhead, once. Each node's state there is its mark on the big tree (the
 table above); the small previews draw none.
