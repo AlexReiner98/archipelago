@@ -6,7 +6,9 @@
  *   the trial flavour branch, interchange (a moved map's change sets),
  *   exchange, agent, git and hub (a run's repository and hub as facts),
  *   verdict, words, loaded, profile (which runs a node is for), written,
- *   placed (a profile's skills written where its runs are), grow, since ("since
+ *   placed (a profile's skills written where its runs are), used (which given
+ *   tools runs use), lean (what a profile leaves out of Claude Code's
+ *   context; its writer only with writing on), grow, since ("since
  *   you last heard", at each prompt), the Claude Code adapter (5181), the
  *   map's agent tools on its MCP server (mcp), the reference read from the
  *   running packs (docs, and its `packs` tool, docs-tool), the old maps kept read only
@@ -19,7 +21,8 @@
  * an older one ignores them and runs on the default ports.
  *
  * --no-write (ARCHIPELAGO_WRITE=0) leaves the written pack off, so the
- * server writes no skill or memory file. The dev server runs so: those files
+ * server writes no skill or memory file, and the lean writer, so it writes
+ * no project settings. The dev server runs so: those files
  * are what real sessions load, and only live writes them.
  *
  * Point Claude Code at the adapter (packs/claude-code/README.md) and open

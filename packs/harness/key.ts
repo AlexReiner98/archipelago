@@ -14,7 +14,7 @@ import { CHANNELS, channelOf, isHarness, shapePath, type Filter } from "./channe
  * user's key is short, and one with profiles, verdicts and trials grows as
  * they appear. Ids: `said`, `refused`, `acted` (the run did something),
  * `held`, `shadow` (holds), `v-held`, `v-failed`, `v-quiet` (verdict rings),
- * `trial`, the filters (`map`, `harness`, each channel: there, or hidden
+ * `trial`, `unused` (a given tool or server no run used), the filters (`map`, `harness`, each channel: there, or hidden
  * now, so a click can bring them back) and `pack:<id>` for each pack's hue.
  */
 export function marksIn(p: {
@@ -35,6 +35,10 @@ export function marksIn(p: {
     out.add(channelOf(n));
     if (!isHarness(n)) out.add(`pack:${n.pack}`);
     if (p.trial(n)) out.add("trial");
+    // A given tool or server: never used across runs; one a lean profile would leave out (packs/harness/use.ts).
+    const g = n as NodeInfo & { use?: { used: number }; out?: { applied: boolean } };
+    if (g.use?.used === 0) out.add("unused");
+    if (g.out) out.add(g.out.applied ? "held" : "shadow");
   }
   return out;
 }
@@ -119,6 +123,7 @@ export const Key = ({ hues, filter, open = true, onOpen, present }: { hues: Map<
     row("v-failed", html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-failed" cx="7" cy="5" r="3.5" /></svg>`, "failed", "Said, and a miss it covers followed"),
     row("v-quiet", html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-quiet" cx="7" cy="5" r="3.5" /></svg>`, "quiet", "Said, with nothing to judge it by"),
     row("trial", html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:none;stroke:${v("fg")};stroke-width:1.2`} /></svg>`, "trial node", "Written after a miss, not yet kept or retired"),
+    row("unused", html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:${v("harness")};fill-opacity:.15;stroke:${v("harness")};stroke-width:1.2`} /></svg>`, "given, never used", "Claude Code gave this tool or server, and no run counted used it"),
   ];
   const from = filters.filter(({ f }) => f === "map" || f === "harness");
   const how = filters.filter(({ f }) => f !== "map" && f !== "harness");

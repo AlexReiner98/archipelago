@@ -10,7 +10,7 @@ UI rules are kept, but said only in the runs they fit. Provides
 
 | | |
 |---|---|
-| `profile` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members`, `fallback` |
+| `profile` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members`, `fallback`, `leave_out` (what Claude Code is to leave out of its runs: the [lean](../lean/README.md) pack's) |
 | `in_profile` | A node item → the profile that holds it |
 | `out_of_profile` | A node item → a profile it is taken out of |
 | `uses` | An item → a profile: runs with that item in their facts (a repo, a hub) are in it |

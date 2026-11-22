@@ -26,7 +26,7 @@ it worked.
 ## Running it
 
 One process ([app/server.ts](app/server.ts)) runs the server's packs (graph,
-action, exchange, agent, verdict, words, loaded, transcript, written, grow, keep, the Claude
+action, exchange, agent, verdict, words, loaded, transcript, used, lean, written, grow, keep, the Claude
 Code adapter, the bridge) and the page's dev server. The page's own packs
 (bridge client, here, renderer, frame, views, harness) are in
 [app/boot.ts](app/boot.ts).

@@ -22,6 +22,7 @@
  * map changing under it never moves it. A click picks a node,
  */
 import { channelDoc, channelOf, shapeOf, shapePath } from "./channels.ts";
+import { useLine } from "./use.ts";
 import { Key, marksIn, shapeRadius, type KeyFilter } from "./key.ts";
 export type { KeyFilter } from "./key.ts";
 import { givenOnly, isGiven } from "./given.ts";
@@ -64,6 +65,7 @@ export const CANVAS_STYLE = sheet(`
 .rx-branch.given { stroke:var(--harness); }
 .rx-given .rx-name { fill:var(--harness); font-weight:400; }
 .rx-given .rx-dot { fill:var(--harness); fill-opacity:.9; }
+.rx-given.rx-unused .rx-dot { fill-opacity:.15; stroke:var(--harness); stroke-width:1.2; }
 .rx-bough.rx-given .rx-name { fill:var(--harness); opacity:.8; }
 .rx-ring { fill:none; stroke-width:1.6; stroke:none; }
 .rx-ring.v-held { stroke:${C.say}; } .rx-ring.v-failed { stroke:${C.fail}; } .rx-ring.v-quiet { stroke:var(--quiet); stroke-dasharray:1.5 1.5; }
@@ -439,19 +441,21 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
             const r = id ? S.leaf + Math.min(3, Math.log2(1 + (said ?? 0)) * 0.45) : S.node;
             const hue = n ? hues.get(n.pack) : undefined;
             const hear = n ? heard.get(n.id) : undefined;
-            const hold = n ? held.get(n.id) : undefined;
+            // A given tool a lean profile would leave out: a shadow's hold, or held once written (use.ts).
+            const hold = given?.out ? (given.out.applied ? "held" : "shadow") : n ? held.get(n.id) : undefined;
             const st = id ? standing.get(id) : undefined;
             const cls = [
               id ? "rx-node" : "rx-bough",
               trial && "rx-trial",
               theirs.has(t.id) && "rx-given",
+              given?.use?.used === 0 && "rx-unused",
               hear && `rx-${hear}`,
               hold && `rx-${hold}`,
               t.decided && !t.decided.up && "rx-retired",
               picked && picked === id && "rx-pick",
             ].filter(Boolean).join(" ");
             const tip = given
-              ? `${n!.title}\ngiven by ${given.by}, not the map · read only\n${channel}: ${channelDoc(channel!)}\n${n!.at.join(", ")}${given.count > 1 ? `\ngiven ${given.count} times` : ""}`
+              ? `${n!.title}\ngiven by ${given.by}, not the map · read only\n${channel}: ${channelDoc(channel!)}\n${n!.at.join(", ")}${given.count > 1 ? `\ngiven ${given.count} times` : ""}${given.use ? `\n${useLine(given.use)}` : ""}${given.out ? `\n${given.out.applied ? "left out by" : "would be left out by"} ${given.out.title}` : ""}`
               : !n && theirs.has(t.id)
               ? `${t.title}\nonly what the harness gave`
               : n

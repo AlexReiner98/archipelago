@@ -18,6 +18,7 @@ import { LIMIT_MAX } from "../../spec/graph.ts";
 import { channelDoc, channelOf } from "./channels.ts";
 import { PartRow } from "./events.ts";
 import type { Tree, TreeNode } from "./layout.ts";
+import { outOf, readExtras, USE_MS, useOf, UseRows, type Extras, type Out, type Use } from "./use.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -44,6 +45,12 @@ export interface GivenInfo extends NodeInfo {
   by: string;
   count: number;
   size: number;
+  /** A tool or server: in how many runs it was given and used (use.ts). */
+  use?: Use;
+  /** An MCP tool's server's use. */
+  server?: Use & { name: string };
+  /** A profile the run is in would leave it out. */
+  out?: Out;
 }
 
 export const givenId = (run: string, name: string) => `${PACK}/${run}#${name}`;
@@ -85,7 +92,7 @@ export function givenOnly(tree: Tree): Set<string> {
  * tool's definition: the tool's bough says whose it is (the MCP server's,
  * or the harness's own), and its orange says it was given.
  */
-export function givenNodes(run: string, rows: GivenRow[]): GivenInfo[] {
+export function givenNodes(run: string, rows: GivenRow[], extras?: Extras): GivenInfo[] {
   return rows.map((r) => ({
     id: givenId(run, r.name),
     name: `${run}#${r.name}`,
@@ -96,6 +103,8 @@ export function givenNodes(run: string, rows: GivenRow[]): GivenInfo[] {
     by: r.by,
     count: r.count,
     size: r.size,
+    ...useOf(extras, r.name),
+    ...(outOf(extras, r.name) ? { out: outOf(extras, r.name)! } : {}),
   }));
 }
 
@@ -107,6 +116,7 @@ export function givenNodes(run: string, rows: GivenRow[]): GivenInfo[] {
 export function useGiven(invoke: ActionInvoke, has: boolean, on: boolean, runs: string[], tick: unknown): Map<string, GivenInfo[]> {
   const [got, setGot] = useState<Map<string, GivenInfo[]>>(new Map());
   const last = useRef(new Map<string, number>());
+  const extras = useRef(new Map<string, { at: number; extras: Extras }>());
   const alive = useRef(true);
   useEffect(() => () => void (alive.current = false), []);
   const key = runs.join(",");
@@ -143,8 +153,14 @@ export function useGiven(invoke: ActionInvoke, has: boolean, on: boolean, runs: 
           last.current.set(run, 0);
           continue;
         }
+        // Which tools runs use and what a lean profile leaves out: asked again less often (use.ts).
+        let x = extras.current.get(run);
+        if (!x || Date.now() - x.at > USE_MS) {
+          const got = await readExtras(invoke, run, r.rows.map((row) => row.name)).catch(() => undefined);
+          if (got) extras.current.set(run, (x = { at: Date.now(), extras: got }));
+        }
         if (!alive.current) return;
-        setGot((m) => new Map(m).set(run, givenNodes(run, r.rows)));
+        setGot((m) => new Map(m).set(run, givenNodes(run, r.rows, x?.extras)));
         // Still reading a long transcript: go on soon.
         if (r.reading) setTimeout(() => !gone && (last.current.set(run, 0), void load()), 300);
       }
@@ -203,6 +219,7 @@ export function GivenPane({ invoke, id, info }: { invoke: ActionInvoke; id: stri
         <div class="hv-kv"><span class="k">channel</span><span class="v" title=${info ? channelDoc(channelOf(info)) : ""}>${info ? channelOf(info) : "—"}</span></div>
         <div class="hv-kv"><span class="k">place</span><span class="v">${info?.at.join(", ") ?? "—"}</span></div>
         <div class="hv-kv"><span class="k">given</span><span class="v">${info ? `${info.count} time${info.count === 1 ? "" : "s"} · ${info.size.toLocaleString()} letters` : "—"}</span></div>
+        <${UseRows} invoke=${invoke} use=${info?.use} server=${info?.server} out=${info?.out} canSet=${!!info?.out} />
         <div class="hv-given">
           ${text.error ? html`<div class="hv-empty">Not read: ${text.error} <button class="hv-fold" onClick=${() => setTries((n) => n + 1)}>try again</button></div>` : text.text === undefined ? html`<div class="hv-empty">reading…</div>` : html`<${PartRow} p=${{ label: text.cut ? "text, cut: the rest is in the transcript" : "text", text: text.text || "empty" }} />`}
         </div>
