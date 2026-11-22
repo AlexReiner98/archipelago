@@ -58,5 +58,10 @@ own.
   is gone for a moment: it stays picked with its hash, and shows again as
   soon as its fill does. Only if it is still gone after 2 s does home stand
   in, the hash kept, so a reload opens it. Picking another view drops it.
+- **Opening on a view not loaded yet** (`firstView`): the page waits up to
+  3 s for the hash's view, as its pack may load after home's. If it is
+  still not there, home stands in and the hash's view is held the same
+  way: the hash is kept, and the view shows as soon as its pack loads. The
+  hash is never dropped for home.
 - **`here.view`** set by something else (an agent, a panel) shows the
   view of that kind. `views.view` (page) says which view shows.

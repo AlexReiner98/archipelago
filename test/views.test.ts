@@ -15,7 +15,7 @@ import here from "../packs/here/index.ts";
 import renderer from "../packs/renderer/index.ts";
 import views from "../packs/views/index.ts";
 import { SHOWN, shower } from "../packs/views/apply.ts";
-import { byHash, search, sections, views as list, type Kind, type Row } from "../packs/views/pick.ts";
+import { byHash, firstView, search, sections, views as list, type Kind, type Row } from "../packs/views/pick.ts";
 
 const KINDS: Kind[] = [
   { pack: "harness", name: "view", title: "Sensory interface" },
@@ -71,6 +71,24 @@ test("a hash names a view by id, or a kind by its center fill", () => {
   assert.equal(byHash(all, "#map/map")!.id, "map");
   assert.equal(byHash(all, "#two/b")!.id, "two/b");
   assert.equal(byHash(all, ""), undefined);
+});
+
+test("the page opens on the hash's view once it is there; home stands in late and holds the hash, never drops it", () => {
+  const all = list(KINDS, [], none);
+  const without = all.filter((v) => v.id !== "harness");
+  const at = { ready: true, waited: false };
+  // Its pack has loaded: open it.
+  assert.deepEqual(firstView(all, "#harness", at), { pick: all.find((v) => v.id === "harness"), chosen: true });
+  // Its pack hasn't loaded yet, though home has and the map is read: wait for it.
+  assert.equal(firstView(without, "#harness", at), undefined);
+  // Still not there after the wait: home stands in, and the hash's view is held to come back to.
+  const late = firstView(without, "#harness", { ready: true, waited: true })!;
+  assert.equal(late.pick.id, "field");
+  assert.equal(late.chosen, false);
+  assert.equal(late.held, "harness");
+  // No hash: home, once home itself is there.
+  assert.equal(firstView(all.filter((v) => v.id !== "field"), "", at), undefined);
+  assert.deepEqual(firstView(all, "", at), { pick: all.find((v) => v.home), chosen: false });
 });
 
 const filler: Pack = {

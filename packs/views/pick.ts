@@ -138,6 +138,30 @@ export function search(list: View[], q: string): View[] {
   });
 }
 
+/**
+ * What the page opens on, as views arrive. The view the hash names, as soon
+ * as it is there. While it isn't, wait: its pack may load after the others,
+ * and the map's items after the first read. With no hash, wait for home
+ * itself, not whichever view came first. After `waited`, home stands in,
+ * and a hash that named a view not there yet is `held`: kept in the URL and
+ * shown as soon as it arrives, never dropped for home.
+ */
+export function firstView(
+  all: View[],
+  hash: string,
+  o: { ready: boolean; waited: boolean; home?: string },
+): { pick: View; chosen: boolean; held?: string } | undefined {
+  const hashed = byHash(all, hash);
+  if (hashed) return { pick: hashed, chosen: true };
+  const want = decodeURIComponent(hash.replace(/^#/, ""));
+  if (want && !o.waited) return undefined;
+  const homeHere = all.some((v) => v.home && (!v.kind || v.id === (o.home ?? "field")));
+  if (!homeHere && !o.waited) return undefined;
+  const home = all.find((v) => v.home) ?? all[0];
+  if (!home) return undefined;
+  return { pick: home, chosen: false, ...(want ? { held: want } : {}) };
+}
+
 /** The view a hash names: its id, or its center fill (an older `#map/map` link). */
 export function byHash(list: View[], hash: string): View | undefined {
   const want = decodeURIComponent(hash.replace(/^#/, ""));

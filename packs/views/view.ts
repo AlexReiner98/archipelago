@@ -26,7 +26,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet } from "../../spec/style.ts";
 import type { FindIndex, FindOffer } from "../find/index.ts";
 import { SHOWN, shower } from "./apply.ts";
-import { byHash, search, sections, TYPE, views, type Config, type View } from "./pick.ts";
+import { byHash, firstView, search, sections, TYPE, views, type Config, type View } from "./pick.ts";
 
 /** The command line's open state (the command pack's `command.open`), read by name: a key, not an import. */
 const COMMAND_OPEN = "command.open";
@@ -116,21 +116,19 @@ const views_: Pack<Config> = {
     const follow = () => {
       const all = list();
       if (!all.length) return;
-      const hashed = byHash(all, location.hash);
       if (!settled) {
-        // The hash may name an item the map hasn't loaded yet: wait for it, but not past the first read.
-        // With none, wait for home itself (an item tagged home, or the configured kind), not whichever view
-        // came first: packs arrive in any order. After WAIT, the first there is will do.
-        const homeHere = all.some((v) => v.home && (!v.kind || v.id === (config.home ?? "field")));
-        if (hashed) settled = true;
-        else if (location.hash.length >= 2 && !index.ready()) return;
-        else if (!homeHere && !waited) return;
-        else settled = true;
-        if (hashed) pick(hashed);
-        else pick(all.find((v) => v.home)!, false);
+        // The hash's view, once it is there; else wait for it (its pack may load after home's) and for home
+        // itself, up to WAIT. Then home stands in, and the hash's view is held: away, shown when it comes.
+        const first = firstView(all, location.hash, { ready: index.ready(), waited, ...(config.home ? { home: config.home } : {}) });
+        if (!first) return;
+        settled = true;
+        if (first.held) {
+          pick(first.pick, false, true);
+          away = first.held;
+        } else pick(first.pick, first.chosen);
         return;
       }
-      const back = away ? all.find((v) => v.id === away) : undefined;
+      const back = away ? byHash(all, `#${away}`) : undefined;
       if (back) return pick(back);
       const now = show.shown();
       const fresh = now && all.find((v) => v.id === now.id);
