@@ -28,6 +28,10 @@ Code adapter, the bridge) and the page's dev server. The page's own packs
 (bridge client, here, renderer, frame, views, harness) are in
 [app/boot.ts](app/boot.ts).
 
+To reach the map's MCP server from claude.ai or the Claude phone app, the
+[gateway](packs/gateway/README.md) (page + 3, off unless set up) signs the
+owner in with OAuth behind a tunnel.
+
 It runs twice, so that editing the code never touches what real sessions
 report to:
 

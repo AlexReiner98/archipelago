@@ -16,7 +16,8 @@
     "live:stop": "node --disable-warning=ExperimentalWarning scripts/live.ts stop",
     "live:status": "node --disable-warning=ExperimentalWarning scripts/live.ts status",
     "promote": "node --disable-warning=ExperimentalWarning scripts/live.ts promote",
-    "rollback": "node --disable-warning=ExperimentalWarning scripts/live.ts rollback"
+    "rollback": "node --disable-warning=ExperimentalWarning scripts/live.ts rollback",
+    "gateway:passphrase": "node --disable-warning=ExperimentalWarning packs/gateway/passphrase.ts"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

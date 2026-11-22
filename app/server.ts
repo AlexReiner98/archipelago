@@ -11,9 +11,11 @@
  *   map's agent tools on its MCP server (mcp), the reference read from the
  *   running packs (docs, and its `packs` tool, docs-tool), the old maps kept read only
  *   (archive, from <data>/archives), and
- *   the bridge (5182) the page reaches them through.
+ *   the bridge (5182) the page reaches them through, and, when
+ *   --gateway names its public URL, the gateway (5183) that lets the owner's
+ *   Claude apps reach the adapter's MCP server through a tunnel, signed in.
  *
- * --port moves all three (page, page + 1, page + 2); --no-watch turns hot
+ * --port moves them all (page, page + 1, page + 2, page + 3); --no-watch turns hot
  * reload off, for the page and the packs. ARCHIPELAGO_PORT and
  * ARCHIPELAGO_WATCH=0 set the same, so scripts/live.ts can start any commit:
  * an older one ignores them and runs on the default ports.
@@ -22,10 +24,13 @@
  * server writes no skill or memory file. The dev server runs so: those files
  * are what real sessions load, and only live writes them.
  *
+ * --gateway https://name (ARCHIPELAGO_GATEWAY) turns the gateway on
+ * (packs/gateway/README.md); it serves only once a passphrase is set.
+ *
  * Point Claude Code at the adapter (packs/claude-code/README.md) and open
  * http://127.0.0.1:5180/app/.
  *
- *   node app/server.ts [--data dir] [--port 5180] [--no-watch] [--no-write]
+ *   node app/server.ts [--data dir] [--port 5180] [--no-watch] [--no-write] [--gateway https://name]
  */
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -42,11 +47,12 @@ const { values } = parseArgs({
     port: { type: "string", default: process.env.ARCHIPELAGO_PORT ?? "5180" },
     watch: { type: "boolean", default: process.env.ARCHIPELAGO_WATCH !== "0" },
     write: { type: "boolean", default: process.env.ARCHIPELAGO_WRITE !== "0" },
+    gateway: { type: "string", default: process.env.ARCHIPELAGO_GATEWAY || undefined },
   },
 });
 const PAGE = Number(values.port);
 
-const tree = serverTree({ data: values.data, port: PAGE, write: values.write });
+const tree = serverTree({ data: values.data, port: PAGE, write: values.write, gateway: values.gateway });
 
 const host = new NodeHost({
   tree,

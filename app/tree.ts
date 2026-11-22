@@ -41,6 +41,8 @@ export interface TreeOptions {
   origins?: string[];
   /** More Host values they answer (a proxy in front that keeps its own). */
   hosts?: string[];
+  /** The gateway's public https URL (a tunnel to page + 3): set, the gateway pack runs. */
+  gateway?: string;
 }
 
 /** What the page server is given, so that it answers the same as the adapter and the bridge. */
@@ -52,7 +54,7 @@ export function pageAccess({ port: PAGE, origins = [], hosts = [] }: Pick<TreeOp
  * The server's config tree. A host that runs the server its own way (more
  * packs, another front) starts from this tree and adds to it.
  */
-export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }: TreeOptions): Entry[] {
+export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], gateway }: TreeOptions): Entry[] {
   // The app's own origin is the page's: the adapter and the bridge answer it, and a host's in front.
   const access = pageAccess({ port: PAGE, origins, hosts });
   return [
@@ -102,6 +104,18 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }
         actor: { id: "person:owner", kind: "person" },
         ...access,
         onListen: (p: number) => console.log(`bridge on http://127.0.0.1:${p}`),
+      },
+    },
+    {
+      id: "gateway",
+      pack: "packs/gateway/index.ts",
+      disabled: !gateway,
+      config: {
+        issuer: gateway,
+        port: PAGE + 3,
+        upstream: `http://127.0.0.1:${PAGE + 1}/mcp`,
+        db: join(data, "gateway.sqlite"),
+        onListen: (p: number) => console.log(`gateway on http://127.0.0.1:${p}, for ${gateway}/mcp`),
       },
     },
   ];
