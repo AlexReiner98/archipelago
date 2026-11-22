@@ -100,6 +100,7 @@ const STYLE = sheet(`
 .hv-kv { display:flex; gap:var(--space-3); padding:1px var(--space-4); white-space:nowrap; }
 .hv-kv .k { color:var(--dim); width:4.5em; flex:none; }
 .hv-kv .v { overflow:hidden; text-overflow:ellipsis; }
+.hv-kv .v.hv-link { color:var(--pick); cursor:pointer; }
 .hv-words { margin:var(--space-3) var(--space-4); }
 .hv-given { padding:var(--space-2) var(--space-4); }
 .hv-words textarea { width:100%; box-sizing:border-box; min-height:84px; overflow:hidden; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-2) var(--space-3); resize:none; }

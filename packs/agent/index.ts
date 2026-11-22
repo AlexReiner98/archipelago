@@ -124,7 +124,7 @@ const agent: Pack = {
      * and what was said before it. The same words again in one context are
      * held back (edition 4); said again after a compact, they are re-said.
      */
-    const sayings = new Map<RunId, { now: Set<string>; before: Set<string> }>();
+    const sayings = new Map<RunId, { now: Set<string>; before: Set<string>; last: Map<string, string> }>();
     /** Per run: the facts its starts gave (a later begin adds to them), and the nodes a gate has held back. */
     const given = new Map<RunId, Facts>();
     const gated = new Map<RunId, Set<string>>();
@@ -253,12 +253,13 @@ const agent: Pack = {
 
       async reach(moment: Moment): Promise<Answer> {
         const run = await runOf(moment.run, caller, moment.time);
-        const said = sayings.get(moment.run) ?? { now: new Set<string>(), before: new Set<string>() };
+        const said = sayings.get(moment.run) ?? { now: new Set<string>(), before: new Set<string>(), last: new Map<string, string>() };
         sayings.set(moment.run, said);
         if (moment.places.includes("compact")) {
           // The context is about to go: everything said so far must be said again.
           for (const n of said.now) said.before.add(n);
           said.now.clear();
+          said.last.clear();
           await record({ run: moment.run, time: moment.time, place: "compact", direction: "from_agent", kind: "compact", ...(moment.input !== undefined ? { detail: moment.input } : {}) });
         }
         const listening = ordered()
@@ -296,8 +297,15 @@ const agent: Pack = {
             if (said.now.has(key) && !moment.again && r.def.repeat !== "every") continue;
             answer.said.push({ node: r.info.id, text: u.say });
             const resaid = said.before.has(key) && !said.now.has(key);
+            // Other words from a node this context already heard at this kind of place: a rewording, recorded as one.
+            const at = `${r.info.id}
+${familyOf(place)}`;
+            const prior = said.last.get(at);
+            const reworded = prior !== undefined && prior !== u.say && r.def.repeat !== "every";
             said.now.add(key);
-            await record({ ...base, direction: "to_agent", kind: "say", text: u.say, ...(resaid ? { detail: { resaid: true } } : {}) });
+            said.last.set(at, u.say);
+            const detail = { ...(resaid ? { resaid: true } : {}), ...(reworded ? { reworded: true } : {}) };
+            await record({ ...base, direction: "to_agent", kind: "say", text: u.say, ...(resaid || reworded ? { detail } : {}) });
           } else if (refusable(place)) {
             if (!answer.refused) answer.refused = { node: r.info.id, text: u.refuse, ...(u.code ? { code: u.code } : {}) };
             await record({ ...base, direction: "to_agent", kind: "refuse", text: u.refuse, ...(u.code ? { detail: { code: u.code } } : {}) });

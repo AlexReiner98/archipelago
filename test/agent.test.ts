@@ -22,6 +22,8 @@ interface NodeSpec {
   refuse?: string;
   throws?: string;
   repeat?: "once" | "every";
+  /** Says the moment's input: words that change as the test likes. */
+  echo?: boolean;
 }
 
 /** A pack that registers the nodes it is configured with. */
@@ -37,8 +39,9 @@ const nodes: Pack<{ nodes: NodeSpec[] }> = {
         title: n.name,
         at: n.at,
         ...(n.repeat ? { repeat: n.repeat } : {}),
-        speak: () => {
+        speak: (m) => {
           if (n.throws) throw new Error(n.throws);
+          if (n.echo) return { say: String(m.input) };
           return n.say ? { say: n.say } : n.refuse ? { refuse: n.refuse } : null;
         },
       };
@@ -390,5 +393,37 @@ test("a gate holds a node back before it is asked, recorded once per run; a tria
   ]);
   const after = await as().run.reach({ ...moment(["tool:Bash"]), again: true });
   assert.deepEqual(after.said.map((s) => s.node), ["nodes/studio"]);
+  assert.deepEqual(errors, []);
+});
+
+test("other words from a node at the same kind of place in one context are recorded reworded; another place, a repeat-every node, or after a compact aren't", async () => {
+  const { loader, errors, as } = setup();
+  await loader.apply(
+    tree({
+      id: "a",
+      nodes: [
+        { name: "w", kind: "instruction", at: ["session_start", "file:*"], echo: true },
+        { name: "e", kind: "instruction", at: ["tool:Bash"], echo: true, repeat: "every" },
+      ],
+    }),
+  );
+  const { run, read } = as();
+  await run.begin(start);
+  await run.reach(moment(["session_start"], "A line."));
+  await run.reach(moment(["file:a.ts"], "The whole words."));
+  await run.reach(moment(["file:b.ts"], "Reworded."));
+  await run.reach(moment(["tool:Bash"], "One."));
+  await run.reach(moment(["tool:Bash"], "Two."));
+  await run.reach(moment(["compact"]));
+  await run.reach(moment(["file:a.ts"], "After."));
+  const says = (await read.events("r1")).items.filter((e) => e.kind === "say");
+  assert.deepEqual(says.map((e) => [e.text, (e.detail as { reworded?: boolean } | undefined)?.reworded ?? false]), [
+    ["A line.", false],
+    ["The whole words.", false],
+    ["Reworded.", true],
+    ["One.", false],
+    ["Two.", false],
+    ["After.", false],
+  ]);
   assert.deepEqual(errors, []);
 });

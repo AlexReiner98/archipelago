@@ -2,7 +2,8 @@
  * The Sensory interface's left pane: the node looked at (`here.node`). Its
  * words, edited through `words.set` when made from a map item; a trial's
  * miss and its retiring (`words.retire`); its standing by the keep pack;
- * a written file's rule (`written.rule`); its places, pack and kind; its
+ * a written file's rule (`written.rule`); whether it is said whole or
+ * listed at session start (`words.say`); its places, pack and kind; its
  * record, and its verdict in each run, a click away from that run.
  */
 import { h } from "preact";
@@ -25,6 +26,8 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 export const EDIT = "words.set";
 /** The action that retires a node made from a map item. */
 const RETIRE = "words.retire";
+/** The action that says how a node is said at session_start: whole, or listed as one line (packs/words). */
+const SAY = "words.say";
 /** The action that opens a written node to refinement or holds it (packs/written). */
 const RULE = "written.rule";
 
@@ -132,6 +135,30 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
     `;
   };
 
+  /** How a map node is said at session_start: its whole words, or listed as one line; a click flips it. */
+  const Said = ({ info }: { info: NodeInfo }) => {
+    const item = hk.useItem(info.source);
+    const can = hk.useHas(SAY);
+    const [status, setStatus] = useState("");
+    useEffect(() => setStatus(""), [info.id]);
+    if (!item || item.type !== "node" || !info.at.includes("session_start")) return null;
+    const listed = item.fields.say === "listed";
+    const flip = async () => {
+      setStatus("…");
+      const out = await invoke.invoke({
+        action: SAY,
+        input: { node: info.source!, say: listed ? "whole" : "listed" },
+        authority: { of: "human", basis: "set in the sensory interface" },
+        reason: listed ? `${info.title} is said whole at session start` : `${info.title} is listed at session start, one line`,
+      });
+      setStatus(out.ok ? "" : `refused: ${out.refused.message}`);
+    };
+    const tip = listed
+      ? "Listed: one line at session start; its whole words at its other places, or when the agent asks the words tool. Click: say it whole"
+      : "Whole: its words in full at session start. Click: list it as one line";
+    return html`<div class="hv-kv"><span class="k">said</span><span class=${`v ${can ? "hv-link" : ""}`} title=${status || tip} onClick=${can ? flip : undefined}>${listed ? "listed · one line" : "whole"}${status && ` · ${status}`}</span></div>`;
+  };
+
   /** A node the map writes a file from (packs/written): the file, and whether it may be refined here. */
   const Written = ({ info }: { info: NodeInfo }) => {
     const item = hk.useItem(info.source);
@@ -179,6 +206,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
           <${kp.Standing} review=${review} id=${id} source=${info?.source} />
           ${info?.source && html`<${Written} info=${info} />`}
           ${info && html`
+            ${info.source && html`<${Said} info=${info} />`}
             <div class="hv-kv"><span class="k">places</span><span class="v" title=${info.at.join(", ")}>${info.at.join(", ") || "—"}</span></div>
             <div class="hv-kv"><span class="k">pack</span><span class="v">${info.pack}</span></div>
             <div class="hv-kv"><span class="k">kind</span><span class="v">${info.kind}</span></div>

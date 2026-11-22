@@ -69,7 +69,10 @@ export function EventMark({ e, v }: { e: ExchangeEvent; v?: Verdict }) {
 /** One line for an event. */
 export function what(e: ExchangeEvent, titles: Map<string, string>, cwd?: string): string {
   if (e.kind === "act") return actLine(e, cwd);
-  if (e.node) return `${(e.detail as { resaid?: boolean } | undefined)?.resaid ? "re-said · " : ""}${titles.get(e.node) ?? e.node}: ${short(e.text)}`;
+  if (e.node) {
+    const d = e.detail as { resaid?: boolean; reworded?: boolean } | undefined;
+    return `${d?.resaid ? "re-said · " : ""}${d?.reworded ? "reworded · " : ""}${titles.get(e.node) ?? e.node}: ${short(e.text)}`;
+  }
   if (e.kind === "begin") return beginLine(e);
   if (e.kind === "end") return "run ended";
   if (e.kind === "compact") return `context compacted (${String((e.detail as { trigger?: string } | undefined)?.trigger ?? "auto")})`;
