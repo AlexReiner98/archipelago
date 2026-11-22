@@ -14,6 +14,7 @@ import type { NodeInfo } from "../../spec/agent.ts";
 import type { ExchangeRead } from "../../spec/exchange.ts";
 import type { HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
+import { NODE, NodeWindowPart, useNodeWindow } from "./trend.ts";
 import { read as token, verdictGlyph } from "../../spec/style.ts";
 import { channelDoc, channelOf } from "./channels.ts";
 import { Mark } from "./events.ts";
@@ -188,13 +189,17 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
     `;
   };
 
-  const Pane = ({ nodes, review }: { nodes: NodeInfo[]; review?: Review }) => {
+  /** `inView`: the run the tree shows (the agent in focus, live), whose window the node's share is of. */
+  const Pane = ({ nodes, review, run: inView }: { nodes: NodeInfo[]; review?: Review; run?: string }) => {
     const id = hk.useHere<string>(KEYS.node);
     const run = hk.useHere<string>(KEYS.run);
     const editable = hk.useHas(EDIT);
     const info = nodes.find((n) => n.id === id);
     const record = hk.useVerdictData(() => (id ? verdicts.record(id) : Promise.resolve(undefined)), [id]);
     const list = hk.useVerdictData(() => (id ? verdicts.verdicts(id, { limit: 30 }).then((p) => p.items) : Promise.resolve([])), [id]);
+    // Its share of the run's window over time (trend.ts, packs/context).
+    const playhead = hk.useHere<string>(KEYS.event);
+    const win = useNodeWindow(invoke, hk.useHas(NODE), inView ?? run, id, playhead, record);
     if (!id) return html`<div class="hv-pane"><div class="hv-head"><span class="t">Node</span></div><div class="hv-empty">Pick a node.</div></div>`;
     return html`
       <div class="hv-pane">
@@ -212,6 +217,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
             <div class="hv-kv"><span class="k">kind</span><span class="v">${info.kind}</span></div>
             <div class="hv-kv"><span class="k">channel</span><span class="v" title=${channelDoc(channelOf(info))}>${channelOf(info)}</span></div>
           `}
+          <${NodeWindowPart} got=${win} colour="var(--owner)" />
           <div class="hv-kv"><span class="k">record</span><span class="v">
             ${record
               ? html`${record.said} in ${record.runs} · <span class="m-held">${mark("held")} ${record.held}</span> <span class="m-failed">${mark("failed")} ${record.failed}</span> <span class="m-quiet">${mark("quiet")} ${record.quiet}</span>`

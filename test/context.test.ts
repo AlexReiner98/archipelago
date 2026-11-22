@@ -64,7 +64,7 @@ test("the window at the end: start, said, listed and dropped, by source and chan
   assert.equal(w.time, T(7));
   assert.equal(w.at, undefined, "no event asked for: the run's end");
   // The map: said again after the compaction is in; said only before it is dropped; a refusal is a rule's words.
-  assert.deepEqual(part(w, "words/branch"), { id: "words/branch", title: "Stay on the branch", source: "map", channel: "hook", state: "said", tokens: 100, count: 1 });
+  assert.deepEqual(part(w, "words/branch"), { id: "words/branch", title: "Stay on the branch", source: "map", channel: "hook", state: "said", tokens: 100, count: 1, fitted: 0 });
   assert.equal(part(w, "words/paths")?.state, "dropped");
   assert.deepEqual([part(w, "schema/check")?.channel, part(w, "schema/check")?.state], ["rule", "dropped"]);
   // A skill of the map's never loaded is only named in the listing.
@@ -76,7 +76,7 @@ test("the window at the end: start, said, listed and dropped, by source and chan
   assert.deepEqual([part(w, "transcript/r#hook:tool:Bash:guard")?.state, part(w, "transcript/r#hook:tool:Bash:guard")?.channel], ["dropped", "hook"]);
   assert.equal(part(w, "transcript/r#hook:prompt:late"), undefined);
   // The agent's acts by place, before and after the compaction apart.
-  assert.deepEqual(part(w, "act:tool:Bash"), { id: "act:tool:Bash", title: "tool:Bash", source: "agent", channel: "act", state: "said", tokens: 200, count: 1 });
+  assert.deepEqual(part(w, "act:tool:Bash"), { id: "act:tool:Bash", title: "tool:Bash", source: "agent", channel: "act", state: "said", tokens: 200, count: 1, fitted: 0 });
   assert.deepEqual([part(w, "act:tool:Bash#dropped")?.tokens, part(w, "act:prompt#dropped")?.state], [1000, "dropped"]);
   // Shares count only what is in the window; biggest first.
   assert.equal(w.sources.harness, 10_000 + 2_000 + 100);
@@ -179,6 +179,26 @@ test("the pack: context.window from the run's events and its transcript, paged, 
     assert.ok(rest.ok && (rest.output as unknown as Window).parts.length === 2);
     assert.ok(!(await invoke("context.window", { run: "sess-c", at: "no-such-event" })).ok);
     assert.ok(!(await invoke("context.window", {})).ok);
+    // Each node's share over time: the map's from its says, Claude Code's and the conversation's from the transcript.
+    await appendFile(
+      path,
+      [
+        line({ type: "user", timestamp: new Date(Date.now() - 20_000).toISOString(), message: { content: "Fix the bug, please, it is in the parser." } }),
+        line({ type: "user", timestamp: new Date(Date.now() - 10_000).toISOString(), message: { content: "And add a test." } }),
+      ].join("\n") + "\n",
+    );
+    const pieces = await invoke("transcript.pieces", { run: "sess-c", name: "talk:prompt" });
+    assert.ok(pieces.ok, JSON.stringify(pieces));
+    assert.deepEqual([(pieces.output as { stays: string }).stays, (pieces.output as { pieces: { n: number; tokens: number }[] }).pieces.map((p) => [p.n, p.tokens])], ["said", [[1, 11], [2, 4]]]);
+    type NW = { stays: string; now: number; count: number; inWindow: number; points: unknown[]; pieces: { n: number; in: boolean }[] };
+    const talkNode = (await invoke("context.node", { run: "sess-c", id: "transcript/sess-c#talk:prompt" }) as unknown as { output: NW }).output;
+    assert.deepEqual([talkNode.stays, talkNode.now, talkNode.count, talkNode.inWindow, talkNode.pieces.map((p) => [p.n, p.in])], ["said", 15, 2, 2, [[2, true], [1, true]]], "latest first");
+    const sys = (await invoke("context.node", { run: "sess-c", id: "transcript/sess-c#system" }) as unknown as { output: NW }).output;
+    assert.deepEqual([sys.stays, sys.now, sys.count], ["start", 5, 1]);
+    const mapNode = (await invoke("context.node", { run: "sess-c", id: "said/hello" }) as unknown as { output: NW }).output;
+    assert.deepEqual([mapNode.stays, mapNode.count, mapNode.now > 0, mapNode.points.length], ["said", 1, true, 1]);
+    assert.ok(!(await invoke("context.node", { run: "sess-c", id: "transcript/sess-c#nothing" })).ok);
+    assert.ok(!(await invoke("context.node", { run: "sess-c" })).ok);
     // A run with no transcript still has the map's words, as an estimate.
     await fetch(`http://127.0.0.1:${port}/hook`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hook_event_name: "SessionStart", session_id: "bare", cwd: dir, source: "startup" }) });
     const bare = await invoke("context.window", { run: "bare" });
@@ -191,4 +211,35 @@ test("the pack: context.window from the run's events and its transcript, paged, 
     await loader.apply([]);
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("the window with the conversation: each node in the window or dropped by its tokens, the run's own acts not counted again", () => {
+  const talk: GivenRow[] = [
+    { name: "talk:prompt", title: "Your prompts", by: "you", at: "prompt", count: 2, size: 400, tokens: 100, window: 40, fitted: 90, fittedWindow: 30, first: T(1), last: T(6) },
+    { name: "talk:result:Bash", title: "Bash results", by: "Claude Code", at: "tool_result:Bash", count: 3, size: 0, tokens: 5_000, window: 0, first: T(2), last: T(3) },
+  ];
+  const w = windowAt({ run: "r", events, given: [...given, ...talk], usage: { n: 9, time: T(7), input: 0, cacheRead: 20_000, cacheWrite: 0, output: 0 }, compactions: [{ n: 4, time: T(5) }], nodes });
+  assert.deepEqual(part(w, "transcript/r#talk:prompt"), { id: "transcript/r#talk:prompt", title: "Your prompts", source: "agent", channel: "talk", state: "said", tokens: 40, count: 2, fitted: 30 });
+  assert.deepEqual([part(w, "transcript/r#talk:prompt#dropped")?.state, part(w, "transcript/r#talk:prompt#dropped")?.tokens], ["dropped", 60]);
+  assert.deepEqual([part(w, "transcript/r#talk:result:Bash")?.state, part(w, "transcript/r#talk:result:Bash")?.tokens], ["dropped", 5_000]);
+  assert.ok(!w.parts.some((p) => p.channel === "act"), "the conversation holds the acts");
+  assert.equal(w.channels.talk, 40);
+  assert.equal(w.sources.agent, 40);
+  assert.deepEqual([part(w, "transcript/r#talk:prompt#dropped")?.fitted, w.fitted.sources.agent, w.fitted.channels.talk, w.fitted.sources.map], [60, 30, 30, 0], "what is fitted, apart from what is estimated");
+});
+
+test("one node's share over time: said pieces pile up and a compaction drops them, a start node holds its latest size", async () => {
+  const { trendOf } = await import("../packs/context/trend.ts");
+  const said = trendOf({ pieces: [{ time: T(1), tokens: 10 }, { time: T(2), tokens: 30 }, { time: T(6), tokens: 5 }], compactions: [T(5)], stays: "said" });
+  assert.deepEqual([said.now, said.peak, said.total, said.dropped, said.count, said.inWindow], [5, 40, 45, 40, 3, 1]);
+  assert.deepEqual(said.points.map((p) => p.tokens), [10, 40, 0, 5], "each piece a step up, the compaction a drop");
+  const early = trendOf({ pieces: [{ time: T(1), tokens: 10 }, { time: T(2), tokens: 30 }, { time: T(6), tokens: 5 }], compactions: [T(5)], stays: "said", until: T(3) });
+  assert.deepEqual([early.now, early.dropped, early.count], [40, 0, 2], "as of a moment: what came later isn't there");
+  const start = trendOf({ pieces: [{ time: T(0), tokens: 100 }, { time: T(4), tokens: 120 }], compactions: [T(5)], stays: "start" });
+  assert.deepEqual([start.now, start.total, start.dropped, start.inWindow], [120, 220, 0, 1], "every request carries it: the latest size, through compactions");
+  // Many pieces: at most `points`, each with the peak of its stretch.
+  const many = trendOf({ pieces: Array.from({ length: 50 }, (_, i) => ({ time: new Date(Date.UTC(2026, 10, 1, 10, 0, i)).toISOString(), tokens: 1 })), compactions: [new Date(Date.UTC(2026, 10, 1, 10, 0, 25, 500)).toISOString()], stays: "said", points: 5 });
+  assert.equal(many.points.length, 5);
+  assert.ok(many.points.some((p) => p.peak > p.tokens), "a drop inside a stretch keeps its peak");
+  assert.equal(many.now, 24);
 });

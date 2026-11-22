@@ -16,9 +16,18 @@
  *   or that holds what the map said in the run (its `say` events), is
  *   already in the tree as the map's nodes.
  *
+ * The conversation after the start is nodes too (talk.ts): prompts,
+ * replies, thinking, each tool's calls and results, notes, a compaction's
+ * summary, `talk:*` by name, each with its tokens and how many of them are
+ * in the window (after the last compaction).
+ *
  * Three read-only actions, which write nothing:
- * - `transcript.given` ({ run, after?, limit? }): a page of the nodes, by name.
+ * - `transcript.given` ({ run, until?, after?, limit? }): a page of the
+ *   nodes, by name, as of `until` (a time) when given.
  * - `transcript.text` ({ run, name }): one node's text.
+ * - `transcript.pieces` ({ run, name, after?, limit? }): a page of one
+ *   node's pieces in order (each time it was given or said: its time and
+ *   tokens), and how it stays in the window.
  * - `transcript.tokens` ({ run, kind?, until?, after?, limit? }): a page of
  *   token use (each message's `usage`) and compactions, in order.
  *
@@ -32,10 +41,16 @@ import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exch
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { GivenIndex, partOf, readLine, readPage, shown, tokensPage, type Given } from "./read.ts";
+import { talkOf, type Talk } from "./talk.ts";
 
 export const GIVEN = "transcript.given";
 export const TEXT = "transcript.text";
 export const TOKENS = "transcript.tokens";
+export const PIECES = "transcript.pieces";
+/** How a node stays in the window: given at the start (each request carries it), only named in a listing, or said at a moment (a compaction sums it up). */
+export type Stays = "start" | "listed" | "said";
+const LISTINGS = ["skills", "agents", "deferred"];
+export const staysOf = (name: string): Stays => (name.startsWith("talk:") || name.startsWith("hook:") ? "said" : LISTINGS.includes(name) ? "listed" : "start");
 /** The run fact naming its transcript (packs/claude-code). */
 export const FACT = "transcript";
 /** The most pages one call reads; the next call goes on from there. */
@@ -128,25 +143,52 @@ const transcript: Pack = {
       return next;
     };
     const ours = (s: RunState) => (text: string) => [...s.said].some((f) => text.includes(f));
+    /**
+     * What the start is scaled by: the model's first real input, less the given words and conversation that
+     * reached it, over the start's estimate (system prompt, tools, MCP instructions, model), within 0.5 to 3.
+     */
+    const startScale = (s: RunState, list: Given[]) => {
+      const first = s.index.talk.first;
+      if (!first) return 1;
+      const t0 = first.time ? Date.parse(first.time) : NaN;
+      const est = list.filter((g) => staysOf(g.name) === "start" && (Number.isNaN(t0) || !g.first || Date.parse(g.first) <= t0)).reduce((n, g) => n + Math.ceil(g.size / 4), 0);
+      const real = first.input - first.given - first.talk;
+      return est > 0 && real > 0 ? Math.min(3, Math.max(0.5, real / est)) : 1;
+    };
+    /** Every node as of `until` (a time; absent, now): what was given, then the conversation. */
+    const nodesOf = (s: RunState, until?: string): (Given | Talk)[] => {
+      const t = until ? Date.parse(until) : NaN;
+      let cut = -Infinity;
+      for (const r of s.index.tokens.rows()) {
+        const rt = r.time ? Date.parse(r.time) : NaN;
+        if (r.kind === "compact" && !Number.isNaN(rt) && (Number.isNaN(t) || rt <= t)) cut = Math.max(cut, rt);
+      }
+      const list = s.index.list(ours(s));
+      const f = startScale(s, list);
+      const fit = !!s.index.talk.first;
+      const given = list.map((g) => (staysOf(g.name) === "start" ? { ...g, tokens: Math.round(Math.ceil(g.size / 4) * f), ...(fit ? { fitted: Math.round(Math.ceil(g.size / 4) * f) } : {}) } : g));
+      return [...given, ...s.index.talk.rows(t, cut)].sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0));
+    };
 
     const reg = ctx.get<ActionRegister>("action.register");
     reg.register({
       name: GIVEN,
       title: "What Claude Code gave an agent, as read-only nodes",
-      doc: "A page of the run's transcript nodes by name: name, title, by (who said it), at (its place), count, size. `reading` while the transcript is still being read. Writes nothing.",
+      doc: "A page of the run's transcript nodes by name: name, title, by (who said it), at (its place), count, size, first, last. The conversation's nodes (`talk:*`) also have tokens and window (those after the last compaction), and of each how many are fitted to the model's real counts (fitted, fittedWindow); what is there from the start has tokens and fitted too. `until`: as of that time. `reading` while the transcript is still being read. Writes nothing.",
       input: {
         type: "object",
         properties: {
           run: { type: "string" },
+          until: { type: "string", description: "A time: the nodes as they were then" },
           after: { type: "string", description: "The last name of the page before" },
           limit: { type: "number" },
         },
         required: ["run"],
       },
-      async run(input: { run: string; after?: string; limit?: number }) {
+      async run(input: { run: string; until?: string; after?: string; limit?: number }) {
         if (typeof input.run !== "string" || !input.run) throw refuse("transcript.run", "Say which run.");
         const s = await sync(input.run);
-        const all = s.index.list(ours(s));
+        const all = nodesOf(s, typeof input.until === "string" ? input.until : undefined);
         const limit = Math.max(1, Math.min(LIMIT_MAX, Number(input.limit) || LIMIT_MAX));
         const from = input.after ? all.filter((g) => g.name > input.after!) : all;
         const nodes = from.slice(0, limit);
@@ -165,16 +207,48 @@ const transcript: Pack = {
       input: { type: "object", properties: { run: { type: "string" }, name: { type: "string" } }, required: ["run", "name"] },
       async run(input: { run: string; name: string }) {
         const s = await sync(String(input.run ?? ""));
-        const node: Given | undefined = s.index.list(ours(s)).find((g) => g.name === input.name);
+        const node = nodesOf(s).find((g) => g.name === input.name);
         if (!node || !s.path) throw refuse("transcript.name", `No ${JSON.stringify(input.name)} in that run's transcript.`);
+        if ("private" in node && node.private) throw refuse("transcript.private", "The session's own context is counted, never shown.");
         const parts: string[] = [];
-        for (const spot of s.index.spots(node.name)) {
+        const talk = node.name.startsWith("talk:");
+        for (const spot of talk ? s.index.talk.spots(node.name) : s.index.spots(node.name)) {
           const line = await readLine(s.path, spot);
-          const part = line === undefined ? undefined : partOf(line, spot.pick);
+          let part: string | undefined;
+          if (line !== undefined && talk) {
+            try {
+              part = talkOf(JSON.parse(line), spot.pick as never);
+            } catch {}
+          } else if (line !== undefined) part = partOf(line, spot.pick as never);
           if (part?.trim()) parts.push(part.trim());
         }
         const { text, cut } = shown(parts.join("\n\n---\n\n"));
         return { name: node.name, title: node.title, by: node.by, at: node.at, text, ...(cut ? { cut: true } : {}) };
+      },
+    });
+    reg.register({
+      name: PIECES,
+      title: "Each time one node was given or said, in an agent's transcript",
+      doc: "A page of the node's pieces in order: n, time, tokens (characters / 4; an image by its pixels), fit (fitted to the model's real counts). `stays`: start (each request carries it), listed (only named), said (until a compaction sums it up). `after`: the last n of the page before. Numbers only. Writes nothing.",
+      input: {
+        type: "object",
+        properties: { run: { type: "string" }, name: { type: "string" }, after: { type: "number" }, limit: { type: "number" } },
+        required: ["run", "name"],
+      },
+      async run(input: { run: string; name: string; after?: number; limit?: number }) {
+        if (typeof input.run !== "string" || !input.run) throw refuse("transcript.run", "Say which run.");
+        const s = await sync(input.run);
+        const node = nodesOf(s).find((g) => g.name === input.name);
+        if (!node) throw refuse("transcript.name", `No ${JSON.stringify(input.name)} in that run's transcript.`);
+        const f = staysOf(node.name) === "start" ? startScale(s, s.index.list(ours(s))) : 1;
+        const fit = staysOf(node.name) === "start" && !!s.index.talk.first;
+        const all = node.name.startsWith("talk:")
+          ? s.index.talk.piecesOf(node.name).map((p) => ({ ...(p.time ? { time: p.time } : {}), tokens: p.tokens, ...(p.fit ? { fit: true } : {}) }))
+          : s.index.piecesOf(node.name).map((p) => ({ ...(p.time ? { time: p.time } : {}), tokens: Math.round(Math.ceil(p.chars / 4) * f), ...(fit ? { fit: true } : {}) }));
+        const limit = Math.max(1, Math.min(LIMIT_MAX, Number(input.limit) || LIMIT_MAX));
+        const from = Math.max(0, Math.floor(Number(input.after) || 0));
+        const page = all.slice(from, from + limit).map((p, i) => ({ n: from + i + 1, ...p }));
+        return { name: node.name, stays: staysOf(node.name), count: all.length, pieces: page as unknown as Json, ...(from + limit < all.length ? { next: from + limit } : {}), ...(s.path && !s.done ? { reading: true } : {}) };
       },
     });
     reg.register({

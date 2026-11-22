@@ -18,6 +18,8 @@ import { LIMIT_MAX } from "../../spec/graph.ts";
 import { channelDoc, channelOf } from "./channels.ts";
 import { PartRow } from "./events.ts";
 import type { Tree, TreeNode } from "./layout.ts";
+import { NodeWindowPart, useNodeWindow } from "./trend.ts";
+import { sure } from "./windowbar.ts";
 import { outOf, readExtras, USE_MS, useOf, UseRows, type Extras, type Out, type Use } from "./use.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
@@ -38,6 +40,11 @@ export interface GivenRow {
   at: string;
   count: number;
   size: number;
+  /** The conversation's (`talk:*`): tokens, and those after the last compaction. */
+  tokens?: number;
+  window?: number;
+  /** Of `tokens`, fitted to the model's real counts. */
+  fitted?: number;
 }
 
 /** A given node: a node of the tree, with who said it. */
@@ -45,6 +52,9 @@ export interface GivenInfo extends NodeInfo {
   by: string;
   count: number;
   size: number;
+  tokens?: number;
+  window?: number;
+  fitted?: number;
   /** A tool or server: in how many runs it was given and used (use.ts). */
   use?: Use;
   /** An MCP tool's server's use. */
@@ -98,11 +108,14 @@ export function givenNodes(run: string, rows: GivenRow[], extras?: Extras): Give
     name: `${run}#${r.name}`,
     pack: PACK,
     kind: KIND,
-    title: r.name.startsWith("tool:") || r.title.includes(r.by) ? r.title : `${r.title} · ${r.by}`,
+    title: r.name.startsWith("tool:") || r.name.startsWith("talk:") || r.title.includes(r.by) ? r.title : `${r.title} · ${r.by}`,
     at: [r.at],
     by: r.by,
     count: r.count,
     size: r.size,
+    ...(r.tokens !== undefined ? { tokens: r.tokens } : {}),
+    ...(r.window !== undefined ? { window: r.window } : {}),
+    ...(r.fitted !== undefined ? { fitted: r.fitted } : {}),
     ...useOf(extras, r.name),
     ...(outOf(extras, r.name) ? { out: outOf(extras, r.name)! } : {}),
   }));
@@ -178,8 +191,9 @@ export function useGiven(invoke: ActionInvoke, has: boolean, on: boolean, runs: 
 const READ_MS = 15_000;
 
 /** The node pane for a given node: who said it, where, and its text, read only. */
-export function GivenPane({ invoke, id, info }: { invoke: ActionInvoke; id: string; info?: GivenInfo }) {
+export function GivenPane({ invoke, id, info, hasWindow, playhead }: { invoke: ActionInvoke; id: string; info?: GivenInfo; hasWindow?: boolean; playhead?: string }) {
   const at = parseGiven(id);
+  const win = useNodeWindow(invoke, !!hasWindow, at?.run, id, playhead, info?.count);
   const [text, setText] = useState<{ text?: string; error?: string; cut?: boolean }>({});
   const [tries, setTries] = useState(0);
   useEffect(() => {
@@ -218,10 +232,14 @@ export function GivenPane({ invoke, id, info }: { invoke: ActionInvoke; id: stri
         <div class="hv-kv"><span class="k">by</span><span class="v">${info?.by ?? "—"}</span></div>
         <div class="hv-kv"><span class="k">channel</span><span class="v" title=${info ? channelDoc(channelOf(info)) : ""}>${info ? channelOf(info) : "—"}</span></div>
         <div class="hv-kv"><span class="k">place</span><span class="v">${info?.at.join(", ") ?? "—"}</span></div>
-        <div class="hv-kv"><span class="k">given</span><span class="v">${info ? `${info.count} time${info.count === 1 ? "" : "s"} · ${info.size.toLocaleString()} letters` : "—"}</span></div>
+        ${info?.tokens !== undefined
+          ? html`<div class="hv-kv"><span class="k">said</span><span class="v" title=${sure(info.tokens, info.fitted ?? 0).tip}>${`${info.count} piece${info.count === 1 ? "" : "s"} · ${sure(info.tokens, info.fitted ?? 0).text} tokens`}</span></div>
+              <div class="hv-kv"><span class="k">window</span><span class="v" title="What came after the last compaction: the rest was summed up">${info.window === info.tokens ? "all in it" : `${(info.window ?? 0).toLocaleString()} in it, ${(info.tokens - (info.window ?? 0)).toLocaleString()} dropped`}</span></div>`
+          : html`<div class="hv-kv"><span class="k">given</span><span class="v">${info ? `${info.count} time${info.count === 1 ? "" : "s"} · ${info.size.toLocaleString()} letters` : "—"}</span></div>`}
+        <${NodeWindowPart} got=${win} colour="var(--harness)" />
         <${UseRows} invoke=${invoke} use=${info?.use} server=${info?.server} out=${info?.out} canSet=${!!info?.out} />
         <div class="hv-given">
-          ${text.error ? html`<div class="hv-empty">Not read: ${text.error} <button class="hv-fold" onClick=${() => setTries((n) => n + 1)}>try again</button></div>` : text.text === undefined ? html`<div class="hv-empty">reading…</div>` : html`<${PartRow} p=${{ label: text.cut ? "text, cut: the rest is in the transcript" : "text", text: text.text || "empty" }} />`}
+          ${text.error ? html`<div class="hv-empty">Not read: ${text.error} <button class="hv-fold" onClick=${() => setTries((n) => n + 1)}>try again</button></div>` : text.text === undefined ? html`<div class="hv-empty">reading…</div>` : html`<${PartRow} p=${{ label: text.cut ? "text, cut: the rest is in the transcript" : info?.tokens !== undefined && info.count > 20 ? "the latest 20" : "text", text: text.text || "empty" }} />`}
         </div>
       </div>
     </div>`;

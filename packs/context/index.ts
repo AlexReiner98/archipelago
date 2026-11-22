@@ -4,7 +4,9 @@
  * transcript (`transcript.given`, `transcript.tokens`). One read-only
  * action, `context.window` ({ run, at?, after?, limit? }): the window's
  * total against its limit, its shares by source and channel, and a page of
- * its parts, biggest first.
+ * its parts, biggest first. And `context.node` ({ run, id, at?, after?,
+ * limit? }): one tree node's share of the window over the run (trend.ts),
+ * and a page of its pieces, latest first, each in the window or dropped.
  *
  * Nothing is stored in the graph. In memory, per run: each event's kind,
  * node, place, time and size, never its text, read a page at a time from a
@@ -22,9 +24,11 @@ import { Refused } from "../../spec/common.ts";
 import type { ExchangeEvent, ExchangeRead } from "../../spec/exchange.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { windowAt, type CompactRow, type Ev, type GivenRow, type UsageRow } from "./window.ts";
+import { trendOf, type Piece, type Stays } from "./trend.ts";
+import { tokensOf, windowAt, type CompactRow, type Ev, type GivenRow, type UsageRow } from "./window.ts";
 
 export const WINDOW = "context.window";
+export const NODE = "context.node";
 /** The most event pages one call reads; the next goes on from there. */
 export const PAGES = 64;
 /** The most pages of the transcript pack's answers one call reads. */
@@ -81,12 +85,12 @@ const context: Pack = {
       const out = await invoke.invoke({ action, input, authority: { of: "agent", basis: "the context pack reads the window" }, reason: "Read what is in the run's window" });
       return out.ok ? (out.output as Record<string, unknown>) : undefined;
     };
-    const given = async (run: string): Promise<GivenRow[]> => {
+    const given = async (run: string, until: string | undefined): Promise<GivenRow[]> => {
       if (!has("transcript.given")) return [];
       const rows: GivenRow[] = [];
       let after: string | undefined;
       for (let i = 0; i < ASK_PAGES; i++) {
-        const o = await ask("transcript.given", { run, limit: LIMIT_MAX, ...(after ? { after } : {}) });
+        const o = await ask("transcript.given", { run, limit: LIMIT_MAX, ...(until ? { until } : {}), ...(after ? { after } : {}) });
         rows.push(...((o?.nodes as GivenRow[] | undefined) ?? []));
         if (typeof o?.next !== "string") break;
         after = o.next;
@@ -112,11 +116,66 @@ const context: Pack = {
       return none ? undefined : { usage, compactions };
     };
 
+    /** One node's pieces: the map's from the run's events, Claude Code's and the conversation's from the transcript pack. */
+    const piecesOf = async (run: string, s: RunState, id: string): Promise<{ stays: Stays; pieces: Piece[] } | undefined> => {
+      const prefix = `transcript/${run}#`;
+      const name = id.startsWith(prefix) ? id.slice(prefix.length) : undefined;
+      if (!name) {
+        const mine = s.events.filter((e) => (e.kind === "say" || e.kind === "refuse") && e.node === id);
+        return { stays: "said", pieces: mine.map((e) => ({ time: e.time, tokens: tokensOf(e.size) })) };
+      }
+      if (!has("transcript.pieces")) return undefined;
+      const pieces: Piece[] = [];
+      let stays: Stays = "said";
+      let after: number | undefined;
+      for (let i = 0; i < ASK_PAGES; i++) {
+        const o = await ask("transcript.pieces", { run, name, limit: LIMIT_MAX, ...(after !== undefined ? { after } : {}) });
+        if (!o) return undefined;
+        stays = (o.stays as Stays) ?? stays;
+        pieces.push(...((o.pieces as Piece[] | undefined) ?? []));
+        if (typeof o.next !== "number") break;
+        after = o.next;
+      }
+      return { stays, pieces };
+    };
+
     const reg = ctx.get<ActionRegister>("action.register");
+    reg.register({
+      name: NODE,
+      title: "One node's share of a run's window over time",
+      doc: "For a tree node (a map node's id, or `transcript/<run>#<name>`): how it stays (start, listed, said), its tokens in the window `now` (at the event `at`) and of them `nowFitted` (fitted to the model's real counts; the rest estimated), `peak`, `total` put in, `dropped` by compactions, `count` pieces and how many are `inWindow`, `points` over time (each the value at the end of a stretch and its peak), the `compactions`' times, and a page of its `pieces`, latest first: n, time, tokens, fit, in (in the window). `after`: how many pieces the pages before held. Writes nothing.",
+      input: {
+        type: "object",
+        properties: { run: { type: "string" }, id: { type: "string" }, at: { type: "string" }, after: { type: "number" }, limit: { type: "number" } },
+        required: ["run", "id"],
+      },
+      async run(input: { run: string; id: string; at?: string; after?: number; limit?: number }) {
+        if (typeof input.run !== "string" || !input.run) throw refuse("context.run", "Say which run.");
+        if (typeof input.id !== "string" || !input.id) throw refuse("context.id", "Say which node.");
+        const s = await sync(input.run);
+        const at = typeof input.at === "string" && input.at ? s.events.find((e) => e.id === input.at) : undefined;
+        if (input.at && !at) throw refuse("context.at", `No event ${JSON.stringify(input.at)} in that run.`);
+        const [got, t] = await Promise.all([piecesOf(input.run, s, input.id), tokens(input.run, undefined)]);
+        if (!got) throw refuse("context.node", "Without the transcript pack, a node Claude Code gave has no history.");
+        const compactions = (t ? t.compactions.map((c) => c.time) : s.events.filter((e) => e.kind === "compact").map((e) => e.time)).filter((x): x is string => !!x);
+        const until = at?.time;
+        const trend = trendOf({ pieces: got.pieces, compactions, stays: got.stays, ...(until ? { until } : {}) });
+        // Each piece by then, latest first: in the window or not.
+        const upTo = got.pieces.map((p, i) => ({ n: i + 1, ...p })).filter((p) => !until || !p.time || Date.parse(p.time) <= Date.parse(until));
+        const cut = Math.max(-Infinity, ...compactions.filter((c) => !until || Date.parse(c) <= Date.parse(until)).map((c) => Date.parse(c)));
+        const latest = upTo[upTo.length - 1];
+        const isIn = (p: (typeof upTo)[number]) => (got.stays === "said" ? !p.time || Date.parse(p.time) >= cut : got.stays === "listed" ? true : p === latest);
+        const rows = [...upTo].reverse().map((p) => ({ ...p, in: isIn(p) }));
+        const limit = Math.max(1, Math.min(LIMIT_MAX, Number(input.limit) || 30));
+        const from = Math.max(0, Math.floor(Number(input.after) || 0));
+        const page = rows.slice(from, from + limit);
+        return { id: input.id, ...(until ? { time: until } : {}), ...(trend as unknown as Record<string, Json>), compactions: compactions as unknown as Json, pieces: page as unknown as Json, ...(from + limit < rows.length ? { next: from + limit } : {}) };
+      },
+    });
     reg.register({
       name: WINDOW,
       title: "What is in a run's window at a moment",
-      doc: "The run's window at the event `at` (absent: its end): `total` tokens (from the model's usage, else characters / 4) against `limit`, its shares by `sources` (map, harness, agent) and `channels` (hook, rule, file, context, act), `unseen` (usage the parts don't account for), and a page of `parts`, biggest first: id (the tree's), title, source, channel, state (start, said, listed, dropped), tokens, count. `after`: how many parts the pages before held. Writes nothing.",
+      doc: "The run's window at the event `at` (absent: its end): `total` tokens (from the model's usage, else characters / 4) against `limit`, its shares by `sources` (map, harness, agent) and `channels` (hook, rule, file, context, talk: the conversation, act), `fitted` (of those shares, how many tokens are fitted to the model's real counts), `unseen` (usage the parts don't account for), and a page of `parts`, biggest first: id (the tree's), title, source, channel, state (start, said, listed, dropped), tokens, count, fitted. `after`: how many parts the pages before held. Writes nothing.",
       input: {
         type: "object",
         properties: {
@@ -132,7 +191,7 @@ const context: Pack = {
         const s = await sync(input.run);
         const at = typeof input.at === "string" && input.at ? s.events.find((e) => e.id === input.at) : s.events[s.events.length - 1];
         if (input.at && !at) throw refuse("context.at", `No event ${JSON.stringify(input.at)} in that run.`);
-        const [rows, t] = await Promise.all([given(input.run), tokens(input.run, at?.time)]);
+        const [rows, t] = await Promise.all([given(input.run, input.at ? at?.time : undefined), tokens(input.run, at?.time)]);
         const w = windowAt({
           run: input.run,
           events: s.events,

@@ -11,11 +11,12 @@ focus, and as marks on its tree ([harness](../harness/README.md)). Injects
 |---|---|
 | `map` | each node the map said (or refused with) in the run; a skill of the map's never loaded |
 | `harness` | each node Claude Code gave ([transcript](../transcript/README.md)): system prompt, tool definitions, MCP instructions, listings, the model, other hooks' words |
-| `agent` | what the agent did, by place: tool calls and their results, replies, a person's prompts |
+| `agent` | the conversation since the start (the transcript pack's `talk:*` nodes: prompts, replies, thinking, each tool's calls and results, notes); without a transcript, the agent's acts by place |
 
 Each part's channel is how it reaches the agent, as the tree shapes its
 dot ([channels.ts](../harness/channels.ts)): `hook`, `rule`, `file`,
-`context`; the agent's own are `act`.
+`context`, `talk` (the conversation); the agent's acts, without a
+transcript, are `act`.
 
 | State | Means |
 |---|---|
@@ -25,7 +26,11 @@ dot ([channels.ts](../harness/channels.ts)): `hook`, `rule`, `file`,
 | `dropped` | said before the last compaction, and not said again since: gone |
 
 - **Sizes.** A part's size is characters / 4 (a say's words, an act's input
-  and output, a given node's text). The **total** is the model's own count
+  and output, a given node's text), or the transcript pack's tokens where
+  it knows better: the start and the conversation, fitted to the model's
+  real counts. Each part says how many of its tokens are `fitted`, and so
+  do the shares (`fitted.sources`, `fitted.channels`): the rest are
+  estimates. The **total** is the model's own count
   when the transcript has it (`total.from: "usage"`): the latest message's
   input, cache read, cache write and output tokens by then, or what the
   last compaction left if it came after; else the parts summed
@@ -45,6 +50,7 @@ dot ([channels.ts](../harness/channels.ts)): `hook`, `rule`, `file`,
 
 | Action | Input | Answers |
 |---|---|---|
-| `context.window` | `run`, `at?` (an event's id; absent, the run's end), `after?` (how many parts the pages before held), `limit?` | `total` {tokens, from}, `limit` {tokens, from}, `model`, `compactions`, `compacted` (the last one's time, trigger, tokens before and after), `sources` and `channels` (tokens in the window), `unseen`, a page of `parts` biggest first (`id`: the tree's, `title`, `source`, `channel`, `state`, `tokens`, `count`), `next` |
+| `context.window` | `run`, `at?` (an event's id; absent, the run's end), `after?` (how many parts the pages before held), `limit?` | `total` {tokens, from}, `limit` {tokens, from}, `model`, `compactions`, `compacted` (the last one's time, trigger, tokens before and after), `sources` and `channels` (tokens in the window), `fitted` (of those, fitted to the model's real counts), `unseen`, a page of `parts` biggest first (`id`: the tree's, `title`, `source`, `channel`, `state`, `tokens`, `count`, `fitted`), `next` |
+| `context.node` | `run`, `id` (a tree node's: the map's, or `transcript/<run>#<name>`), `at?`, `after?`, `limit?` (30) | one node's share of the window over the run ([trend.ts](trend.ts)): `stays` (start: its latest size from the first time, through compactions; listed; said: every piece since the last compaction), `now` and `nowFitted` (at `at`), `peak`, `total` put in, `dropped` by compactions, `count` and `inWindow` pieces, `points` (at most 120, each the value at the end of a stretch of time and its `peak`), `compactions` (their times), a page of `pieces` latest first (`n`, `time`, `tokens`, `fit`, `in`), `next` |
 
-It reads; it writes nothing. Tested in `test/context.test.ts`.
+They read; they write nothing. Tested in `test/context.test.ts`.

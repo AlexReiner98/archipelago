@@ -655,7 +655,7 @@ test("the window bar: each share on the window's scale, a click shows only that 
     limit: { tokens: 200_000, from: "default" as const },
     compactions: 1,
     sources: { map: 1_000, harness: 30_000, agent: 4_000 },
-    channels: { hook: 1_500, rule: 0, file: 500, context: 29_000, act: 4_000 },
+    channels: { hook: 1_500, rule: 0, file: 500, context: 29_000, talk: 0, act: 4_000 },
     unseen: 15_000,
     parts: [
       { id: "words/a", title: "A", source: "map" as const, channel: "hook" as const, state: "said" as const, tokens: 900, count: 1 },
@@ -671,8 +671,8 @@ test("the window bar: each share on the window's scale, a click shows only that 
   // A click shows only that share of its row; again, everything; the other row is left as it was.
   assert.deepEqual([...only(new Set(), "map")], ["harness"]);
   assert.deepEqual([...only(new Set(["harness"]), "map")], []);
-  assert.deepEqual([...only(new Set(["harness"]), "hook")].sort(), ["context", "file", "harness", "rule"]);
-  assert.deepEqual([...only(new Set(["rule", "file", "context"]), "context")].sort(), ["file", "hook", "rule"]);
+  assert.deepEqual([...only(new Set(["harness"]), "hook")].sort(), ["context", "file", "harness", "rule", "talk"]);
+  assert.deepEqual([...only(new Set(["rule", "file", "context"]), "context")].sort(), ["file", "hook", "rule", "talk"]);
   // The marks: in (said or from the start), listed, dropped; the agent's acts have no node.
   const marks = windowMarks(w);
   assert.deepEqual([...marks], [["words/a", "in"], ["words/b", "dropped"], ["transcript/r#system", "in"], ["transcript/r#skills", "listed"]]);
@@ -685,4 +685,39 @@ test("the window bar: each share on the window's scale, a click shows only that 
   const present = marksIn({ nodes: [node("words/a")], heard: new Map(), held: new Map(), trial: () => false, window: shown });
   assert.ok(present.has("w-in") && !present.has("w-dropped") && !present.has("w-listed"));
   assert.deepEqual([tok(950), tok(9_876), tok(12_345), tok(121_000), tok(1_000_000), tok(1_250_000)], ["950", "9.9k", "12k", "121k", "1M", "1.25M"]);
+});
+
+test("the conversation's nodes: the talk channel, a hexagon", async () => {
+  const { channelOf, shapeOf, shapePath, CHANNELS } = await import("../packs/harness/channels.ts");
+  const n = (name: string): NodeInfo => ({ id: `transcript/r#${name}`, pack: "transcript", name: `r#${name}`, kind: "given", title: name, at: ["prompt"] });
+  assert.equal(channelOf(n("talk:prompt")), "talk");
+  assert.equal(channelOf(n("hook:prompt:x")), "hook");
+  assert.equal(shapeOf("talk"), "hexagon");
+  assert.ok(CHANNELS.some((c) => c.channel === "talk"));
+  assert.match(shapePath("hexagon", 4), /^M-4\.4 0L/);
+});
+
+test("how sure each number is: fitted, estimated, measured, marked in the bar", async () => {
+  const { sharesOf, sure, sureOf } = await import("../packs/harness/windowbar.ts");
+  assert.equal(sureOf(100, 99.5), "fitted");
+  assert.equal(sureOf(100, 95), "partly");
+  assert.equal(sureOf(100, 0.5), "estimated");
+  assert.equal(sureOf(0, 0), "estimated");
+  assert.deepEqual(sure(12_000, 12_000).text, "~12k");
+  assert.equal(sure(2_000, 0).text, "≈2k");
+  assert.equal(sure(10_000, 5_000).text, "~≈10k");
+  assert.match(sure(10_000, 5_000).tip, /5k fitted, 5k estimated/);
+  const w = {
+    total: { tokens: 50_000, from: "usage" as const },
+    limit: { tokens: 200_000, from: "default" as const },
+    compactions: 0,
+    sources: { map: 1_000, harness: 30_000, agent: 9_000 },
+    channels: { hook: 1_000, rule: 0, file: 0, context: 30_000, talk: 9_000, act: 0 },
+    fitted: { sources: { map: 0, harness: 30_000, agent: 9_000 }, channels: { hook: 0, rule: 0, file: 0, context: 30_000, talk: 9_000, act: 0 } },
+    unseen: 10_000,
+    parts: [],
+  };
+  const { sources } = sharesOf(w);
+  assert.deepEqual(sources.map((s) => [s.key, s.fitted]), [["map", 0], ["harness", 30_000], ["agent", 9_000], ["unseen", undefined]], "what isn't counted apart is measured: no fitted share");
+  assert.equal(sources[2]!.title, "the conversation");
 });

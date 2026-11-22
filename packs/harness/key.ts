@@ -136,6 +136,16 @@ export const Key = ({ hues, filter, open = true, onOpen, present }: { hues: Map<
     row("w-listed", html`<svg viewBox="0 0 14 10"><circle class="rx-win w-listed" cx="7" cy="5" r="4" /><circle cx="7" cy="5" r="2" style=${`fill:${v("fg")}`} /></svg>`, "only named in a listing", "Only its name is in the window, in a listing: the skill or tool itself loads when it is used"),
     row("w-dropped", html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="2" style=${`fill:${v("fg")}`} /><path class="rx-win w-dropped" d="M3 9L11 1" /></svg>`, "dropped by a compaction", "Said before the last compaction and not again since: gone from the window"),
   ];
+  const glyph = (t: string) => html`<svg viewBox="0 0 14 10"><text x="7" y="8.5" text-anchor="middle" style=${`fill:${v("fg")};font-size:9px`}>${t}</text></svg>`;
+  const anyWindow = has("w-in") || has("w-listed") || has("w-dropped");
+  const sureRows = anyWindow
+    ? [
+        KeyRow(glyph("12"), "measured: the model's count", "The window's total, and what isn't counted apart: the model's own usage"),
+        KeyRow(glyph("~"), "fitted to the real counts", "Shared out from the model's real counts by size: each message's output, the window's growth between requests. Solid in the bar"),
+        KeyRow(glyph("~≈"), "partly fitted", "Some fitted, the rest estimated: the tooltip gives the split. In the bar, the fitted part solid and the rest faded"),
+        KeyRow(glyph("≈"), "estimated: 4 letters a token", "Not fitted to anything: four characters a token. Faded in the bar"),
+      ]
+    : [];
   const from = filters.filter(({ f }) => f === "map" || f === "harness");
   const how = filters.filter(({ f }) => f !== "map" && f !== "harness");
   const packs = [...hues].filter(([p]) => has(`pack:${p}`));
@@ -144,6 +154,7 @@ export const Key = ({ hues, filter, open = true, onOpen, present }: { hues: Map<
     ${head && html`<span class="rx-kfull">${head}</span>`}
     ${section("in this run", "What happened in the run looked at, as it lights the tree", said)}
     ${section("in the window", "At the playhead, or live: what the agent has in its context window (the window bar over the tree)", inWindow)}
+    ${section("how sure", "How each number of the window is known: a mark before it", sureRows)}
     ${section("judged", "Each node's verdict once the run ends, and nodes still on trial", judged)}
     ${section("from", "Who supplies it: the map, or Claude Code itself. A click hides or shows", from.map(({ f, mark, text }) => FilterRow(f, mark, text, filter)))}
     ${section("how it reaches the agent", "The dot's shape: the channel it comes through. A click hides or shows", how.map(({ f, mark, text }) => FilterRow(f, mark, text, filter)))}

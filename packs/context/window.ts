@@ -14,6 +14,17 @@
  * | `listed` | only named in a listing: the skill or tool itself loads when it is used |
  * | `dropped` | said before the last compaction, and not said again since: gone from the window |
  *
+ * The conversation after the start (the transcript pack's `talk:*` nodes:
+ * prompts, replies, thinking, tool calls and results, notes) is the agent's
+ * source and the `talk` channel; its in-window share is what came after
+ * the last compaction. With it, the run's own acts aren't counted again.
+ *
+ * How sure each number is: the total is measured (the model's usage) or
+ * estimated; each part's `fitted` tokens are shared out from the model's
+ * real counts (the transcript pack's calibration), the rest of it is
+ * estimated at characters / 4; so are the shares (`fitted` by source and
+ * channel). What isn't counted apart is measured less the rest.
+ *
  * Sizes are characters / 4, an estimate (`from: "estimate"`); the total is
  * the latest message's real token use (`from: "usage"`) when the transcript
  * has it, else the sum of what is in the window.
@@ -47,6 +58,12 @@ export interface GivenRow {
   size: number;
   first?: string;
   last?: string;
+  /** Tokens, when the transcript pack knows better than characters / 4: the start scaled to the first real input; the conversation's by then, and of those, after the last compaction. */
+  tokens?: number;
+  window?: number;
+  /** Of `tokens` and of `window`, fitted to the model's real counts. */
+  fitted?: number;
+  fittedWindow?: number;
 }
 
 /** A row of `transcript.tokens` of kind usage. */
@@ -80,6 +97,8 @@ export interface Part {
   tokens: number;
   /** How many times it was said, given or done. */
   count: number;
+  /** Of its tokens, how many are fitted to the model's real counts; the rest are estimated. */
+  fitted: number;
 }
 
 export interface Window {
@@ -99,6 +118,8 @@ export interface Window {
   /** In the window (not dropped), by source and by channel, in tokens. */
   sources: Record<Source, number>;
   channels: Record<PartChannel, number>;
+  /** Of those, fitted to the model's real counts. */
+  fitted: { sources: Record<Source, number>; channels: Record<PartChannel, number> };
   /** Usage over what the parts account for: prompts, replies and results not counted apart. Only with real usage. */
   unseen: number;
   parts: Part[];
@@ -165,26 +186,38 @@ export function windowAt(p: WindowInput): Window {
     const n = info.get(id);
     const channel = n ? channelOf(n) : e2channel(s.place);
     const title = n?.title ?? id;
-    parts.push(s.nIn ? { id, title, source: "map", channel, state: "said", tokens: tokensOf(s.in), count: s.nIn } : { id, title, source: "map", channel, state: "dropped", tokens: tokensOf(s.out), count: s.nOut });
+    parts.push(s.nIn ? { id, title, source: "map", channel, state: "said", tokens: tokensOf(s.in), count: s.nIn, fitted: 0 } : { id, title, source: "map", channel, state: "dropped", tokens: tokensOf(s.out), count: s.nOut, fitted: 0 });
   }
   // A skill of the map's never loaded: only its name, in Claude Code's skill listing.
   if (p.given.some((g) => g.name === "skills" && by(g.first)))
     for (const n of p.nodes)
-      if (!said.has(n.id) && n.kind === "skill") parts.push({ id: n.id, title: n.title ?? n.id, source: "map", channel: "file", state: "listed", tokens: tokensOf((n.title ?? n.name).length + 4), count: 1 });
+      if (!said.has(n.id) && n.kind === "skill") parts.push({ id: n.id, title: n.title ?? n.id, source: "map", channel: "file", state: "listed", tokens: tokensOf((n.title ?? n.name).length + 4), count: 1, fitted: 0 });
 
   // What Claude Code gave: from the start, a listing, or a hook's words, said or dropped.
   for (const g of p.given) {
-    if (!by(g.first)) continue;
+    if (!by(g.first) || g.name.startsWith("talk:")) continue;
     const id = `transcript/${p.run}#${g.name}`;
     const hook = g.name.startsWith("hook:");
     const state: State = hook ? (after(g.last) ? "said" : "dropped") : LISTINGS.has(g.name) ? "listed" : "start";
-    parts.push({ id, title: g.title, source: "harness", channel: hook ? "hook" : "context", state, tokens: tokensOf(g.size), count: g.count });
+    parts.push({ id, title: g.title, source: "harness", channel: hook ? "hook" : "context", state, tokens: g.tokens ?? tokensOf(g.size), count: g.count, fitted: g.fitted ?? 0 });
   }
 
-  // What the agent did, by place: its tool calls and results, replies, a person's prompts.
+  // The conversation: what is after the last compaction is in the window; what came before, dropped.
+  const talk = p.given.filter((g) => g.name.startsWith("talk:") && by(g.first));
+  for (const g of talk) {
+    const id = `transcript/${p.run}#${g.name}`;
+    const all = g.tokens ?? tokensOf(g.size);
+    const inside = g.window ?? all;
+    const base = { title: g.title, source: "agent" as const, channel: "talk" as const, count: g.count };
+    const fitIn = g.fittedWindow ?? 0;
+    if (inside > 0) parts.push({ id, ...base, state: "said", tokens: inside, fitted: fitIn });
+    if (all - inside > 0) parts.push({ id: inside > 0 ? `${id}#dropped` : id, ...base, state: "dropped", tokens: all - inside, fitted: Math.max(0, (g.fitted ?? 0) - fitIn) });
+  }
+
+  // What the agent did, by place, as the run's events have it: only without the conversation, which holds it.
   const acts = new Map<string, { in: number; out: number; nIn: number; nOut: number }>();
   for (const e of upTo) {
-    if (e.kind !== "act") continue;
+    if (e.kind !== "act" || talk.length) continue;
     const place = e.place ?? "run";
     const a = acts.get(place) ?? { in: 0, out: 0, nIn: 0, nOut: 0 };
     if (after(e.time)) (a.in += e.size), a.nIn++;
@@ -193,18 +226,21 @@ export function windowAt(p: WindowInput): Window {
   }
   for (const [place, a] of acts) {
     const id = `act:${place}`;
-    if (a.nIn) parts.push({ id, title: place, source: "agent", channel: "act", state: "said", tokens: tokensOf(a.in), count: a.nIn });
-    if (a.nOut) parts.push({ id: `${id}#dropped`, title: place, source: "agent", channel: "act", state: "dropped", tokens: tokensOf(a.out), count: a.nOut });
+    if (a.nIn) parts.push({ id, title: place, source: "agent", channel: "act", state: "said", tokens: tokensOf(a.in), count: a.nIn, fitted: 0 });
+    if (a.nOut) parts.push({ id: `${id}#dropped`, title: place, source: "agent", channel: "act", state: "dropped", tokens: tokensOf(a.out), count: a.nOut, fitted: 0 });
   }
 
   parts.sort((x, y) => y.tokens - x.tokens || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
   const sources: Record<Source, number> = { map: 0, harness: 0, agent: 0 };
-  const channels: Record<PartChannel, number> = { hook: 0, rule: 0, file: 0, context: 0, act: 0 };
+  const channels: Record<PartChannel, number> = { hook: 0, rule: 0, file: 0, context: 0, talk: 0, act: 0 };
+  const fitted = { sources: { map: 0, harness: 0, agent: 0 } as Record<Source, number>, channels: { hook: 0, rule: 0, file: 0, context: 0, talk: 0, act: 0 } as Record<PartChannel, number> };
   let counted = 0;
   for (const x of parts) {
     if (x.state === "dropped") continue;
     sources[x.source] += x.tokens;
     channels[x.channel] += x.tokens;
+    fitted.sources[x.source] += x.fitted;
+    fitted.channels[x.channel] += x.fitted;
     counted += x.tokens;
   }
   // The total: the model's own count when there is one since the last compaction, else what a compaction left, else the parts.
@@ -223,6 +259,7 @@ export function windowAt(p: WindowInput): Window {
     ...(last ? { compacted: { ...(last.time ? { time: last.time } : {}), ...(last.trigger ? { trigger: last.trigger } : {}), ...(last.pre !== undefined ? { pre: last.pre } : {}), ...(last.post !== undefined ? { post: last.post } : {}) } } : {}),
     sources,
     channels,
+    fitted,
     unseen: total.from === "usage" ? Math.max(0, total.tokens - counted) : 0,
     parts,
   };

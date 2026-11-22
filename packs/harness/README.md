@@ -117,7 +117,7 @@ from one "decided" bough as well, retired ones struck.
 | hollow dot | its item is a trial |
 | orange dot, name and branch | given by the harness (Claude Code), not the map: read only (below) |
 | hollow orange dot | a given tool or MCP server no run counted used ([used](../used/README.md)) |
-| dot shape | drawn bigger than a plain dot, and never under 4 px on screen however far out the zoom (`shapeRadius`): its channel ([channels.ts](channels.ts)): ● hook, said at a moment by a hook; ◆ rule, a check that can refuse (a rule, the schema's refusal); ■ file, a skill or memory file the harness loads; ▲ context, there from the start (system prompt, tool definitions, MCP instructions, listings) |
+| dot shape | drawn bigger than a plain dot, and never under 4 px on screen however far out the zoom (`shapeRadius`): its channel ([channels.ts](channels.ts)): ● hook, said at a moment by a hook; ◆ rule, a check that can refuse (a rule, the schema's refusal); ■ file, a skill or memory file the harness loads; ▲ context, there from the start (system prompt, tool definitions, MCP instructions, listings); ⬢ talk, the conversation since (prompts, replies, thinking, tool calls and results, notes) |
 | dot size, number | how often it was said: in the run, or all time |
 | ↑ ↓ ⊝ | the keep pack's standing: promote, retire, held back by a check |
 | soft halo | in the agent's window at the playhead: said since the last compaction, or there from the start (the window, below) |
@@ -136,9 +136,11 @@ the tree in sight shows (`marksIn`): a new user's key is who and how, and
 held-back, shadow, verdict and trial marks join it as they appear. Its
 rows stand in titled sections, each a line apart, with what it means in
 its tooltip: "in this run" (said, refused, acted, held back), "in the
-window" (in it now, listed only, dropped), "judged"
+window" (in it now, listed only, dropped), "how sure" (a number
+measured, fitted to the model's real counts `~`, partly fitted `~≈`, or
+estimated `≈`), "judged"
 (verdicts, trial nodes), "from" (the map's or Claude Code's), "how it
-reaches the agent" (the four channels) and "made by" (each pack's colour,
+reaches the agent" (the five channels) and "made by" (each pack's colour,
 named plainly: "the map's words", "learned from a miss", "skills & memory
 loaded", "what changed since" for the since pack, and so on). The key doubles as a
 filter, open or collapsed: a click on a
@@ -170,12 +172,15 @@ is at the playhead, or live (`context.window`): the tokens in it of the
 window's size and the share that is, "≈" when it is an estimate (no usage
 in the transcript yet), and how many compactions. Under it two thin rows
 on the window's one scale: its share by source (the map's, Claude Code's,
-the agent's own, and what the model counts beyond those), and by channel
-(hook, rule, file, context, the agent's acts). A share's tooltip says its
-tokens and its part of the window. A click on a share filters the tree to
+the conversation, and what the model counts beyond those), and by channel
+(hook, rule, file, context, talk). A share's tooltip says its tokens, its
+part of the window, and how sure: each number carries its mark (`~`
+fitted, `~≈` partly, `≈` estimated, none measured), and a share's bar is
+solid for what is fitted and faded for what is estimated. A click on a share filters the tree to
 it through the key's filter: only the map's, or only hooks; a second click
-shows everything again, and the other row stays as it was. The agent's
-acts and what isn't counted apart have no nodes, so no filter. Live, the
+shows everything again, and the other row stays as it was. The conversation
+filters to the talk nodes; what isn't counted apart has no nodes, so no
+filter. Live, the
 window is read again as events come, at most every 3 seconds; at a
 playhead, once. Each node's state there is its mark on the big tree (the
 table above); the small previews draw none.
@@ -225,6 +230,22 @@ context a circle, everything else a triangle (context). Picked, the left bar sho
 and its text, read only and folded (`transcript.text`). "given · by the
 harness" in the ⋯ menu hides them. The run's `transcript` fact is a path,
 so it is never shown.
+
+The conversation since the start is nodes too, from the same pack: your
+prompts, Claude's replies and thinking, each tool's calls and its results
+(hung at that tool's place, beside its definition), Claude Code's notes
+and a compaction's summary, each a hexagon (talk). Picked, one says how
+many pieces and tokens it holds, how many are in the window and how many
+a compaction dropped, and its latest 20 pieces' text.
+
+Every node, the map's, the harness's or the conversation's, shows in the
+node pane its share of the window over the run (`context.node`,
+[trend.ts](trend.ts)): how much is in it at the playhead or now, its peak
+and what compactions dropped, a step chart across the run (the fitted or
+estimated tokens it held, the peak of each stretch faint behind, each
+compaction a dashed line, the playhead a solid one), and its latest
+pieces, each with its time and tokens, struck once dropped. Without the
+context pack, none shows.
 
 A tool's definition or a server's instructions also shows, from the used
 pack, in how many of the newest runs it was given and used ("used in 3 of

@@ -8,14 +8,15 @@
  * | rule | diamond | a check that can refuse a step: a rule, the schema's refusal |
  * | file | square | a file the harness loads: a skill's text, a memory file |
  * | context | triangle | there from the start: the system prompt, tool definitions, MCP instructions, listings |
+ * | talk | hexagon | the conversation since: prompts, replies, thinking, tool calls and results, notes |
  *
  * Who it is from is the colour: the map's in its pack's hue, the harness's
  * own (packs/transcript) in the `harness` token, orange.
  */
 import type { NodeInfo } from "../../spec/agent.ts";
 
-export type Channel = "hook" | "rule" | "file" | "context";
-export type DotShape = "circle" | "diamond" | "square" | "triangle";
+export type Channel = "hook" | "rule" | "file" | "context" | "talk";
+export type DotShape = "circle" | "diamond" | "square" | "triangle" | "hexagon";
 
 /** `key`: the few words the tree's key gives it, one line. */
 export const CHANNELS: { channel: Channel; shape: DotShape; title: string; key: string; doc: string }[] = [
@@ -23,6 +24,7 @@ export const CHANNELS: { channel: Channel; shape: DotShape; title: string; key: 
   { channel: "rule", shape: "diamond", title: "rule", key: "can refuse a step", doc: "a check that can refuse a step" },
   { channel: "file", shape: "square", title: "file", key: "skill or memory loaded", doc: "a file the harness loads: a skill, a memory file" },
   { channel: "context", shape: "triangle", title: "context", key: "there from the start", doc: "there from the start: system prompt, tools, MCP instructions, listings" },
+  { channel: "talk", shape: "hexagon", title: "talk", key: "the conversation since", doc: "the conversation since the start: prompts, replies, thinking, tool calls and results, notes" },
 ];
 
 const SHAPE = new Map(CHANNELS.map((c) => [c.channel, c]));
@@ -47,7 +49,7 @@ export const isHarness = (n: Pick<NodeInfo, "kind" | "pack"> | undefined): boole
 export function channelOf(n: Pick<NodeInfo, "kind" | "pack" | "at" | "name">): Channel {
   if (isHarness(n)) {
     const name = n.name.slice(n.name.indexOf("#") + 1);
-    return name.startsWith("hook:") ? "hook" : "context";
+    return name.startsWith("hook:") ? "hook" : name.startsWith("talk:") ? "talk" : "context";
   }
   if (n.kind === "rule" || n.kind === "schema_check") return "rule";
   if (n.kind === "skill" || n.kind === "memory" || n.at.some((p) => p.startsWith("skill:") || p.startsWith("memory:"))) return "file";
@@ -68,6 +70,11 @@ export function shapePath(shape: DotShape, r: number): string {
     case "diamond": {
       const d = r * 1.25;
       return `M0 ${f(-d)}L${f(d)} 0L0 ${f(d)}L${f(-d)} 0Z`;
+    }
+    case "hexagon": {
+      const x = r * 1.1;
+      const y = x * 0.87;
+      return `M${f(-x)} 0L${f(-x / 2)} ${f(-y)}H${f(x / 2)}L${f(x)} 0L${f(x / 2)} ${f(y)}H${f(-x / 2)}Z`;
     }
     case "triangle": {
       const t = r * 1.3;

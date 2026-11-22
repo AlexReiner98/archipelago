@@ -52,6 +52,7 @@ import { GIVEN, GivenPane, parseGiven, useGiven, type GivenInfo } from "./given.
 import { holdsOf, nodeOf, playhead, stateAt } from "./replay.ts";
 import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
 import { useWindow, WINDOW, WindowBar, WINDOWBAR_STYLE, windowMarks } from "./windowbar.ts";
+import { NODE as NODE_WINDOW, TREND_STYLE } from "./trend.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -124,6 +125,7 @@ ${BAR_STYLE}
 ${CANVAS_STYLE}
 ${TIMELINE_STYLE}
 ${WINDOWBAR_STYLE}
+${TREND_STYLE}
 .hv-onerun { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; min-width:0; }`);
 
 const values = (v: string | string[] | undefined) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
@@ -424,13 +426,13 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} />`
+              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} />`
               : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
                   <div class="hv-onerun">
                     ${run ? html`<${WindowBar} w=${win} filter=${keyFilter} />` : html`<span></span>`}
                     <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} window=${run ? marks : undefined} />
                   </div>
-                  ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} /></div>`}
+                  ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} run=${windowRun} /></div>`}
                 </div>`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
             ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${lives.find((r) => r.run === menu.run)?.title ?? menu.run.slice(0, 8)} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}
@@ -501,19 +503,21 @@ const harness: Pack = {
       return useMemo(() => (had.current = colours(lives.map((r) => r.run), had.current)), [lives.map((r) => r.run).join(",")]);
     };
 
-    const NodeFill = ({ given }: { given?: Map<string, GivenInfo[]> }) => {
+    const NodeFill = ({ given, run }: { given?: Map<string, GivenInfo[]>; run?: string }) => {
       const picked = hk.useHere<string>(KEYS.node);
       const nodes = hk.useNodes();
       const review = kp.useReview();
       const at = parseGiven(picked);
-      // A node the harness gave: its text, read only (given.ts).
-      if (at) return html`<${GivenPane} key=${picked} invoke=${invoke} id=${picked} info=${given?.get(at.run)?.find((g) => g.id === picked)} />`;
-      return html`<${node.Pane} nodes=${nodes} review=${review} />`;
+      const hasWindow = hk.useHas(NODE_WINDOW);
+      const playhead = hk.useHere<string>(KEYS.event);
+      // A node the harness gave: its text, read only (given.ts), and its share of the window.
+      if (at) return html`<${GivenPane} key=${picked} invoke=${invoke} id=${picked} info=${given?.get(at.run)?.find((g) => g.id === picked)} hasWindow=${hasWindow} playhead=${playhead} />`;
+      return html`<${node.Pane} nodes=${nodes} review=${review} run=${run} />`;
     };
     /** The node in the left bar, under a way back: to the previews, or closed. */
-    const NodeSide = ({ label, tip, onBack, given }: { label: string; tip: string; onBack(): void; given?: Map<string, GivenInfo[]> }) => html`
+    const NodeSide = ({ label, tip, onBack, given, run }: { label: string; tip: string; onBack(): void; given?: Map<string, GivenInfo[]>; run?: string }) => html`
       <div class="hv-back"><button title=${tip} onClick=${onBack}>${label}</button></div>
-      <${NodeFill} given=${given} />`;
+      <${NodeFill} given=${given} run=${run} />`;
 
     ctx.effect(() => {
       const style = document.createElement("style");

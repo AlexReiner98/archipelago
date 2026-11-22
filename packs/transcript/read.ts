@@ -12,6 +12,10 @@
 import { open } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import type { Place } from "../../spec/agent.ts";
+import { TalkIndex } from "./talk.ts";
+import { TokenIndex } from "./tokens.ts";
+
+export * from "./tokens.ts";
 
 /** How much of the file one page reads. */
 export const PAGE_BYTES = 256 * 1024;
@@ -127,6 +131,10 @@ export interface Given {
   at: Place;
   /** How many times it was given. */
   count: number;
+  /** Tokens, for what is there from the start: characters / 4, scaled to the first real input (index.ts). */
+  tokens?: number;
+  /** Of them, fitted to the model's real counts. */
+  fitted?: number;
   /** About how long its text is, in characters. */
   size: number;
   /** When it was first and last given: the transcript's own times, when it has them. */
@@ -145,6 +153,9 @@ export const CLAUDE_CODE = "Claude Code";
 
 /** The session's own context (the account, its email, git status, folders): never indexed, never shown. */
 export const PRIVATE = ["session_context", "environment", "credential_org"];
+
+/** How many times one node's givings are kept, for its history; the oldest drop off. */
+export const PIECES_MAX = 5000;
 
 /** How many places one hook node keeps texts from; older ones drop off. */
 const SPOTS_MAX = 20;
@@ -214,6 +225,8 @@ export class GivenIndex {
   private pending: { event?: string; hook?: string; content: string; spot: Spot; time?: string }[] = [];
   /** Token use and compactions, from the same records (TokenIndex). */
   readonly tokens = new TokenIndex();
+  /** The conversation after the start, from the same records (talk.ts). */
+  readonly talk = new TalkIndex();
 
   add(line: Line): void {
     let e: any;
@@ -224,6 +237,7 @@ export class GivenIndex {
     }
     if (!e || typeof e !== "object" || e.isSidechain) return;
     this.tokens.take(e);
+    this.talk.take(e, line);
     const time = typeof e.timestamp === "string" ? e.timestamp : undefined;
     this.time = time;
     const at = (pick: Pick): Spot => ({ offset: line.offset, length: line.length, pick });
@@ -311,8 +325,21 @@ export class GivenIndex {
         if (entry.spots.length > SPOTS_MAX) entry.spots.shift();
       }
       this.entries.set(name, entry);
+      this.piece(name, p.content.length, p.time);
     }
     return [...this.entries.values()].map(({ spots: _s, seen: _h, ...g }) => g).sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0));
+  }
+
+  /** Each time a node was given, and how long: its history, numbers only. */
+  piecesOf(name: string): readonly { time?: string; chars: number }[] {
+    return this.pieces.get(name) ?? [];
+  }
+
+  private pieces = new Map<string, { time?: string; chars: number }[]>();
+  private piece(name: string, chars: number, time = this.time) {
+    const list = this.pieces.get(name) ?? (this.pieces.set(name, []), this.pieces.get(name)!);
+    list.push({ ...(time ? { time } : {}), chars });
+    if (list.length > PIECES_MAX) list.shift();
   }
 
   spots(name: string): Spot[] {
@@ -331,6 +358,7 @@ export class GivenIndex {
   private one(name: string, title: string, by: string, at: Place, size: number, spot: Spot) {
     const had = this.entries.get(name);
     this.entries.set(name, { name, title, by, at, count: (had?.count ?? 0) + 1, size, spots: [spot], ...this.when(had) });
+    this.piece(name, size);
   }
 
   /** A node given in parts (a listing and what is added to it): every part counts. */
@@ -342,136 +370,8 @@ export class GivenIndex {
     had.spots.push(spot);
     if (had.spots.length > SPOTS_MAX) had.spots.shift();
     this.entries.set(name, had);
+    this.piece(name, size);
   }
-}
-
-// ---------- token use and compactions ----------
-
-/** What one of the model's messages used, as its `message.usage` says: real tokens. */
-export interface Usage {
-  /** Its place in the transcript: rows count from 1, in the order they were written. */
-  n: number;
-  kind: "usage";
-  time?: string;
-  model?: string;
-  /** Tokens sent fresh, read from the cache, written to the cache, and answered. */
-  input: number;
-  cacheRead: number;
-  cacheWrite: number;
-  output: number;
-}
-
-/** A compaction: the window summed up and begun again (`compact_boundary`). */
-export interface Compaction {
-  n: number;
-  kind: "compact";
-  time?: string;
-  /** `auto` or `manual`. */
-  trigger?: string;
-  /** Tokens in the window before and after, and dropped so far in the run. */
-  pre?: number;
-  post?: number;
-  dropped?: number;
-}
-
-export type TokenRow = Usage | Compaction;
-
-/** The most rows kept; older usage drops off first, compactions stay. */
-export const TOKENS_MAX = 20_000;
-
-const count = (x: unknown) => (typeof x === "number" && Number.isFinite(x) && x >= 0 ? x : 0);
-
-/** The tokens in the window as of a message: what it was sent, and what it answered. */
-export const windowOf = (u: Usage) => u.input + u.cacheRead + u.cacheWrite + u.output;
-
-/**
- * Token use and compactions, record by record, in the order they were
- * written. A message streamed as several records counts once (its id),
- * the latest usage winning. Numbers only: no text is kept.
- */
-export class TokenIndex {
-  private list: TokenRow[] = [];
-  private byMessage = new Map<string, Usage>();
-  private n = 0;
-
-  add(line: Line): void {
-    try {
-      const e = JSON.parse(line.text);
-      if (e && typeof e === "object" && !e.isSidechain) this.take(e);
-    } catch {}
-  }
-
-  /** One parsed record. */
-  take(e: any): void {
-    const time = typeof e?.timestamp === "string" ? e.timestamp : undefined;
-    if (e?.type === "assistant" && e.message?.usage && typeof e.message.usage === "object") {
-      const u = e.message.usage;
-      const id = typeof e.message.id === "string" ? e.message.id : undefined;
-      const had = id ? this.byMessage.get(id) : undefined;
-      const at = had?.time ?? time;
-      const row: Usage = {
-        n: had?.n ?? ++this.n,
-        kind: "usage",
-        ...(at ? { time: at } : {}),
-        ...(typeof e.message.model === "string" ? { model: e.message.model } : {}),
-        input: count(u.input_tokens),
-        cacheRead: count(u.cache_read_input_tokens),
-        cacheWrite: count(u.cache_creation_input_tokens),
-        output: count(u.output_tokens),
-      };
-      if (had) Object.assign(had, row);
-      else {
-        this.list.push(row);
-        if (id) this.byMessage.set(id, row);
-        this.trim();
-      }
-      return;
-    }
-    if (e?.type === "system" && e.subtype === "compact_boundary") {
-      const m = e.compactMetadata && typeof e.compactMetadata === "object" ? e.compactMetadata : {};
-      this.list.push({
-        n: ++this.n,
-        kind: "compact",
-        ...(time ? { time } : {}),
-        ...(typeof m.trigger === "string" ? { trigger: m.trigger } : {}),
-        ...(typeof m.preTokens === "number" ? { pre: m.preTokens } : {}),
-        ...(typeof m.postTokens === "number" ? { post: m.postTokens } : {}),
-        ...(typeof m.cumulativeDroppedTokens === "number" ? { dropped: m.cumulativeDroppedTokens } : {}),
-      });
-    }
-  }
-
-  /** Every row, in order. */
-  rows(): readonly TokenRow[] {
-    return this.list;
-  }
-
-  private trim() {
-    if (this.list.length <= TOKENS_MAX) return;
-    const i = this.list.findIndex((r) => r.kind === "usage");
-    if (i < 0) return;
-    const [gone] = this.list.splice(i, 1);
-    for (const [id, u] of this.byMessage) if (u === gone) this.byMessage.delete(id);
-  }
-}
-
-/**
- * A page of rows: of one kind, written up to `until` (a time), after the
- * place `after`. With the latest usage up to `until`, and how many
- * compactions came by then, whatever the page.
- */
-export function tokensPage(rows: readonly TokenRow[], q: { kind?: "usage" | "compact"; until?: string; after?: number; limit: number }) {
-  const until = q.until ? Date.parse(q.until) : NaN;
-  const upTo = rows.filter((r) => Number.isNaN(until) || !r.time || Date.parse(r.time) <= until);
-  let last: Usage | undefined;
-  let compactions = 0;
-  for (const r of upTo) {
-    if (r.kind === "usage") last = r;
-    else compactions++;
-  }
-  const from = upTo.filter((r) => (!q.kind || r.kind === q.kind) && (q.after === undefined || r.n > q.after));
-  const page = from.slice(0, q.limit);
-  return { rows: page, ...(from.length > q.limit ? { next: page[page.length - 1]!.n } : {}), ...(last ? { last } : {}), compactions };
 }
 
 /** A part of one record, as text: what a spot points at. */
@@ -510,8 +410,11 @@ export function partOf(line: string, pick: Pick): string | undefined {
 
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b/g;
 
-/** Text fit to show: an email address is never shown, and it is cut at TEXT_MAX. */
+/** A home folder, Windows or POSIX, any slashes: whose it is is never shown. */
+const HOME = /\b[A-Za-z]:(?:\\{1,2}|\/)Users(?:\\{1,2}|\/)[^\\/\s"'`]+|\/(?:Users|home)\/[^/\s"'`]+/g;
+
+/** Text fit to show: an email address or a home folder is never shown, and it is cut at TEXT_MAX. */
 export function shown(text: string): { text: string; cut: boolean } {
-  const clean = text.replace(EMAIL, "(email)");
+  const clean = text.replace(EMAIL, "(email)").replace(HOME, "~");
   return clean.length > TEXT_MAX ? { text: `${clean.slice(0, TEXT_MAX)}…`, cut: true } : { text: clean, cut: false };
 }

@@ -16,6 +16,13 @@ sensory interface hangs them into each agent's tree
 | Deferred tools (`deferred`) | `tool:ToolSearch` | Claude Code |
 | Model (`model`) | `session_start` | Claude Code |
 | Another hook's context (`hook:<place>:<who>`) | the hook's: `session_start`, `prompt`, `tool:<name>`, `tool_result:<name>`, `reply_end`, `compact` | the plugin, else the hook's script, never a path |
+| Your prompts (`talk:prompt`) | `prompt` | you |
+| Claude's replies and thinking (`talk:reply`, `talk:thinking`) | `reply_end` | Claude |
+| A tool's calls (`talk:call:<tool>`) | `tool:<tool>` | Claude |
+| A tool's results (`talk:result:<tool>`) | `tool_result:<tool>` | Claude Code, or the MCP server |
+| A compaction's summary (`talk:summary`) | `compact` | Claude Code |
+| Claude Code's notes (`talk:note:<type>`: project instructions, the date, reminders, edited files) | `prompt` (`instructions`: `session_start`) | Claude Code |
+| The session's own context (`talk:note:private`) | `session_start` | Claude Code: counted by its size, its text never read |
 
 - **Where.** A run's `transcript` fact, which the Claude Code adapter adds
   from the hook's `transcript_path` ([claude-code](../claude-code/README.md)),
@@ -29,13 +36,30 @@ sensory interface hangs them into each agent's tree
   names, places, counts and where each text is in the file; the text is
   read again from the file when asked for, with email addresses taken out.
   The session's own context (`session_context`, `environment`, the
-  account) is never indexed, and neither are prompts, replies and tool
-  results: those are acts, in the run pane.
+  account) is counted by its size alone, never read. A home folder in any
+  text shown is said as `~`, whose it is left out.
 - **The map's own words** are left out: a hook context printed by
   Archipelago's adapter, or holding what the map said in the run (its `say`
   events), is already in the tree as the map's nodes.
 
-- **Token use and compactions** (`TokenIndex`). Each of the model's
+- **The conversation** ([talk.ts](talk.ts)). Everything after the start
+  is a node too, so the window can be told apart all the way down: each
+  piece of it (a prompt, a reply, a tool's call or result, a note, as the
+  model was sent it: an attachment's `rendered`) keeps its time and size,
+  never its text, so a node is counted as of a moment, and what came
+  before the last compaction is told from what is in the window now.
+  Sizes start as characters / 4, an image by its pixels (width × height /
+  750, once scaled to fit). Then they are **fitted** to the model's real
+  counts: a message's thinking (the transcript keeps only its signature)
+  is its real `output_tokens` less its reply and calls; what reached the
+  model between two of its messages is scaled to the window's real growth
+  between them (the next input less the last input and output, given
+  words counted in the sum), within a factor of four; and what is there
+  from the start (system prompt, tools, MCP instructions, model) to the
+  first message's real input, less what else reached it, within 0.5 to 3.
+  Each node says how many of its tokens are fitted (`fitted`); the rest,
+  hooks' words and replies and calls among them, are estimates.
+- **Token use and compactions** ([tokens.ts](tokens.ts)). Each of the model's
   messages' `message.usage` (input, cache read, cache write and output
   tokens, and its model), once per message however many records it was
   streamed in, and each `compact_boundary` with its `compactMetadata`
@@ -46,11 +70,12 @@ sensory interface hangs them into each agent's tree
 
 ## Actions
 
-All three read; they write nothing.
+All four read; they write nothing.
 
 | Action | Input | Answers |
 |---|---|---|
-| `transcript.given` | `run`, `after?`, `limit?` | a page of nodes by name (`name`, `title`, `by`, `at`, `count`, `size`, `first` and `last`: when it was first and last given), `next`, `reading` while the file is still being read, `none` when the run has no transcript |
+| `transcript.given` | `run`, `until?` (a time: the nodes as they were then), `after?`, `limit?` | a page of nodes by name (`name`, `title`, `by`, `at`, `count`, `size`, `first` and `last`: when it was first and last given; `tokens` and `fitted` for what is there from the start and the conversation; the conversation's also `window` and `fittedWindow`, those after the last compaction), `next`, `reading` while the file is still being read, `none` when the run has no transcript |
+| `transcript.pieces` | `run`, `name`, `after?` (how many the pages before held), `limit?` | a page of one node's pieces in order (`n`, `time`, `tokens`, `fit`), `stays` (`start`: each request carries its latest; `listed`; `said`: until a compaction), `count`, `next` |
 | `transcript.tokens` | `run`, `kind?` (`usage` or `compact`), `until?` (a time), `after?` (a row's `n`), `limit?` | a page of rows in order (`usage`: `input`, `cacheRead`, `cacheWrite`, `output`, `model`; `compact`: `trigger`, `pre`, `post`, `dropped`; each with `n` and `time`), `next`, `last` (the latest usage up to `until`), `compactions` (how many by then), `reading`, `none` |
 | `transcript.text` | `run`, `name` | the node's text (each distinct text, latest last), `cut` past 200,000 letters |
 

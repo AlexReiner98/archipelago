@@ -287,3 +287,96 @@ test("tokens: each message's usage once, compactions with their numbers, a page 
   assert.deepEqual(g.list().map((n) => [n.first, n.last]), [["2026-11-01T09:00:00Z", "2026-11-01T09:02:00Z"]]);
   assert.equal(g.tokens.rows().length, 1);
 });
+
+test("talk: the conversation as nodes at their places, counted as of a moment, what came before a compaction apart", async () => {
+  const { TalkIndex, imageTokens, talkOf, IMAGE_TOKENS } = await import("../packs/transcript/talk.ts");
+  const T = (min: number) => new Date(Date.UTC(2026, 10, 1, 10, min)).toISOString();
+  // A PNG's header, 1000 × 750: its pixels / 750 tokens.
+  const png = Buffer.alloc(24);
+  png.writeUInt32BE(0x89504e47, 0);
+  png.writeUInt32BE(1000, 16);
+  png.writeUInt32BE(750, 20);
+  const recs = [
+    { type: "attachment", timestamp: T(0), attachment: { type: "environment" }, rendered: [{ content: "cwd C:\\Users\\pat\\proj" }] },
+    { type: "attachment", timestamp: T(0), attachment: { type: "date" }, rendered: [{ content: "Today is a day." }] },
+    { type: "attachment", timestamp: T(0), attachment: { type: "skill_listing", content: "- x" }, rendered: [{ content: "- x" }] },
+    { type: "attachment", timestamp: T(0), attachment: { type: "hook_success", stdout: "{}" } },
+    { type: "user", timestamp: T(1), message: { content: "Fix the bug" } },
+    { type: "assistant", timestamp: T(2), message: { id: "m1", content: [{ type: "thinking", thinking: "Look first." }] } },
+    { type: "assistant", timestamp: T(2), message: { id: "m1", content: [{ type: "tool_use", id: "tu1", name: "Bash", input: { command: "ls" } }] } },
+    { type: "user", timestamp: T(3), message: { content: [{ type: "tool_result", tool_use_id: "tu1", content: [{ type: "text", text: "a.ts in C:\\Users\\pat\\proj" }, { type: "image", source: { type: "base64", data: png.toString("base64") } }] }] } },
+    { type: "assistant", timestamp: T(4), message: { content: [{ type: "tool_use", id: "tu2", name: "mcp__archipelago__get", input: { ids: ["x"] } }] } },
+    { type: "user", timestamp: T(4), message: { content: [{ type: "tool_result", tool_use_id: "tu2", content: "an item" }] } },
+    { type: "system", subtype: "compact_boundary", timestamp: T(5), compactMetadata: { trigger: "auto", preTokens: 900, postTokens: 90 } },
+    { type: "user", timestamp: T(5), isCompactSummary: true, message: { content: "So far: a bug." } },
+    { type: "user", timestamp: T(6), isMeta: true, message: { content: "A caveat." } },
+    { type: "assistant", timestamp: T(7), message: { content: [{ type: "text", text: "Fixed it." }] } },
+  ];
+  const index = new TalkIndex();
+  recs.forEach((r, i) => index.take(r, { offset: i * 1000, length: 10 }));
+  const cut = Date.parse(T(5));
+  const rows = index.rows(NaN, cut);
+  assert.deepEqual(
+    rows.map((r) => [r.name, r.at, r.by, r.count]),
+    [
+      ["talk:call:Bash", "tool:Bash", "Claude", 1],
+      ["talk:call:mcp__archipelago__get", "tool:mcp__archipelago__get", "Claude", 1],
+      ["talk:note:date", "prompt", "Claude Code", 1],
+      ["talk:note:meta", "prompt", "Claude Code", 1],
+      ["talk:note:private", "session_start", "Claude Code", 1],
+      ["talk:prompt", "prompt", "you", 1],
+      ["talk:reply", "reply_end", "Claude", 1],
+      ["talk:result:Bash", "tool_result:Bash", "Claude Code", 1],
+      ["talk:result:mcp__archipelago__get", "tool_result:mcp__archipelago__get", "archipelago", 1],
+      ["talk:summary", "compact", "Claude Code", 1],
+      ["talk:thinking", "reply_end", "Claude", 1],
+    ],
+    "a listing is given, not talk; a record the model isn't sent (no rendered) isn't counted",
+  );
+  const row = (name: string, rs = rows) => rs.find((r) => r.name === name)!;
+  // An image by its pixels; text by characters / 4.
+  assert.equal(imageTokens(png.toString("base64")), 1000);
+  assert.equal(imageTokens("not an image"), IMAGE_TOKENS);
+  assert.equal(row("talk:result:Bash").tokens, Math.ceil("a.ts in C:\\Users\\pat\\proj".length / 4) + 1000);
+  assert.equal(row("talk:result:mcp__archipelago__get").title, "get results");
+  // Before the compaction: dropped (window 0); after it: in the window.
+  assert.deepEqual([row("talk:prompt").window, row("talk:reply").window, row("talk:summary").window > 0], [0, row("talk:reply").tokens, true]);
+  assert.equal(row("talk:note:private").private, true);
+  // As of a moment: only what was written by then, and the compaction not come yet.
+  const early = index.rows(Date.parse(T(3)), -Infinity);
+  assert.equal(row("talk:reply", early), undefined);
+  assert.equal(row("talk:prompt", early).window, row("talk:prompt", early).tokens);
+  // The text, read from the record where a spot points; images named; the private note has no spots.
+  const [spot] = index.spots("talk:result:Bash");
+  assert.equal(talkOf(recs[spot!.offset / 1000], spot!.pick), "a.ts in C:\\Users\\pat\\proj\n[image]");
+  const [call] = index.spots("talk:call:Bash");
+  assert.equal(talkOf(recs[call!.offset / 1000], call!.pick), 'Bash\n{\n  "command": "ls"\n}');
+  assert.equal(index.spots("talk:note:private").length, 0);
+  // A home folder is never shown: whose it is stays out.
+  assert.equal(shown("a.ts in C:\\Users\\pat\\proj and /home/sam/x and C:/Users/pat/y").text, "a.ts in ~\\proj and ~/x and ~/y");
+});
+
+test("talk sums to the model's own count: thinking from its real output, what reached it scaled to the window's growth", async () => {
+  const { TalkIndex } = await import("../packs/transcript/talk.ts");
+  const T = (s: number) => new Date(Date.UTC(2026, 10, 1, 10, 0, s)).toISOString();
+  const recs = [
+    { type: "attachment", timestamp: T(0), attachment: { type: "skill_listing" }, rendered: [{ content: "s".repeat(80) }] },
+    { type: "user", timestamp: T(1), message: { content: "p".repeat(40) } },
+    { type: "assistant", timestamp: T(2), message: { id: "m1", content: [{ type: "thinking", thinking: "", signature: "sig" }], usage: { input_tokens: 1000, output_tokens: 5 } } },
+    { type: "assistant", timestamp: T(2), message: { id: "m1", content: [{ type: "text", text: "x".repeat(40) }], usage: { input_tokens: 1000, output_tokens: 60 } } },
+    { type: "assistant", timestamp: T(2), message: { id: "m1", content: [{ type: "tool_use", id: "tu1", name: "Bash", input: {} }], usage: { input_tokens: 1000, output_tokens: 100 } } },
+    { type: "user", timestamp: T(3), message: { content: [{ type: "tool_result", tool_use_id: "tu1", content: "y".repeat(400) }] } },
+    { type: "assistant", timestamp: T(4), message: { id: "m2", content: [{ type: "text", text: "done" }], usage: { input_tokens: 10, cache_read_input_tokens: 1290, output_tokens: 3 } } },
+  ];
+  const index = new TalkIndex();
+  recs.forEach((r, i) => index.take(r, { offset: i, length: 1 }));
+  const row = (name: string) => index.rows().find((r) => r.name === name)!;
+  // m1 put out 100: its reply is 10, its call 1, so its thinking is the other 89, though its text isn't kept.
+  assert.equal(row("talk:thinking").tokens, 89);
+  // The window grew 1300 - (1000 + 100) = 200 from m1 to m2: the result, estimated at 100, is 200.
+  assert.equal(row("talk:result:Bash").tokens, 200);
+  // The first message: its real input, the given words (a listing) and the conversation (a prompt) that reached it.
+  assert.deepEqual(index.first, { time: T(2), input: 1000, given: 20, talk: 10 });
+  // Fitted: the thinking (from real output) and the result (from real growth); the prompt before the first message stays an estimate.
+  assert.deepEqual([row("talk:thinking").fitted, row("talk:result:Bash").fitted, row("talk:prompt").fitted, row("talk:reply").fitted], [89, 200, 0, 0]);
+});

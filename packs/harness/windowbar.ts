@@ -30,6 +30,28 @@ const AGAIN_MS = 3000;
 const PAGES = 10;
 
 export type WindowState = "start" | "said" | "listed" | "dropped";
+
+/**
+ * How sure a number is: measured (the model's own count: no mark), fitted
+ * (shared out from the model's real counts by size: `~`), estimated (four
+ * characters a token: `≈`), or partly fitted (`~≈`), the tooltip giving the
+ * split. In the bar, a share's fitted part is solid and the rest faded.
+ */
+export type Sure = "measured" | "fitted" | "partly" | "estimated";
+export const SURE: Record<Sure, { mark: string; text: string; tip: string }> = {
+  measured: { mark: "", text: "measured", tip: "Measured: the model's own count" },
+  fitted: { mark: "~", text: "fitted", tip: "Fitted: shared out from the model's real counts (each message's output, the window's growth between requests), by size" },
+  partly: { mark: "~≈", text: "partly fitted", tip: "Partly fitted to the model's real counts, the rest estimated at four characters a token" },
+  estimated: { mark: "≈", text: "estimated", tip: "Estimated: four characters a token" },
+};
+/** Within a hundredth either way reads as all or nothing. */
+export const sureOf = (tokens: number, fitted = 0): Sure => (tokens <= 0 || fitted <= tokens * 0.01 ? "estimated" : fitted >= tokens * 0.99 ? "fitted" : "partly");
+/** A number with its mark, and what the mark means with the split. */
+export function sure(tokens: number, fitted = 0): { text: string; tip: string } {
+  const s = sureOf(tokens, fitted);
+  const split = fitted > 0 && fitted < tokens ? `\n${tok(fitted)} fitted, ${tok(tokens - fitted)} estimated` : "";
+  return { text: `${SURE[s].mark}${tok(tokens)}`, tip: `${SURE[s].tip}${split}` };
+}
 /** A node's mark on the tree: in the window (said or there from the start), listed only, dropped. */
 export type WindowMark = "in" | "listed" | "dropped";
 
@@ -37,10 +59,12 @@ export interface WindowPart {
   id: string;
   title: string;
   source: "map" | "harness" | "agent";
-  channel: "hook" | "rule" | "file" | "context" | "act";
+  channel: "hook" | "rule" | "file" | "context" | "talk" | "act";
   state: WindowState;
   tokens: number;
   count: number;
+  /** Of its tokens, fitted to the model's real counts. */
+  fitted?: number;
 }
 
 /** What `context.window` answers. */
@@ -52,15 +76,17 @@ export interface WindowRead {
   compacted?: { time?: string; trigger?: string; pre?: number; post?: number };
   sources: Record<WindowPart["source"], number>;
   channels: Record<WindowPart["channel"], number>;
+  /** Of those, fitted to the model's real counts. */
+  fitted?: { sources: Record<WindowPart["source"], number>; channels: Record<WindowPart["channel"], number> };
   unseen: number;
   parts: WindowPart[];
 }
 
-/** Each part's mark, by tree id. A map node's acts have no tree node; their parts are left out. */
+/** Each part's mark, by tree id. The run's own acts have no tree node; their parts are left out. */
 export function windowMarks(w: WindowRead | undefined): Map<string, WindowMark> {
   const out = new Map<string, WindowMark>();
   for (const p of w?.parts ?? []) {
-    if (p.source === "agent") continue;
+    if (p.channel === "act" || p.id.endsWith("#dropped")) continue;
     out.set(p.id, p.state === "listed" ? "listed" : p.state === "dropped" ? "dropped" : "in");
   }
   return out;
@@ -93,25 +119,31 @@ export interface Share {
   tokens: number;
   colour: string;
   tip: string;
+  /** Of its tokens, fitted; absent for what is measured (what isn't counted apart). */
+  fitted?: number;
 }
 
 /** The two rows of shares: by source, by channel, each with what usage counts beyond the parts. */
 export function sharesOf(w: WindowRead): { sources: Share[]; channels: Share[] } {
-  const unseen: Share[] = w.unseen > 0 ? [{ key: "unseen", title: "not counted apart", tokens: w.unseen, colour: `color-mix(in srgb, ${v("dim")} 35%, transparent)`, tip: "The model's own count over what the parts account for: prompts, replies, tool results, thinking" }] : [];
+  const unseen: Share[] = w.unseen > 0 ? [{ key: "unseen", title: "not counted apart", tokens: w.unseen, colour: `color-mix(in srgb, ${v("dim")} 35%, transparent)`, tip: "Measured: the model's own count less what the parts account for: what the transcript doesn't show, and the estimates' error" }] : [];
+  const fs = w.fitted?.sources;
+  const fc = w.fitted?.channels;
   const sources: Share[] = [
-    { filter: "map" as Filter, key: "map", title: "the map's", tokens: w.sources.map, colour: v("owner"), tip: "What the map said: its nodes' words, rules' refusals" },
-    { filter: "harness" as Filter, key: "harness", title: "Claude Code's", tokens: w.sources.harness, colour: v("harness"), tip: "What Claude Code gave: system prompt, tools, MCP instructions, listings, other hooks" },
-    { key: "agent", title: "the agent's", tokens: w.sources.agent, colour: v("write"), tip: "What the agent did: tool calls and results, replies, a person's prompts" },
+    { filter: "map" as Filter, key: "map", title: "the map's", tokens: w.sources.map, fitted: fs?.map ?? 0, colour: v("owner"), tip: "What the map said: its nodes' words, rules' refusals" },
+    { filter: "harness" as Filter, key: "harness", title: "Claude Code's", tokens: w.sources.harness, fitted: fs?.harness ?? 0, colour: v("harness"), tip: "What Claude Code gave: system prompt, tools, MCP instructions, listings, other hooks" },
+    w.channels.talk > 0
+      ? { filter: "talk" as Filter, key: "agent", title: "the conversation", tokens: w.sources.agent, fitted: fs?.agent ?? 0, colour: v("write"), tip: "The conversation since the start: your prompts, Claude's replies and thinking, tool calls and results, Claude Code's notes" }
+      : { key: "agent", title: "the agent's", tokens: w.sources.agent, fitted: fs?.agent ?? 0, colour: v("write"), tip: "What the agent did: tool calls and results, replies, a person's prompts" },
   ];
-  const ink = [80, 60, 44, 30];
+  const ink = [80, 60, 44, 30, 18];
   const channels: Share[] = [
-    ...CHANNELS.map((c, i) => ({ filter: c.channel as Filter, key: c.channel, title: `${GLYPH[shapeOf(c.channel)]} ${c.title}`, tokens: w.channels[c.channel], colour: `color-mix(in srgb, ${v("fg")} ${ink[i]}%, transparent)`, tip: `${c.title}: ${c.doc}` })),
-    { key: "act", title: "acts", tokens: w.channels.act, colour: v("write"), tip: "The agent's own acts" },
+    ...CHANNELS.map((c, i) => ({ filter: c.channel as Filter, key: c.channel, title: `${GLYPH[shapeOf(c.channel)]} ${c.title}`, tokens: w.channels[c.channel], fitted: fc?.[c.channel] ?? 0, colour: `color-mix(in srgb, ${v("fg")} ${ink[i]}%, transparent)`, tip: `${c.title}: ${c.doc}` })),
+    { key: "act", title: "acts", tokens: w.channels.act, fitted: 0, colour: v("write"), tip: "The agent's own acts" },
   ];
   return { sources: [...sources.filter((s) => s.tokens > 0), ...unseen], channels: [...channels.filter((s) => s.tokens > 0), ...unseen] };
 }
 
-const GLYPH: Record<string, string> = { circle: "●", diamond: "◆", square: "■", triangle: "▲" };
+const GLYPH: Record<string, string> = { circle: "●", diamond: "◆", square: "■", triangle: "▲", hexagon: "⬢" };
 
 /** Filters that a share in this row stands for: a click shows only one of them. */
 const SOURCE_FILTERS: Filter[] = ["map", "harness"];
@@ -193,13 +225,21 @@ const Row = ({ shares, limit, filter, label }: { shares: Share[]; limit: number;
     e.stopPropagation();
     if (s.filter && filter?.set) filter.set((off) => only(off, s.filter!));
   };
-  const tip = (s: Share) => `${s.title}: ${tok(s.tokens)} tokens, ${pct(s.tokens, limit).toFixed(1)}% of the window\n${s.tip}${s.filter && filter?.set ? "\nA click shows only these on the tree; again, everything" : ""}`;
+  // Its fitted part solid, the estimated rest faded; what is measured, solid.
+  const fill = (s: Share) => {
+    if (s.fitted === undefined || s.tokens <= 0) return s.colour;
+    const f = Math.min(100, (s.fitted / s.tokens) * 100).toFixed(1);
+    const faded = `color-mix(in srgb, ${s.colour} 40%, transparent)`;
+    return `linear-gradient(to right, ${s.colour} 0 ${f}%, ${faded} ${f}% 100%)`;
+  };
+  const num = (s: Share) => (s.fitted === undefined ? { text: tok(s.tokens), tip: SURE.measured.tip } : sure(s.tokens, s.fitted));
+  const tip = (s: Share) => `${s.title}: ${num(s).text} tokens, ${pct(s.tokens, limit).toFixed(1)}% of the window\n${s.tip}\n${num(s).tip}${s.filter && filter?.set ? "\nA click shows only these on the tree; again, everything" : ""}`;
   return html`
     <div class="row" role="group" aria-label=${label}>
-      ${shares.map((s) => html`<button key=${s.key} class=${`${s.filter && filter?.set ? "" : "plain"}${shown(s) ? "" : " off"}`} style=${`width:${pct(s.tokens, limit)}%;background:${s.colour}`} title=${tip(s)} onClick=${click(s)}></button>`)}
+      ${shares.map((s) => html`<button key=${s.key} class=${`${s.filter && filter?.set ? "" : "plain"}${shown(s) ? "" : " off"}`} style=${`width:${pct(s.tokens, limit)}%;background:${fill(s)}`} title=${tip(s)} onClick=${click(s)}></button>`)}
     </div>
     <div class="lg">
-      ${shares.map((s) => html`<button key=${s.key} class=${`${s.filter && filter?.set ? "" : "plain"}${shown(s) ? "" : " off"}`} title=${tip(s)} onClick=${click(s)}><i style=${`background:${s.colour}`}></i>${s.title} ${tok(s.tokens)}</button>`)}
+      ${shares.map((s) => html`<button key=${s.key} class=${`${s.filter && filter?.set ? "" : "plain"}${shown(s) ? "" : " off"}`} title=${tip(s)} onClick=${click(s)}><i style=${`background:${s.colour}`}></i>${s.title} ${num(s).text}</button>`)}
     </div>`;
 };
 
