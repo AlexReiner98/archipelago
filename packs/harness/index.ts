@@ -15,7 +15,8 @@
  *   as an opened line needs the room. Live: the agent in focus's
  *   (`harness.focus`), opening in place as one run's do.
  *   Every run: the runs, or a profile's runs.
- * - Left: the node looked at (node.ts). The dials (dials.ts) are in the
+ * - Left, inside the view: one bar, the previews, or while a node is picked
+ *   the node (node.ts) in their place. The dials (dials.ts) are in the
  *   bar's ⋯ menu.
  *
  * The playhead is `here.event`: unset, the view follows the run's end
@@ -37,7 +38,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
 import { Events, short } from "./events.ts";
-import { ALL, FOCUS, foldForNode, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
+import { ALL, FOCUS, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
 import { colourOf, colours, liveRuns } from "./live.ts";
 import { AGENTS_STYLE, placementOf, ProfileMenu } from "./agents.ts";
 import { focusOf, switchFocus, Trees, TREES_STYLE, treesAndRows } from "./trees.ts";
@@ -51,8 +52,6 @@ import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
-/** The frame's page key for its folded fills (packs/frame/fold.ts): the node pane is open while a node is picked. */
-const FOLDED = "frame.folded";
 
 /** How long a step lasts when the run plays, in ms. */
 const STEP = 260;
@@ -140,13 +139,6 @@ const harness: Pack = {
     ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The Sensory interface's dials, those moved from where they start." }));
     ctx.effect(() => declare.declare({ key: FOCUS, scope: "page", doc: "Live: the run whose tree is big; the run pane shows its events." }));
     ctx.effect(() => declare.declare({ key: LIVE, scope: "page", doc: "True: the sensory interface looks at every live run at once, a colour each." }));
-    // The node pane is open while a node is picked, from anywhere, and folds to its rail when none is (a click on the background).
-    ctx.effect(() =>
-      here.watch(KEYS.node, (c) => {
-        const next = foldForNode(here.get(FOLDED), c.value as string | undefined);
-        if (next) set.set(FOLDED, next);
-      }),
-    );
     // A run picked anywhere (here, the node's runs, Activity) is looked at alone, with its own profiles.
     ctx.effect(() =>
       here.watch(KEYS.run, () => {
@@ -376,8 +368,11 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} />`
-              : html`<${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />`}
+              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeFill} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} />`
+              : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
+                  <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />
+                  ${picked && html`<div class="hv-peeks hv-side"><${NodeFill} /></div>`}
+                </div>`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
             ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${lives.find((r) => r.run === menu.run)?.title ?? menu.run.slice(0, 8)} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}
           </div>
@@ -458,7 +453,6 @@ const harness: Pack = {
     // The run takes the right, the wider side: an opened line needs the room.
     const fill = ctx.get<SlotFill>("slot.fill");
     const whileShown = { "here.view": "harness/view" };
-    fill.fill({ slot: "left", name: "node", title: "Node", when: whileShown, view: NodeFill });
     fill.fill({ slot: "center", name: "view", title: "Sensory interface", view: Center });
     fill.fill({ slot: "right", name: "run", title: "Run", when: whileShown, view: RunFill });
   },

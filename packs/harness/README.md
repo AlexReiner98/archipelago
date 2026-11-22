@@ -8,17 +8,15 @@ every profile. What the map says to an agent is a
 tree of places and nodes. It lands on every live run: each agent has a tree
 of its own, holding the nodes its profile lets it hear, under its name in
 its colour and its profile, and what it is told colours that tree. Nothing
-moves. Three fills,
-linked through `here`; the two beside show while the view does
-(`when: { "here.view": "harness/view" }`), and start folded to rails (the
-frame's `folded` config in `app/boot.ts`), so the landing is the tree and
-the agents only. Picking a node opens the node pane; a click on the
-background, picking none, folds it.
+moves. Two fills, linked through `here`; the run pane shows beside the
+view while it does (`when: { "here.view": "harness/view" }`), open from
+the start. Inside the view, one bar on the left holds the previews, or,
+while a node is picked, the node in their place; a click on the
+background, picking none, brings the previews back.
 
 | Fill | Region | Shows |
 |---|---|---|
-| Sensory interface (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline |
-| Node (`harness/node`, "Node") | `left` | Its words, standing, places, pack, kind, record, and its verdict per run |
+| Sensory interface (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline. Its left bar: the previews, or the node picked (its words, standing, places, pack, kind, record, and its verdict per run) |
 | Run (`harness/run`, "Run") | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: the events of the agent in focus, opening in place as one run's do. All runs: the runs, or a profile's |
 
 ## The bar ([bar.ts](bar.ts))
@@ -61,7 +59,7 @@ come.
 
 Live mode and the agents are one idea: each live run is an agent, in the
 colour live mode gives it, with a tree of its own. One is in focus, big,
-with every name; the others are small previews in a column beside it, in
+with every name; the others are small previews in a column to its left, in
 the order of their colours so each keeps its place, and a click on one
 brings it into focus. The switch is smooth: the one clicked grows into
 the big place while the old one shrinks into the column (a view
@@ -165,10 +163,9 @@ its record against the thresholds, its checks, Keep and Retire
 (`keep.apply`). A node the map writes a file from shows the file and its
 rule (`written.rule`).
 
-The node pane is open while a node is picked and folds to its rail when
-none is (a click on the tree's background, from anywhere): the pack
-takes `harness/node` out of the frame's page key `frame.folded`, or puts
-it back (`foldForNode`).
+The node shows in the view's left bar while one is picked, in place of
+the previews (or, one run looked at, beside the tree), and gives way to
+them when none is: a click on the tree's background, from anywhere.
 
 Injects `slot.fill`, `here.*`, `agent.tree`, `exchange.read`,
 `exchange.watch`, `verdict.read`, `action.list`, `action.invoke`,

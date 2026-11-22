@@ -11,7 +11,7 @@ import { asText, expand, fold, pretty } from "../packs/harness/expand.ts";
 import type { NodeInfo, RunInfo } from "../spec/agent.ts";
 import { HUES } from "../spec/style.ts";
 import { colourOf, colours, keepLast, liveRuns, LIVE_MOST } from "../packs/harness/live.ts";
-import { foldForNode, groupsOf } from "../packs/harness/hooks.ts";
+import { groupsOf } from "../packs/harness/hooks.ts";
 import { DECIDED, dotsBox, nameOf, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
 import { fitKey, shouldFit } from "../packs/harness/canvas.ts";
 import { crowded, quadsOverlap, type Quad } from "../packs/harness/labels.ts";
@@ -502,13 +502,6 @@ test("switchFocus: where the page has no view transitions, the change happens at
   assert.notEqual(transitionName(0), transitionName(1));
 });
 
-test("foldForNode: the node pane opens when a node is picked and folds when none is; nothing when the frame keeps no folds", () => {
-  assert.deepEqual(foldForNode(["harness/node", "harness/run"], "words/x"), ["harness/run"]);
-  assert.deepEqual(foldForNode(["harness/run"], undefined), ["harness/run", "harness/node"]);
-  assert.equal(foldForNode(["harness/run"], "words/x"), undefined, "already open");
-  assert.equal(foldForNode(["harness/node"], undefined), undefined, "already folded");
-  assert.equal(foldForNode(undefined, "words/x"), undefined);
-});
 
 test("fitKey: the same shape read again keeps the camera; a node more or a new size fits again", () => {
   const b = { x: -100.2, y: -80.4, width: 200.4, height: 160.6 };

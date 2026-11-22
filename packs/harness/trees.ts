@@ -2,11 +2,14 @@
  * Every live agent with a tree of its own: the nodes its profile lets it
  * hear (`profile.read.hears`), hung as the big tree is. One agent is in
  * focus, its tree big with every name; the others are small previews in a
- * column beside it, and a click on one brings it into focus. Each is under
+ * column to its left, and a click on one brings it into focus. Each is under
  * its agent's name in its colour and its profile. What an agent
  * is told colours that node and its branch in its colour, then fades
  * (tint.ts); nothing moves. Small, a tree names only what is lit, what the
  * agent was told, and what is picked.
+ *
+ * The left bar holds the previews, or, while a node is picked, the node in
+ * their place; picking none brings the previews back.
  *
  * A switch of focus is smooth: each tree's drawing, or a line's coloured
  * dot, and nothing else, has a view-transition name by its colour slot, so
@@ -82,8 +85,8 @@ html.hv-switching { view-transition-name:none; }
 ::view-transition-old(*.hv-agent) { animation:hv-gone .12s ease-out both; }
 @keyframes hv-gone { to { opacity:0; } }
 .hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); }
-.hv-trees.many { grid-template-columns:minmax(0,1fr) minmax(180px,22%); }
-.hv-peeks { min-height:0; overflow-y:auto; border-left:1px solid var(--line); scrollbar-width:thin; }
+.hv-trees.many { grid-template-columns:minmax(180px,22%) minmax(0,1fr); }
+.hv-peeks { order:-1; min-height:0; overflow-y:auto; border-right:1px solid var(--line); scrollbar-width:thin; }
 .hv-peeks > .hv-tree { height:var(--peek, 140px); }
 .hv-tree.peek { cursor:pointer; }
 .hv-rows { border-top:1px solid var(--line); padding:var(--space-1) 0; }
@@ -139,6 +142,8 @@ export interface TreesProps {
   focus?: string;
   /** Live agents shown as one line each, not as trees. */
   rows?: AgentTree[];
+  /** What the left bar shows instead of the previews: the node picked. */
+  side?: unknown;
   onFocus(run: string): void;
 }
 
@@ -167,9 +172,10 @@ export const Trees = (p: TreesProps) => {
   const rest = p.agents.filter((a) => a.run.run !== focus);
   const big = p.agents.find((a) => a.run.run === focus);
   // The previews stand at a fixed height and scroll, however many agents are live.
-  return html`<div class="hv-trees${rest.length || p.rows?.length ? " many" : ""}">
+  // The left bar is one: the previews, or, while a node is picked, the node in their place.
+  return html`<div class="hv-trees${p.side || rest.length || p.rows?.length ? " many" : ""}">
     ${big && html`<${One} key=${big.run.run} a=${big} p=${p} big=${true} />`}
-    ${(rest.length > 0 || p.rows?.length) && html`<div class="hv-peeks">
+    ${p.side ? html`<div class="hv-peeks hv-side">${p.side}</div>` : (rest.length > 0 || p.rows?.length) && html`<div class="hv-peeks">
       ${rest.map((a) => html`<${One} key=${a.run.run} a=${a} p=${p} big=${false} />`)}
       ${p.rows?.length ? html`<div class="hv-rows">
         <div class="h" title="Live, but not among the last active: a run that stopped without ending stays live">${p.rows.length} more live</div>
