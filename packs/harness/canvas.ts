@@ -93,11 +93,12 @@ export const CANVAS_STYLE = sheet(`
 .rx-key svg { width:14px; height:10px; }
 .rx-key.filters { pointer-events:auto; }
 .rx-key .rx-krow { display:contents; font:inherit; color:inherit; cursor:pointer; }
-.rx-key .rx-krow > span { cursor:pointer; }
+.rx-key .rx-krow > span { cursor:pointer; text-align:left; justify-self:start; }
 .rx-key .rx-krow:hover > span { color:var(--fg); }
 .rx-key .rx-krow.off > * { opacity:.35; } .rx-key .rx-krow.off > span { text-decoration:line-through; }
-.rx-key .rx-kh { color:var(--dim); font-size:var(--text-xs); }
 .rx-key .rx-kfull { grid-column:1 / -1; }
+.rx-key .rx-ksec { grid-column:1 / -1; margin-top:var(--space-2); padding-top:var(--space-2); border-top:1px solid var(--line); color:var(--fg); font-size:var(--text-xs); font-weight:var(--bold); }
+.rx-key .rx-kfull + .rx-ksec { margin-top:0; }
 .rx-key .rx-khead { font:inherit; font-size:var(--text-xs); background:none; border:0; padding:0; color:var(--dim); cursor:pointer; }
 .rx-key .rx-khead:hover { color:var(--fg); }
 .rx-key.closed { display:flex; gap:var(--space-3); align-items:center; white-space:nowrap; }

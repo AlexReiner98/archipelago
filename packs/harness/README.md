@@ -113,7 +113,7 @@ from one "decided" bough as well, retired ones struck.
 | faint, struck | a profile held it back (a `gated` event; or the profile picked) |
 | dashed dot | only a shadow profile would have |
 | ring | its verdict in the run (blue held, red failed, dashed quiet), once looked at to the end |
-| dot hue | its pack: the map's words purple, what grow learned gold |
+| dot hue | its pack: the map's words purple, what grow learned gold; never `hue-2`, too near Claude Code's orange |
 | hollow dot | its item is a trial |
 | orange dot, name and branch | given by the harness (Claude Code), not the map: read only (below) |
 | dot shape | drawn bigger than a plain dot, and never under 4 px on screen however far out the zoom (`shapeRadius`): its channel ([channels.ts](channels.ts)): ● hook, said at a moment by a hook; ◆ rule, a check that can refuse (a rule, the schema's refusal); ■ file, a skill or memory file the harness loads; ▲ context, there from the start (system prompt, tool definitions, MCP instructions, listings) |
@@ -129,7 +129,13 @@ there, bottom left of one run's tree or the agent in focus: open, every
 mark with its words, or collapsed by its head ("key ▾") to one line of the
 marks that filter; the browser remembers which. It lists only the marks
 the tree in sight shows (`marksIn`): a new user's key is who and how, and
-held-back, shadow, verdict and trial marks join it as they appear. The key doubles as a
+held-back, shadow, verdict and trial marks join it as they appear. Its
+rows stand in titled sections, each a line apart, with what it means in
+its tooltip: "in this run" (said, refused, acted, held back), "judged"
+(verdicts, trial nodes), "from" (the map's or Claude Code's), "how it
+reaches the agent" (the four channels) and "made by" (each pack's colour,
+named plainly: "the map's words", "learned from a miss", "skills & memory
+loaded", "what changed since" for the since pack, and so on). The key doubles as a
 filter, open or collapsed: a click on a
 channel's row, on "the map's", or on Claude Code's orange hides those nodes
 from the trees (struck while hidden), and a second click shows them again

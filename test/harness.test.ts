@@ -269,7 +269,7 @@ test("packHues, branchAt and cut", () => {
   assert.equal(h.get("words"), STYLE.colors.owner);
   assert.equal(h.get("grow"), STYLE.colors.learned);
   assert.equal(h.get("harness"), STYLE.hues[0]);
-  assert.equal(h.get("loaded"), STYLE.hues[1]);
+  assert.equal(h.get("loaded"), STYLE.hues[2], "hue-2 is skipped: too near the harness's orange");
   assert.equal(branchAt(1).width, STYLE.branch);
   assert.ok(branchAt(3).width < branchAt(2).width);
   assert.equal(branchAt(40).width, STYLE.branchLeast);

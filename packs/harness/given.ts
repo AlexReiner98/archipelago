@@ -107,6 +107,8 @@ export function givenNodes(run: string, rows: GivenRow[]): GivenInfo[] {
 export function useGiven(invoke: ActionInvoke, has: boolean, on: boolean, runs: string[], tick: unknown): Map<string, GivenInfo[]> {
   const [got, setGot] = useState<Map<string, GivenInfo[]>>(new Map());
   const last = useRef(new Map<string, number>());
+  const alive = useRef(true);
+  useEffect(() => () => void (alive.current = false), []);
   const key = runs.join(",");
   useEffect(() => {
     if (!has || !on || !runs.length) return;
@@ -134,8 +136,14 @@ export function useGiven(invoke: ActionInvoke, has: boolean, on: boolean, runs: 
         const at = last.current.get(run) ?? 0;
         if (Date.now() - at < AGAIN_MS) continue;
         last.current.set(run, Date.now());
-        const r = await read(run);
-        if (gone || !r) continue;
+        const r = await read(run).catch(() => undefined);
+        // A read that failed is asked again next time. One that lands after the effect moved on (an event came,
+        // the pack reloaded) still counts: dropping it, with the run marked read, left an ended run empty.
+        if (!r) {
+          last.current.set(run, 0);
+          continue;
+        }
+        if (!alive.current) return;
         setGot((m) => new Map(m).set(run, givenNodes(run, r.rows)));
         // Still reading a long transcript: go on soon.
         if (r.reading) setTimeout(() => !gone && (last.current.set(run, 0), void load()), 300);

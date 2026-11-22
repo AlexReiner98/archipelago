@@ -60,7 +60,7 @@ export function shapeRadius(r: number, k: number, small: boolean): number {
   return small ? Math.max(SHAPE_SMALL, SMALL_SCREEN / zoom) : Math.max(Math.min(r * SHAPE_GROW, SHAPE_MOST), SHAPE_SCREEN / zoom);
 }
 
-const KeyRow = (mark: unknown, text: string) => html`${mark}<span>${text}</span>`;
+const KeyRow = (mark: unknown, text: string, tip?: string) => html`${mark}<span title=${tip ?? ""}>${text}</span>`;
 
 /** The key as a filter: what it hides, and a click on a row hides or shows it. */
 export interface KeyFilter {
@@ -97,7 +97,7 @@ export const Key = ({ hues, filter, open = true, onOpen, present }: { hues: Map<
   // Only the marks the tree shows (`marksIn`); given no `present`, every mark.
   const has = (id: string) => !present || present.has(id);
   const filters = FILTERS().filter(({ f }) => has(f));
-  const row = (id: string, mark: unknown, text: string) => (has(id) ? KeyRow(mark, text) : "");
+  const row = (id: string, mark: unknown, text: string, tip?: string) => (has(id) ? KeyRow(mark, text, tip) : "");
   const head = onOpen && html`<button class="rx-khead" title=${open ? "Collapse the key to one line" : "Open the key"} onPointerDown=${stop} onClick=${(e: Event) => (stop(e), onOpen(!open))}>key ${open ? "▾" : "▸"}</button>`;
   if (!open)
     return html`<div class="rx-key closed filters">
@@ -107,21 +107,49 @@ export const Key = ({ hues, filter, open = true, onOpen, present }: { hues: Map<
         return html`<button class=${`rx-kmark${off ? " off" : ""}`} title=${`${text}${filter ? (off ? "\nHidden: a click shows it" : "\nA click hides it") : ""}`} onPointerDown=${stop} onClick=${(e: Event) => (stop(e), filter?.onToggle(f))}>${mark}</button>`;
       })}
     </div>`;
+  const said = [
+    row("said", html`<svg viewBox="0 0 14 10"><path class="rx-trail k-say" d="M1 5H13" style="stroke-opacity:1" /></svg>`, "said to the agent", "The map told the agent this node, at the moment it lit up"),
+    row("refused", html`<svg viewBox="0 0 14 10"><path class="rx-trail k-fail" d="M1 5H13" style="stroke-opacity:1" /></svg>`, "refused · failed", "A rule stopped a step, or something the agent did failed"),
+    row("acted", html`<svg viewBox="0 0 14 10"><circle class="k-write" cx="7" cy="5" r="4" /></svg>`, "the agent acted here", "A tool call or a reply, sparking on the bough of its place"),
+    row("held", html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:${v("fg")};opacity:.38`} /></svg>`, "held back by a profile", "A profile kept this node from this agent: it wasn't said"),
+    row("shadow", html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:${v("fg")};stroke:${v("dim")};stroke-dasharray:1.5 1;stroke-width:1.2`} /></svg>`, "a trial profile would hold", "A profile being tried out would have held it back; it was still said"),
+  ];
+  const judged = [
+    row("v-held", html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-held" cx="7" cy="5" r="3.5" /></svg>`, "held", "Said, and nothing went wrong that it covers"),
+    row("v-failed", html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-failed" cx="7" cy="5" r="3.5" /></svg>`, "failed", "Said, and a miss it covers followed"),
+    row("v-quiet", html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-quiet" cx="7" cy="5" r="3.5" /></svg>`, "quiet", "Said, with nothing to judge it by"),
+    row("trial", html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:none;stroke:${v("fg")};stroke-width:1.2`} /></svg>`, "trial node", "Written after a miss, not yet kept or retired"),
+  ];
+  const from = filters.filter(({ f }) => f === "map" || f === "harness");
+  const how = filters.filter(({ f }) => f !== "map" && f !== "harness");
+  const packs = [...hues].filter(([p]) => has(`pack:${p}`));
   return html`
   <div class=${`rx-key${filter || onOpen ? " filters" : ""}`}>
     ${head && html`<span class="rx-kfull">${head}</span>`}
-    ${row("said", html`<svg viewBox="0 0 14 10"><path class="rx-trail k-say" d="M1 5H13" style="stroke-opacity:1" /></svg>`, "said to the agent")}
-    ${row("refused", html`<svg viewBox="0 0 14 10"><path class="rx-trail k-fail" d="M1 5H13" style="stroke-opacity:1" /></svg>`, "refused · failed")}
-    ${row("acted", html`<svg viewBox="0 0 14 10"><circle class="k-write" cx="7" cy="5" r="4" /></svg>`, "the agent acted here")}
-    ${row("held", html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:${v("fg")};opacity:.38`} /></svg>`, "held back by a profile")}
-    ${row("shadow", html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:${v("fg")};stroke:${v("dim")};stroke-dasharray:1.5 1;stroke-width:1.2`} /></svg>`, "a trial profile would hold")}
-    ${row("v-held", html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-held" cx="7" cy="5" r="3.5" /></svg>`, "verdict: held")}
-    ${row("v-failed", html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-failed" cx="7" cy="5" r="3.5" /></svg>`, "verdict: failed")}
-    ${row("v-quiet", html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-quiet" cx="7" cy="5" r="3.5" /></svg>`, "verdict: quiet")}
-    ${row("trial", html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:none;stroke:${v("fg")};stroke-width:1.2`} /></svg>`, "trial node")}
-    ${filter && filters.length > 0 && html`<span class="rx-kh">show</span><span class="rx-kh">a click hides or shows</span>`}
-    ${filters.map(({ f, mark, text }) => FilterRow(f, mark, text, filter))}
-    ${[...hues].filter(([p]) => has(`pack:${p}`)).map(([p, c]) => KeyRow(html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3.5" style=${`fill:${c}`} /></svg>`, p === "words" ? "the map's words" : p === "grow" ? "learned" : p))}
+    ${section("in this run", "What happened in the run looked at, as it lights the tree", said)}
+    ${section("judged", "Each node's verdict once the run ends, and nodes still on trial", judged)}
+    ${section("from", "Who supplies it: the map, or Claude Code itself. A click hides or shows", from.map(({ f, mark, text }) => FilterRow(f, mark, text, filter)))}
+    ${section("how it reaches the agent", "The dot's shape: the channel it comes through. A click hides or shows", how.map(({ f, mark, text }) => FilterRow(f, mark, text, filter)))}
+    ${section("made by", "The dot's colour: the pack that made the map's node", packs.map(([p, c]) => KeyRow(html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3.5" style=${`fill:${c}`} /></svg>`, packName(p), PACKS[p]?.[1] ?? `The ${p} pack`)))}
   </div>
 `;
 };
+
+/** A titled part of the key, over a line; nothing when it has no rows. */
+function section(title: string, tip: string, rows: unknown[]) {
+  const shown = rows.filter((r) => r !== "");
+  if (!shown.length) return "";
+  return html`<span class="rx-ksec" title=${tip}>${title}</span>${shown}`;
+}
+
+/** The packs whose nodes the key names, in plain words, with what they do. Any other is named by its id. */
+const PACKS: Record<string, [string, string]> = {
+  words: ["the map's words", "Words written on the map, said where they are placed"],
+  grow: ["learned from a miss", "Trial nodes the learning loop wrote after an agent stumbled"],
+  loaded: ["skills & memory loaded", "The skill and memory files Claude Code loaded into the run"],
+  since: ["what changed since", "Since you last heard: at each prompt, what a person changed on the map since the last one"],
+  schema: ["type rules", "The schema's refusals: an item that doesn't fit its type"],
+  written: ["files the map writes", "Skills and memory files the map writes for agents to load"],
+  keep: ["kept or retired", "Trial nodes the keep pack kept or retired by their record"],
+};
+export const packName = (p: string) => PACKS[p]?.[0] ?? p;

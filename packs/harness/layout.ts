@@ -463,13 +463,20 @@ export function dotsBox(placed: Placed, margin = 40): Placed["box"] {
   return { x: x0 - margin, y: y0 - margin, width: x1 - x0 + 2 * margin, height: y1 - y0 + 2 * margin };
 }
 
-/** Each pack's hue: the map's words are the owner's, what grow learned its own, every other pack the next hue. */
+/**
+ * Each pack's hue: the map's words are the owner's, what grow learned its
+ * own, every other pack the next hue. `hue-2` is left out: it is close to
+ * the `harness` orange, which says Claude Code gave a node, not the map.
+ */
 export function packHues(packs: string[], style = STYLE): Map<string, string> {
   let next = 0;
+  const hues = style.hues.filter((_, i) => i !== NOT_HUE);
   return new Map(
-    [...new Set(packs)].sort().map((p) => [p, p === "words" ? style.colors.owner : p === "grow" ? style.colors.learned : style.hues[next++ % style.hues.length]!]),
+    [...new Set(packs)].sort().map((p) => [p, p === "words" ? style.colors.owner : p === "grow" ? style.colors.learned : hues[next++ % hues.length]!]),
   );
 }
+/** The pack hue too near the harness's orange (hue-2, by its place in HUES). */
+const NOT_HUE = 1;
 
 /** A branch's stroke at a depth: thick and strong at the root, fine and faint at the edge. */
 export function branchAt(depth: number, s = STYLE): { width: number; ink: number } {
