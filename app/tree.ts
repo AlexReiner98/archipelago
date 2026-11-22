@@ -80,6 +80,7 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }
     { id: "words", pack: "packs/words/index.ts", config: { seed: SEED } },
     { id: "loaded", pack: "packs/loaded/index.ts" },
     { id: "transcript", pack: "packs/transcript/index.ts" },
+    { id: "context", pack: "packs/context/index.ts" },
     { id: "profile", pack: "packs/profile/index.ts" },
     { id: "used", pack: "packs/used/index.ts" },
     { id: "lean", pack: "packs/lean/index.ts" },

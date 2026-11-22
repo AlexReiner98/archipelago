@@ -646,3 +646,43 @@ test("an opened say shows the whole block the agent got at its moment, tagged an
   assert.equal(gotAt(events, 0, speakers), undefined, "not a say");
   assert.deepEqual(expand(events[1]!, block).map((p) => p.label), ["kind", "node", "place", "said", "agent got", "at"]);
 });
+
+test("the window bar: each share on the window's scale, a click shows only that share, a mark per node at the playhead", async () => {
+  const { only, sharesOf, tok, windowMarks, windowShown } = await import("../packs/harness/windowbar.ts");
+  const { marksIn } = await import("../packs/harness/key.ts");
+  const w = {
+    total: { tokens: 50_000, from: "usage" as const },
+    limit: { tokens: 200_000, from: "default" as const },
+    compactions: 1,
+    sources: { map: 1_000, harness: 30_000, agent: 4_000 },
+    channels: { hook: 1_500, rule: 0, file: 500, context: 29_000, act: 4_000 },
+    unseen: 15_000,
+    parts: [
+      { id: "words/a", title: "A", source: "map" as const, channel: "hook" as const, state: "said" as const, tokens: 900, count: 1 },
+      { id: "words/b", title: "B", source: "map" as const, channel: "hook" as const, state: "dropped" as const, tokens: 50, count: 1 },
+      { id: "transcript/r#system", title: "System prompt", source: "harness" as const, channel: "context" as const, state: "start" as const, tokens: 29_000, count: 1 },
+      { id: "transcript/r#skills", title: "Skill listing", source: "harness" as const, channel: "context" as const, state: "listed" as const, tokens: 400, count: 1 },
+      { id: "act:tool:Bash", title: "tool:Bash", source: "agent" as const, channel: "act" as const, state: "said" as const, tokens: 4_000, count: 3 },
+    ],
+  };
+  const { sources, channels } = sharesOf(w);
+  assert.deepEqual(sources.map((s) => [s.key, s.tokens, s.filter]), [["map", 1_000, "map"], ["harness", 30_000, "harness"], ["agent", 4_000, undefined], ["unseen", 15_000, undefined]]);
+  assert.deepEqual(channels.map((s) => s.key), ["hook", "file", "context", "act", "unseen"], "a channel with nothing in the window has no share");
+  // A click shows only that share of its row; again, everything; the other row is left as it was.
+  assert.deepEqual([...only(new Set(), "map")], ["harness"]);
+  assert.deepEqual([...only(new Set(["harness"]), "map")], []);
+  assert.deepEqual([...only(new Set(["harness"]), "hook")].sort(), ["context", "file", "harness", "rule"]);
+  assert.deepEqual([...only(new Set(["rule", "file", "context"]), "context")].sort(), ["file", "hook", "rule"]);
+  // The marks: in (said or from the start), listed, dropped; the agent's acts have no node.
+  const marks = windowMarks(w);
+  assert.deepEqual([...marks], [["words/a", "in"], ["words/b", "dropped"], ["transcript/r#system", "in"], ["transcript/r#skills", "listed"]]);
+  assert.equal(windowMarks(undefined).size, 0);
+  // The key lists a window mark only when the tree in sight shows it.
+  const node = (id: string): NodeInfo => ({ id, pack: "words", name: id, kind: "instruction", title: id, at: ["session_start"] });
+  const tree = treeOf([node("words/a")], {});
+  const shown = windowShown(marks, tree);
+  assert.deepEqual([...shown], [["words/a", "in"]]);
+  const present = marksIn({ nodes: [node("words/a")], heard: new Map(), held: new Map(), trial: () => false, window: shown });
+  assert.ok(present.has("w-in") && !present.has("w-dropped") && !present.has("w-listed"));
+  assert.deepEqual([tok(950), tok(9_876), tok(12_345), tok(121_000), tok(1_000_000), tok(1_250_000)], ["950", "9.9k", "12k", "121k", "1M", "1.25M"]);
+});

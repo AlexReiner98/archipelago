@@ -51,6 +51,7 @@ import { shows } from "./channels.ts";
 import { GIVEN, GivenPane, parseGiven, useGiven, type GivenInfo } from "./given.ts";
 import { holdsOf, nodeOf, playhead, stateAt } from "./replay.ts";
 import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
+import { useWindow, WINDOW, WindowBar, WINDOWBAR_STYLE, windowMarks } from "./windowbar.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -121,7 +122,9 @@ ${DIALS_STYLE}
 ${TREES_STYLE}
 ${BAR_STYLE}
 ${CANVAS_STYLE}
-${TIMELINE_STYLE}`);
+${TIMELINE_STYLE}
+${WINDOWBAR_STYLE}
+.hv-onerun { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; min-width:0; }`);
 
 const values = (v: string | string[] | undefined) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
@@ -289,7 +292,12 @@ const harness: Pack = {
         const mine = !live && run ? (keptGiven.get(run) ?? []) : [];
         return mine.length ? [...kept, ...mine] : kept;
       }, [live, run, kept, keptGiven]);
-      const keyFilter = { off, onToggle: toggle };
+      const keyFilter = { off, onToggle: toggle, set: setOff };
+      // The window of the agent in focus, or of the run looked at, at the playhead (windowbar.ts, packs/context).
+      const hasWindow = hk.useHas(WINDOW);
+      const windowRun = live ? focusOf(lives.map((r) => r.run), focusNow) : run;
+      const win = useWindow(invoke, hasWindow, windowRun, live || following.current ? undefined : event, live ? liveEvents.length : events.length);
+      const marks = useMemo(() => windowMarks(win), [win]);
       const tree = useMemo(() => treeOf(treeNodes, { by, unsaid, profiles: membership, decided }), [treeNodes, by, unsaid, membership, decided]);
       const placed = useMemo(() => radial(tree), [tree]);
       // The harness's given nodes are grey, not a pack hue (canvas.ts).
@@ -416,9 +424,12 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} />`
+              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} />`
               : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
-                  <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} />
+                  <div class="hv-onerun">
+                    ${run ? html`<${WindowBar} w=${win} filter=${keyFilter} />` : html`<span></span>`}
+                    <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} window=${run ? marks : undefined} />
+                  </div>
                   ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} /></div>`}
                 </div>`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}

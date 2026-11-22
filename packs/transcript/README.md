@@ -35,13 +35,23 @@ sensory interface hangs them into each agent's tree
   Archipelago's adapter, or holding what the map said in the run (its `say`
   events), is already in the tree as the map's nodes.
 
+- **Token use and compactions** (`TokenIndex`). Each of the model's
+  messages' `message.usage` (input, cache read, cache write and output
+  tokens, and its model), once per message however many records it was
+  streamed in, and each `compact_boundary` with its `compactMetadata`
+  (trigger, tokens before and after, dropped so far), in the order they
+  were written, each with its place `n` and its time. Real tokens,
+  numbers only. A side chain (a subagent's) is not the run's window and is
+  left out. The [context](../context/README.md) pack reads them.
+
 ## Actions
 
-Both read; they write nothing.
+All three read; they write nothing.
 
 | Action | Input | Answers |
 |---|---|---|
-| `transcript.given` | `run`, `after?`, `limit?` | a page of nodes by name (`name`, `title`, `by`, `at`, `count`, `size`), `next`, `reading` while the file is still being read, `none` when the run has no transcript |
+| `transcript.given` | `run`, `after?`, `limit?` | a page of nodes by name (`name`, `title`, `by`, `at`, `count`, `size`, `first` and `last`: when it was first and last given), `next`, `reading` while the file is still being read, `none` when the run has no transcript |
+| `transcript.tokens` | `run`, `kind?` (`usage` or `compact`), `until?` (a time), `after?` (a row's `n`), `limit?` | a page of rows in order (`usage`: `input`, `cacheRead`, `cacheWrite`, `output`, `model`; `compact`: `trigger`, `pre`, `post`, `dropped`; each with `n` and `time`), `next`, `last` (the latest usage up to `until`), `compactions` (how many by then), `reading`, `none` |
 | `transcript.text` | `run`, `name` | the node's text (each distinct text, latest last), `cut` past 200,000 letters |
 
 The transcript's format is Claude Code's own, undocumented and internal to
