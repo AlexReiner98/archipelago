@@ -13,7 +13,7 @@ import claudeCode from "../packs/claude-code/index.ts";
 import exchange from "../packs/exchange/index.ts";
 import graph from "../packs/graph/index.ts";
 import transcript, { transcriptOf } from "../packs/transcript/index.ts";
-import { GivenIndex, hookPlace, hookWho, isOurs, partOf, readLine, readPage, shown, type Line } from "../packs/transcript/read.ts";
+import { GivenIndex, hookPlace, hookWho, isOurs, partOf, readLine, readPage, shown, TokenIndex, tokensPage, windowOf, type Line } from "../packs/transcript/read.ts";
 import { givenNodes, givenOnly, isGiven, parseGiven } from "../packs/harness/given.ts";
 import { treeOf } from "../packs/harness/layout.ts";
 
@@ -230,6 +230,20 @@ test("the pack: a run's transcript fact from the adapter, read on demand, nothin
     const text = await invoke("transcript.text", { run: "sess-t", name: "system" });
     assert.ok(text.ok);
     assert.equal((text.output as { text: string }).text, "You are Claude Code.\n\nWrite to (email).");
+    // Token use and compactions, in order, real numbers.
+    await appendFile(path, [
+      line({ type: "assistant", timestamp: "2026-11-01T10:00:00.000Z", message: { id: "m1", model: "claude-x", usage: { input_tokens: 3, cache_read_input_tokens: 100, cache_creation_input_tokens: 20, output_tokens: 7 } } }),
+      line({ type: "system", subtype: "compact_boundary", timestamp: "2026-11-01T10:05:00.000Z", compactMetadata: { trigger: "auto", preTokens: 130, postTokens: 30, cumulativeDroppedTokens: 100 } }),
+    ].join("\n") + "\n");
+    const tokens = await invoke("transcript.tokens", { run: "sess-t" });
+    assert.ok(tokens.ok, JSON.stringify(tokens));
+    const t = tokens.output as { rows: { kind: string }[]; last?: { cacheRead: number }; compactions: number };
+    assert.deepEqual(t.rows.map((r) => r.kind), ["usage", "compact"]);
+    assert.equal(t.last?.cacheRead, 100);
+    assert.equal(t.compactions, 1);
+    const before = await invoke("transcript.tokens", { run: "sess-t", until: "2026-11-01T10:01:00.000Z" });
+    assert.ok(before.ok && (before.output as { compactions: number }).compactions === 0);
+    assert.ok(!(await invoke("transcript.tokens", { run: "sess-t", kind: "nope" })).ok);
     const none = await invoke("transcript.text", { run: "sess-t", name: "nothing" });
     assert.ok(!none.ok);
     const other = await invoke("transcript.given", { run: "no-such-run" });
@@ -239,4 +253,37 @@ test("the pack: a run's transcript fact from the adapter, read on demand, nothin
     await loader.apply([]);
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("tokens: each message's usage once, compactions with their numbers, a page by place and time", () => {
+  const ix = new TokenIndex();
+  const add = (o: object, offset = 0) => ix.add({ offset, length: 0, text: line(o) });
+  const usage = (id: string, time: string, u: object) => add({ type: "assistant", timestamp: time, message: { id, model: "claude-x", usage: u } });
+  usage("a", "2026-11-01T10:00:00Z", { input_tokens: 2, cache_read_input_tokens: 10, cache_creation_input_tokens: 5, output_tokens: 1 });
+  // The same message streamed again: counted once, its latest usage.
+  usage("a", "2026-11-01T10:00:01Z", { input_tokens: 2, cache_read_input_tokens: 10, cache_creation_input_tokens: 5, output_tokens: 9 });
+  add({ type: "assistant", isSidechain: true, timestamp: "2026-11-01T10:00:02Z", message: { id: "side", usage: { input_tokens: 999 } } });
+  add({ type: "system", subtype: "compact_boundary", timestamp: "2026-11-01T10:01:00Z", compactMetadata: { trigger: "manual", preTokens: 26, postTokens: 4, cumulativeDroppedTokens: 22 } });
+  usage("b", "2026-11-01T10:02:00Z", { input_tokens: 1, cache_read_input_tokens: 4 });
+  ix.add({ offset: 0, length: 0, text: "{not json" });
+  const rows = ix.rows();
+  assert.deepEqual(rows.map((r) => [r.n, r.kind]), [[1, "usage"], [2, "compact"], [3, "usage"]]);
+  assert.equal(rows[0]!.kind === "usage" && windowOf(rows[0]!), 26);
+  assert.equal(rows[0]!.time, "2026-11-01T10:00:00Z", "its time is when it began");
+  assert.deepEqual(rows[1], { n: 2, kind: "compact", time: "2026-11-01T10:01:00Z", trigger: "manual", pre: 26, post: 4, dropped: 22 });
+  const all = tokensPage(rows, { limit: 2 });
+  assert.equal(all.next, 2);
+  assert.equal(all.last?.n, 3);
+  assert.equal(all.compactions, 1);
+  assert.deepEqual(tokensPage(rows, { limit: 9, after: 2 }).rows.map((r) => r.n), [3]);
+  assert.deepEqual(tokensPage(rows, { limit: 9, kind: "compact" }).rows.map((r) => r.n), [2]);
+  const early = tokensPage(rows, { limit: 9, until: "2026-11-01T10:00:30Z" });
+  assert.deepEqual([early.rows.length, early.last?.n, early.compactions], [1, 1, 0]);
+  // The given index keeps the same rows, and when each node was given.
+  const g = new GivenIndex();
+  g.add({ offset: 0, length: 0, text: line({ type: "attachment", timestamp: "2026-11-01T09:00:00Z", attachment: { type: "model", text: "m" } }) });
+  g.add({ offset: 0, length: 0, text: line({ type: "assistant", timestamp: "2026-11-01T09:01:00Z", message: { id: "x", usage: { input_tokens: 1 } } }) });
+  g.add({ offset: 0, length: 0, text: line({ type: "attachment", timestamp: "2026-11-01T09:02:00Z", attachment: { type: "model", text: "m" } }) });
+  assert.deepEqual(g.list().map((n) => [n.first, n.last]), [["2026-11-01T09:00:00Z", "2026-11-01T09:02:00Z"]]);
+  assert.equal(g.tokens.rows().length, 1);
 });

@@ -16,9 +16,11 @@
  *   or that holds what the map said in the run (its `say` events), is
  *   already in the tree as the map's nodes.
  *
- * Two read-only actions, which write nothing:
+ * Three read-only actions, which write nothing:
  * - `transcript.given` ({ run, after?, limit? }): a page of the nodes, by name.
  * - `transcript.text` ({ run, name }): one node's text.
+ * - `transcript.tokens` ({ run, kind?, until?, after?, limit? }): a page of
+ *   token use (each message's `usage`) and compactions, in order.
  *
  * Injects exchange.read and exchange.watch for the runs' facts and what the
  * map said, action.register for the two actions.
@@ -29,10 +31,11 @@ import { Refused } from "../../spec/common.ts";
 import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { GivenIndex, partOf, readLine, readPage, shown, type Given } from "./read.ts";
+import { GivenIndex, partOf, readLine, readPage, shown, tokensPage, type Given } from "./read.ts";
 
 export const GIVEN = "transcript.given";
 export const TEXT = "transcript.text";
+export const TOKENS = "transcript.tokens";
 /** The run fact naming its transcript (packs/claude-code). */
 export const FACT = "transcript";
 /** The most pages one call reads; the next call goes on from there. */
@@ -172,6 +175,35 @@ const transcript: Pack = {
         }
         const { text, cut } = shown(parts.join("\n\n---\n\n"));
         return { name: node.name, title: node.title, by: node.by, at: node.at, text, ...(cut ? { cut: true } : {}) };
+      },
+    });
+    reg.register({
+      name: TOKENS,
+      title: "Token use and compactions in an agent's transcript",
+      doc: "A page of rows in the order they were written: `usage` (each of the model's messages: input, cacheRead, cacheWrite, output tokens, its model) and `compact` (trigger, tokens before and after, dropped so far). Up to `until` (a time), after the place `after` (a row's `n`). `last`: the latest usage up to `until`; `compactions`: how many by then. Real tokens, numbers only. Writes nothing.",
+      input: {
+        type: "object",
+        properties: {
+          run: { type: "string" },
+          kind: { type: "string", enum: ["usage", "compact"] },
+          until: { type: "string", description: "A time: only what was written by then" },
+          after: { type: "number", description: "The last row's n of the page before" },
+          limit: { type: "number" },
+        },
+        required: ["run"],
+      },
+      async run(input: { run: string; kind?: "usage" | "compact"; until?: string; after?: number; limit?: number }) {
+        if (typeof input.run !== "string" || !input.run) throw refuse("transcript.run", "Say which run.");
+        if (input.kind !== undefined && input.kind !== "usage" && input.kind !== "compact") throw refuse("transcript.kind", "A kind is usage or compact.");
+        const s = await sync(input.run);
+        const limit = Math.max(1, Math.min(LIMIT_MAX, Number(input.limit) || LIMIT_MAX));
+        const page = tokensPage(s.index.tokens.rows(), {
+          limit,
+          ...(input.kind ? { kind: input.kind } : {}),
+          ...(typeof input.until === "string" ? { until: input.until } : {}),
+          ...(typeof input.after === "number" ? { after: input.after } : {}),
+        });
+        return { ...(page as unknown as Record<string, Json>), ...(!s.path ? { none: true } : {}), ...(s.path && !s.done ? { reading: true } : {}) };
       },
     });
     ctx.effect(() => () => runs.clear());
