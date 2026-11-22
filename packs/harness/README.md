@@ -124,7 +124,13 @@ A step of the playhead runs a light from the root to its node (red for a
 refusal), or sparks on the bough of an act's place (amber, red when it
 failed). Under reduced motion only the names light. Drag to move, wheel to
 zoom, double-click to fit; a press picks a node by its name, or anywhere
-within 22 px of its dot (`HIT_PX`); "key" shows the marks.
+within 22 px of its dot (`HIT_PX`); "key" shows the marks, over one run's
+tree or the agent in focus. The key doubles as a filter: a click on a
+channel's row, on "the map's", or on Claude Code's orange hides those nodes
+from the trees (struck while hidden), and a second click shows them again
+(`shows`, [channels.ts](channels.ts)). Claude Code's row is the same switch
+as "given" in the ⋯ menu. A node's text that the server doesn't answer for
+says so after 15 seconds, with "try again".
 
 Names are whole, never cut, and never show a path: a path is said as
 whose it is, after a dot (`nameOf`, `placeName`): its project's folder,

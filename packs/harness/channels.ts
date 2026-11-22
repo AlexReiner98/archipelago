@@ -17,17 +17,28 @@ import type { NodeInfo } from "../../spec/agent.ts";
 export type Channel = "hook" | "rule" | "file" | "context";
 export type DotShape = "circle" | "diamond" | "square" | "triangle";
 
-export const CHANNELS: { channel: Channel; shape: DotShape; title: string; doc: string }[] = [
-  { channel: "hook", shape: "circle", title: "hook", doc: "said at a moment by a hook" },
-  { channel: "rule", shape: "diamond", title: "rule", doc: "a check that can refuse a step" },
-  { channel: "file", shape: "square", title: "file", doc: "a file the harness loads: a skill, a memory file" },
-  { channel: "context", shape: "triangle", title: "context", doc: "there from the start: system prompt, tools, MCP instructions, listings" },
+/** `key`: the few words the tree's key gives it, one line. */
+export const CHANNELS: { channel: Channel; shape: DotShape; title: string; key: string; doc: string }[] = [
+  { channel: "hook", shape: "circle", title: "hook", key: "said at a moment", doc: "said at a moment by a hook" },
+  { channel: "rule", shape: "diamond", title: "rule", key: "can refuse a step", doc: "a check that can refuse a step" },
+  { channel: "file", shape: "square", title: "file", key: "skill or memory loaded", doc: "a file the harness loads: a skill, a memory file" },
+  { channel: "context", shape: "triangle", title: "context", key: "there from the start", doc: "there from the start: system prompt, tools, MCP instructions, listings" },
 ];
 
 const SHAPE = new Map(CHANNELS.map((c) => [c.channel, c]));
 export const shapeOf = (c: Channel): DotShape => SHAPE.get(c)!.shape;
 export const channelTitle = (c: Channel): string => SHAPE.get(c)!.title;
 export const channelDoc = (c: Channel): string => SHAPE.get(c)!.doc;
+
+/** What the key can hide: a channel, the map's own nodes, or the harness's. */
+export type Filter = Channel | "map" | "harness";
+
+/** Whether a node shows with `off` hidden. */
+export function shows(n: Pick<NodeInfo, "kind" | "pack" | "at" | "name">, off: ReadonlySet<string>): boolean {
+  if (!off.size) return true;
+  if (off.has(isHarness(n) ? "harness" : "map")) return false;
+  return !off.has(channelOf(n));
+}
 
 /** The harness's own nodes (packs/transcript, given.ts). */
 export const isHarness = (n: Pick<NodeInfo, "kind" | "pack"> | undefined): boolean => n?.kind === "given" && n.pack === "transcript";

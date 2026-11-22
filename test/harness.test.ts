@@ -579,3 +579,18 @@ test("channels: how a node reaches the agent, as its dot's shape; hang by channe
   assert.equal(path("words/b"), "rule / words");
   assert.equal(path("transcript/r#system"), "context / Claude Code");
 });
+
+test("the key filters: a channel, the map's own, or the harness's", async () => {
+  const { shows } = await import("../packs/harness/channels.ts");
+  const map = { kind: "instruction", pack: "words", at: ["prompt"], name: "w" };
+  const rule = { kind: "rule", pack: "words", at: ["tool:*"], name: "r" };
+  const sys = { kind: "given", pack: "transcript", at: ["session_start"], name: "run#system" };
+  const hook = { kind: "given", pack: "transcript", at: ["tool:Bash"], name: "run#hook:tool:Bash:guard" };
+  const all = [map, rule, sys, hook];
+  const left = (off: string[]) => all.filter((n) => shows(n, new Set(off))).map((n) => n.name);
+  assert.deepEqual(left([]), ["w", "r", "run#system", "run#hook:tool:Bash:guard"]);
+  assert.deepEqual(left(["map"]), ["run#system", "run#hook:tool:Bash:guard"]);
+  assert.deepEqual(left(["harness"]), ["w", "r"]);
+  assert.deepEqual(left(["context"]), ["w", "r", "run#hook:tool:Bash:guard"]);
+  assert.deepEqual(left(["hook", "rule"]), ["run#system"]);
+});

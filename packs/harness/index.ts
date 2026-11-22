@@ -47,6 +47,7 @@ import { Bar, BAR_STYLE } from "./bar.ts";
 import { KEEP_STYLE, keepParts } from "./keep.ts";
 import { packHues, radial, treeOf, type Grouping } from "./layout.ts";
 import { nodePane } from "./node.ts";
+import { shows } from "./channels.ts";
 import { GIVEN, GivenPane, parseGiven, useGiven, type GivenInfo } from "./given.ts";
 import { holdsOf, nodeOf, playhead, stateAt } from "./replay.ts";
 import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
@@ -248,7 +249,15 @@ const harness: Pack = {
       );
       // What the harness gave each agent shown (packs/transcript): read-only nodes in its tree, a toggle in the ⋯ menu.
       const hasGiven = hk.useHas(GIVEN);
-      const [showGiven, setShowGiven] = useState(true);
+      // The key doubles as a filter: a channel, the map's own, or the harness's (canvas.ts Key, channels.ts shows).
+      const [off, setOff] = useState<Set<string>>(new Set());
+      const toggle = (f: string) => setOff((was) => {
+        const next = new Set(was);
+        if (!next.delete(f)) next.add(f);
+        return next;
+      });
+      const showGiven = !off.has("harness");
+      const setShowGiven = (on: boolean) => on !== showGiven && toggle("harness");
       const focusNow = hk.useHere<string>(FOCUS);
       const givenRuns = useMemo(() => {
         if (!live) return run ? [run] : [];
@@ -257,7 +266,13 @@ const harness: Pack = {
       }, [live, run, lives, focusNow]);
       const given = useGiven(invoke, hasGiven, showGiven, givenRuns, live ? liveEvents.length : events.length);
       const shownGiven = (live ? given.get(focusOf(lives.map((r) => r.run), focusNow) ?? "") : run ? given.get(run) : undefined) ?? [];
-      const treeNodes = useMemo(() => (!live && shownGiven.length ? [...nodes, ...shownGiven] : nodes), [live, nodes, shownGiven]);
+      const kept = useMemo(() => nodes.filter((n) => shows(n, off)), [nodes, off]);
+      const keptGiven = useMemo(() => new Map([...given].map(([r, list]) => [r, list.filter((n) => shows(n, off))])), [given, off]);
+      const treeNodes = useMemo(() => {
+        const mine = !live && run ? (keptGiven.get(run) ?? []) : [];
+        return mine.length ? [...kept, ...mine] : kept;
+      }, [live, run, kept, keptGiven]);
+      const keyFilter = { off, onToggle: toggle };
       const tree = useMemo(() => treeOf(treeNodes, { by, unsaid, profiles: membership, decided }), [treeNodes, by, unsaid, membership, decided]);
       const placed = useMemo(() => radial(tree), [tree]);
       // The harness's given nodes are grey, not a pack hue (canvas.ts).
@@ -384,9 +399,9 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${given} />`
+              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${showKey} keyFilter=${keyFilter} />`
               : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
-                  <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />
+                  <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} keyFilter=${keyFilter} />
                   ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} /></div>`}
                 </div>`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}

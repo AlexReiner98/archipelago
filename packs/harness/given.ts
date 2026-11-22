@@ -150,27 +150,42 @@ export function useGiven(invoke: ActionInvoke, has: boolean, on: boolean, runs: 
   return has && on ? got : new Map();
 }
 
+/** How long a text read may take before the pane says it got no answer. */
+const READ_MS = 15_000;
+
 /** The node pane for a given node: who said it, where, and its text, read only. */
 export function GivenPane({ invoke, id, info }: { invoke: ActionInvoke; id: string; info?: GivenInfo }) {
   const at = parseGiven(id);
   const [text, setText] = useState<{ text?: string; error?: string; cut?: boolean }>({});
+  const [tries, setTries] = useState(0);
   useEffect(() => {
     setText({});
     if (!at) return;
     let gone = false;
+    // A server that is down never answers: say so after a while, never "reading…" for good.
+    const late = setTimeout(() => !gone && setText({ error: "no answer from the server" }), READ_MS);
     void invoke
       .invoke({ action: GIVEN_TEXT, input: { run: at.run, name: at.name }, authority: { of: "human", basis: "read in the sensory interface" }, reason: "Read what the harness gave the agent" })
-      .then((out) => {
-        if (gone) return;
-        if (out.ok) {
-          const o = out.output as { text?: string; cut?: boolean };
-          setText({ text: o.text ?? "", ...(o.cut ? { cut: true } : {}) });
-        } else setText({ error: out.refused.message });
-      });
+      .then(
+        (out) => {
+          if (gone) return;
+          clearTimeout(late);
+          if (out.ok) {
+            const o = out.output as { text?: string; cut?: boolean };
+            setText({ text: o.text ?? "", ...(o.cut ? { cut: true } : {}) });
+          } else setText({ error: out.refused.message });
+        },
+        (e: unknown) => {
+          if (gone) return;
+          clearTimeout(late);
+          setText({ error: e instanceof Error ? e.message : String(e) });
+        },
+      );
     return () => {
       gone = true;
+      clearTimeout(late);
     };
-  }, [id]);
+  }, [id, tries]);
   const title = info?.title ?? at?.name ?? id;
   return html`
     <div class="hv-pane">
@@ -181,7 +196,7 @@ export function GivenPane({ invoke, id, info }: { invoke: ActionInvoke; id: stri
         <div class="hv-kv"><span class="k">place</span><span class="v">${info?.at.join(", ") ?? "—"}</span></div>
         <div class="hv-kv"><span class="k">given</span><span class="v">${info ? `${info.count} time${info.count === 1 ? "" : "s"} · ${info.size.toLocaleString()} letters` : "—"}</span></div>
         <div class="hv-given">
-          ${text.error ? html`<div class="hv-empty">Not read: ${text.error}</div>` : text.text === undefined ? html`<div class="hv-empty">reading…</div>` : html`<${PartRow} p=${{ label: text.cut ? "text, cut: the rest is in the transcript" : "text", text: text.text || "empty" }} />`}
+          ${text.error ? html`<div class="hv-empty">Not read: ${text.error} <button class="hv-fold" onClick=${() => setTries((n) => n + 1)}>try again</button></div>` : text.text === undefined ? html`<div class="hv-empty">reading…</div>` : html`<${PartRow} p=${{ label: text.cut ? "text, cut: the rest is in the transcript" : "text", text: text.text || "empty" }} />`}
         </div>
       </div>
     </div>`;

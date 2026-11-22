@@ -21,7 +21,7 @@
  * when first laid out, and then only on a double-click (`shouldFit`): the
  * map changing under it never moves it. A click picks a node,
  */
-import { CHANNELS, channelDoc, channelOf, shapeOf, shapePath } from "./channels.ts";
+import { CHANNELS, channelDoc, channelOf, shapeOf, shapePath, type Filter } from "./channels.ts";
 import { givenOnly, isGiven } from "./given.ts";
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -89,6 +89,12 @@ export const CANVAS_STYLE = sheet(`
 .rx-trail.k-say { stroke:${C.say}; fill:none; } .rx-trail.k-fail { stroke:${C.fail}; fill:none; } .rx-trail.k-write { stroke:${C.write}; fill:none; }
 .rx-key { position:absolute; left:10px; bottom:10px; padding:var(--space-3); background:color-mix(in srgb, var(--bg) 88%, transparent); border:1px solid var(--line); border-radius:var(--radius); font-size:var(--text-s); color:var(--dim); display:grid; grid-template-columns:auto 1fr; gap:var(--space-1) var(--space-3); align-items:center; pointer-events:none; }
 .rx-key svg { width:14px; height:10px; }
+.rx-key.filters { pointer-events:auto; }
+.rx-key .rx-krow { display:contents; font:inherit; color:inherit; cursor:pointer; }
+.rx-key .rx-krow > span { cursor:pointer; }
+.rx-key .rx-krow:hover > span { color:var(--fg); }
+.rx-key .rx-krow.off > * { opacity:.35; } .rx-key .rx-krow.off > span { text-decoration:line-through; }
+.rx-key .rx-kh { color:var(--dim); font-size:var(--text-xs); }
 .rx-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); pointer-events:none; }
 `);
 
@@ -229,8 +235,26 @@ export type Standing = "up" | "down" | "gone";
 const STANDING: Record<Standing, string> = { up: "↑", down: "↓", gone: "⊝" };
 
 const KeyRow = (mark: unknown, text: string) => html`${mark}<span>${text}</span>`;
-export const Key = ({ hues }: { hues: Map<string, string> }) => html`
-  <div class="rx-key">
+
+/** The key as a filter: what it hides, and a click on a row hides or shows it. */
+export interface KeyFilter {
+  off: ReadonlySet<string>;
+  onToggle(f: Filter): void;
+}
+
+/** A row of the key that filters: its mark and words, struck while hidden. */
+const FilterRow = (f: Filter, mark: unknown, text: string, filter?: KeyFilter) => {
+  if (!filter) return KeyRow(mark, text);
+  const off = filter.off.has(f);
+  const flip = (e: Event) => {
+    e.stopPropagation();
+    filter.onToggle(f);
+  };
+  return html`<button class=${`rx-krow${off ? " off" : ""}`} title=${off ? "Hidden: show it again" : "Hide these from the tree"} onPointerDown=${(e: Event) => e.stopPropagation()} onClick=${flip}>${mark}<span>${text}</span></button>`;
+};
+
+export const Key = ({ hues, filter }: { hues: Map<string, string>; filter?: KeyFilter }) => html`
+  <div class=${`rx-key${filter ? " filters" : ""}`}>
     ${KeyRow(html`<svg viewBox="0 0 14 10"><path class="rx-trail k-say" d="M1 5H13" style="stroke-opacity:1" /></svg>`, "said")}
     ${KeyRow(html`<svg viewBox="0 0 14 10"><path class="rx-trail k-fail" d="M1 5H13" style="stroke-opacity:1" /></svg>`, "refused · failed")}
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle class="k-write" cx="7" cy="5" r="4" /></svg>`, "acted")}
@@ -240,8 +264,10 @@ export const Key = ({ hues }: { hues: Map<string, string> }) => html`
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-failed" cx="7" cy="5" r="3.5" /></svg>`, "failed")}
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-quiet" cx="7" cy="5" r="3.5" /></svg>`, "quiet")}
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:none;stroke:${v("fg")};stroke-width:1.2`} /></svg>`, "trial")}
-    ${KeyRow(html`<svg viewBox="0 0 14 10"><path d="M1 5H8" style=${`stroke:${v("harness")};stroke-width:2`} /><circle cx="10" cy="5" r="3" style=${`fill:${v("harness")}`} /></svg>`, "orange: Claude Code gave it, not the map")}
-    ${CHANNELS.map((c) => KeyRow(html`<svg viewBox="0 0 14 10"><path transform="translate(7 5)" d=${shapePath(c.shape, 3.2)} style=${`fill:${v("dim")}`} /></svg>`, `${c.shape}: ${c.title}, ${c.doc}`))}
+    ${filter && html`<span class="rx-kh">show</span><span class="rx-kh">a click hides or shows</span>`}
+    ${FilterRow("map", html`<svg viewBox="0 0 14 10"><path d="M1 5H8" style=${`stroke:${v("say")};stroke-width:2`} /><circle cx="10" cy="5" r="3" style=${`fill:${v("owner")}`} /></svg>`, "the map's: what we supply", filter)}
+    ${FilterRow("harness", html`<svg viewBox="0 0 14 10"><path d="M1 5H8" style=${`stroke:${v("harness")};stroke-width:2`} /><circle cx="10" cy="5" r="3" style=${`fill:${v("harness")}`} /></svg>`, "orange: Claude Code gave it", filter)}
+    ${CHANNELS.map((c) => FilterRow(c.channel, html`<svg viewBox="0 0 14 10"><path transform="translate(7 5)" d=${shapePath(c.shape, 3.2)} style=${`fill:${v("dim")}`} /></svg>`, `${c.title}: ${c.key}`, filter))}
     ${[...hues].map(([p, c]) => KeyRow(html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3.5" style=${`fill:${c}`} /></svg>`, p === "words" ? "the map's words" : p === "grow" ? "learned" : p))}
   </div>
 `;
@@ -287,11 +313,13 @@ export interface CanvasProps {
   fires: { current?: Fire };
   onPick(node: string | undefined): void;
   showKey: boolean;
+  /** The key as a filter: its rows hide and show. */
+  keyFilter?: KeyFilter;
   /** Small, one of many: names show only on what is lit, said or picked. */
   small?: boolean;
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, small }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyFilter, small }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const fxGroup = useRef<SVGGElement>(null);
@@ -468,7 +496,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
         <g ref=${fxGroup}></g>
       </g></svg>
       ${tree.order.length === 1 && html`<div class="rx-empty">No nodes to show.</div>`}
-      ${showKey && html`<${Key} hues=${hues} />`}
+      ${showKey && html`<${Key} hues=${hues} filter=${keyFilter} />`}
     </div>
   `;
 };

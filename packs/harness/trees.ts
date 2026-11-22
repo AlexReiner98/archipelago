@@ -27,7 +27,7 @@ import type { NodeInfo, RunInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { sheet } from "../../spec/style.ts";
 import { placementText, placementTip, type Placement } from "./agents.ts";
-import { Canvas, type Fire, type Standing } from "./canvas.ts";
+import { Canvas, type Fire, type KeyFilter, type Standing } from "./canvas.ts";
 import { radial, treeOf, type Grouping } from "./layout.ts";
 import { stateAt } from "./replay.ts";
 
@@ -152,6 +152,9 @@ export interface TreesProps {
   onFocus(run: string): void;
   /** What the harness gave each agent, by run: read-only nodes hung into its tree (given.ts). */
   given?: Map<string, NodeInfo[]>;
+  /** The marks' key, over the agent in focus, and what it hides. */
+  showKey?: boolean;
+  keyFilter?: KeyFilter;
 }
 
 const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
@@ -172,7 +175,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
       ${a.placement && html`<span class="prof" title=${`${placementTip(a.placement)}${big && p.canPlace ? "\nMove it to another profile" : ""}`} onClick=${big ? (e: MouseEvent) => p.canPlace && p.onProfile(a.run.run, e) : undefined}>${placementText(a.placement)}${big && p.canPlace ? " ▾" : ""}</span>`}
       <span class="n" title=${`The nodes it hears, of all${extra?.length ? `; and ${extra.length} the harness gave it` : ""}`}>${a.hears ? (big ? `${heard.length} / ${p.nodes.length}` : heard.length) : ""}${extra?.length ? ` + ${extra.length}` : ""}</span>
     </div>
-    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${false} small=${!big} />
+    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyFilter=${p.keyFilter} small=${!big} />
   </div>`;
 };
 
