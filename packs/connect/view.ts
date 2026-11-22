@@ -9,7 +9,8 @@
  * - When the first run begins, a line in `over` says so, live, with the
  *   run's name: a click opens it in the harness view.
  * - On a guest map (the server's setup names `save`), a quiet "save" in
- *   `top` leads to where the guest signs up to keep it.
+ *   `top` leads to where the guest signs up to keep it, and with `signin`
+ *   a quiet "sign in" beside it, for someone who has an account.
  *
  * Injects action.invoke, exchange.read, exchange.watch, here.set,
  * slot.fill. Nothing here writes to the map.
@@ -54,6 +55,7 @@ const STYLE = sheet(`
   background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:var(--space-3) var(--space-4); box-shadow:0 2px 8px rgb(0 0 0 / 12%); }
 .cn-landed .x { overflow:hidden; text-overflow:ellipsis; min-width:0; font-weight:var(--bold); }
 .cn-save { color:var(--dim); text-decoration:none; font-size:var(--text-s); }
+.cn-save + .cn-save { margin-left:var(--space-3); }
 .cn-save:hover { color:var(--pick); }
 .cn-landed .f { flex:none; color:var(--dim); }
 .cn-landed .m::before { content:var(--glyph-circle-moving); color:var(--mark-moving); }
@@ -194,11 +196,11 @@ const connectView: Pack = {
       </div>`;
     };
 
-    /** On a guest map (the server names `save`): a quiet way to keep it, which leads to sign-up. */
+    /** On a guest map (the server names `save` or `signin`): a quiet way to keep it (sign-up), and one to sign in instead. */
     const Save = () => {
       const { made } = useFirst();
-      if (!made?.save) return null;
-      return html`<a class="cn-save" href=${made.save} title="This map is a guest's: sign up to keep it">save</a>`;
+      if (!made?.save && !made?.signin) return null;
+      return html`${made.signin && html`<a class="cn-save" href=${made.signin} title="Have an account? Sign in to it">sign in</a>`}${made.save && html`<a class="cn-save" href=${made.save} title="This map is a guest's: sign up to keep it">save</a>`}`;
     };
 
     ctx.effect(() => {

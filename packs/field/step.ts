@@ -1,16 +1,20 @@
 /**
  * The step: every behaviour that is on adds its push (the downhill slope of
- * its energy), times its weight; then each particle moves, its speed kept
- * by `friction`'s share less each step (easing to `friction_cool` as it cools).
+ * its energy), times its weight; then each particle moves by its push over
+ * its mass (one plus `mass_links` times its links, so a hub that feels all
+ * its springs at once does not shake), its speed kept by `friction`'s share
+ * less each step. Friction is low, so the run goes fast down long gentle
+ * slopes; when the particles as a whole move against the push (they
+ * overshot), every speed drops to nothing (`uphill_stop`), so it never
+ * swings.
  *
- * The run settles: it ends once particles move, on average, less than
- * `settle_move` a step, which is too little to see (or after `steps_most`).
- * Not a push left under some size: repel's Barnes-Hut is close to its
- * energy's slope, not on it, so a little push is always left over. Warmth (alpha) only caps how far a
- * particle may move in a step, `speed_most` times it: it starts at 1 and
- * cools to `alpha_min`, so the first steps may move far and the last move
- * gently, but no push is ever cooled away, so where it ends is where the
- * pushes balance. Steps are counted, not timed, from the seed, so the same
+ * The run settles: it ends once the mean push left on a particle is under
+ * `settle_push`, where the pushes balance (or after `steps_most`, and says
+ * so). Not by how little particles move: right after a speed drop they
+ * barely move while the push is still there. Warmth (alpha) only caps how
+ * far a particle may move in a step, `speed_most` times it: it starts at 1
+ * and cools to `alpha_min`, so the first steps may move far, but no push is
+ * ever cooled away. Steps are counted, not timed, from the seed, so the same
  * answer settles into the same picture on every machine; a new answer, a
  * drag or a dial warms it again.
  */
@@ -30,14 +34,15 @@ export const isOn = (b: Behaviour, S: Settings) => (S[`on_${b.name}`] ?? (b.on ?
 
 /** The run's own dials, beside each behaviour's. */
 export const RUN: Dial[] = [
-  { key: "settle_move", label: "settled under", min: 0.001, max: 1, step: 0.001, value: 0.05, doc: "The run ends once particles move less than this a step, on average, in world units: too little to see." },
+  { key: "settle_push", label: "settled under", min: 0.001, max: 1, step: 0.001, value: 0.02, doc: "The run ends once the mean push left on a particle is under this: the pushes balance." },
   { key: "steps_most", label: "steps at most", min: 100, max: 10000, step: 100, value: 3000, doc: "A run that has not settled by this many steps stops anyway, and says so." },
   { key: "alpha_decay", label: "cooling", min: 0.001, max: 0.1, step: 0.001, value: 0.012, doc: "How much warmth the run loses each step, until it is at 'coolest'." },
   { key: "alpha_min", label: "coolest", min: 0.01, max: 1, step: 0.01, value: 0.1, doc: "The least warmth: the slowest a particle may still move is 'fastest' times this." },
   { key: "alpha_warm", label: "rewarm to", min: 0, max: 1, step: 0.01, value: 0.25, doc: "How warm a change to the map, a drag or a dial makes the run again." },
   { key: "alpha_filter", label: "filter rewarms to", min: 0, max: 1, step: 0.01, value: 0.6, doc: "How warm a change to the legend's filter or the find line makes the run: the graph settles again with what is shown (1: from fully hot)." },
-  { key: "friction", label: "friction", min: 0, max: 0.95, step: 0.01, value: 0.15, doc: "The share of its speed a particle loses each step, while the run is warm." },
-  { key: "friction_cool", label: "friction cool", min: 0, max: 0.95, step: 0.01, value: 0.6, doc: "The friction once the run is at its coolest; between, it eases with the warmth. Friction never moves where the pushes balance, only how fast the run gets there, so a run that is nearly there stops trembling." },
+  { key: "friction", label: "friction", min: 0, max: 0.95, step: 0.01, value: 0.1, doc: "The share of its speed a particle loses each step. Low: fast down long gentle slopes ('stop uphill' keeps it from swinging)." },
+  { key: "mass_links", label: "mass per link", min: 0, max: 2, step: 0.05, value: 0.5, doc: "A particle's mass is one plus this times its links: a hub feels all its springs at once, so it is heavier and does not shake. Mass never moves where the pushes balance, only how the run gets there." },
+  { key: "uphill_stop", label: "stop uphill", min: 0, max: 1, step: 1, value: 1, choices: ["no", "yes"], doc: "When the particles as a whole move against the push (they overshot), every speed drops to nothing and the run goes on downhill from there: low friction without swinging." },
   { key: "speed_most", label: "fastest", min: 1, max: 100, step: 1, value: 30, doc: "At full warmth, no particle moves further than this in one step." },
   { key: "dt", label: "time per step", min: 0.1, max: 3, step: 0.05, value: 1, doc: "Physics time per step." },
   { key: "frame_ms", label: "ms per frame", min: 1, max: 40, step: 1, value: 12, then: "paint", doc: "How long each frame may spend stepping. Changes how fast it settles, not where." },
@@ -64,11 +69,11 @@ export function push(g: G, S: Settings, list: Behaviour[] = BEHAVIOURS): void {
   }
 }
 
-/** The whole energy: the behaviours' on, each times its weight, and the particles' speed (half of each squared). */
+/** The whole energy: the behaviours' on, each times its weight, and the particles' motion (half of each mass times its speed squared). */
 export function energy(g: G, S: Settings, list: Behaviour[] = BEHAVIOURS): number {
   let u = 0;
   for (const b of list) if (isOn(b, S)) u += b.energy(g, S) * (S[`w_${b.name}`] ?? 1);
-  for (let i = 0; i < g.n; i++) if (!g.fixed[i]) u += (g.vx[i]! ** 2 + g.vy[i]! ** 2 + g.vz[i]! ** 2) / 2;
+  for (let i = 0; i < g.n; i++) if (!g.fixed[i]) u += ((1 + S.mass_links! * g.degree[i]!) * (g.vx[i]! ** 2 + g.vy[i]! ** 2 + g.vz[i]! ** 2)) / 2;
   return u;
 }
 
@@ -85,17 +90,26 @@ export function step(g: G, S: Settings, list: Behaviour[] = BEHAVIOURS): number 
     sim.settled = false;
     return 0;
   }
-  const cool = Math.min(1, Math.max(0, (1 - sim.alpha) / Math.max(1e-9, 1 - S.alpha_min!)));
-  const dt = S.dt!, keep = 1 - (S.friction! + (S.friction_cool! - S.friction!) * cool), most = S.speed_most! * Math.max(sim.alpha, S.alpha_min!);
+  const dt = S.dt!, keep = 1 - S.friction!, most = S.speed_most! * Math.max(sim.alpha, S.alpha_min!);
+  // Uphill: where the run as a whole moves against the push, it has overshot; with `uphill_stop` on, every speed is
+  // dropped and it starts down again from where it is. So friction can stay low (fast down long gentle slopes) and
+  // still never swing back and forth.
+  if (S.uphill_stop) {
+    let power = 0;
+    for (let i = 0; i < n; i++) power += g.vx[i]! * total.x[i]! + g.vy[i]! * total.y[i]! + g.vz[i]! * total.z[i]!;
+    if (power < 0) (g.vx.fill(0), g.vy.fill(0), g.vz.fill(0));
+  }
   let energy = 0, moved = 0;
   for (let i = 0; i < n; i++) {
     if (g.fixed[i]) {
       g.vx[i] = g.vy[i] = g.vz[i] = 0;
       continue;
     }
-    let vx = (g.vx[i]! + total.x[i]! * dt) * keep;
-    let vy = (g.vy[i]! + total.y[i]! * dt) * keep;
-    let vz = (g.vz[i]! + total.z[i]! * dt) * keep;
+    // Heavier with its links: a hub feels every one of its springs at once, and would shake if it were as light as a leaf.
+    const m = 1 + S.mass_links! * g.degree[i]!;
+    let vx = (g.vx[i]! + (total.x[i]! / m) * dt) * keep;
+    let vy = (g.vy[i]! + (total.y[i]! / m) * dt) * keep;
+    let vz = (g.vz[i]! + (total.z[i]! / m) * dt) * keep;
     const sp = Math.hypot(vx, vy, vz) * dt;
     if (sp > most) (vx *= most / sp), (vy *= most / sp), (vz *= most / sp);
     g.vx[i] = vx;
@@ -112,8 +126,8 @@ export function step(g: G, S: Settings, list: Behaviour[] = BEHAVIOURS): number 
   sim.energy = energy / Math.max(1, n);
   moved /= Math.max(1, free);
   sim.moved = moved;
-  // Settled: nothing moves enough to see. Never on the first step of a run, when nothing has had a push yet.
-  sim.settled = moved < S.settle_move! && sim.steps > (sim.from ?? 0) + 1;
+  // Settled: the pushes balance. Never on the first step of a run.
+  sim.settled = left < S.settle_push! && sim.steps > (sim.from ?? 0) + 1;
   return sim.settled ? 0 : Math.max(moved, 1e-9);
 }
 

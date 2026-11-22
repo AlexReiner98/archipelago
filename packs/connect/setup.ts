@@ -27,6 +27,8 @@ export interface Where {
   name?: string;
   /** On a guest map: where the guest goes to keep it (sign-up). */
   save?: string;
+  /** On a guest map: where someone with an account signs in instead. */
+  signin?: string;
   /** Where a hook script is served (`<origin>/hook.ts`): the hooks are then one command that fetches it and wires it in. */
   script?: string;
   /** Where the page asks for a token (a path, POST `{name}` → `{name, token}`), instead of `connect.token`. */
@@ -44,6 +46,8 @@ export interface Setup {
   mcpUrl: string;
   /** On a guest map: where the guest goes to keep it. */
   save?: string;
+  /** On a guest map: where someone with an account signs in instead. */
+  signin?: string;
   /** With a served script: one command for a terminal that fetches it to ~/.archipelago/hook.ts and merges the hooks into ~/.claude/settings.json. */
   install?: string;
   /** Where the page asks for a token, when not through `connect.token`. */
@@ -68,6 +72,7 @@ export function setup(w: Where): Setup {
     hookUrl: w.hook,
     mcpUrl: w.mcp,
     ...(w.save ? { save: w.save } : {}),
+    ...(w.signin ? { signin: w.signin } : {}),
     ...(w.script ? { install: install(w.script, w.hook, w.token) } : {}),
     ...(w.tokenAt ? { tokenAt: w.tokenAt } : {}),
   };

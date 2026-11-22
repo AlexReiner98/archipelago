@@ -3,7 +3,8 @@
 Page side: the map as particles, the view "Landscape" (the world every agent's sensory interface
 touches) in the frame's `center` (home). Each item is a particle in its type's colour and its base's shape,
 and links are faint lines with arrows. It lays out the whole map, open and
-closed, up to `field_limit` items, less what the legend hides; while the
+closed, up to `field_limit` items, less what the legend hides (closed
+items, to start with); while the
 find line has words, only what it finds and what lies near it.
 
 - **No groups.** The map has no islands, and Field knows none: clusters
@@ -14,13 +15,15 @@ find line has words, only what it finds and what lies near it.
   energy of its own (`energy`), and its push is that energy's downhill
   slope (`apply`) ([behaviour.ts](behaviour.ts)). [step.ts](step.ts) sums
   the pushes of the behaviours that are on, each times its weight, and
-  moves the particles. So the run's whole energy falls step by step, and
-  the run ends when particles move less than `settle_move` a step: where
-  the pushes balance, not where it cooled. Warmth only caps how far a
-  particle may move in a step, and friction eases from `friction` to
-  `friction_cool` as it cools, so a run that is nearly there stops
-  trembling. The run line says `settled`, or `stopped` when it hit
-  `steps_most` first.
+  moves each particle by its push over its mass (one plus `mass_links`
+  times its links: a hub feels all its springs at once, and would shake as
+  light as a leaf). So the run's whole energy falls step by step, and the
+  run ends when the mean push left on a particle is under `settle_push`:
+  where the pushes balance, not where it cooled or slowed. Friction is low
+  (fast down long gentle slopes), and when the particles as a whole move
+  against the push every speed drops to nothing (`uphill_stop`), so it
+  never swings. Warmth only caps how far a particle may move in a step.
+  The run line says `settled`, or `stopped` when it hit `steps_most` first.
 - **The rule is checked, not trusted.** [descends.ts](descends.ts) checks a
   behaviour: its push against its energy's measured slope at a few
   particles, and its energy step by step with gather, warmth held. The
@@ -45,7 +48,9 @@ find line has words, only what it finds and what lies near it.
   full, and `find_faint` links further, drawn faint (`query_fade`); the
   rest of the map leaves the layout and what is kept settles again
   (`alpha_filter`). The view goes to what it finds (`find_follow_ms`).
-  What it finds is drawn whole, closed or not, and named first.
+  What it finds is drawn whole, closed or not, and named first; the
+  legend's open and closed switches do not apply while it has words, so a
+  plan shows its done steps.
 - **Shapes** ([shapes.ts](shapes.ts)). A particle is its base's mark shape
   (spec/style.ts: square, diamond, circle, triangle), each the area of its
   circle: hollow while its status is the first open one, half (◐, one
@@ -66,8 +71,11 @@ find line has words, only what it finds and what lies near it.
   and kinds, open and closed, items with no links, and each link type as a
   switch, with how many the map has and how many show. What is hidden is
   left out of the layout and the graph settles again with what is shown.
-  What is hidden is `field.hide` (page scope). `dials` opens the run line
-  and every dial, in the same box, the same size.
+  What is hidden is `field.hide` (page scope); it starts with closed items
+  hidden, so Field opens on the work still open, and `show all` shows
+  everything (kept as `{}`). `dials` opens every dial,
+  in the same box, the same size, with how the run is going last, closed
+  (`state`).
 - **Titles** ([labels.ts](labels.ts)). Placed in order: the particle
   pointed at and its neighbours, what the find line finds, what was named
   last frame (so names hold still while it settles), the most linked
@@ -95,6 +103,7 @@ find line has words, only what it finds and what lies near it.
 - It only shows: nothing here writes to the map.
 
 On the live map's copy (943 items, about 1,900 links) a run settles in about
-1,800 to 3,000 steps at about 5 ms each (node); 600 sample items settle in
-about 2,600 steps (`test/field.test.ts`). The physics is ported from the old
+1,350 steps at about 5 ms each (node), and its 391 open items in about 1,100
+in the browser; 600 sample items settle in about 2,300 steps
+(`test/field.test.ts`). The physics is ported from the old
 map's Field layout (14 Nov 2026), without its islands, untangle and plane.

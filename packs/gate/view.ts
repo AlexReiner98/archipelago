@@ -27,10 +27,10 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 const SETUP = "gate.setup";
 
 const STYLE = sheet(`
-.gt { position:fixed; inset:0; z-index:20; overflow:auto; display:flex; background:var(--bg); color:var(--fg); pointer-events:auto; }
+.gt-gate { position:fixed; inset:0; z-index:20; overflow:auto; display:flex; background:var(--bg); color:var(--fg); pointer-events:auto; }
 .gt-col { box-sizing:border-box; width:100%; max-width:calc(var(--frame-right) + 2 * var(--space-5)); margin:auto; padding:var(--space-5) var(--space-5) calc(6 * var(--space-5)); display:flex; flex-direction:column; gap:var(--space-4); }
 .gt-mark { align-self:center; width:calc(4 * var(--space-5)); height:calc(4 * var(--space-5)); border-radius:var(--radius); }
-.gt h1 { margin:0 0 var(--space-3); text-align:center; font-size:var(--text-l); font-weight:var(--bold); }
+.gt-gate h1 { margin:0 0 var(--space-3); text-align:center; font-size:var(--text-l); font-weight:var(--bold); }
 .gt-in { box-sizing:border-box; width:100%; min-width:0; font:inherit; color:var(--control-fg); background:var(--control); border:1px solid var(--dim); border-radius:var(--radius); padding:var(--space-4); }
 .gt-in:focus, .gt-way:focus-visible { outline:1px solid var(--pick); outline-offset:0; border-color:var(--pick); }
 .gt-way { box-sizing:border-box; width:100%; display:flex; align-items:center; justify-content:center; gap:var(--space-3); padding:var(--space-4); font:inherit; color:var(--fg); background:none; border:1px solid var(--dim); border-radius:var(--radius); cursor:pointer; white-space:nowrap; }
@@ -46,7 +46,7 @@ const STYLE = sheet(`
 .gt-show { position:relative; }
 .gt-show > .gt-in { padding-right:calc(4 * var(--space-5)); }
 .gt-show > .gt-link { position:absolute; right:var(--space-4); top:50%; transform:translateY(-50%); font-size:var(--text-s); }
-.gt-link, .gt a { color:var(--fg); background:none; border:0; padding:0; font:inherit; cursor:pointer; text-decoration:underline; text-decoration-color:var(--dim); text-underline-offset:var(--space-1); }
+.gt-link, .gt-gate a { color:var(--fg); background:none; border:0; padding:0; font:inherit; cursor:pointer; text-decoration:underline; text-decoration-color:var(--dim); text-underline-offset:var(--space-1); }
 .gt-foot { margin:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .gt-foot .gt-link + .gt-link { margin-left:var(--space-4); }
 .gt-dim { color:var(--dim); }
@@ -133,7 +133,7 @@ const gateView: Pack = {
         PKC.isConditionalMediationAvailable?.().then((yes) => void (yes && passkey(stop.signal).catch(() => undefined)), () => undefined);
         return () => stop.abort();
       }, [offer]);
-      if (!offer) return html`<div class="gt"><div class="gt-col"><div class="gt-err">${error}</div></div></div>`;
+      if (!offer) return html`<div class="gt-gate"><div class="gt-col"><div class="gt-err">${error}</div></div></div>`;
 
       const step = async (s: Step) => {
         setBusy(true);
@@ -173,7 +173,7 @@ const gateView: Pack = {
       const done = screen === "sign-up" ? "Sign up" : "Sign in";
       // One button, as on most sign-in pages: a password typed signs in, a code typed is traded, else a code is mailed.
       const label = !mail?.code || pw || typedCode ? done : sent ? "Send again" : "Email me a code";
-      return html`<div class="gt" role="dialog" aria-label=${offer.title}><form class="gt-col" onSubmit=${submit}>
+      return html`<div class="gt-gate" role="dialog" aria-label=${offer.title}><form class="gt-col" onSubmit=${submit}>
         ${offer.emblem && html`<img class="gt-mark" src=${offer.emblem} alt="" />`}
         <h1>${offer.title}</h1>
         ${offer.agree &&

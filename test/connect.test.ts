@@ -70,6 +70,8 @@ test("a guest map's setup says where to save it; any other says nothing", () => 
   const base = { hook: "h", mcp: "m", command: "c", token: false };
   assert.equal(setup({ ...base, save: "/signup?save=1" }).save, "/signup?save=1");
   assert.ok(!("save" in setup(base)));
+  assert.equal(setup({ ...base, signin: "#gate/sign-in" }).signin, "#gate/sign-in");
+  assert.ok(!("signin" in setup(base)));
 });
 
 test("the local command runs this checkout's hook script", () => {

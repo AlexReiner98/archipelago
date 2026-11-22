@@ -9,7 +9,7 @@
  *   less what the legend hides. While the find line (`find.query`) has
  *   words, only what it finds and what lies near it (`find_steps`, then
  *   `find_faint`) stay, settled again and fitted to the view.
- * - The legend's "dials" tab: the run line and every dial. Each
+ * - The legend's "dials" tab: every dial, and the run's state last. Each
  *   behaviour, and every number it reads, is one. Their values are `field.dials` and what the
  *   legend hides is `field.hide` (both page scope), so an agent can set
  *   them; this browser also remembers them.
@@ -65,6 +65,8 @@ const QUERY = "find.query";
 const REMEMBER = "archipelago.field.dials";
 const HIDE = "field.hide";
 const REMEMBER_HIDE = "archipelago.field.hide";
+/** What the legend hides until someone says otherwise: closed items, so Field opens on the work still open. */
+export const HIDE_START: Hide = { closed: true };
 
 /** Field's view in `center`, as the frame names it in `here.view`. */
 export const VIEW = "field/field";
@@ -115,10 +117,11 @@ const fieldPack: Pack = {
     const set = ctx.get<HereSet>("here.set");
     const declare = ctx.get<HereDeclare>("here.declare");
     declare.declare({ key: DIALS, scope: "page", doc: "The field's dials that differ from where they start, by key." });
-    declare.declare({ key: HIDE, scope: "page", doc: "What the field's legend hides: types, type:status, type:kind, open, closed, links, lone. The layout is what is left." });
+    declare.declare({ key: HIDE, scope: "page", doc: "What the field's legend hides: types, type:status, type:kind, open, closed, links, lone. The layout is what is left. Absent: closed items ({ closed: true }); {} hides nothing." });
     for (const [key, kept] of [[DIALS, REMEMBER], [HIDE, REMEMBER_HIDE]] as const) {
       const v = here.get(key) === undefined ? recall(kept) : undefined;
-      if (v && Object.keys(v).length) set.set(key, v);
+      // A kept {} for what is hidden still says something: show everything, not the start.
+      if (v && (Object.keys(v).length || key === HIDE)) set.set(key, v);
     }
 
 
@@ -207,24 +210,28 @@ const fieldPack: Pack = {
       const input = useMemo<FieldIn>(() => inputOf(result), [shape]);
 
       // What the legend hides is left out of the layout: a change to it settles the graph again with what is left.
-      const hide = (useHere<Json>(HIDE) ?? {}) as Hide;
+      const hide = (useHere<Json>(HIDE) ?? HIDE_START) as Hide;
       const hideKey = JSON.stringify(hide);
       const [styled, restyle] = useState(0);
       useEffect(() => onStyle(() => restyle((n) => n + 1)), []);
       const facets = useMemo(() => facetsOf(input, hide, palette()), [input, hideKey, styled]);
+      // While the find line has words, open and closed are not switched: a plan shows its done steps beside the rest.
       const visible = useMemo<FieldIn>(() => {
-        if (!Object.keys(hide).length) return input;
-        const vis = shown(input, hide);
+        const { open: _open, closed: _closed, ...kept } = hide;
+        const by = found ? kept : hide;
+        if (!Object.keys(by).length) return input;
+        const vis = shown(input, by);
         return { items: input.items.filter((it) => vis.items.has(it.id)), links: input.links.filter((l) => vis.links.has(l.id)), types: input.types };
-      }, [input, hideKey]);
+      }, [input, hideKey, !!found]);
       // While the find line has words, only what it finds and what lies near it stay: each by how it is drawn.
       const levels = useMemo(() => (found ? around(visible, found, S.find_steps!, S.find_faint!) : null), [visible, found, S.find_steps, S.find_faint]);
       const laid = useMemo<FieldIn>(() => {
         if (!levels) return visible;
         return { items: visible.items.filter((it) => levels.has(it.id)), links: visible.links.filter((l) => levels.has(l.from) && levels.has(l.to)), types: visible.types };
       }, [visible, levels]);
+      // Kept as it is, {} included (show everything); only the start is absent.
       const setHide = (next: Hide | undefined) => {
-        const v = next && Object.keys(next).length ? (next as Json) : undefined;
+        const v = (next ?? {}) as Json;
         remember(REMEMBER_HIDE, v);
         set.set(HIDE, v);
       };
@@ -285,7 +292,7 @@ const fieldPack: Pack = {
       `;
     };
 
-    /** The legend's dials tab: the run line and every dial. */
+    /** The legend's dials tab: every dial, and the run's state last, closed. */
     const Dials = () => {
       const version = useVersion();
       const q = useHere<string>(QUERY) ?? "";
