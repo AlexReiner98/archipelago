@@ -23,7 +23,7 @@ background, picking none, brings the previews back.
 
 Kept quiet: the run picker, the live dot and the ✓ ✕ ○ tally. The profile
 looked at, how the tree hangs (place, channel, pack, profile), nodes never said,
-the harness's given nodes, the key and the view's dials ([dials.ts](dials.ts), ↺ to put one back)
+the harness's given nodes and the view's dials ([dials.ts](dials.ts), ↺ to put one back)
 are in one ⋯ menu.
 
 ## Picking
@@ -124,8 +124,11 @@ A step of the playhead runs a light from the root to its node (red for a
 refusal), or sparks on the bough of an act's place (amber, red when it
 failed). Under reduced motion only the names light. Drag to move, wheel to
 zoom, double-click to fit; a press picks a node by its name, or anywhere
-within 22 px of its dot (`HIT_PX`); "key" ([key.ts](key.ts)) shows the marks, over one run's
-tree or the agent in focus. The key doubles as a filter: a click on a
+within 22 px of its dot (`HIT_PX`). The key ([key.ts](key.ts)) is always
+there, bottom left of one run's tree or the agent in focus: open, every
+mark with its words, or collapsed by its head ("key ▾") to one line of the
+marks that filter; the browser remembers which. The key doubles as a
+filter, open or collapsed: a click on a
 channel's row, on "the map's", or on Claude Code's orange hides those nodes
 from the trees (struck while hidden), and a second click shows them again
 (`shows`, [channels.ts](channels.ts)). Claude Code's row is the same switch

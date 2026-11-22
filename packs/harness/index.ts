@@ -55,6 +55,9 @@ import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
 
+/** Where the browser remembers whether the key is open. */
+const KEY_OPEN = "harness.key-open";
+
 /** How long a step lasts when the run plays, in ms. */
 const STEP = 260;
 
@@ -225,7 +228,20 @@ const harness: Pack = {
       const review = kp.useReview();
       const [by, setBy] = useState<Grouping>("place");
       const [unsaid, setUnsaid] = useState(false);
-      const [showKey, setShowKey] = useState(false);
+      // The key is always there: open, or collapsed to one line; the browser remembers which.
+      const [keyOpen, setKeyOpenState] = useState(() => {
+        try {
+          return localStorage.getItem(KEY_OPEN) !== "0";
+        } catch {
+          return true;
+        }
+      });
+      const setKeyOpen = (open: boolean) => {
+        setKeyOpenState(open);
+        try {
+          localStorage.setItem(KEY_OPEN, open ? "1" : "0");
+        } catch {}
+      };
       const [playing, setPlaying] = useState(false);
       const [menu, setMenu] = useState<{ run: string; x: number; y: number; error?: string }>();
       const canPlace = hk.useHas("profile.place");
@@ -373,8 +389,8 @@ const harness: Pack = {
         <div class="hv-view">
           <${Bar}
             runs=${runs} live=${live} all=${all} pinned=${pinned} info=${info} sum=${sum} profile=${profile} profiles=${profileList}
-            by=${by} hidden=${tree.hidden} unsaid=${unsaid} showKey=${showKey}
-            onBy=${setBy} onUnsaid=${setUnsaid} onKey=${setShowKey}
+            by=${by} hidden=${tree.hidden} unsaid=${unsaid}
+            onBy=${setBy} onUnsaid=${setUnsaid}
             given=${hasGiven ? shownGiven.length : undefined} showGiven=${showGiven} onGiven=${setShowGiven}
             onRun=${(val: string) => {
               set.set(KEYS.event, undefined);
@@ -399,9 +415,9 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${showKey} keyFilter=${keyFilter} />`
+              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} />`
               : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
-                  <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} keyFilter=${keyFilter} />
+                  <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} />
                   ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} /></div>`}
                 </div>`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}

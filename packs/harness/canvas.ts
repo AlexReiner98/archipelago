@@ -97,6 +97,13 @@ export const CANVAS_STYLE = sheet(`
 .rx-key .rx-krow:hover > span { color:var(--fg); }
 .rx-key .rx-krow.off > * { opacity:.35; } .rx-key .rx-krow.off > span { text-decoration:line-through; }
 .rx-key .rx-kh { color:var(--dim); font-size:var(--text-xs); }
+.rx-key .rx-kfull { grid-column:1 / -1; }
+.rx-key .rx-khead { font:inherit; font-size:var(--text-xs); background:none; border:0; padding:0; color:var(--dim); cursor:pointer; }
+.rx-key .rx-khead:hover { color:var(--fg); }
+.rx-key.closed { display:flex; gap:var(--space-3); align-items:center; white-space:nowrap; }
+.rx-key .rx-kmark { display:inline-flex; background:none; border:0; padding:0; cursor:pointer; }
+.rx-key .rx-kmark.off { opacity:.3; }
+.rx-key .rx-kmark:hover { filter:brightness(1.4); }
 .rx-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); pointer-events:none; }
 `);
 
@@ -276,14 +283,18 @@ export interface CanvasProps {
   picked?: string;
   fires: { current?: Fire };
   onPick(node: string | undefined): void;
+  /** This tree has the key: the big one, or one run's. */
   showKey: boolean;
+  /** The key open (every mark with its words), else collapsed to one line. */
+  keyOpen?: boolean;
+  onKeyOpen?(open: boolean): void;
   /** The key as a filter: its rows hide and show. */
   keyFilter?: KeyFilter;
   /** Small, one of many: names show only on what is lit, said or picked. */
   small?: boolean;
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyFilter, small }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const fxGroup = useRef<SVGGElement>(null);
@@ -460,7 +471,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
         <g ref=${fxGroup}></g>
       </g></svg>
       ${tree.order.length === 1 && html`<div class="rx-empty">No nodes to show.</div>`}
-      ${showKey && html`<${Key} hues=${hues} filter=${keyFilter} />`}
+      ${showKey && html`<${Key} hues=${hues} filter=${keyFilter} open=${keyOpen ?? true} onOpen=${onKeyOpen} />`}
     </div>
   `;
 };

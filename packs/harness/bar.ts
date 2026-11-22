@@ -1,7 +1,7 @@
 /**
  * The Sensory interface's bar, kept quiet: the run picker (every live run, every
  * run, or one), the live dot and the verdict tally in sight; the rest (the
- * profile looked at, how the tree hangs, nodes never said, the key, and the
+ * profile looked at, how the tree hangs, nodes never said, Claude Code's given nodes, and the
  * view's dials) in one ⋯ menu.
  */
 import { h } from "preact";
@@ -41,13 +41,11 @@ export interface BarProps {
   by: Grouping;
   hidden: number;
   unsaid: boolean;
-  showKey: boolean;
   /** "live", "*" (every run), "" (the last active) or a run id. */
   onRun(value: string): void;
   onProfile(id: string | undefined): void;
   onBy(by: Grouping): void;
   onUnsaid(on: boolean): void;
-  onKey(on: boolean): void;
   /** How many nodes the harness gave the agents shown; absent when nothing reads transcripts. */
   given?: number;
   showGiven?: boolean;
@@ -80,7 +78,7 @@ export const Bar = (p: BarProps) => {
       ${p.profile && html`<span class="hv-dim hv-cut" title="The profile looked at: what it holds back">in ${p.profiles.find((x) => x.id === p.profile)?.title ?? p.profile}</span>`}
       <span class="sp"></span>
       <span class="hv-more" ref=${more}>
-        <button class=${open ? "on" : ""} title="Profile, grouping, key, dials" onClick=${() => setOpen(!open)}>⋯</button>
+        <button class=${open ? "on" : ""} title="Profile, grouping, what shows, dials" onClick=${() => setOpen(!open)}>⋯</button>
         ${open && html`<div class="hv-menu">
           <label class="row" title="A profile: what it holds back, over every run's totals"><span class="k">profile</span>
             <select class="hv-select" value=${p.profile ?? ""} onChange=${(e: Event) => p.onProfile((e.target as HTMLSelectElement).value || undefined)}>
@@ -91,7 +89,6 @@ export const Bar = (p: BarProps) => {
           <span class="row" title="How the tree hangs its nodes"><span class="k">hang by</span>${groupings.map((g, i) => html`${i > 0 && html`<span>·</span>`}<button class=${p.by === g ? "on" : ""} onClick=${() => p.onBy(g)}>${g}</button>`)}</span>
           ${p.by === "place" && html`<span class="row" title="Nodes with no place: kept, never said"><span class="k">show</span><button class=${p.unsaid ? "on" : ""} onClick=${() => p.onUnsaid(!p.unsaid)}>never said${p.hidden > 0 ? ` · ${p.hidden}` : ""}</button></span>`}
           ${p.given !== undefined && html`<span class="row" title="What the harness gave the agent (system prompt, tools, MCP instructions, listings, other hooks), read from its transcript: read only"><span class="k">given</span><button class=${p.showGiven ? "on" : ""} onClick=${() => p.onGiven?.(!p.showGiven)}>by the harness${p.showGiven && p.given > 0 ? ` · ${p.given}` : ""}</button></span>`}
-          <span class="row"><span class="k">marks</span><button class=${p.showKey ? "on" : ""} onClick=${() => p.onKey(!p.showKey)} title="What the marks mean">key</button></span>
           ${p.more}
         </div>`}
       </span>
