@@ -8,8 +8,8 @@
  * overshot), every speed drops to nothing (`uphill_stop`), so it never
  * swings.
  *
- * The run settles: it ends once the mean push left on a particle is under
- * `settle_push`, where the pushes balance (or after `steps_most`, and says
+ * The run settles: it ends once the push left is under `settle_push` on
+ * `settle_share` of the particles, where the pushes balance (or after `steps_most`, and says
  * so). Not by how little particles move: right after a speed drop they
  * barely move while the push is still there. Warmth (alpha) only caps how
  * far a particle may move in a step, `speed_most` times it: it starts at 1
@@ -34,7 +34,8 @@ export const isOn = (b: Behaviour, S: Settings) => (S[`on_${b.name}`] ?? (b.on ?
 
 /** The run's own dials, beside each behaviour's. */
 export const RUN: Dial[] = [
-  { key: "settle_push", label: "settled under", min: 0.001, max: 1, step: 0.001, value: 0.02, doc: "The run ends once the mean push left on a particle is under this: the pushes balance." },
+  { key: "settle_push", label: "settled under", min: 0.001, max: 1, step: 0.001, value: 0.02, doc: "A particle is at rest once the push left on it is under this." },
+  { key: "settle_share", label: "settled share", min: 0.5, max: 1, step: 0.01, value: 0.98, doc: "The run ends once this share of the particles is at rest. Not the mean: a few hundred leaves at rest would hide a cluster still on its way." },
   { key: "steps_most", label: "steps at most", min: 100, max: 10000, step: 100, value: 3000, doc: "A run that has not settled by this many steps stops anyway, and says so." },
   { key: "alpha_decay", label: "cooling", min: 0.001, max: 0.1, step: 0.001, value: 0.012, doc: "How much warmth the run loses each step, until it is at 'coolest'." },
   { key: "alpha_min", label: "coolest", min: 0.01, max: 1, step: 0.01, value: 0.1, doc: "The least warmth: the slowest a particle may still move is 'fastest' times this." },
@@ -82,8 +83,14 @@ export function step(g: G, S: Settings, list: Behaviour[] = BEHAVIOURS): number 
   const sim = g.sim, n = g.n;
   push(g, S, list);
   const total = g.total;
-  let left = 0, free = 0;
-  for (let i = 0; i < n; i++) if (!g.fixed[i]) (left += Math.hypot(total.x[i]!, total.y[i]!, total.z[i]!)), free++;
+  let left = 0, free = 0, rest = 0;
+  for (let i = 0; i < n; i++) {
+    if (g.fixed[i]) continue;
+    const p = Math.hypot(total.x[i]!, total.y[i]!, total.z[i]!);
+    left += p;
+    free++;
+    if (p < S.settle_push!) rest++;
+  }
   left /= Math.max(1, free);
   sim.push = left;
   if (sim.steps >= (sim.from ?? 0) + S.steps_most!) {
@@ -126,8 +133,8 @@ export function step(g: G, S: Settings, list: Behaviour[] = BEHAVIOURS): number 
   sim.energy = energy / Math.max(1, n);
   moved /= Math.max(1, free);
   sim.moved = moved;
-  // Settled: the pushes balance. Never on the first step of a run.
-  sim.settled = left < S.settle_push! && sim.steps > (sim.from ?? 0) + 1;
+  // Settled: the pushes balance on all but a few particles. Never on the first step of a run.
+  sim.settled = rest >= (S.settle_share ?? 1) * free && sim.steps > (sim.from ?? 0) + 1;
   return sim.settled ? 0 : Math.max(moved, 1e-9);
 }
 

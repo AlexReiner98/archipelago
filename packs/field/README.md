@@ -18,7 +18,8 @@ find line has words, only what it finds and what lies near it.
   moves each particle by its push over its mass (one plus `mass_links`
   times its links: a hub feels all its springs at once, and would shake as
   light as a leaf). So the run's whole energy falls step by step, and the
-  run ends when the mean push left on a particle is under `settle_push`:
+  run ends when the push left is under `settle_push` on `settle_share` of
+  the particles (not the mean, which a crowd of resting leaves pulls down):
   where the pushes balance, not where it cooled or slowed. Friction is low
   (fast down long gentle slopes), and when the particles as a whole move
   against the push every speed drops to nothing (`uphill_stop`), so it

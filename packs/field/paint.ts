@@ -223,12 +223,31 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   const partOf = g.linkKinds.indexOf("part_of");
   const fade = (i: number) => (match && match[i] === FAINT ? S.query_fade! : 1);
   const full = (i: number) => (match ? (match[i] !== FAINT ? 1 : 0) : 1);
-  // An arrowhead at a link's `to`, its tip on that particle's edge: added to a path, filled after the lines.
+  // Lit particles grow, only into the room round them (drawn after the links); the one pointed at also has a
+  // ring. Their drawn edge is known first, so an arrowhead at one ends there rather than under it.
+  let rmax = 0;
+  for (let i = 0; i < g.n; i++) rmax = Math.max(rmax, g.r[i]!);
+  const gap = S.collide_gap ?? 1;
+  const grown = new Map<number, number>();
+  for (const i of shining) {
+    const want = g.r[i]! * (1 + shine[i]! * (i === focus ? S.hover_grow! : S.hover_grow! / 3));
+    let room = want;
+    const reach = want + rmax + gap;
+    grid.each(g.x[i]! - reach, g.y[i]! - reach, g.x[i]! + reach, g.y[i]! + reach, (j) => {
+      if (j === i) return;
+      const d = Math.hypot(g.x[j]! - g.x[i]!, g.y[j]! - g.y[i]!), free = d - g.r[i]! - g.r[j]! - gap / 2;
+      room = Math.min(room, g.r[i]! + (shine[j]! > 0 ? free / 2 : free));
+    });
+    grown.set(i, Math.max(g.r[i]!, room));
+  }
+  const ringOf = (i: number, rr: number) => (i === focus && S.hover_ring! > 0 ? Math.min(S.hover_ring! / cam.k, rr / 2) : 0);
+  // An arrowhead at a link's `to`, its tip on that particle's edge as drawn: added to a path, filled after the lines.
   const alen = S.arrow_px! / cam.k, awide = (S.arrow_px! * 2) / 3 / cam.k, afrom = S.arrow_from_px! / cam.k;
   const head = (path: Path2D, e: number) => {
     const a = g.a[e]!, b = g.b[e]!, dx = g.x[a]! - g.x[b]!, dy = g.y[a]! - g.y[b]!;
     if (Math.hypot(dx, dy) < afrom) return;
-    const back = g.r[b]! * (S.shapes ? edge(g.shape[b]!, Math.atan2(dy, dx)) : 1);
+    const rb = grown.get(b) ?? g.r[b]!;
+    const back = (rb + ringOf(b, rb)) * (S.shapes ? edge(g.shape[b]!, Math.atan2(dy, dx)) : 1);
     const p = arrow(g.x[a]!, g.y[a]!, g.x[b]!, g.y[b]!, back, alen, awide);
     path.moveTo(p[0], p[1]);
     path.lineTo(p[2], p[3]);
@@ -289,25 +308,14 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
       }
     }
   }
-  // Lit particles over the faded rest: each grows, only into the room round it; the one pointed at gets a ring.
-  let rmax = 0;
-  for (let i = 0; i < g.n; i++) rmax = Math.max(rmax, g.r[i]!);
-  const gap = S.collide_gap ?? 1;
+  // Lit particles over the faded rest, at the size worked out above; the one pointed at gets a ring.
   for (const i of shining) {
-    const want = g.r[i]! * (1 + shine[i]! * (i === focus ? S.hover_grow! : S.hover_grow! / 3));
-    let room = want;
-    const reach = want + rmax + gap;
-    grid.each(g.x[i]! - reach, g.y[i]! - reach, g.x[i]! + reach, g.y[i]! + reach, (j) => {
-      if (j === i) return;
-      const d = Math.hypot(g.x[j]! - g.x[i]!, g.y[j]! - g.y[i]!), free = d - g.r[i]! - g.r[j]! - gap / 2;
-      room = Math.min(room, g.r[i]! + (shine[j]! > 0 ? free / 2 : free));
-    });
-    const rr = Math.max(g.r[i]!, room);
+    const rr = grown.get(i)!;
     c.globalAlpha = shine[i]!;
     c.fillStyle = g.types[g.typeIx[i]!]!.colour;
     particle(c, g, i, rr, S, cam.k, ink.sea);
     if (i === focus && S.hover_ring! > 0) {
-      const lw = Math.min(S.hover_ring! / cam.k, rr / 2);
+      const lw = ringOf(i, rr);
       c.strokeStyle = ink.accent;
       c.lineWidth = lw;
       c.lineJoin = "round";
