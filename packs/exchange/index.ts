@@ -84,9 +84,10 @@ export class Log {
     if (!begins.length) return undefined;
     const first = begins[0]!.detail as unknown as RunInfo;
     const merged = Object.assign({}, ...begins.map((b) => b.detail)) as RunInfo;
-    const last = list.lastIndexOf(begins[begins.length - 1]!);
-    const end = list.slice(last + 1).find((e) => e.kind === "end");
-    return { ...merged, started: first.started, ...(end ? { ended: end.time } : {}) };
+    const begun = list.lastIndexOf(begins[begins.length - 1]!);
+    const end = list.slice(begun + 1).find((e) => e.kind === "end");
+    const last = list[list.length - 1]?.time;
+    return { ...merged, started: first.started, ...(end ? { ended: end.time } : {}), ...(last ? { last } : {}) };
   }
 }
 

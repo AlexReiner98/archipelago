@@ -21,6 +21,7 @@ export interface Dial {
 
 export const DIALS: readonly Dial[] = [
   { key: "switch_s", label: "switch s", min: 0, max: 1.5, step: 0.05, value: 0.4, doc: "Seconds a tree takes to grow into focus while the old one shrinks into the column; 0 switches at once." },
+  { key: "quiet_min", label: "live for min", min: 1, max: 240, step: 1, value: 15, doc: "Minutes a run may go unheard and still be live; past it, it is a past run in the list, not an agent in the previews." },
 ];
 
 export type Dials = Record<string, number>;

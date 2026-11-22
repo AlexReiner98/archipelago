@@ -10,16 +10,26 @@
  * - `keepLast`: an event added to the live events, the last few kept.
  * - The runs themselves are agents, each with a tree of its own (trees.ts).
  */
-import type { RunInfo } from "../../spec/agent.ts";
+import { runName, type RunInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { HUES, v, type Token } from "../../spec/style.ts";
 
 /** How many live runs the view shows at most: the page of runs it reads. */
 export const LIVE_MOST = 50;
 
+/** Minutes a run may be quiet and still be live, unless the dial says (`quiet_min`): as Activity counts a run live. */
+export const QUIET_MIN = 15;
+
+/** Whether a run is live: not ended, and heard from within `quietMin` minutes. A run whose harness stopped without ending it (a session archived or killed) drops out. */
+export function isLive(r: RunInfo, quietMin: number = QUIET_MIN, now: number = Date.now()): boolean {
+  if (r.ended) return false;
+  const at = Date.parse(r.last ?? r.started);
+  return !Number.isFinite(at) || now - at <= quietMin * 60_000;
+}
+
 /** The runs that are live, last active first (as `exchange.read.runs` gives them), at most `max`. */
-export function liveRuns(runs: RunInfo[], max: number = LIVE_MOST): RunInfo[] {
-  return runs.filter((r) => !r.ended).slice(0, max);
+export function liveRuns(runs: RunInfo[], max: number = LIVE_MOST, quietMin: number = QUIET_MIN, now: number = Date.now()): RunInfo[] {
+  return runs.filter((r) => isLive(r, quietMin, now)).slice(0, max);
 }
 
 /** Each run's colour slot: the one it had, else the lowest not taken. As many as there are runs. */
@@ -61,4 +71,4 @@ export function keepLast(list: ExchangeEvent[], e: ExchangeEvent, max: number): 
 }
 
 
-const title = (r: RunInfo) => r.title ?? r.run.slice(0, 8);
+const title = (r: RunInfo) => runName(r);

@@ -12,7 +12,7 @@ import agent from "../packs/agent/index.ts";
 import graph from "../packs/graph/index.ts";
 import exchange from "../packs/exchange/index.ts";
 import claudeCode from "../packs/claude-code/index.ts";
-import { handle, lastAssistantText, relativePath, toolPlaces, transcriptPath, unseenFailures, type HookInput, type RunPort } from "../packs/claude-code/mapping.ts";
+import { handle, lastAssistantText, promptTitle, relativePath, toolPlaces, transcriptPath, unseenFailures, type HookInput, type RunPort } from "../packs/claude-code/mapping.ts";
 import { rpc } from "../packs/claude-code/mcp.ts";
 import { withRemote } from "../packs/claude-code/hook.ts";
 import { ordered, tagOf, taggedText, told, type Speakers } from "../packs/claude-code/context.ts";
@@ -89,7 +89,9 @@ test("a prompt is reached, then recorded as the person's act; a refusal blocks i
     ["prompt", "prompt", "person", "hello", true],
     ["prompt", "prompt", "person", "rm everything", false],
   ]);
-  assert.deepEqual((calls[1]![1] as Moment).places, ["prompt"]);
+  assert.deepEqual((calls.find((c) => c[0] === "reach")![1] as Moment).places, ["prompt"]);
+  const begins = calls.filter((c) => c[0] === "begin").map((c) => (c[1] as RunStart).title);
+  assert.deepEqual(begins, [undefined, "hello"], "begun, then again with its first prompt as its title; once");
 });
 
 test("PreToolUse reaches tool: and file:, and a refusal denies the call and is its act", async () => {
@@ -396,6 +398,7 @@ test("hooks and MCP over HTTP reach the agent pack and land on the exchange, bot
       [
         ["begin", "from_agent", "-", "-"],
         ["say", "to_agent", "session_start", "nodes/hello"],
+        ["begin", "from_agent", "-", "-"],
         ["act", "from_agent", "prompt", "prompt"],
         ["say", "to_agent", "file:spec/agent.ts", "nodes/spec"],
         ["act", "from_agent", "tool:Edit", "tool"],
@@ -408,6 +411,7 @@ test("hooks and MCP over HTTP reach the agent pack and land on the exchange, bot
     );
     const begin = (await read.runs()).items[0]!;
     assert.deepEqual([begin.run, begin.harness, begin.agent], ["sess-1", "claude-code", actor]);
+    assert.equal(begin.title, "edit the spec", "named by its first prompt");
     assert.equal(events.find((e) => e.act?.kind === "reply")!.act!.output, "Finished.");
     assert.deepEqual(errors, []);
 
@@ -802,4 +806,14 @@ test("the hook's transcript, as numbers: no text, no path; a page at a time from
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("a run's title is its first prompt that says something: one line, a few words, a slash command as itself", () => {
+  assert.equal(promptTitle("fix the run names\nand the previews"), "fix the run names and the previews");
+  assert.equal(promptTitle("<command-message>review</command-message>\n<command-name>/review</command-name>\n<command-args>12</command-args>"), "/review 12");
+  assert.equal(promptTitle("<pasted_content id=\"x\">a long log</pasted_content>"), undefined, "only pasted text: ask the next prompt");
+  assert.equal(promptTitle("look at this <pasted_content id=\"x\">a long log</pasted_content> please"), "look at this please");
+  const long = promptTitle("lets fix the run names and also fix the fact that a bunch of runs that have been archived are showing")!;
+  assert.ok(long.length <= 60 && long.endsWith("…") && long.startsWith("lets fix the run names"), long);
+  assert.equal(promptTitle("   "), undefined);
 });

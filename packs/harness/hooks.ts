@@ -11,7 +11,8 @@ import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exch
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import type { HereRead } from "../../spec/here.ts";
 import type { Hearing, ProfileInfo, ProfileRead } from "../../spec/profile.ts";
-import { keepLast, liveRuns } from "./live.ts";
+import { DIALS_KEY, dialsOf, remembered } from "./dials.ts";
+import { keepLast, LIVE_MOST, liveRuns } from "./live.ts";
 
 /** What `verdict.read` answers (the verdict pack's own key). */
 export type Verdict = "held" | "failed" | "quiet";
@@ -144,10 +145,18 @@ export function hooks(c: Caps) {
     const pinned = useHere<string>("here.run");
     const said = useHere<boolean>(LIVE);
     const every = useHere<boolean>(ALL) === true;
-    const live = landsLive(said, pinned, every, liveRuns(runs).length > 0);
+    const quiet = dialsOf(useHere<unknown>(DIALS_KEY) ?? remembered()).quiet_min;
+    // A run goes quiet with nothing happening: look again each minute.
+    const [now, setNow] = useState(Date.now());
+    useEffect(() => {
+      const t = setInterval(() => setNow(Date.now()), 60_000);
+      return () => clearInterval(t);
+    }, []);
+    const current = useMemo(() => liveRuns(runs, LIVE_MOST, quiet, now), [runs, quiet, now]);
+    const live = landsLive(said, pinned, every, current.length > 0);
     const all = !live && every;
     const run = all || live ? undefined : (pinned ?? runs[0]?.run);
-    return { runs, run, pinned, all, live, info: runs.find((r) => r.run === run) };
+    return { runs, run, pinned, all, live, lives: live ? current : [], current, info: runs.find((r) => r.run === run) };
   };
 
   /** The runs a profile has in it (`profile.read.of`), from those given; undefined while it reads. */

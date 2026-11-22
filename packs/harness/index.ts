@@ -27,7 +27,7 @@ import { h } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import type { ActionInvoke, ActionList } from "../../spec/action.ts";
-import type { AgentTree, NodeInfo, RunInfo } from "../../spec/agent.ts";
+import { runName, type AgentTree, type NodeInfo, type RunInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
@@ -39,7 +39,7 @@ import { sheet, v } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
 import { Events, short } from "./events.ts";
 import { ALL, FOCUS, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
-import { colourOf, colours, liveRuns } from "./live.ts";
+import { colourOf, colours } from "./live.ts";
 import { AGENTS_STYLE, placementOf, ProfileMenu } from "./agents.ts";
 import { focusOf, switchFocus, Trees, TREES_STYLE, treesAndRows } from "./trees.ts";
 import { DIALS_KEY, DIALS_STYLE, DialsPane, useDials } from "./dials.ts";
@@ -209,8 +209,7 @@ const harness: Pack = {
 
     const Center = () => {
       const nodes = hk.useNodes();
-      const { runs, run, pinned, all, live, info } = hk.useRun();
-      const lives = useMemo(() => (live ? liveRuns(runs) : []), [live, runs]);
+      const { runs, run, pinned, all, live, lives, current, info } = hk.useRun();
       const colour = useLiveColours(lives);
       const liveEvents = hk.useLiveEvents(lives.map((r) => r.run), live);
       const fires = useRef<Fire | undefined>(undefined);
@@ -349,7 +348,8 @@ const harness: Pack = {
         set.set(KEYS.run, r);
       };
       const place = (r: string, profile: string) => {
-        const who = lives.find((x) => x.run === r)?.title ?? r.slice(0, 8);
+        const found = lives.find((x) => x.run === r);
+        const who = found ? runName(found) : r.slice(0, 8);
         const to = profileList.find((p) => p.id === profile)?.title ?? profile;
         void invoke
           .invoke({ action: "profile.place", input: { run: r, profile }, authority: { of: "human", basis: "moved in the sensory interface" }, reason: `Move ${who} into ${to}` })
@@ -401,7 +401,7 @@ const harness: Pack = {
       return html`
         <div class="hv-view">
           <${Bar}
-            runs=${runs} live=${live} all=${all} pinned=${pinned} info=${info} sum=${sum} profile=${profile} profiles=${profileList}
+            runs=${runs} current=${current} live=${live} all=${all} pinned=${pinned} info=${info} sum=${sum} profile=${profile} profiles=${profileList}
             by=${by} hidden=${tree.hidden} unsaid=${unsaid}
             onBy=${setBy} onUnsaid=${setUnsaid}
             given=${hasGiven ? shownGiven.length : undefined} showGiven=${showGiven} onGiven=${setShowGiven}
@@ -437,7 +437,7 @@ const harness: Pack = {
                   ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} run=${windowRun} /></div>`}
                 </div>`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
-            ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${lives.find((r) => r.run === menu.run)?.title ?? menu.run.slice(0, 8)} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}
+            ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${((r) => (r ? runName(r) : menu.run.slice(0, 8)))(lives.find((r) => r.run === menu.run))} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}
           </div>
           ${run && html`<${Timeline}
             events=${events}
@@ -461,12 +461,11 @@ const harness: Pack = {
 
     const RunFill = () => {
       const nodes = hk.useNodes();
-      const { run, info, runs, all, live } = hk.useRun();
+      const { run, info, runs, all, live, lives } = hk.useRun();
       const profile = hk.useHere<string>(PROFILE);
       const inProfile = hk.useRunsIn(runs, all ? profile : undefined);
       const profileTitle = hk.useProfileList().find((p) => p.id === profile)?.title;
       // Live: the agent in focus (its tree is big), its events as one run's, each line opening in place.
-      const lives = useMemo(() => (live ? liveRuns(runs) : []), [live, runs]);
       const focusKey = hk.useHere<string>(FOCUS);
       const focused = live ? focusOf(lives.map((r) => r.run), focusKey) : undefined;
       const shown = live ? focused : run;
@@ -494,7 +493,7 @@ const harness: Pack = {
         <div class="hv-body">
           ${runs && !runs.length && html`<div class="hv-empty" title="Of the last 50 runs, by profile.read.of">${of ? `No run in ${of}` : "No run yet"}</div>`}
           ${(runs ?? []).map((r) => html`<div class="hv-row" title=${r.title ?? r.run} onClick=${() => set.set(KEYS.run, r.run)}>
-            <span class="hv-m">${r.ended ? "○" : "●"}</span><span class="x">${r.title ?? r.run.slice(0, 8)}</span><span class="n">${clock(r.started)}</span>
+            <span class="hv-m">${r.ended ? "○" : "●"}</span><span class="x" title=${runName(r)}>${runName(r)}</span><span class="n">${clock(r.started)}</span>
           </div>`)}
         </div>
       </div>`;

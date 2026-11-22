@@ -20,7 +20,7 @@ import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import type { ActionInvoke } from "../../spec/action.ts";
 import { UNDO } from "../../spec/action.ts";
-import type { RunInfo } from "../../spec/agent.ts";
+import { runName, type RunInfo } from "../../spec/agent.ts";
 import type { Json, Page } from "../../spec/common.ts";
 import type { ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
@@ -250,7 +250,7 @@ const activity: Pack = {
 
     const GroupRows = ({ g, lit, now }: { g: Group; lit: boolean; now: number }) => {
       const state = g.run ? liveness(g.run, heard.get(g.run.run), now) : "ended";
-      const title = g.run ? (g.run.title ?? g.run.cwd?.split(/[\\/]/).pop() ?? g.run.run.slice(0, 8)) : g.actor;
+      const title = g.run ? runName(g.run) : g.actor;
       return html`
         <div class=${`av-run ${lit ? "av-lit" : ""}`} onClick=${() => g.run && set.set(KEYS.run, g.run.run)} title=${g.run ? `${g.run.run}${g.run.task ? ` · on ${g.run.task}` : ""}` : "changes made outside a run"}>
           <span class=${state === "live" ? "av-open" : "av-dim"} title=${g.run ? state : "no run"}>${g.key.startsWith("run:") ? (state === "live" ? "●" : state === "open" ? "◌" : "○") : "◇"}</span>
@@ -310,7 +310,7 @@ const activity: Pack = {
       return html`
         <div class="as">
           <span class="go" onClick=${() => set.set(KEYS.view, VIEW)} title=${`${live.length} live, ${open.length} open but quiet`}>
-            <span class=${live.length ? "av-open" : ""}>●</span> ${live.length}${newest ? html` · ${newest.title ?? newest.run.slice(0, 8)}` : " live"}
+            <span class=${live.length ? "av-open" : ""}>●</span> ${live.length}${newest ? html` · ${runName(newest)}` : " live"}
           </span>
           <span class=${up === "open" ? "up" : "down"} title=${up === "open" ? "The page reaches the server" : "The page lost the server; it tries again"}>${up === "open" ? "● linked" : "✕ no link"}</span>
           <span class="sp"></span>

@@ -23,7 +23,7 @@
 import { h } from "preact";
 import { useMemo } from "preact/hooks";
 import htm from "htm";
-import type { NodeInfo, RunInfo } from "../../spec/agent.ts";
+import { runName, type NodeInfo, type RunInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { sheet } from "../../spec/style.ts";
 import { placementText, placementTip, type Placement } from "./agents.ts";
@@ -176,7 +176,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
   const placed = useMemo(() => radial(tree), [tree]);
   const mine = useMemo(() => p.events.filter((e) => e.run === a.run.run), [p.events, a.run.run]);
   const state = useMemo(() => stateAt(mine, mine.length - 1), [mine]);
-  const title = a.run.title ?? a.run.run.slice(0, 8);
+  const title = runName(a.run);
   return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}${big && p.win ? " win" : ""}`} style=${`--hv-vt:${transitionName(a.slot)}`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
     <div class="hd">
       <span class="d" style=${`color:${a.colour}`}>●</span>
@@ -202,7 +202,7 @@ export const Trees = (p: TreesProps) => {
       ${p.rows?.length ? html`<div class="hv-rows">
         <div class="h" title="Live, but not among the last active: a run that stopped without ending stays live">${p.rows.length} more live</div>
         ${p.rows.map((a) => html`<div class="r" key=${a.run.run} title=${`${a.run.title ?? a.run.run}\nBring it into focus`} onClick=${() => p.onFocus(a.run.run)}>
-          <span class="dot" style=${`color:${a.colour};--hv-vt:${transitionName(a.slot)}`}>●</span><span class="x">${a.run.title ?? a.run.run.slice(0, 8)}</span>${a.placement && html`<span class="p">${placementText(a.placement)}</span>`}
+          <span class="dot" style=${`color:${a.colour};--hv-vt:${transitionName(a.slot)}`}>●</span><span class="x" title=${runName(a.run)}>${runName(a.run)}</span>${a.placement && html`<span class="p">${placementText(a.placement)}</span>`}
         </div>`)}
       </div>` : ""}
     </div>`}

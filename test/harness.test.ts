@@ -10,7 +10,7 @@ import type { ExchangeEvent } from "../spec/exchange.ts";
 import { asText, expand, fold, pretty } from "../packs/harness/expand.ts";
 import type { NodeInfo, RunInfo } from "../spec/agent.ts";
 import { HUES } from "../spec/style.ts";
-import { colourOf, colours, keepLast, liveRuns, LIVE_MOST } from "../packs/harness/live.ts";
+import { colourOf, colours, isLive, keepLast, liveRuns, LIVE_MOST } from "../packs/harness/live.ts";
 import { groupsOf } from "../packs/harness/hooks.ts";
 import { DECIDED, dotsBox, nameOf, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
 import { fitKey, HIT_PX, nearest, shouldFit } from "../packs/harness/canvas.ts";
@@ -393,14 +393,25 @@ test("nodeOf: an event's own node; an act's failed node, else the one told just 
 
 // ---------- live.ts: every live run at once ----------
 
-const runInfo = (run: string, ended?: string) => ({ run, agent: { kind: "agent", id: "a" }, harness: "test", reaches: [], started: "2026-11-21T09:00:00Z", ...(ended ? { ended } : {}) }) as unknown as RunInfo;
+const runInfo = (run: string, ended?: string, last?: string) => ({ run, agent: { kind: "agent", id: "a" }, harness: "test", reaches: [], started: "2026-11-21T09:00:00Z", ...(ended ? { ended } : {}), ...(last ? { last } : {}) }) as unknown as RunInfo;
+/** Ten minutes after the runs above began. */
+const SOON = Date.parse("2026-11-21T09:10:00Z");
 
 test("the live runs: those not ended, in the order given, more than there are hues, up to the page", () => {
   const runs = [runInfo("a"), runInfo("b", "2026-11-21T10:00:00Z"), runInfo("c"), runInfo("d")];
-  assert.deepEqual(liveRuns(runs).map((r) => r.run), ["a", "c", "d"]);
-  assert.deepEqual(liveRuns(runs, 2).map((r) => r.run), ["a", "c"]);
-  assert.equal(liveRuns(Array.from({ length: 10 }, (_, i) => runInfo(`r${i}`))).length, 10);
-  assert.equal(liveRuns(Array.from({ length: 80 }, (_, i) => runInfo(`r${i}`))).length, LIVE_MOST);
+  assert.deepEqual(liveRuns(runs, LIVE_MOST, 30, SOON).map((r) => r.run), ["a", "c", "d"]);
+  assert.deepEqual(liveRuns(runs, 2, 30, SOON).map((r) => r.run), ["a", "c"]);
+  assert.equal(liveRuns(Array.from({ length: 10 }, (_, i) => runInfo(`r${i}`)), LIVE_MOST, 30, SOON).length, 10);
+  assert.equal(liveRuns(Array.from({ length: 80 }, (_, i) => runInfo(`r${i}`)), LIVE_MOST, 30, SOON).length, LIVE_MOST);
+});
+
+test("a run quiet past the dial is not live: an archived or killed session leaves the previews for the list", () => {
+  const hour = Date.parse("2026-11-21T10:00:00Z");
+  assert.equal(isLive(runInfo("a", undefined, "2026-11-21T09:45:00Z"), 30, hour), true, "heard 15 minutes ago");
+  assert.equal(isLive(runInfo("a", undefined, "2026-11-21T09:15:00Z"), 30, hour), false, "quiet 45 minutes");
+  assert.equal(isLive(runInfo("a", undefined, "2026-11-21T09:15:00Z"), 60, hour), true, "the dial lets it stay");
+  assert.equal(isLive(runInfo("a"), 30, hour), false, "no event since it began an hour ago");
+  assert.equal(isLive(runInfo("a", "2026-11-21T09:59:00Z", "2026-11-21T09:59:00Z"), 30, hour), false, "ended");
 });
 
 test("a live run keeps its colour slot while it stays; a new one takes the lowest free, past six too", () => {

@@ -155,6 +155,30 @@ export interface RunPort {
   asks?: Map<string, number>;
   /** When the oldest pending ask was made: only results after it can answer one. */
   askedAt?: Time;
+  /** Whether the run has its title, from its first prompt that says something. */
+  titled?: boolean;
+}
+
+/** Most of a title: a few words, as an item's title is. */
+const TITLE_MOST = 60;
+
+/**
+ * A run's title from a prompt: a slash command as itself (`/review 12`),
+ * else the words outside any tagged block the harness wraps around pasted or
+ * injected text, on one line, cut at a word to 60 characters. Undefined when
+ * nothing is left: the next prompt is asked.
+ */
+export function promptTitle(prompt: string): string | undefined {
+  const cmd = /<command-name>([^<]*)<\/command-name>/.exec(prompt);
+  const args = /<command-args>([^<]*)<\/command-args>/.exec(prompt);
+  const text = cmd
+    ? `${cmd[1]!.trim()} ${args?.[1] ?? ""}`
+    : prompt.replace(/<([\w-]+)[^>]*>[\s\S]*?<\/\1>/g, " ").replace(/<[^>]*>/g, " ");
+  const s = text.replace(/\s+/g, " ").trim();
+  if (!s) return undefined;
+  if (s.length <= TITLE_MOST) return s;
+  const cut = s.slice(0, TITLE_MOST - 1);
+  return `${cut.includes(" ") ? cut.slice(0, cut.lastIndexOf(" ")) : cut}…`;
 }
 
 export interface Options {
@@ -413,6 +437,12 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
       return {};
     }
     case "UserPromptSubmit": {
+      // The run is named by the first prompt that says something: begun again with its title.
+      const title = run === input.session_id && !port.titled ? promptTitle(input.prompt ?? "") : undefined;
+      if (title) {
+        await agent.begin({ ...runStart(input, options.actor), title });
+        port.titled = true;
+      }
       const answer = await reach(["prompt"], input.prompt ?? "");
       await act({ place: "prompt", kind: "prompt", by: "person", input: input.prompt ?? "", ok: !answer.refused });
       if (answer.refused) return { decision: "block", reason: refusalText(answer) };

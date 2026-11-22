@@ -19,7 +19,7 @@ import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import type { ActionInvoke } from "../../spec/action.ts";
-import type { RunInfo } from "../../spec/agent.ts";
+import { runName, type RunInfo } from "../../spec/agent.ts";
 import type { ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
@@ -64,7 +64,7 @@ const STYLE = sheet(`
 `);
 
 /** A run's name: its title, else its folder, else the start of its id. */
-export const runName = (r: Pick<RunInfo, "run" | "title" | "cwd">) => r.title ?? r.cwd?.split(/[\\/]/).filter(Boolean).pop() ?? r.run.slice(0, 8);
+export { runName };
 
 /** A text with the token hidden, for the line on the page. */
 const hidden = (text: string, token: string | undefined) => text.replaceAll(TOKEN, token ? "••••••" : TOKEN);

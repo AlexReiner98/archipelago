@@ -7,11 +7,11 @@
 import { h } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import htm from "htm";
-import type { RunInfo } from "../../spec/agent.ts";
+import { runName, type RunInfo } from "../../spec/agent.ts";
 import { read as token, sheet, verdictGlyph } from "../../spec/style.ts";
 import { short } from "./events.ts";
 import type { Grouping } from "./layout.ts";
-import { liveRuns } from "./live.ts";
+
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -43,6 +43,8 @@ export interface BarProps {
   unsaid: boolean;
   /** "live", "*" (every run), "" (the last active) or a run id. */
   onRun(value: string): void;
+  /** The runs live now: not ended, and heard from lately. */
+  current: RunInfo[];
   onProfile(id: string | undefined): void;
   onBy(by: Grouping): void;
   onUnsaid(on: boolean): void;
@@ -68,12 +70,12 @@ export const Bar = (p: BarProps) => {
   return html`
     <div class="hv-bar">
       <select class="hv-select" value=${value} title="Every live run at once, every run, or one run" onChange=${(e: Event) => p.onRun((e.target as HTMLSelectElement).value)}>
-        <option value="live">live · ${liveRuns(p.runs).length} at once</option>
+        <option value="live">live · ${p.current.length} at once</option>
         <option value="*">all runs</option>
-        <option value="">last active${p.runs[0] ? ` · ${short(p.runs[0].title ?? p.runs[0].run.slice(0, 8), 40)}` : ""}</option>
-        ${p.runs.map((r) => html`<option value=${r.run}>${r.ended ? "○" : "●"} ${short(r.title ?? r.run.slice(0, 8), 40)} · ${clock(r.started)}</option>`)}
+        <option value="">last active${p.runs[0] ? ` · ${short(runName(p.runs[0]), 40)}` : ""}</option>
+        ${p.runs.map((r) => html`<option value=${r.run}>${p.current.some((x) => x.run === r.run) ? "●" : "○"} ${short(runName(r), 40)} · ${clock(r.started)}</option>`)}
       </select>
-      ${p.info && !p.info.ended && html`<span class="live" title="The run hasn't ended">●</span>`}
+      ${p.info && p.current.some((x) => x.run === p.info!.run) && html`<span class="live" title="The run is live">●</span>`}
       ${!p.live && html`<span class="hv-n" title=${p.all ? "Every run's verdicts, node by run: held, failed, quiet" : "This run's verdicts: held, failed, quiet"}><span class="m-held">${token(verdictGlyph("held"))} ${p.sum.held}</span> <span class="m-failed">${token(verdictGlyph("failed"))} ${p.sum.failed}</span> <span class="m-quiet">${token(verdictGlyph("quiet"))} ${p.sum.quiet}</span></span>`}
       ${p.profile && html`<span class="hv-dim hv-cut" title="The profile looked at: what it holds back">in ${p.profiles.find((x) => x.id === p.profile)?.title ?? p.profile}</span>`}
       <span class="sp"></span>

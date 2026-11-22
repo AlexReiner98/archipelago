@@ -45,6 +45,14 @@ test("a run that begins again after its end is open again", () => {
   assert.equal(log.info("r")?.ended, "2026-11-21T12:00:00Z");
 });
 
+test("a run says when it was last heard from: its latest event's time", () => {
+  const log = new Log();
+  log.add(begin("r", "2026-11-21T09:00:00Z", "First"));
+  assert.equal(log.info("r")?.last, "2026-11-21T09:00:00Z");
+  log.add(say("r", "2026-11-21T09:20:00Z"));
+  assert.equal(log.info("r")?.last, "2026-11-21T09:20:00Z");
+});
+
 test("exchange.read.runs is last active first, through the pack", async () => {
   const rt = new Runtime();
   const probe: Pack = { id: "probe", inject: ["exchange.append", "exchange.read"], apply() {} };

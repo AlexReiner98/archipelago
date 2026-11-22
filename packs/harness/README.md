@@ -34,13 +34,18 @@ so a long run acting now is at the top, and the list reads again as events
 come.
 
 - **A run:** `here.run`, or the last active ("last active" sets
-  `harness.live` to false). ● not ended, ○ ended. The counts
+  `harness.live` to false). ● live, ○ past. A run is named by its title
+  (Claude Code's is its first prompt that says something), else its
+  folder (`runName`, spec/agent.ts). The counts
   are what that run said, up to the playhead; the tally, its verdicts; its
   holds, its own `gated` events. Picking a run anywhere (the node's runs,
   Activity) looks at it alone.
 - **Live:** `harness.live` (this pack's own page key), "live" in the run
-  picker, and what the view shows while nothing else is picked. Every run
-  not ended, of the last 50 active, each in its own colour
+  picker, and what the view shows while some run is live and nothing else
+  is picked (with none live, it lands on the last active). Every run not
+  ended and heard from within `quiet_min` minutes (15, as Activity counts
+  live), of the last 50 active, each in its own colour: a session archived
+  or killed without ending its run drops to the past runs
   ([live.ts](live.ts)): the style's six hues, then round again mixed toward
   the text colour, then toward the page, so there is no limit and every
   colour is made of tokens. A run keeps its colour while it stays live. Each is an agent with a tree of its own (below). The right pane shows the
@@ -85,8 +90,9 @@ node, in the agent's colour (red for a refusal), and the name lights when
 the light gets there; an act sparks on the bough of its place. The light
 and spark are the tree's own (see the tree, below).
 
-The one dial, in the bar's ⋯ menu, is how long a switch of focus takes
-(`switch_s`). Its value is `harness.dials` (page scope), so an agent can
+The dials, in the bar's ⋯ menu: how long a switch of focus takes
+(`switch_s`), and how long a run may be quiet and still be live
+(`quiet_min`). Its value is `harness.dials` (page scope), so an agent can
 set it; the browser remembers it. Colours are style tokens only.
 
 Over each agent's tree, its profile from `profile.read.of`: ● the one it

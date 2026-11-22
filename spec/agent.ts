@@ -136,6 +136,8 @@ export interface RunStart {
 export interface RunInfo extends RunStart {
   started: Time;
   ended?: Time;
+  /** When the run's latest event came: a run quiet for long is not live, ended or not (one whose harness stopped without saying). */
+  last?: Time;
   /**
    * Edition 5: every fact about the run, made again at each `begin`: the
    * fields above that it has (`harness`, `cwd`, `parent`, `task`), then the
@@ -281,3 +283,6 @@ export const capabilities: Capability[] = [
   { key: "agent.facts", since: 5, doc: "Adds a fact source: facts about a run, asked at each begin." },
   { key: "agent.gate", since: 5, doc: "Adds a gate that may hold a node back from a run before it is asked." },
 ];
+
+/** A run's name for people: its title, else its folder, else the start of its id. */
+export const runName = (r: Pick<RunInfo, "run" | "title" | "cwd">): string => r.title ?? r.cwd?.split(/[\\/]/).filter(Boolean).pop() ?? r.run.slice(0, 8);
