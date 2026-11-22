@@ -96,8 +96,8 @@ const STYLE = sheet(`
 .hv-kv .k { color:var(--dim); width:4.5em; flex:none; }
 .hv-kv .v { overflow:hidden; text-overflow:ellipsis; }
 .hv-words { margin:var(--space-3) var(--space-4); }
-.hv-words textarea { width:100%; box-sizing:border-box; min-height:84px; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-2) var(--space-3); resize:vertical; }
-.hv-words .ro { white-space:pre-wrap; padding:var(--space-2) var(--space-3); border-left:2px solid var(--line); max-height:12em; overflow:auto; }
+.hv-words textarea { width:100%; box-sizing:border-box; min-height:84px; overflow:hidden; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-2) var(--space-3); resize:none; }
+.hv-words .ro { white-space:pre-wrap; padding:var(--space-2) var(--space-3); border-left:2px solid var(--line); }
 .hv-words .bar { display:flex; gap:var(--space-3); align-items:center; margin-top:var(--space-2); color:var(--dim); white-space:nowrap; }
 .hv-empty { padding:var(--space-4); color:var(--dim); }
 .hv-tag { flex:none; font-size:var(--text-xs); padding:0 var(--space-2); border-radius:var(--radius); border:1px dashed var(--pick); color:var(--pick); }

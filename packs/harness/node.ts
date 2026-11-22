@@ -6,7 +6,7 @@
  * record, and its verdict in each run, a click away from that run.
  */
 import { h } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import type { ActionInvoke } from "../../spec/action.ts";
 import type { NodeInfo } from "../../spec/agent.ts";
@@ -39,6 +39,24 @@ interface Deps {
   kp: ReturnType<typeof keepParts>;
 }
 
+/** A text box as tall as its words, never a scroll bar: it grows as they are typed and as its width changes. */
+const GrowArea = ({ value, onInput }: { value: string; onInput(v: string): void }) => {
+  const el = useRef<HTMLTextAreaElement>(null);
+  const fit = () => {
+    const t = el.current;
+    if (!t) return;
+    t.style.height = "auto";
+    t.style.height = `${t.scrollHeight + 2}px`;
+  };
+  useLayoutEffect(fit, [value]);
+  useEffect(() => {
+    const ro = new ResizeObserver(fit);
+    if (el.current) ro.observe(el.current);
+    return () => ro.disconnect();
+  }, []);
+  return html`<textarea ref=${el} value=${value} onInput=${(e: Event) => onInput((e.target as HTMLTextAreaElement).value)}></textarea>`;
+};
+
 export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
   const Words = ({ info, editable }: { info: NodeInfo; editable: boolean }) => {
     const item = hk.useItem(info.source);
@@ -68,7 +86,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
       };
       return html`
         <div class="hv-words">
-          <textarea value=${text} onInput=${(e: Event) => setDraft((e.target as HTMLTextAreaElement).value)}></textarea>
+          <${GrowArea} value=${text} onInput=${setDraft} />
           <div class="bar">
             <button class="hv-btn" disabled=${draft === undefined || draft === saved} onClick=${save} title="The next say uses it">Save</button>
             ${draft !== undefined && draft !== saved && html`<button class="hv-btn" onClick=${() => setDraft(undefined)}>Revert</button>`}

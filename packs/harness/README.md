@@ -157,7 +157,8 @@ Each part folds past a dozen lines. A red edge: the event failed the node picked
 
 ## The node ([node.ts](node.ts), [keep.ts](keep.ts))
 
-Words made from a map item are edited through `words.set`, and the next
+Words made from a map item are edited through `words.set`, in a box as
+tall as they are (it grows as you type, never a scroll bar), and the next
 say uses them; any other node shows what it last said. A trial shows the
 miss it came from and can be retired (`words.retire`). With the keep pack:
 its record against the thresholds, its checks, Keep and Retire
