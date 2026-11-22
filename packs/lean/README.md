@@ -47,7 +47,7 @@ runs (the newest 50):
   left alone and reported.
 - **Revertible.** Undoing the `lean.set`, or the profile going off, takes
   its entries out at the next pass; unloading takes them all out. What it
-  added is kept in a ledger (config `ledger`, `lean.json` in the data
+  added is kept in a ledger (config `ledger`, a file in the data
   folder), so a crash is mended at the next load.
 
 Injects `graph.read`, `exchange.read`, `profile.read`, `action.register`
