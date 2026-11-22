@@ -145,7 +145,7 @@ export function hooks(c: Caps) {
     const pinned = useHere<string>("here.run");
     const said = useHere<boolean>(LIVE);
     const every = useHere<boolean>(ALL) === true;
-    const quiet = dialsOf(useHere<unknown>(DIALS_KEY) ?? remembered()).quiet_min;
+    const quiet = dialsOf(useHere<Json>(DIALS_KEY) ?? remembered()).quiet_min;
     // A run goes quiet with nothing happening: look again each minute.
     const [now, setNow] = useState(Date.now());
     useEffect(() => {
