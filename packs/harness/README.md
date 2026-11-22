@@ -119,6 +119,9 @@ from one "decided" bough as well, retired ones struck.
 | dot shape | drawn bigger than a plain dot, and never under 4 px on screen however far out the zoom (`shapeRadius`): its channel ([channels.ts](channels.ts)): ● hook, said at a moment by a hook; ◆ rule, a check that can refuse (a rule, the schema's refusal); ■ file, a skill or memory file the harness loads; ▲ context, there from the start (system prompt, tool definitions, MCP instructions, listings) |
 | dot size, number | how often it was said: in the run, or all time |
 | ↑ ↓ ⊝ | the keep pack's standing: promote, retire, held back by a check |
+| soft halo | in the agent's window at the playhead: said since the last compaction, or there from the start (the window, below) |
+| dotted ring | only named in a listing (skills, agents, deferred tools): the thing itself loads when it is used |
+| slash | dropped by a compaction: said before it, not since |
 
 A step of the playhead runs a light from the root to its node (red for a
 refusal), or sparks on the bough of an act's place (amber, red when it
@@ -131,7 +134,8 @@ marks that filter; the browser remembers which. It lists only the marks
 the tree in sight shows (`marksIn`): a new user's key is who and how, and
 held-back, shadow, verdict and trial marks join it as they appear. Its
 rows stand in titled sections, each a line apart, with what it means in
-its tooltip: "in this run" (said, refused, acted, held back), "judged"
+its tooltip: "in this run" (said, refused, acted, held back), "in the
+window" (in it now, listed only, dropped), "judged"
 (verdicts, trial nodes), "from" (the map's or Claude Code's), "how it
 reaches the agent" (the four channels) and "made by" (each pack's colour,
 named plainly: "the map's words", "learned from a miss", "skills & memory
@@ -156,6 +160,24 @@ The names on the wires (a bough's, along its branch) grow and shrink with
 the zoom, and give way ([labels.ts](labels.ts)): after each draw, one that
 overlaps a node's name or dot, a bough's dot, the root or a wire name
 nearer the root fades out, and comes back when zoom or a move clears it.
+
+## The window ([windowbar.ts](windowbar.ts))
+
+With the context pack ([context](../context/README.md)), a bar over the
+agent in focus, and over one run's tree, says how full its context window
+is at the playhead, or live (`context.window`): the tokens in it of the
+window's size and the share that is, "≈" when it is an estimate (no usage
+in the transcript yet), and how many compactions. Under it two thin rows
+on the window's one scale: its share by source (the map's, Claude Code's,
+the agent's own, and what the model counts beyond those), and by channel
+(hook, rule, file, context, the agent's acts). A share's tooltip says its
+tokens and its part of the window. A click on a share filters the tree to
+it through the key's filter: only the map's, or only hooks; a second click
+shows everything again, and the other row stays as it was. The agent's
+acts and what isn't counted apart have no nodes, so no filter. Live, the
+window is read again as events come, at most every 3 seconds; at a
+playhead, once. Each node's state there is its mark on the big tree (the
+table above); the small previews draw none.
 
 ## The timeline ([timeline.ts](timeline.ts), [replay.ts](replay.ts))
 

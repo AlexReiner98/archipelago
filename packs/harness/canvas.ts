@@ -35,6 +35,7 @@ import { fadeCrowded } from "./labels.ts";
 import { branchAt, dotsBox, lightOf, pointAt, route, STYLE, type Placed, type Tree } from "./layout.ts";
 import type { Verdict } from "./hooks.ts";
 import type { Heard, Hold } from "./replay.ts";
+import { WINDOW_TIP, windowShown, type WindowMark } from "./windowbar.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -66,6 +67,11 @@ export const CANVAS_STYLE = sheet(`
 .rx-given .rx-dot { fill:var(--harness); fill-opacity:.9; }
 .rx-bough.rx-given .rx-name { fill:var(--harness); opacity:.8; }
 .rx-ring { fill:none; stroke-width:1.6; stroke:none; }
+.rx-win { pointer-events:none; }
+.rx-win.w-in { fill:var(--say); fill-opacity:.16; stroke:none; }
+.rx-win.w-listed { fill:none; stroke:var(--dim); stroke-width:1.1; stroke-dasharray:1 2; }
+.rx-win.w-dropped { fill:none; stroke:var(--dim); stroke-width:1.4; stroke-linecap:round; }
+.rx-small .rx-win { display:none; }
 .rx-ring.v-held { stroke:${C.say}; } .rx-ring.v-failed { stroke:${C.fail}; } .rx-ring.v-quiet { stroke:var(--quiet); stroke-dasharray:1.5 1.5; }
 .rx-name { fill:var(--fg); font:var(--bold) ${S.nameText}px var(--font); dominant-baseline:middle; pointer-events:none; }
 .rx-node .rx-name { pointer-events:auto; cursor:pointer; }
@@ -293,9 +299,11 @@ export interface CanvasProps {
   keyFilter?: KeyFilter;
   /** Small, one of many: names show only on what is lit, said or picked. */
   small?: boolean;
+  /** Each node's place in the agent's window at the playhead: in it, listed only, dropped (windowbar.ts). */
+  window?: ReadonlyMap<string, WindowMark>;
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const fxGroup = useRef<SVGGElement>(null);
@@ -410,8 +418,8 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   const statusOf = (n?: NodeInfo) => (n?.source ? statuses.get(n.source) : undefined);
   // The marks this tree shows: the key lists only those.
   const present = useMemo(
-    () => (showKey ? marksIn({ nodes: tree.order.flatMap((t) => (t.node ? [t.node] : [])), heard, held, ...(rings ? { rings } : {}), trial: (n) => statusOf(n) === "trial", ...(keyFilter ? { off: keyFilter.off } : {}) }) : undefined),
-    [showKey, tree, heard, held, rings, statuses, keyFilter?.off],
+    () => (showKey ? marksIn({ nodes: tree.order.flatMap((t) => (t.node ? [t.node] : [])), heard, held, ...(rings ? { rings } : {}), trial: (n) => statusOf(n) === "trial", ...(keyFilter ? { off: keyFilter.off } : {}), ...(win ? { window: windowShown(win, tree) } : {}) }) : undefined),
+    [showKey, tree, heard, held, rings, statuses, keyFilter?.off, win],
   );
   // What the harness gave, and every bough that holds nothing else: grey, so the map's own stands out in colour.
   const theirs = useMemo(() => givenOnly(tree), [tree]);
@@ -441,6 +449,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
             const hear = n ? heard.get(n.id) : undefined;
             const hold = n ? held.get(n.id) : undefined;
             const st = id ? standing.get(id) : undefined;
+            const wm = id ? win?.get(id) : undefined;
             const cls = [
               id ? "rx-node" : "rx-bough",
               trial && "rx-trial",
@@ -450,20 +459,23 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
               t.decided && !t.decided.up && "rx-retired",
               picked && picked === id && "rx-pick",
             ].filter(Boolean).join(" ");
-            const tip = given
+            const tip0 = given
               ? `${n!.title}\ngiven by ${given.by}, not the map · read only\n${channel}: ${channelDoc(channel!)}\n${n!.at.join(", ")}${given.count > 1 ? `\ngiven ${given.count} times` : ""}`
               : !n && theirs.has(t.id)
               ? `${t.title}\nonly what the harness gave`
               : n
               ? `${n.title}\n${n.kind} · ${n.pack} · ${channel}: ${channelDoc(channel!)}${trial ? " · trial" : ""}${hear ? ` · ${hear}` : ""}${hold ? ` · ${hold === "held" ? "held back" : "a shadow would hold it back"}` : ""}${ver ? ` · ${ver}` : ""}\n${n.at.join(", ") || "said nowhere"}${said ? `\nsaid ${said} times` : ""}`
               : t.decided ? `${t.title}\n${t.decided.up ? "kept" : "retired"}` : t.title;
+            const tip = wm ? `${tip0}\n${WINDOW_TIP[wm]}` : tip0;
             return html`
               <g key=${`n:${t.id}`} data-id=${t.id} data-depth=${t.depth} class=${cls} transform=${`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
                 <title>${tip}</title>
+                ${wm === "in" ? html`<circle class="rx-win w-in" r=${r + 5} />` : wm === "listed" ? html`<circle class="rx-win w-listed" r=${r + 4.5} />` : ""}
                 ${ver && html`<circle class=${`rx-ring v-${ver}`} r=${r + 2.5} />`}
                 ${channel
                   ? html`<path class="rx-dot" d=${shapePath(shapeOf(channel), shapeRadius(r, view.k, !!small))} style=${!given && hue ? (trial ? `stroke:${hue}` : `fill:${hue}`) : ""} />`
                   : html`<circle class="rx-dot" r=${r} style=${hue ? (trial ? `stroke:${hue}` : `fill:${hue}`) : ""} />`}
+                ${wm === "dropped" && html`<path class="rx-win w-dropped" d=${`M${-(r + 3)} ${r + 3}L${r + 3} ${-(r + 3)}`} />`}
                 <text class="rx-name" transform=${`rotate(${l.turn})`} x=${l.dx} y=${l.dy} text-anchor=${l.anchor}>${
                   l.anchor === "end"
                     ? html`${st && html`<tspan class=${st}>${STANDING[st]} </tspan>`}${said ? html`<tspan class="c">${said} </tspan>` : ""}${l.text}`

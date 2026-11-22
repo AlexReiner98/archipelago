@@ -15,7 +15,8 @@ import { CHANNELS, channelOf, isHarness, shapePath, type Filter } from "./channe
  * they appear. Ids: `said`, `refused`, `acted` (the run did something),
  * `held`, `shadow` (holds), `v-held`, `v-failed`, `v-quiet` (verdict rings),
  * `trial`, the filters (`map`, `harness`, each channel: there, or hidden
- * now, so a click can bring them back) and `pack:<id>` for each pack's hue.
+ * now, so a click can bring them back), `pack:<id>` for each pack's hue,
+ * and the window's marks at the playhead (`w-in`, `w-listed`, `w-dropped`).
  */
 export function marksIn(p: {
   nodes: NodeInfo[];
@@ -24,8 +25,11 @@ export function marksIn(p: {
   rings?: ReadonlyMap<string, string>;
   trial(n: NodeInfo): boolean;
   off?: ReadonlySet<string>;
+  /** Each node's place in the window at the playhead (windowbar.ts). */
+  window?: ReadonlyMap<string, string>;
 }): Set<string> {
   const out = new Set<string>(p.off ?? []);
+  for (const m of p.window?.values() ?? []) out.add(`w-${m}`);
   for (const h of p.heard.values()) out.add(h);
   if (p.heard.size) out.add("acted");
   for (const h of p.held.values()) out.add(h);
@@ -66,6 +70,8 @@ const KeyRow = (mark: unknown, text: string, tip?: string) => html`${mark}<span 
 export interface KeyFilter {
   off: ReadonlySet<string>;
   onToggle(f: Filter): void;
+  /** Sets what is hidden at once, from what is hidden now: the window bar's click shows only one share. */
+  set?(next: (off: ReadonlySet<string>) => Set<string>): void;
 }
 
 /** A row of the key that filters: its mark and words, struck while hidden. */
@@ -120,6 +126,11 @@ export const Key = ({ hues, filter, open = true, onOpen, present }: { hues: Map<
     row("v-quiet", html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-quiet" cx="7" cy="5" r="3.5" /></svg>`, "quiet", "Said, with nothing to judge it by"),
     row("trial", html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:none;stroke:${v("fg")};stroke-width:1.2`} /></svg>`, "trial node", "Written after a miss, not yet kept or retired"),
   ];
+  const inWindow = [
+    row("w-in", html`<svg viewBox="0 0 14 10"><circle class="rx-win w-in" cx="7" cy="5" r="4.5" /><circle cx="7" cy="5" r="2" style=${`fill:${v("fg")}`} /></svg>`, "in the window now", "Said, or there from the start, and not dropped since: the agent has it in mind at the playhead"),
+    row("w-listed", html`<svg viewBox="0 0 14 10"><circle class="rx-win w-listed" cx="7" cy="5" r="4" /><circle cx="7" cy="5" r="2" style=${`fill:${v("fg")}`} /></svg>`, "only named in a listing", "Only its name is in the window, in a listing: the skill or tool itself loads when it is used"),
+    row("w-dropped", html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="2" style=${`fill:${v("fg")}`} /><path class="rx-win w-dropped" d="M3 9L11 1" /></svg>`, "dropped by a compaction", "Said before the last compaction and not again since: gone from the window"),
+  ];
   const from = filters.filter(({ f }) => f === "map" || f === "harness");
   const how = filters.filter(({ f }) => f !== "map" && f !== "harness");
   const packs = [...hues].filter(([p]) => has(`pack:${p}`));
@@ -127,6 +138,7 @@ export const Key = ({ hues, filter, open = true, onOpen, present }: { hues: Map<
   <div class=${`rx-key${filter || onOpen ? " filters" : ""}`}>
     ${head && html`<span class="rx-kfull">${head}</span>`}
     ${section("in this run", "What happened in the run looked at, as it lights the tree", said)}
+    ${section("in the window", "At the playhead, or live: what the agent has in its context window (the window bar over the tree)", inWindow)}
     ${section("judged", "Each node's verdict once the run ends, and nodes still on trial", judged)}
     ${section("from", "Who supplies it: the map, or Claude Code itself. A click hides or shows", from.map(({ f, mark, text }) => FilterRow(f, mark, text, filter)))}
     ${section("how it reaches the agent", "The dot's shape: the channel it comes through. A click hides or shows", how.map(({ f, mark, text }) => FilterRow(f, mark, text, filter)))}

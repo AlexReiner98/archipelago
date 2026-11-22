@@ -31,6 +31,7 @@ import { Canvas, type Fire, type Standing } from "./canvas.ts";
 import type { KeyFilter } from "./key.ts";
 import { radial, treeOf, type Grouping } from "./layout.ts";
 import { stateAt } from "./replay.ts";
+import { WindowBar, type WindowMark, type WindowRead } from "./windowbar.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -106,6 +107,8 @@ html.hv-switching { view-transition-name:none; }
 .hv-tree.peek .rx-canvas { pointer-events:none; }
 .hv-tree.peek .who, .hv-tree.peek .prof { cursor:pointer; }
 .hv-tree.big .hd { padding:var(--space-3) var(--space-4); }
+.hv-tree.big.win { grid-template-rows:auto auto minmax(0,1fr); }
+.hv-tree.big.win .hd { padding-bottom:var(--space-1); }
 .hv-tree { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; min-width:0; overflow:hidden; border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
 .hv-tree .hd { display:flex; gap:var(--space-3); align-items:baseline; padding:var(--space-2) var(--space-4); white-space:nowrap; min-width:0; }
 .hv-tree .d { flex:none; }
@@ -158,6 +161,9 @@ export interface TreesProps {
   keyOpen?: boolean;
   onKeyOpen?(open: boolean): void;
   keyFilter?: KeyFilter;
+  /** The window of the agent in focus, live, and each node's place in it (windowbar.ts). */
+  win?: WindowRead;
+  winMarks?: ReadonlyMap<string, WindowMark>;
 }
 
 const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
@@ -171,14 +177,15 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
   const mine = useMemo(() => p.events.filter((e) => e.run === a.run.run), [p.events, a.run.run]);
   const state = useMemo(() => stateAt(mine, mine.length - 1), [mine]);
   const title = a.run.title ?? a.run.run.slice(0, 8);
-  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}`} style=${`--hv-vt:${transitionName(a.slot)}`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
+  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}${big && p.win ? " win" : ""}`} style=${`--hv-vt:${transitionName(a.slot)}`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
     <div class="hd">
       <span class="d" style=${`color:${a.colour}`}>●</span>
       <span class="who" title=${big ? `${title}\nLook at it alone` : `${title}\nBring it into focus`} onClick=${big ? () => p.onOpen(a.run.run) : undefined}>${title}</span>
       ${a.placement && html`<span class="prof" title=${`${placementTip(a.placement)}${big && p.canPlace ? "\nMove it to another profile" : ""}`} onClick=${big ? (e: MouseEvent) => p.canPlace && p.onProfile(a.run.run, e) : undefined}>${placementText(a.placement)}${big && p.canPlace ? " ▾" : ""}</span>`}
       <span class="n" title=${`The nodes it hears, of all${extra?.length ? `; and ${extra.length} the harness gave it` : ""}`}>${a.hears ? (big ? `${heard.length} / ${p.nodes.length}` : heard.length) : ""}${extra?.length ? ` + ${extra.length}` : ""}</span>
     </div>
-    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} />
+    ${big && p.win && html`<${WindowBar} w=${p.win} filter=${p.keyFilter} />`}
+    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} />
   </div>`;
 };
 
