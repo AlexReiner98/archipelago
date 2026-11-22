@@ -6,8 +6,8 @@
  * menu's toggle is gone.
  *
  * A given node's id is `transcript/<run>#<name>`: one per run, so picking
- * one in an agent's tree picks it there alone. Its kind is `given`, its dot
- * a square, its name plain: you can see it, not edit it.
+ * one in an agent's tree picks it there alone. Its kind is `given`, it is
+ * orange (the `harness` token), its name plain: you can see it, not edit it.
  */
 import { h } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
@@ -15,6 +15,7 @@ import htm from "htm";
 import type { ActionInvoke } from "../../spec/action.ts";
 import type { NodeInfo } from "../../spec/agent.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
+import { channelDoc, channelOf } from "./channels.ts";
 import { PartRow } from "./events.ts";
 import type { Tree, TreeNode } from "./layout.ts";
 
@@ -82,7 +83,7 @@ export function givenOnly(tree: Tree): Set<string> {
 /**
  * Each row as a node of the run's tree. Its name says who said it, except a
  * tool's definition: the tool's bough says whose it is (the MCP server's,
- * or the harness's own), and the square dot says it was given.
+ * or the harness's own), and its orange says it was given.
  */
 export function givenNodes(run: string, rows: GivenRow[]): GivenInfo[] {
   return rows.map((r) => ({
@@ -176,6 +177,7 @@ export function GivenPane({ invoke, id, info }: { invoke: ActionInvoke; id: stri
       <div class="hv-head"><span class="t hv-cut" title=${title}>${title}</span><span class="sp"></span><span class="hv-dim" title="Given by the harness, read from the run's transcript: you can see it, not edit it">read only</span></div>
       <div class="hv-body">
         <div class="hv-kv"><span class="k">by</span><span class="v">${info?.by ?? "—"}</span></div>
+        <div class="hv-kv"><span class="k">channel</span><span class="v" title=${info ? channelDoc(channelOf(info)) : ""}>${info ? channelOf(info) : "—"}</span></div>
         <div class="hv-kv"><span class="k">place</span><span class="v">${info?.at.join(", ") ?? "—"}</span></div>
         <div class="hv-kv"><span class="k">given</span><span class="v">${info ? `${info.count} time${info.count === 1 ? "" : "s"} · ${info.size.toLocaleString()} letters` : "—"}</span></div>
         <div class="hv-given">

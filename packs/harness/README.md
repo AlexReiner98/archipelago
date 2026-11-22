@@ -22,7 +22,7 @@ background, picking none, brings the previews back.
 ## The bar ([bar.ts](bar.ts))
 
 Kept quiet: the run picker, the live dot and the ✓ ✕ ○ tally. The profile
-looked at, how the tree hangs (place, pack, profile), nodes never said,
+looked at, how the tree hangs (place, channel, pack, profile), nodes never said,
 the harness's given nodes, the key and the view's dials ([dials.ts](dials.ts), ↺ to put one back)
 are in one ⋯ menu.
 
@@ -99,8 +99,10 @@ the page never writes itself.
 
 Every node in `agent.tree` hangs under one root at its first place: tool,
 then the MCP server, then the tool; file, then its glob's top folders;
-memory, then its scope; skill, then each part of its name. "pack" hangs it
-from its pack and kind, "profile" from the profile it is in. Nodes said
+memory, then its scope; skill, then each part of its name. "channel" hangs
+it from how it reaches the agent, then who it is from (the map's pack, or
+who in the harness said it); "pack" from its pack and kind, "profile" from
+the profile it is in. Nodes said
 nowhere show on "never said". Nodes kept or retired by the keep pack hang
 from one "decided" bough as well, retired ones struck.
 
@@ -113,7 +115,8 @@ from one "decided" bough as well, retired ones struck.
 | ring | its verdict in the run (blue held, red failed, dashed quiet), once looked at to the end |
 | dot hue | its pack: the map's words purple, what grow learned gold |
 | hollow dot | its item is a trial |
-| grey: square dot, plain name, its branch | given by the harness, not the map: read only (below) |
+| orange dot, name and branch | given by the harness (Claude Code), not the map: read only (below) |
+| dot shape | its channel ([channels.ts](channels.ts)): ● hook, said at a moment by a hook; ◆ rule, a check that can refuse (a rule, the schema's refusal); ■ file, a skill or memory file the harness loads; ▲ context, there from the start (system prompt, tool definitions, MCP instructions, listings) |
 | dot size, number | how often it was said: in the run, or all time |
 | ↑ ↓ ⊝ | the keep pack's standing: promote, retire, held back by a check |
 
@@ -163,12 +166,14 @@ agent's tree, and one run's, also holds what Claude Code gave it: the
 system prompt, each tool's definition, each MCP server's instructions, the
 skill, agent and deferred tool listings, the model, and other hooks'
 context, each at its place (`transcript.given`). They are the run's own
-(id `transcript/<run>#<name>`), square and plain, named with who said
+(id `transcript/<run>#<name>`), plain, named with who said
 them (a tool's definition by its bough), and counted apart over the tree
-("72 / 72 + 65"). They are grey, not a pack's hue, and so is every bough
-that holds nothing else (`givenOnly`): what the map supplies and controls
-keeps its colour, and what Claude Code does on its own reads as grey; a
-bough both speak on (`tool:Bash`) stays the map's. Picked, the left bar shows who gave it, where, how often,
+("72 / 72 + 65"). They are orange (the style token `harness`), not a
+pack's hue, and so is every bough that holds nothing else (`givenOnly`):
+what the map supplies and controls keeps its colour, and what Claude Code
+does on its own reads as orange; a bough both speak on (`tool:Bash`) stays
+the map's. Their shape is their channel, as for the map's nodes: a hook's
+context a circle, everything else a triangle (context). Picked, the left bar shows who gave it, where, how often,
 and its text, read only and folded (`transcript.text`). "given · by the
 harness" in the ⋯ menu hides them. The run's `transcript` fact is a path,
 so it is never shown.

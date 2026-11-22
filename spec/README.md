@@ -5,7 +5,7 @@ be changed silently. Each contract is a TypeScript module (the types) and a
 short doc.
 
 <!-- contracts: written by scripts/contracts.ts from the spec -->
-This is **edition 8**. A capability that came after edition 1 shows the edition it came in.
+This is **edition 9**. A capability that came after edition 1 shows the edition it came in.
 
 | Contract | Capabilities | What it is |
 |---|---|---|
@@ -34,7 +34,8 @@ surface, and the spec owns the six places of edition 1 and edition 2's
 Edition 3 adds the place `compact` and the person's acts, `decision` and
 `notice` ([agent](agent.md)). Edition 4 says a node's same words once per
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
-([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 8 adds `slot.arrange`, an arrange laid over the
+([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 9 adds the style token `harness`, the colour of what the
+harness gave an agent rather than the map ([style](style.md)). Edition 8 adds `slot.arrange`, an arrange laid over the
 page's while a pack holds it, so a view moves fills without a reload
 ([slot](slot.md)).
 

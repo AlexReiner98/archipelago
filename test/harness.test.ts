@@ -555,3 +555,27 @@ test("nearest: a press picks the nearest node within reach of its dot; none furt
   assert.equal(nearest(pts, { x: 0, y: 40 }, HIT_PX), undefined);
   assert.ok(HIT_PX >= 20);
 });
+
+test("channels: how a node reaches the agent, as its dot's shape; hang by channel, then who", async () => {
+  const { channelOf, shapeOf, shapePath } = await import("../packs/harness/channels.ts");
+  const node = (o: Partial<NodeInfo>): NodeInfo => ({ id: `words/${o.name ?? "n"}`, name: "n", pack: "words", kind: "instruction", title: "t", at: ["prompt"], ...o });
+  assert.equal(channelOf(node({})), "hook");
+  assert.equal(channelOf(node({ kind: "rule" })), "rule");
+  assert.equal(channelOf(node({ kind: "schema_check", pack: "schema" })), "rule");
+  assert.equal(channelOf(node({ kind: "memory", pack: "loaded" })), "file");
+  assert.equal(channelOf(node({ at: ["skill:docs"] })), "file", "the map's words written into a skill");
+  assert.equal(channelOf(node({ kind: "tool_text" })), "context");
+  assert.equal(channelOf(node({ pack: "transcript", kind: "given", name: "r#system" })), "context");
+  assert.equal(channelOf(node({ pack: "transcript", kind: "given", name: "r#hook:tool:Bash:guard" })), "hook");
+  assert.deepEqual(["hook", "rule", "file", "context"].map((c) => shapeOf(c as never)), ["circle", "diamond", "square", "triangle"]);
+  assert.match(shapePath("diamond", 4), /^M0 -5L5 0L0 5L-5 0Z$/);
+  const given = (name: string) => ({ ...node({ pack: "transcript", kind: "given", name: `r#${name}`, at: ["session_start"] }), id: `transcript/r#${name}`, by: "Claude Code" }) as NodeInfo;
+  const tree = treeOf([node({ name: "a" }), node({ name: "b", kind: "rule" }), node({ name: "c", kind: "rule" }), given("system"), given("model")], { by: "channel" });
+  const path = (id: string) => {
+    const out: string[] = [];
+    for (let t = tree.byId.get(id)?.parent; t?.parent; t = t.parent) out.unshift(t.title);
+    return out.join(" / ");
+  };
+  assert.equal(path("words/b"), "rule / words");
+  assert.equal(path("transcript/r#system"), "context / Claude Code");
+});

@@ -23,7 +23,7 @@ const COLOURS: [string, Token[]][] = [
   ["verdicts", ["held", "failed", "quiet"]],
   ["marks", ["mark-fresh", "mark-moving", "mark-done", "mark-gone"]],
   ["exchange", ["say", "write", "fire"]],
-  ["sources", ["owner", "learned", "schema"]],
+  ["sources", ["owner", "learned", "schema", "harness"]],
   ["packs", [...HUES]],
   ["controls", ["control", "control-fg", "control-line"]],
 ];

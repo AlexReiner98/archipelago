@@ -21,6 +21,7 @@
  * when first laid out, and then only on a double-click (`shouldFit`): the
  * map changing under it never moves it. A click picks a node,
  */
+import { CHANNELS, channelDoc, channelOf, shapeOf, shapePath } from "./channels.ts";
 import { givenOnly, isGiven } from "./given.ts";
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -58,9 +59,10 @@ export const CANVAS_STYLE = sheet(`
 .rx-bough .rx-dot { fill-opacity:.5; }
 .rx-node { cursor:pointer; }
 .rx-trial .rx-dot { fill:none !important; stroke-width:1.2; }
-.rx-branch.given { stroke:var(--dim); }
-.rx-given .rx-name { fill:var(--dim); font-weight:400; }
-.rx-given .rx-dot { fill:var(--dim); fill-opacity:.8; }
+.rx-branch.given { stroke:var(--harness); }
+.rx-given .rx-name { fill:var(--harness); font-weight:400; }
+.rx-given .rx-dot { fill:var(--harness); fill-opacity:.9; }
+.rx-bough.rx-given .rx-name { fill:var(--harness); opacity:.8; }
 .rx-ring { fill:none; stroke-width:1.6; stroke:none; }
 .rx-ring.v-held { stroke:${C.say}; } .rx-ring.v-failed { stroke:${C.fail}; } .rx-ring.v-quiet { stroke:var(--quiet); stroke-dasharray:1.5 1.5; }
 .rx-name { fill:var(--fg); font:var(--bold) ${S.nameText}px var(--font); dominant-baseline:middle; pointer-events:none; }
@@ -238,7 +240,8 @@ export const Key = ({ hues }: { hues: Map<string, string> }) => html`
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-failed" cx="7" cy="5" r="3.5" /></svg>`, "failed")}
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-quiet" cx="7" cy="5" r="3.5" /></svg>`, "quiet")}
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:none;stroke:${v("fg")};stroke-width:1.2`} /></svg>`, "trial")}
-    ${KeyRow(html`<svg viewBox="0 0 14 10"><path d="M1 5H8" style=${`stroke:${v("dim")};stroke-width:2`} /><rect x="8" y="2" width="6" height="6" style=${`fill:${v("dim")}`} /></svg>`, "grey: the harness gave it, not the map")}
+    ${KeyRow(html`<svg viewBox="0 0 14 10"><path d="M1 5H8" style=${`stroke:${v("harness")};stroke-width:2`} /><circle cx="10" cy="5" r="3" style=${`fill:${v("harness")}`} /></svg>`, "orange: Claude Code gave it, not the map")}
+    ${CHANNELS.map((c) => KeyRow(html`<svg viewBox="0 0 14 10"><path transform="translate(7 5)" d=${shapePath(c.shape, 3.2)} style=${`fill:${v("dim")}`} /></svg>`, `${c.shape}: ${c.title}, ${c.doc}`))}
     ${[...hues].map(([p, c]) => KeyRow(html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3.5" style=${`fill:${c}`} /></svg>`, p === "words" ? "the map's words" : p === "grow" ? "learned" : p))}
   </div>
 `;
@@ -421,6 +424,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
             const id = n?.id ?? t.decided?.node;
             const trial = statusOf(n) === "trial";
             const given = isGiven(n) ? n : undefined;
+            const channel = n ? channelOf(n) : undefined;
             const ver = id ? rings?.get(id) : undefined;
             const said = id ? counts.get(id) : undefined;
             const r = id ? S.leaf + Math.min(3, Math.log2(1 + (said ?? 0)) * 0.45) : S.node;
@@ -438,18 +442,18 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
               picked && picked === id && "rx-pick",
             ].filter(Boolean).join(" ");
             const tip = given
-              ? `${n!.title}\ngiven by ${given.by}, not the map · read only\n${n!.at.join(", ")}${given.count > 1 ? `\ngiven ${given.count} times` : ""}`
+              ? `${n!.title}\ngiven by ${given.by}, not the map · read only\n${channel}: ${channelDoc(channel!)}\n${n!.at.join(", ")}${given.count > 1 ? `\ngiven ${given.count} times` : ""}`
               : !n && theirs.has(t.id)
               ? `${t.title}\nonly what the harness gave`
               : n
-              ? `${n.title}\n${n.kind} · ${n.pack}${trial ? " · trial" : ""}${hear ? ` · ${hear}` : ""}${hold ? ` · ${hold === "held" ? "held back" : "a shadow would hold it back"}` : ""}${ver ? ` · ${ver}` : ""}\n${n.at.join(", ") || "said nowhere"}${said ? `\nsaid ${said} times` : ""}`
+              ? `${n.title}\n${n.kind} · ${n.pack} · ${channel}: ${channelDoc(channel!)}${trial ? " · trial" : ""}${hear ? ` · ${hear}` : ""}${hold ? ` · ${hold === "held" ? "held back" : "a shadow would hold it back"}` : ""}${ver ? ` · ${ver}` : ""}\n${n.at.join(", ") || "said nowhere"}${said ? `\nsaid ${said} times` : ""}`
               : t.decided ? `${t.title}\n${t.decided.up ? "kept" : "retired"}` : t.title;
             return html`
               <g key=${`n:${t.id}`} data-id=${t.id} data-depth=${t.depth} class=${cls} transform=${`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
                 <title>${tip}</title>
                 ${ver && html`<circle class=${`rx-ring v-${ver}`} r=${r + 2.5} />`}
-                ${given
-                  ? html`<rect class="rx-dot" x=${-r} y=${-r} width=${2 * r} height=${2 * r} />`
+                ${channel
+                  ? html`<path class="rx-dot" d=${shapePath(shapeOf(channel), small ? 3.5 : r)} style=${!given && hue ? (trial ? `stroke:${hue}` : `fill:${hue}`) : ""} />`
                   : html`<circle class="rx-dot" r=${r} style=${hue ? (trial ? `stroke:${hue}` : `fill:${hue}`) : ""} />`}
                 <text class="rx-name" transform=${`rotate(${l.turn})`} x=${l.dx} y=${l.dy} text-anchor=${l.anchor}>${
                   l.anchor === "end"

@@ -25,6 +25,7 @@ export const LIGHT: Tokens = {
   owner: "#b06ee8",
   learned: "#d99a2b",
   schema: "#8c9bb0",
+  harness: "#d97757",
   "hue-1": "#5aa9e6",
   "hue-2": "#e07a5f",
   "hue-3": "#81b29a",
@@ -65,6 +66,7 @@ export const DARK: Tokens = {
   owner: "#c58af9",
   learned: "#e8b04a",
   schema: "#8c9bb0",
+  harness: "#e0896a",
 };
 
 export const TYPE: Tokens = {

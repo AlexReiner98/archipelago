@@ -66,7 +66,7 @@ export const Bar = (p: BarProps) => {
     return () => window.removeEventListener("pointerdown", away, true);
   }, [open]);
   const value = p.live ? "live" : p.all ? "*" : (p.pinned ?? "");
-  const groupings: Grouping[] = ["place", "pack", ...(p.profiles.length ? (["profile"] as Grouping[]) : [])];
+  const groupings: Grouping[] = ["place", "channel", "pack", ...(p.profiles.length ? (["profile"] as Grouping[]) : [])];
   return html`
     <div class="hv-bar">
       <select class="hv-select" value=${value} title="Every live run at once, every run, or one run" onChange=${(e: Event) => p.onRun((e.target as HTMLSelectElement).value)}>

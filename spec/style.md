@@ -28,7 +28,7 @@ and font, and the page still reads.
 | Verdicts | `held` `failed` `quiet` |
 | Items' marks | `mark-fresh` `mark-moving` `mark-done` `mark-gone` |
 | Exchange | `say` `write` `fire` |
-| Words' sources | `owner` `learned` `schema` |
+| Words' sources | `owner` `learned` `schema` `harness` (edition 9: what the harness gave the agent, not the map) |
 | Packs | `hue-1` … `hue-6` |
 | Controls | `control` `control-fg` `control-line` |
 | Type | `font` `mono` `text-xs` `text-s` `text-m` `text` `text-l` `leading` `bold` |

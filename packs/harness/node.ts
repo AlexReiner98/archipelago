@@ -14,6 +14,7 @@ import type { ExchangeRead } from "../../spec/exchange.ts";
 import type { HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
 import { read as token, verdictGlyph } from "../../spec/style.ts";
+import { channelDoc, channelOf } from "./channels.ts";
 import { Mark } from "./events.ts";
 import type { Hooks, VerdictRead } from "./hooks.ts";
 import type { keepParts, Review } from "./keep.ts";
@@ -181,6 +182,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
             <div class="hv-kv"><span class="k">places</span><span class="v" title=${info.at.join(", ")}>${info.at.join(", ") || "—"}</span></div>
             <div class="hv-kv"><span class="k">pack</span><span class="v">${info.pack}</span></div>
             <div class="hv-kv"><span class="k">kind</span><span class="v">${info.kind}</span></div>
+            <div class="hv-kv"><span class="k">channel</span><span class="v" title=${channelDoc(channelOf(info))}>${channelOf(info)}</span></div>
           `}
           <div class="hv-kv"><span class="k">record</span><span class="v">
             ${record

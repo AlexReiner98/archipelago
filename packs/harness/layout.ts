@@ -19,6 +19,7 @@
 import type { NodeInfo, Place } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { HUES, v } from "../../spec/style.ts";
+import { channelOf, channelTitle, isHarness } from "./channels.ts";
 
 export interface Bough {
   key: string;
@@ -47,7 +48,7 @@ export interface Tree {
   hidden: number;
 }
 
-export type Grouping = "place" | "pack" | "profile";
+export type Grouping = "place" | "pack" | "profile" | "channel";
 
 export interface TreeOptions {
   by?: Grouping;
@@ -97,6 +98,12 @@ export function boughsOf(place: Place | undefined, fileDepth = 2, most = 4): Bou
 
 /** The boughs a node hangs from. */
 function boughsFor(n: NodeInfo, o: Required<TreeOptions>): Bough[] | undefined {
+  if (o.by === "channel") {
+    // How it reaches the agent, then who it is from: the harness (who said it) or the map's pack.
+    const c = channelOf(n);
+    const who = isHarness(n) ? ((n as NodeInfo & { by?: string }).by ?? "the harness") : n.pack;
+    return [{ key: `channel:${c}`, title: channelTitle(c) }, { key: `channel:${c}:${isHarness(n) ? "h" : "m"}:${who}`, title: who }];
+  }
   if (o.by === "pack") return [{ key: `pack:${n.pack}`, title: n.pack }, { key: `pack:${n.pack}:${n.kind}`, title: words(n.kind) }];
   if (o.by === "profile") {
     const from = o.profiles.get(n.id)?.[0] ?? "no profile";

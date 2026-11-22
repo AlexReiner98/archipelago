@@ -77,6 +77,8 @@ export const TOKENS = {
   owner: "CanvasText",
   learned: "CanvasText",
   schema: "GrayText",
+  /** Edition 9: what the harness (Claude Code) gave the agent, not the map. */
+  harness: "CanvasText",
   // Packs, in turn.
   "hue-1": "CanvasText",
   "hue-2": "CanvasText",
