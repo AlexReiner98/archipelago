@@ -20,6 +20,7 @@ import { placementOf, placementText } from "../packs/harness/agents.ts";
 import { DIALS, dialsOf } from "../packs/harness/dials.ts";
 import { focusOf, heardBy, switchFocus, transitionName, treesAndRows } from "../packs/harness/trees.ts";
 import { landsLive } from "../packs/harness/hooks.ts";
+import { gotAt } from "../packs/harness/got.ts";
 
 const base = { id: "e1", run: "r", seq: 3, time: "2026-11-21T09:00:00Z" };
 const labels = (e: ExchangeEvent) => expand(e).map((p) => p.label);
@@ -618,4 +619,30 @@ test("the key lists only the marks the tree shows; a hidden filter stays so it c
   });
   for (const m of ["said", "acted", "shadow", "v-held", "trial", "map", "harness", "hook", "rule", "context", "file", "pack:words"]) assert.ok(run.has(m), m);
   for (const m of ["refused", "held", "v-failed", "v-quiet", "pack:transcript"]) assert.ok(!run.has(m), m);
+});
+
+test("an opened say shows the whole block the agent got at its moment, tagged and in the adapter's order", () => {
+  const t = "2026-11-21T09:00:00Z";
+  const ev = (seq: number, over: Partial<ExchangeEvent>): ExchangeEvent => ({ id: `e${seq}`, run: "r", seq, time: t, direction: "to_agent", kind: "say", ...over }) as ExchangeEvent;
+  const events: ExchangeEvent[] = [
+    ev(1, { kind: "begin", direction: "from_agent" }),
+    ev(2, { place: "session_start", node: "since/heard", text: "Two changes." }),
+    ev(3, { place: "session_start", node: "words/b", text: "Always b.\nAnd more." }),
+    ev(4, { place: "session_start", node: "words/a", text: "Always a." }),
+    ev(5, { place: "prompt", node: "words/a", text: "Later.", time: "2026-11-21T09:01:00Z" }),
+    ev(6, { place: "memory:project/CLAUDE.md", node: "loaded/m", text: "Loaded.", time: "2026-11-21T09:02:00Z" }),
+  ];
+  const speakers = new Map([
+    ["words/a", { title: "Rule a", kind: "instruction" }],
+    ["words/b", { title: "Rule b", kind: "instruction" }],
+    ["since/heard", { title: "Since you last heard", kind: "reflex" }],
+    ["loaded/m", { title: "project memory CLAUDE.md", kind: "memory" }],
+  ]);
+  const block = "[Rule a] Always a.\n\n[Rule b]\nAlways b.\nAnd more.\n\n[Since you last heard] Two changes.";
+  assert.equal(gotAt(events, 2, speakers), block, "the moment's says, standing first");
+  assert.equal(gotAt(events, 3, speakers), block, "any say of the moment opens the same block");
+  assert.equal(gotAt(events, 4, speakers), "[Rule a] Later.", "another moment is its own block");
+  assert.equal(gotAt(events, 5, speakers), undefined, "a load's words aren't handed back");
+  assert.equal(gotAt(events, 0, speakers), undefined, "not a say");
+  assert.deepEqual(expand(events[1]!, block).map((p) => p.label), ["kind", "node", "place", "said", "agent got", "at"]);
 });

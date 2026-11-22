@@ -97,7 +97,7 @@ test("a miss nothing covers is asked about once; the agent writes a trial node t
     await hook("s1", "PostToolUseFailure", { tool_name: "Bash", tool_input: { command: "npm run lint" }, error: 'npm ERR! Missing script: "lint"', tool_use_id: "t2" });
     const ask = await hook("s1", "Stop", { last_assistant_message: "Done." });
     assert.equal(ask.decision, "block", "the ask keeps the agent going");
-    const [seq, bashSeq] = [...ask.reason.split("\n")[0].matchAll(/#(\d+)/g)].map((m: RegExpMatchArray) => Number(m[1]));
+    const [seq, bashSeq] = [...ask.reason.split("\n").find((l: string) => l.startsWith("Before you finish"))!.matchAll(/#(\d+)/g)].map((m: RegExpMatchArray) => Number(m[1]));
     assert.match(ask.reason, /at tool:Edit, file:packs\/x\.ts: String to replace not found/);
     assert.match(ask.reason, new RegExp(`#${bashSeq} at tool:Bash: npm ERR! Missing script`), "a broad node at tool:Bash doesn't cover every Bash failure");
 
@@ -141,7 +141,7 @@ test("a miss nothing covers is asked about once; the agent writes a trial node t
     // Run 2: the trial node is said at its exact place, marked, and nowhere else.
     await hook("s2", "SessionStart", { source: "startup" });
     const at = await hook("s2", "PreToolUse", { tool_name: "Edit", tool_input: { file_path: file }, tool_use_id: "u1" });
-    assert.equal(at.hookSpecificOutput.additionalContext, `${TRIAL_MARK} Read packs/x.ts again before you edit it: it changes under you.`);
+    assert.equal(at.hookSpecificOutput.additionalContext, `[Read x.ts again before you edit it] ${TRIAL_MARK} Read packs/x.ts again before you edit it: it changes under you.`);
     const near = await hook("s2", "PreToolUse", { tool_name: "Edit", tool_input: { file_path: join(dir, "packs", "y.ts") }, tool_use_id: "u2" });
     assert.deepEqual(near, {});
 

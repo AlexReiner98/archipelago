@@ -41,12 +41,12 @@ moment's events (with the nodes' titles as loaded now). Words said at
 
 ### Reading the cache in a transcript
 
-Each assistant entry in a Claude Code transcript carries `message.usage`:
-`cache_read_input_tokens` is the part of the prompt read from the cache,
-`cache_creation_input_tokens` the part written to it. On a session's first
-entry the read is the system prompt and tools another session already
-cached (the same count across sessions of one setup); the first user
-message, where the SessionStart context sits, is written. The cache matches
+Each assistant entry in a Claude Code transcript carries its message's
+usage: the cache-read input tokens are the part of the prompt read from the
+cache, the cache-creation input tokens the part written to it. On a
+session's first entry the read is the system prompt and tools another
+session already cached (the same count across sessions of one setup); the
+first user message, where the SessionStart context sits, is written. The cache matches
 a prefix only up to a cache breakpoint, so the map's words count as read
 only when everything before such a breakpoint is the same as in a run that
 wrote it: stable standing words are what makes that possible, they don't

@@ -85,7 +85,7 @@ async function load(pack: Pack, keys: readonly string[], config: Record<string, 
 }
 
 test("the adapter's /hook, /mcp and /health refuse a foreign Host or Origin; Claude Code's own requests go through", async () => {
-  const { port, close } = await load(claudeCode, ["agent.run", "action.invoke", "action.list", "exchange.read"], access);
+  const { port, close } = await load(claudeCode, ["agent.run", "agent.tree", "action.invoke", "action.list", "exchange.read"], access);
   try {
     await cases(port, "/health");
     // A cross-site simple POST (text/plain, no preflight) is refused before its body is read.

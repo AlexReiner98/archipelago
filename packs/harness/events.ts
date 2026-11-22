@@ -14,6 +14,8 @@ import type { ExchangeEvent } from "../../spec/exchange.ts";
 import type { ProfileInfo } from "../../spec/profile.ts";
 import { read, verdictGlyph } from "../../spec/style.ts";
 import { expand, fold, type Part } from "./expand.ts";
+import { gotAt } from "./got.ts";
+import type { Speaker } from "../claude-code/context.ts";
 import type { RunVerdict, Verdict } from "./hooks.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
@@ -93,6 +95,8 @@ export interface EventsProps {
   end: boolean;
   verdicts: RunVerdict[];
   titles: Map<string, string>;
+  /** The nodes loaded now, by id: what tags their words in what the agent got. */
+  speakers?: Map<string, Speaker>;
   node?: string;
   profiles?: ProfileInfo[];
   onPick(e: ExchangeEvent): void;
@@ -103,7 +107,7 @@ export function atFoot(scrollHeight: number, scrollTop: number, clientHeight: nu
   return scrollHeight - scrollTop - clientHeight <= slack;
 }
 
-export const Events = ({ info, events, index, end, verdicts, titles, node, profiles, onPick }: EventsProps) => {
+export const Events = ({ info, events, index, end, verdicts, titles, speakers, node, profiles, onPick }: EventsProps) => {
   const body = useRef<HTMLDivElement>(null);
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const stick = useRef(true);
@@ -164,7 +168,7 @@ export const Events = ({ info, events, index, end, verdicts, titles, node, profi
                 ${e.place && html`<span class="p">${e.place}</span>`}
                 <span class="x">${what(e, titles, info?.cwd)}</span>
               </div>
-              ${isOpen && html`<div class="hv-open" onClick=${(ev: Event) => ev.stopPropagation()}>${expand(e).map((p, k) => html`<${PartRow} key=${k} p=${p} />`)}</div>`}
+              ${isOpen && html`<div class="hv-open" onClick=${(ev: Event) => ev.stopPropagation()}>${expand(e, info?.harness === "claude-code" && speakers ? gotAt(events, i, speakers) : undefined).map((p, k) => html`<${PartRow} key=${k} p=${p} />`)}</div>`}
             </div>
           `;
         })}

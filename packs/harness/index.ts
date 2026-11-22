@@ -461,9 +461,10 @@ const harness: Pack = {
       const index = playhead(events, event);
       const verdictsOfRun = hk.useVerdictsOfRun(shown);
       const titles = useMemo(() => new Map(nodes.map((n) => [n.id, n.title])), [nodes]);
+      const speakers = useMemo(() => new Map(nodes.map((n) => [n.id, { title: n.title, kind: n.kind }])), [nodes]);
       const inProfiles = hk.useRunProfiles(shownInfo);
       if (all) return html`<${Runs} runs=${inProfile} of=${profile ? (profileTitle ?? profile) : undefined} />`;
-      return html`<${Events} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} node=${picked} profiles=${inProfiles} onPick=${(e: ExchangeEvent) => {
+      return html`<${Events} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} speakers=${speakers} node=${picked} profiles=${inProfiles} onPick=${(e: ExchangeEvent) => {
         set.set(KEYS.event, e.id);
         // The node pane follows: the event's node, or for an act the node it failed or was told just before.
         set.set(KEYS.node, nodeOf(events, events.indexOf(e), verdictsOfRun));

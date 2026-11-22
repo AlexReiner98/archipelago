@@ -32,7 +32,7 @@ export function tagOf(node: string, speakers?: Speakers): string {
     .split(/\s+/)
     .map((w) => (/[\\/]/.test(w) && !ID.test(w) ? (w.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? "") : w))
     .filter((w) => w && !ID.test(w) && w !== node);
-  let tag = words.join(" ").trim();
+  let tag = words.join(" ").trim().replace(/[\s:;,.]+$/, "");
   if (!tag) tag = s?.kind ?? "node";
   if (tag.length > TAG_MAX) {
     const cut = tag.slice(0, TAG_MAX - 1);

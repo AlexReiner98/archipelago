@@ -172,7 +172,11 @@ scrolled up to read, it stays where it is. A click
 picks its node for the node pane: its own, or for an act the node it
 failed, else the node told just before it (`nodeOf`, replay.ts); and it
 opens the line in place ([expand.ts](expand.ts)): for the map to the agent,
-the node, place, pack and what was said, whole; for the agent to the map,
+the node, place, pack and what was said, whole, then, for a Claude Code
+run, "agent got": the whole block the hook handed the agent at that moment,
+each node's words under its tag and in the adapter's order, rebuilt with
+the adapter's own formatting ([got.ts](got.ts), packs/claude-code/context.ts);
+for the agent to the map,
 the act's input and output field by field, each label over its value.
 Each part folds past a dozen lines. A red edge: the event failed the node picked.
 

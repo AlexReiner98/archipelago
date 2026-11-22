@@ -4,7 +4,8 @@
  * reach it without a page.
  *
  * - The map to the agent: what a node said or refused (whole), its node,
- *   place and pack; a gate's hold and why.
+ *   place and pack; a gate's hold and why; for a Claude Code run, the whole
+ *   block the agent got at that moment (got.ts).
  * - The agent to the map: an act's kind, who did it, and its input and
  *   output field by field (a tool call's arguments, a `tell`'s words, an
  *   action's input, a prompt or a reply in full); whether it worked.
@@ -63,8 +64,8 @@ function output(v: Json | undefined): Json | undefined {
   return v;
 }
 
-/** Every part of one event, in the order it reads. */
-export function expand(e: ExchangeEvent): Part[] {
+/** Every part of one event, in the order it reads. `got`: the block the agent got at its moment (got.ts), after the words. */
+export function expand(e: ExchangeEvent, got?: string): Part[] {
   const out: Part[] = [];
   const head = (label: string, text: string | undefined) => text && out.push({ label, text });
   if (e.act) {
@@ -86,6 +87,7 @@ export function expand(e: ExchangeEvent): Part[] {
     head("place", e.place);
     head("pack", e.pack);
     if (e.text) out.push({ label: e.kind === "refuse" ? "refused" : e.kind === "say" ? "said" : "text", text: e.text });
+    if (got) out.push({ label: "agent got", text: got });
   }
   if (e.detail !== undefined && e.detail !== null) out.push(...fields("detail", e.detail));
   head("at", `#${e.seq} · ${e.time}`);
