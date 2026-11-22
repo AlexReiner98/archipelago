@@ -744,3 +744,13 @@ test("the map's own row: each node it controls in the window, biggest first, nam
   assert.deepEqual(shares.map((s) => [s.id, s.pack, s.tokens, s.state]), [["loaded/mem", "loaded", 400, "said"], ["words/a", "words", 100, "said"], ["loaded/docs", "loaded", 3, "listed"]], "the map's alone, dropped left out");
   assert.ok(!shares[0]!.title.includes("Users"), "never a path");
 });
+
+test("the wire names give way the same through the grid: a crowded name hides, the first of two overlapping keeps", async () => {
+  const { crowded } = await import("../packs/harness/labels.ts");
+  const sq = (x: number, y: number, w = 10, h = 10): [number, number][] => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+  // Far apart across many cells, one on a dot, two on each other, one spanning cells.
+  const names = [sq(0, 0), sq(500, 500), sq(1000, 0), sq(1005, 5), sq(60, 200, 200, 10)];
+  const shown = [sq(505, 505, 2, 2), sq(250, 205, 4, 4)];
+  assert.deepEqual(crowded(names, shown), [false, true, false, true, true]);
+  assert.deepEqual(crowded([], shown), []);
+});

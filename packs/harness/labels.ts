@@ -31,12 +31,42 @@ export function quadsOverlap(a: Quad, b: Quad): boolean {
   return true;
 }
 
+/** The grid's cell, in screen pixels: a quad is tested only against those in the cells its box touches. */
+const CELL = 64;
+
+/** A grid of quads by the cells their boxes touch. */
+class Grid {
+  private cells = new Map<string, Quad[]>();
+  private keys(q: Quad): string[] {
+    if (!q.length) return [];
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y] of q) (x0 = Math.min(x0, x)), (y0 = Math.min(y0, y)), (x1 = Math.max(x1, x)), (y1 = Math.max(y1, y));
+    const out: string[] = [];
+    for (let i = Math.floor(x0 / CELL); i <= Math.floor(x1 / CELL); i++) for (let j = Math.floor(y0 / CELL); j <= Math.floor(y1 / CELL); j++) out.push(`${i},${j}`);
+    return out;
+  }
+  add(q: Quad) {
+    for (const k of this.keys(q)) (this.cells.get(k) ?? (this.cells.set(k, []), this.cells.get(k)!)).push(q);
+  }
+  hits(q: Quad): boolean {
+    const seen = new Set<Quad>();
+    for (const k of this.keys(q))
+      for (const s of this.cells.get(k) ?? []) {
+        if (seen.has(s)) continue;
+        seen.add(s);
+        if (quadsOverlap(q, s)) return true;
+      }
+    return false;
+  }
+}
+
 /** Which of the wire names to hide: in order (nearest the root first), each that overlaps a shown thing or a name kept before it. */
 export function crowded(names: Quad[], shown: Quad[]): boolean[] {
-  const kept: Quad[] = [];
+  const grid = new Grid();
+  for (const s of shown) grid.add(s);
   return names.map((q) => {
-    const hit = shown.some((s) => quadsOverlap(q, s)) || kept.some((k) => quadsOverlap(q, k));
-    if (!hit) kept.push(q);
+    const hit = grid.hits(q);
+    if (!hit) grid.add(q);
     return hit;
   });
 }

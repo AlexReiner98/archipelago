@@ -16,7 +16,8 @@
  * - Small (one agent's tree among many, trees.ts): names show only on what
  *   is lit, said or picked.
  *
- * Drag to move, wheel to zoom, double-click to fit. A press picks a node by
+ * Drag to move, wheel to zoom, double-click to fit: the camera is set on the
+ * picture's transform as it moves, and the tree drawn again once it settles. A press picks a node by
  * its name, or within HIT_PX of its dot. The camera fits once,
  * when first laid out, and then only on a double-click (`shouldFit`): the
  * map changing under it never moves it. A click picks a node,
@@ -305,12 +306,38 @@ export interface CanvasProps {
   window?: ReadonlyMap<string, WindowMark>;
 }
 
+/** How long after the last wheel or move the picture is drawn again for its zoom. */
+export const SETTLE_MS = 140;
+/** The camera as the picture's transform. */
+export const cameraOf = (v: { x: number; y: number; k: number }) => `scale(${v.k}) translate(${-v.x} ${-v.y})`;
+
 export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const svg = useRef<SVGSVGElement>(null);
   const fxGroup = useRef<SVGGElement>(null);
-  const [view, setView] = useState({ x: placed.box.x, y: placed.box.y, k: 1 });
-  const [panning, setPanning] = useState(false);
+  // The camera: kept in a ref and set straight on the picture's transform while a wheel or a drag goes on, so
+  // moving draws nothing again; one render follows once it settles (SETTLE_MS), for what depends on the zoom.
+  const viewRef = useRef({ x: placed.box.x, y: placed.box.y, k: 1 });
+  const camera = useRef<SVGGElement>(null);
+  const [, rendered] = useState(0);
+  const settle = useRef(0);
+  const moving = useRef(false);
+  const view = viewRef.current;
+  const setView = (v: { x: number; y: number; k: number }) => {
+    viewRef.current = v;
+    rendered((n) => n + 1);
+  };
+  /** While moving: the transform alone, and a render once it settles. */
+  const glide = (v: { x: number; y: number; k: number }) => {
+    viewRef.current = v;
+    now.current.k = v.k;
+    moving.current = true;
+    camera.current?.setAttribute("transform", cameraOf(v));
+    clearTimeout(settle.current);
+    settle.current = window.setTimeout(() => ((moving.current = false), rendered((n) => n + 1)), SETTLE_MS);
+  };
+  useEffect(() => () => clearTimeout(settle.current), []);
+  const panning = useRef(false);
   const [fits, refit] = useState(0);
   const now = useRef({ tree, placed, k: view.k });
   now.current = { tree, placed, k: view.k };
@@ -355,7 +382,8 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
 
   const toWorld = (e: { clientX: number; clientY: number }) => {
     const r = box.current!.getBoundingClientRect();
-    return { x: view.x + (e.clientX - r.left) / view.k, y: view.y + (e.clientY - r.top) / view.k };
+    const v = viewRef.current;
+    return { x: v.x + (e.clientX - r.left) / v.k, y: v.y + (e.clientY - r.top) / v.k };
   };
   const hit = (p: { x: number; y: number }) => {
     const pts = tree.order.flatMap((t) => {
@@ -363,7 +391,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
       const q = placed.xy.get(t.id);
       return id && q ? [{ id, x: q.x, y: q.y }] : [];
     });
-    return nearest(pts, p, HIT_PX / view.k);
+    return nearest(pts, p, HIT_PX / viewRef.current.k);
   };
   /** A node's name is part of it: a press on the name picks it. */
   const named = (target: EventTarget | null) => {
@@ -375,14 +403,14 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     e.preventDefault();
     manual.current = true;
     const p = toWorld(e);
-    const k = Math.min(6, Math.max(0.05, view.k * Math.exp(-e.deltaY * 0.0015)));
+    const k = Math.min(6, Math.max(0.05, viewRef.current.k * Math.exp(-e.deltaY * 0.0015)));
     const r = box.current!.getBoundingClientRect();
-    setView({ k, x: p.x - (e.clientX - r.left) / k, y: p.y - (e.clientY - r.top) / k });
+    glide({ k, x: p.x - (e.clientX - r.left) / k, y: p.y - (e.clientY - r.top) / k });
   };
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
     const on = named(e.target) ?? hit(toWorld(e));
-    const start = { cx: e.clientX, cy: e.clientY, view };
+    const start = { cx: e.clientX, cy: e.clientY, view: viewRef.current };
     let moved = false;
     const el = box.current!;
     el.setPointerCapture(e.pointerId);
@@ -390,14 +418,15 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
       if (!moved && Math.hypot(m.clientX - start.cx, m.clientY - start.cy) < 4) return;
       moved = true;
       manual.current = true;
-      setPanning(true);
-      setView({ ...start.view, x: start.view.x - (m.clientX - start.cx) / start.view.k, y: start.view.y - (m.clientY - start.cy) / start.view.k });
+      if (!panning.current) (panning.current = true), box.current?.classList.add("panning");
+      glide({ ...start.view, x: start.view.x - (m.clientX - start.cx) / start.view.k, y: start.view.y - (m.clientY - start.cy) / start.view.k });
     };
     const up = () => {
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", up);
       el.removeEventListener("pointercancel", up);
-      setPanning(false);
+      panning.current = false;
+      box.current?.classList.remove("panning");
       if (!moved) onPick(on);
     };
     el.addEventListener("pointermove", move);
@@ -405,8 +434,10 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     el.addEventListener("pointercancel", up);
   };
 
-  // The names on the wires give way: after each draw, those that overlap anything fade (labels.ts).
+  // The names on the wires give way: after each draw, those that overlap anything fade (labels.ts). Not while
+  // moving: the names scale with the picture, so what overlaps stays the same until it settles.
   useEffect(() => {
+    if (moving.current) return;
     const f = requestAnimationFrame(() => svg.current && fadeCrowded(svg.current));
     return () => cancelAnimationFrame(f);
   });
@@ -427,8 +458,8 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   const theirs = useMemo(() => givenOnly(tree), [tree]);
   const rest = tree.order.filter((t) => t.parent);
   return html`
-    <div class=${`rx-canvas${panning ? " panning" : ""}${small ? " rx-small" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${() => ((manual.current = false), (ask.current = true), refit((n) => n + 1))}>
-      <svg ref=${svg}><g transform=${`scale(${view.k}) translate(${-view.x} ${-view.y})`}>
+    <div class=${`rx-canvas${small ? " rx-small" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${() => ((manual.current = false), (ask.current = true), refit((n) => n + 1))}>
+      <svg ref=${svg}><g ref=${camera} transform=${cameraOf(view)}>
         <g>
           ${rest.map((t) => {
             const b = branchAt(t.depth);

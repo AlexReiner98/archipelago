@@ -163,6 +163,13 @@ The names on the wires (a bough's, along its branch) grow and shrink with
 the zoom, and give way ([labels.ts](labels.ts)): after each draw, one that
 overlaps a node's name or dot, a bough's dot, the root or a wire name
 nearer the root fades out, and comes back when zoom or a move clears it.
+Each is tested only against what shares its cells of a 64 px grid.
+
+Moving and zooming draw nothing again: the camera is set straight on the
+picture's transform while a wheel or a drag goes on, and the tree is drawn
+once more when it settles (140 ms after the last, `SETTLE_MS`), for what
+depends on the zoom (the shapes' least size on screen) and for the wire
+names giving way, which stay as they were while it moves.
 
 ## The window ([windowbar.ts](windowbar.ts))
 
