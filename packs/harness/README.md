@@ -23,7 +23,7 @@ background, picking none, brings the previews back.
 
 Kept quiet: the run picker, the live dot and the ✓ ✕ ○ tally. The profile
 looked at, how the tree hangs (place, pack, profile), nodes never said,
-the key and the view's dials ([dials.ts](dials.ts), ↺ to put one back)
+the harness's given nodes, the key and the view's dials ([dials.ts](dials.ts), ↺ to put one back)
 are in one ⋯ menu.
 
 ## Picking
@@ -113,6 +113,7 @@ from one "decided" bough as well, retired ones struck.
 | ring | its verdict in the run (blue held, red failed, dashed quiet), once looked at to the end |
 | dot hue | its pack: the map's words purple, what grow learned gold |
 | hollow dot | its item is a trial |
+| square dot, plain name | given by the harness, not the map: read only (below) |
 | dot size, number | how often it was said: in the run, or all time |
 | ↑ ↓ ⊝ | the keep pack's standing: promote, retire, held back by a check |
 
@@ -154,6 +155,20 @@ opens the line in place ([expand.ts](expand.ts)): for the map to the agent,
 the node, place, pack and what was said, whole; for the agent to the map,
 the act's input and output field by field, each label over its value.
 Each part folds past a dozen lines. A red edge: the event failed the node picked.
+
+## What the harness gave ([given.ts](given.ts))
+
+With the transcript pack ([transcript](../transcript/README.md)), each
+agent's tree, and one run's, also holds what Claude Code gave it: the
+system prompt, each tool's definition, each MCP server's instructions, the
+skill, agent and deferred tool listings, the model, and other hooks'
+context, each at its place (`transcript.given`). They are the run's own
+(id `transcript/<run>#<name>`), square and plain, named with who said
+them (a tool's definition by its bough), and counted apart over the tree
+("72 / 72 + 65"). Picked, the left bar shows who gave it, where, how often,
+and its text, read only and folded (`transcript.text`). "given · by the
+harness" in the ⋯ menu hides them. The run's `transcript` fact is a path,
+so it is never shown.
 
 ## The node ([node.ts](node.ts), [keep.ts](keep.ts))
 

@@ -75,7 +75,7 @@ export function what(e: ExchangeEvent, titles: Map<string, string>, cwd?: string
 }
 
 /** One part of an opened row, its text folded past a dozen lines. */
-const PartRow = ({ p }: { p: Part }) => {
+export const PartRow = ({ p }: { p: Part }) => {
   const [all, setAll] = useState(false);
   const f = fold(p.text);
   return html`<div class="hv-part">
@@ -125,7 +125,8 @@ export const Events = ({ info, events, index, end, verdicts, titles, node, profi
     const el = body.current;
     if (el && !end && at) el.querySelector(`[data-ev="${CSS.escape(at.id)}"]`)?.scrollIntoView({ block: "nearest" });
   }, [at?.id]);
-  const facts = info?.facts ?? {};
+  // The transcript fact is a path on this machine: never shown.
+  const facts = Object.fromEntries(Object.entries(info?.facts ?? {}).filter(([k]) => k !== "transcript"));
   return html`
     <div class="hv-pane">
       <div class="hv-head" title=${Object.entries(facts).map(([k, x]) => `${k}: ${Array.isArray(x) ? x.join(", ") : x}`).join("\n")}>

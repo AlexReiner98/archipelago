@@ -48,6 +48,10 @@ export interface BarProps {
   onBy(by: Grouping): void;
   onUnsaid(on: boolean): void;
   onKey(on: boolean): void;
+  /** How many nodes the harness gave the agents shown; absent when nothing reads transcripts. */
+  given?: number;
+  showGiven?: boolean;
+  onGiven?(on: boolean): void;
   /** More in the menu, under the rest: the view's dials. */
   more?: unknown;
 }
@@ -86,6 +90,7 @@ export const Bar = (p: BarProps) => {
           </label>
           <span class="row" title="How the tree hangs its nodes"><span class="k">hang by</span>${groupings.map((g, i) => html`${i > 0 && html`<span>·</span>`}<button class=${p.by === g ? "on" : ""} onClick=${() => p.onBy(g)}>${g}</button>`)}</span>
           ${p.by === "place" && html`<span class="row" title="Nodes with no place: kept, never said"><span class="k">show</span><button class=${p.unsaid ? "on" : ""} onClick=${() => p.onUnsaid(!p.unsaid)}>never said${p.hidden > 0 ? ` · ${p.hidden}` : ""}</button></span>`}
+          ${p.given !== undefined && html`<span class="row" title="What the harness gave the agent (system prompt, tools, MCP instructions, listings, other hooks), read from its transcript: read only"><span class="k">given</span><button class=${p.showGiven ? "on" : ""} onClick=${() => p.onGiven?.(!p.showGiven)}>by the harness${p.showGiven && p.given > 0 ? ` · ${p.given}` : ""}</button></span>`}
           <span class="row"><span class="k">marks</span><button class=${p.showKey ? "on" : ""} onClick=${() => p.onKey(!p.showKey)} title="What the marks mean">key</button></span>
           ${p.more}
         </div>`}

@@ -321,7 +321,24 @@ function startFacts(input: HookInput, sub: boolean): Record<string, string> {
   const facts: Record<string, string> = {};
   if (sub && typeof input.agent_type === "string" && input.agent_type) facts.agent_type = input.agent_type;
   if (typeof input.git_remote === "string" && input.git_remote) facts.remote = input.git_remote;
+  const path = transcriptPath(input, sub);
+  if (path) facts.transcript = path;
   return facts;
+}
+
+/**
+ * The run's own transcript (packs/transcript reads it): the session's
+ * `transcript_path`; a subagent's is beside it, in the session's
+ * `subagents` folder, named by its agent id.
+ */
+export function transcriptPath(input: Pick<HookInput, "transcript_path" | "agent_transcript_path" | "session_id" | "agent_id">, sub: boolean): string | undefined {
+  if (sub && typeof input.agent_transcript_path === "string" && input.agent_transcript_path) return input.agent_transcript_path;
+  const main = typeof input.transcript_path === "string" ? input.transcript_path : undefined;
+  if (!main || !sub) return main || undefined;
+  const at = /^(.*[\\/])([^\\/]+)\.jsonl$/i.exec(main);
+  if (!at || !input.agent_id) return undefined;
+  const sep = main.includes("\\") ? "\\" : "/";
+  return `${at[1]}${at[2]}${sep}subagents${sep}agent-${input.agent_id}.jsonl`;
 }
 
 /** Handles one hook: calls `agent.run` and answers what the hook prints. */

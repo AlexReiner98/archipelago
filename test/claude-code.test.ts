@@ -12,7 +12,7 @@ import agent from "../packs/agent/index.ts";
 import graph from "../packs/graph/index.ts";
 import exchange from "../packs/exchange/index.ts";
 import claudeCode from "../packs/claude-code/index.ts";
-import { handle, lastAssistantText, relativePath, toolPlaces, unseenFailures, type HookInput, type RunPort } from "../packs/claude-code/mapping.ts";
+import { handle, lastAssistantText, relativePath, toolPlaces, transcriptPath, unseenFailures, type HookInput, type RunPort } from "../packs/claude-code/mapping.ts";
 import { rpc } from "../packs/claude-code/mcp.ts";
 import { withRemote } from "../packs/claude-code/hook.ts";
 import mcpPack from "../packs/mcp/index.ts";
@@ -479,6 +479,17 @@ test("the hook's remote is a fact of the run it begins", async () => {
   const none = fake();
   await none.go({ hook_event_name: "SessionStart" });
   assert.equal((none.calls[0]![1] as RunStart).facts, undefined);
+});
+
+test("the run's transcript is a fact: the session's own, a subagent's in its subagents folder", async () => {
+  const { calls, go } = fake();
+  await go({ hook_event_name: "SessionStart", transcript_path: "C:\p\s1.jsonl" });
+  assert.deepEqual((calls[0]![1] as RunStart).facts, { transcript: "C:\p\s1.jsonl" });
+  const sub = fake();
+  await sub.go({ hook_event_name: "SubagentStart", agent_id: "a9", transcript_path: "/h/p/s1.jsonl" });
+  assert.equal((sub.calls[0]![1] as RunStart).facts?.transcript, "/h/p/s1/subagents/agent-a9.jsonl");
+  assert.equal(transcriptPath({ session_id: "s1", agent_id: "a9", transcript_path: "/h/p/s1.jsonl", agent_transcript_path: "/x/own.jsonl" }, true), "/x/own.jsonl");
+  assert.equal(transcriptPath({ session_id: "s1", agent_id: "a9", transcript_path: "not a file" }, true), undefined);
 });
 
 test("at Stop, the turn's failed tool calls no hook saw are read from the transcript and recorded as failed acts", async () => {

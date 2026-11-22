@@ -127,6 +127,13 @@ hook.ts adds `git_remote`: origin of the session's folder as
 run begins with it as its `remote` fact, so a server that can't see the
 folder still knows the repository ([git](../git/README.md)).
 
+The run's transcript is its `transcript` fact: the hook's
+`transcript_path`, and for a subagent its own file (`agent_transcript_path`,
+else `<session>/subagents/agent-<agent_id>.jsonl` beside the session's).
+The transcript pack reads what the agent was given from it
+([transcript](../transcript/README.md)). It is a path on this machine, so
+the sensory interface never shows it.
+
 ## Every session
 
 To have every Claude Code session, in any repo, report here: run the live

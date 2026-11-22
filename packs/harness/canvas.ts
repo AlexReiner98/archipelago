@@ -21,6 +21,7 @@
  * when first laid out, and then only on a double-click (`shouldFit`): the
  * map changing under it never moves it. A click picks a node,
  */
+import { isGiven } from "./given.ts";
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
@@ -57,6 +58,8 @@ export const CANVAS_STYLE = sheet(`
 .rx-bough .rx-dot { fill-opacity:.5; }
 .rx-node { cursor:pointer; }
 .rx-trial .rx-dot { fill:none !important; stroke-width:1.2; }
+.rx-given .rx-name { fill:var(--dim); font-weight:400; }
+.rx-given .rx-dot { fill-opacity:.7; }
 .rx-ring { fill:none; stroke-width:1.6; stroke:none; }
 .rx-ring.v-held { stroke:${C.say}; } .rx-ring.v-failed { stroke:${C.fail}; } .rx-ring.v-quiet { stroke:var(--quiet); stroke-dasharray:1.5 1.5; }
 .rx-name { fill:var(--fg); font:var(--bold) ${S.nameText}px var(--font); dominant-baseline:middle; pointer-events:none; }
@@ -234,6 +237,7 @@ export const Key = ({ hues }: { hues: Map<string, string> }) => html`
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-failed" cx="7" cy="5" r="3.5" /></svg>`, "failed")}
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-quiet" cx="7" cy="5" r="3.5" /></svg>`, "quiet")}
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:none;stroke:${v("fg")};stroke-width:1.2`} /></svg>`, "trial")}
+    ${KeyRow(html`<svg viewBox="0 0 14 10"><rect x="4" y="2" width="6" height="6" style=${`fill:${v("dim")}`} /></svg>`, "given by the harness, read only")}
     ${[...hues].map(([p, c]) => KeyRow(html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3.5" style=${`fill:${c}`} /></svg>`, p === "words" ? "the map's words" : p === "grow" ? "learned" : p))}
   </div>
 `;
@@ -413,6 +417,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
             const n = t.node;
             const id = n?.id ?? t.decided?.node;
             const trial = statusOf(n) === "trial";
+            const given = isGiven(n) ? n : undefined;
             const ver = id ? rings?.get(id) : undefined;
             const said = id ? counts.get(id) : undefined;
             const r = id ? S.leaf + Math.min(3, Math.log2(1 + (said ?? 0)) * 0.45) : S.node;
@@ -423,19 +428,27 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
             const cls = [
               id ? "rx-node" : "rx-bough",
               trial && "rx-trial",
+              given && "rx-given",
               hear && `rx-${hear}`,
               hold && `rx-${hold}`,
               t.decided && !t.decided.up && "rx-retired",
               picked && picked === id && "rx-pick",
             ].filter(Boolean).join(" ");
-            const tip = n
+            const tip = given
+              ? `${n!.title}
+given by ${given.by} · read only
+${n!.at.join(", ")}${given.count > 1 ? `
+given ${given.count} times` : ""}`
+              : n
               ? `${n.title}\n${n.kind} · ${n.pack}${trial ? " · trial" : ""}${hear ? ` · ${hear}` : ""}${hold ? ` · ${hold === "held" ? "held back" : "a shadow would hold it back"}` : ""}${ver ? ` · ${ver}` : ""}\n${n.at.join(", ") || "said nowhere"}${said ? `\nsaid ${said} times` : ""}`
               : t.decided ? `${t.title}\n${t.decided.up ? "kept" : "retired"}` : t.title;
             return html`
               <g key=${`n:${t.id}`} data-id=${t.id} data-depth=${t.depth} class=${cls} transform=${`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
                 <title>${tip}</title>
                 ${ver && html`<circle class=${`rx-ring v-${ver}`} r=${r + 2.5} />`}
-                <circle class="rx-dot" r=${r} style=${hue ? (trial ? `stroke:${hue}` : `fill:${hue}`) : ""} />
+                ${given
+                  ? html`<rect class="rx-dot" x=${-r} y=${-r} width=${2 * r} height=${2 * r} style=${hue ? `fill:${hue}` : ""} />`
+                  : html`<circle class="rx-dot" r=${r} style=${hue ? (trial ? `stroke:${hue}` : `fill:${hue}`) : ""} />`}
                 <text class="rx-name" transform=${`rotate(${l.turn})`} x=${l.dx} y=${l.dy} text-anchor=${l.anchor}>${
                   l.anchor === "end"
                     ? html`${st && html`<tspan class=${st}>${STANDING[st]} </tspan>`}${said ? html`<tspan class="c">${said} </tspan>` : ""}${l.text}`

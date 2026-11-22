@@ -47,6 +47,7 @@ import { Bar, BAR_STYLE } from "./bar.ts";
 import { KEEP_STYLE, keepParts } from "./keep.ts";
 import { packHues, radial, treeOf, type Grouping } from "./layout.ts";
 import { nodePane } from "./node.ts";
+import { GIVEN, GivenPane, parseGiven, useGiven, type GivenInfo } from "./given.ts";
 import { holdsOf, nodeOf, playhead, stateAt } from "./replay.ts";
 import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
 
@@ -96,6 +97,7 @@ const STYLE = sheet(`
 .hv-kv .k { color:var(--dim); width:4.5em; flex:none; }
 .hv-kv .v { overflow:hidden; text-overflow:ellipsis; }
 .hv-words { margin:var(--space-3) var(--space-4); }
+.hv-given { padding:var(--space-2) var(--space-4); }
 .hv-words textarea { width:100%; box-sizing:border-box; min-height:84px; overflow:hidden; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-2) var(--space-3); resize:none; }
 .hv-words .ro { white-space:pre-wrap; padding:var(--space-2) var(--space-3); border-left:2px solid var(--line); }
 .hv-words .bar { display:flex; gap:var(--space-3); align-items:center; margin-top:var(--space-2); color:var(--dim); white-space:nowrap; }
@@ -244,9 +246,21 @@ const harness: Pack = {
         () => (review?.nodes ?? []).filter((r) => r.decided && (r.node ?? r.decided.node)).map((r) => ({ node: (r.node ?? r.decided!.node)!, title: r.title, up: r.decided!.state === "promote" })),
         [review],
       );
-      const tree = useMemo(() => treeOf(nodes, { by, unsaid, profiles: membership, decided }), [nodes, by, unsaid, membership, decided]);
+      // What the harness gave each agent shown (packs/transcript): read-only nodes in its tree, a toggle in the ⋯ menu.
+      const hasGiven = hk.useHas(GIVEN);
+      const [showGiven, setShowGiven] = useState(true);
+      const focusNow = hk.useHere<string>(FOCUS);
+      const givenRuns = useMemo(() => {
+        if (!live) return run ? [run] : [];
+        const ids = lives.map((r) => r.run);
+        return treesAndRows(ids, focusOf(ids, focusNow)).trees;
+      }, [live, run, lives, focusNow]);
+      const given = useGiven(invoke, hasGiven, showGiven, givenRuns, live ? liveEvents.length : events.length);
+      const shownGiven = (live ? given.get(focusOf(lives.map((r) => r.run), focusNow) ?? "") : run ? given.get(run) : undefined) ?? [];
+      const treeNodes = useMemo(() => (!live && shownGiven.length ? [...nodes, ...shownGiven] : nodes), [live, nodes, shownGiven]);
+      const tree = useMemo(() => treeOf(treeNodes, { by, unsaid, profiles: membership, decided }), [treeNodes, by, unsaid, membership, decided]);
       const placed = useMemo(() => radial(tree), [tree]);
-      const hues = useMemo(() => packHues(nodes.map((n) => n.pack)), [nodes]);
+      const hues = useMemo(() => packHues([...nodes.map((n) => n.pack), ...(given.size ? ["transcript"] : [])]), [nodes, given.size > 0]);
       // Live: each run an agent with a tree of its own (what it hears), in its colour, its profile over it.
       const dials = useDials(here);
       const acting = useMemo(() => new Set(liveEvents.map((e) => e.run)), [liveEvents]);
@@ -345,6 +359,7 @@ const harness: Pack = {
             runs=${runs} live=${live} all=${all} pinned=${pinned} info=${info} sum=${sum} profile=${profile} profiles=${profileList}
             by=${by} hidden=${tree.hidden} unsaid=${unsaid} showKey=${showKey}
             onBy=${setBy} onUnsaid=${setUnsaid} onKey=${setShowKey}
+            given=${hasGiven ? shownGiven.length : undefined} showGiven=${showGiven} onGiven=${setShowGiven}
             onRun=${(val: string) => {
               set.set(KEYS.event, undefined);
               set.set(PROFILE, undefined);
@@ -368,10 +383,10 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} />`
+              ? html`<${Trees} agents=${agents} nodes=${nodes} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${given} />`
               : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
                   <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${showKey} />
-                  ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} /></div>`}
+                  ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} /></div>`}
                 </div>`}
             ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
             ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${lives.find((r) => r.run === menu.run)?.title ?? menu.run.slice(0, 8)} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}
@@ -441,11 +456,19 @@ const harness: Pack = {
       return useMemo(() => (had.current = colours(lives.map((r) => r.run), had.current)), [lives.map((r) => r.run).join(",")]);
     };
 
-    const NodeFill = () => html`<${node.Pane} nodes=${hk.useNodes()} review=${kp.useReview()} />`;
+    const NodeFill = ({ given }: { given?: Map<string, GivenInfo[]> }) => {
+      const picked = hk.useHere<string>(KEYS.node);
+      const nodes = hk.useNodes();
+      const review = kp.useReview();
+      const at = parseGiven(picked);
+      // A node the harness gave: its text, read only (given.ts).
+      if (at) return html`<${GivenPane} key=${picked} invoke=${invoke} id=${picked} info=${given?.get(at.run)?.find((g) => g.id === picked)} />`;
+      return html`<${node.Pane} nodes=${nodes} review=${review} />`;
+    };
     /** The node in the left bar, under a way back: to the previews, or closed. */
-    const NodeSide = ({ label, tip, onBack }: { label: string; tip: string; onBack(): void }) => html`
+    const NodeSide = ({ label, tip, onBack, given }: { label: string; tip: string; onBack(): void; given?: Map<string, GivenInfo[]> }) => html`
       <div class="hv-back"><button title=${tip} onClick=${onBack}>${label}</button></div>
-      <${NodeFill} />`;
+      <${NodeFill} given=${given} />`;
 
     ctx.effect(() => {
       const style = document.createElement("style");

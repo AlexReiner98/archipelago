@@ -150,12 +150,16 @@ export interface TreesProps {
   /** What the left bar shows instead of the previews: the node picked. */
   side?: unknown;
   onFocus(run: string): void;
+  /** What the harness gave each agent, by run: read-only nodes hung into its tree (given.ts). */
+  given?: Map<string, NodeInfo[]>;
 }
 
 const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
   // Keyed by what it hears, not by the set read: hearing is read again often, mostly the same.
   const hearsKey = a.hears ? [...a.hears].sort().join(",") : "*";
-  const nodes = useMemo(() => heardBy(p.nodes, a.hears), [p.nodes, hearsKey]);
+  const extra = p.given?.get(a.run.run);
+  const heard = useMemo(() => heardBy(p.nodes, a.hears), [p.nodes, hearsKey]);
+  const nodes = useMemo(() => (extra?.length ? [...heard, ...extra] : heard), [heard, extra]);
   const tree = useMemo(() => treeOf(nodes, { by: p.by }), [nodes, p.by]);
   const placed = useMemo(() => radial(tree), [tree]);
   const mine = useMemo(() => p.events.filter((e) => e.run === a.run.run), [p.events, a.run.run]);
@@ -166,7 +170,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
       <span class="d" style=${`color:${a.colour}`}>●</span>
       <span class="who" title=${big ? `${title}\nLook at it alone` : `${title}\nBring it into focus`} onClick=${big ? () => p.onOpen(a.run.run) : undefined}>${title}</span>
       ${a.placement && html`<span class="prof" title=${`${placementTip(a.placement)}${big && p.canPlace ? "\nMove it to another profile" : ""}`} onClick=${big ? (e: MouseEvent) => p.canPlace && p.onProfile(a.run.run, e) : undefined}>${placementText(a.placement)}${big && p.canPlace ? " ▾" : ""}</span>`}
-      <span class="n" title="The nodes it hears, of all">${a.hears ? (big ? `${nodes.length} / ${p.nodes.length}` : nodes.length) : ""}</span>
+      <span class="n" title=${`The nodes it hears, of all${extra?.length ? `; and ${extra.length} the harness gave it` : ""}`}>${a.hears ? (big ? `${heard.length} / ${p.nodes.length}` : heard.length) : ""}${extra?.length ? ` + ${extra.length}` : ""}</span>
     </div>
     <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${false} small=${!big} />
   </div>`;
