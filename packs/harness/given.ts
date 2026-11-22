@@ -239,7 +239,7 @@ export function GivenPane({ invoke, id, info, hasWindow, playhead }: { invoke: A
         <div class="hv-kv"><span class="k">by</span><span class="v">${info?.by ?? "—"}</span></div>
         <div class="hv-kv"><span class="k">channel</span><span class="v" title=${info ? channelDoc(channelOf(info)) : ""}>${info ? channelOf(info) : "—"}</span></div>
         <div class="hv-kv"><span class="k">place</span><span class="v">${info?.at.join(", ") ?? "—"}</span></div>
-        ${info?.tokens !== undefined
+        ${info?.tokens !== undefined && info.window !== undefined
           ? html`<div class="hv-kv"><span class="k">said</span><span class="v" title=${sure(info.tokens, info.fitted ?? 0).tip}>${`${info.count} piece${info.count === 1 ? "" : "s"} · ${sure(info.tokens, info.fitted ?? 0).text} tokens`}</span></div>
               <div class="hv-kv"><span class="k">window</span><span class="v" title="What came after the last compaction: the rest was summed up">${info.window === info.tokens ? "all in it" : `${(info.window ?? 0).toLocaleString()} in it, ${(info.tokens - (info.window ?? 0)).toLocaleString()} dropped`}</span></div>`
           : html`<div class="hv-kv"><span class="k">given</span><span class="v">${info ? `${info.count} time${info.count === 1 ? "" : "s"} · ${info.size.toLocaleString()} letters` : "—"}</span></div>`}
@@ -247,7 +247,7 @@ export function GivenPane({ invoke, id, info, hasWindow, playhead }: { invoke: A
         <${UseRows} invoke=${invoke} use=${info?.use} server=${info?.server} out=${info?.out} canSet=${!!info?.out} />
         <div class="hv-given">
           ${away
-            ? html`<div class="hv-empty" title="Its words stay on the machine the run ran on: its hook sent only their sizes, times and counts">⌂ on its machine</div>`
+            ? html`<div class="hv-kv"><span class="k">words</span><span class="v" title="Its words stay on the machine the run ran on: its hook sent only their sizes, times and counts">⌂ on its machine</span></div>`
             : text.error ? html`<div class="hv-empty">Not read: ${text.error} <button class="hv-fold" onClick=${() => setTries((n) => n + 1)}>try again</button></div>` : text.text === undefined ? html`<div class="hv-empty">reading…</div>` : html`<${PartRow} p=${{ label: text.cut ? "text, cut: the rest is in the transcript" : info?.tokens !== undefined && info.count > 20 ? "the latest 20" : "text", text: text.text || "empty" }} />`}
         </div>
       </div>

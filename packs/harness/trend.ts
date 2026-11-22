@@ -118,10 +118,10 @@ const Chart = ({ w, at, colour }: { w: NodeWindow; at?: string; colour: string }
 export const NodeWindowPart = ({ got, colour }: { got?: { whole?: NodeWindow; then?: NodeWindow }; colour: string }) => {
   const w = got?.then ?? got?.whole;
   if (!w || !got?.whole) return "";
-  const now = got.then ? "at the playhead" : "now";
+  const now = got.then ? "then" : "now";
   return html`
     <div class="hv-group" title=${STAYS[w.stays]}>in the window · ${w.stays === "start" ? "from the start" : w.stays === "listed" ? "listed" : "said at moments"}</div>
-    <div class="hv-kv"><span class="k">${now}</span><span class="v" title=${sure(w.now, w.nowFitted ?? 0).tip}>${sure(w.now, w.nowFitted ?? 0).text} tokens · ${w.inWindow} of ${w.count} piece${w.count === 1 ? "" : "s"}</span></div>
+    <div class="hv-kv"><span class="k" title=${got.then ? "At the playhead" : "Now, live"}>${now}</span><span class="v" title=${sure(w.now, w.nowFitted ?? 0).tip}>${sure(w.now, w.nowFitted ?? 0).text} tokens · ${w.inWindow} of ${w.count} piece${w.count === 1 ? "" : "s"}</span></div>
     <div class="hv-kv"><span class="k">put in</span><span class="v">${tok(w.total)} in all · peak ${tok(w.peak)}${w.dropped ? ` · ${tok(w.dropped)} dropped by compactions` : ""}</span></div>
     <${Chart} w=${got.whole} at=${got.then?.time} colour=${colour} />
     ${w.pieces.map((p) => html`<div class=${`hv-piece ${p.in ? "" : "out"}`} title=${`${p.in ? "in the window" : w.stays === "start" ? "an earlier copy: the latest is sent" : "dropped by a compaction"}\n${SURE[p.fit ? "fitted" : "estimated"].tip}`}><span class="w">${hm(p.time)}</span><span class="n">#${p.n} · ${SURE[p.fit ? "fitted" : "estimated"].mark}${tok(p.tokens)}</span></div>`)}

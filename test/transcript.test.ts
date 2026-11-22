@@ -438,6 +438,7 @@ test("a server elsewhere: the hook sends its transcript as numbers, the tree has
     // Nothing of the text reached the server: not the record, not the journal.
     const journal = await readFile(join(dir, "exchange.jsonl"), "utf8");
     assert.ok(!journal.includes("archipelago_transcript") && !journal.includes("You are Claude Code") && !journal.includes("Fix the parser"));
+    assert.ok(!journal.includes("sess.jsonl"), "a path on the session's machine isn't kept here");
     // A page past where the run is (one lost) is left, and the hook told where to go on from; one from 0 begins it again.
     const at = await invoke("transcript.take", { run: "sess-far", from: 10_000_000, to: 10_000_100, lines: [] });
     assert.ok(at.ok && (at.output as { at: number }).at < 10_000_000);

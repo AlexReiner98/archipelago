@@ -372,6 +372,11 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
           const page = input[TRANSCRIPT_FIELD];
           delete input[TRANSCRIPT_FIELD];
           res.setHeader(TRANSCRIPT_HEADER, await pageAnswer(input, page).catch(() => "send 0"));
+          // A path on the session's machine means nothing here: it isn't kept as the run's fact.
+          if (!files) {
+            delete input.transcript_path;
+            delete input.agent_transcript_path;
+          }
           return send(res, 200, await hook(input));
         }
         if (path === "/mcp") {

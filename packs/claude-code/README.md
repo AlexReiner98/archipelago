@@ -208,7 +208,7 @@ forwards as before and sends no transcript.
 
 | Setting | Default | |
 |---|---|---|
-| `files` | true | Whether a transcript a hook names is opened on this server's disk (also the last reply, read from it). A server elsewhere sets false: a hook's path names a file on another machine, and it reads only the pages the hook sends |
+| `files` | true | Whether a transcript a hook names is opened on this server's disk (also the last reply, read from it). A server elsewhere sets false: a hook's path names a file on another machine, and it reads only the pages the hook sends. The path isn't kept either: such a run has no `transcript` fact |
 
 ## Every session
 
