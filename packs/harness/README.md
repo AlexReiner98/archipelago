@@ -175,6 +175,10 @@ opens the line in place ([expand.ts](expand.ts)): for the map to the agent,
 the node, place, pack and what was said, whole; for the agent to the map,
 the act's input and output field by field, each label over its value.
 Each part folds past a dozen lines. A red edge: the event failed the node picked.
+A say is led by "re-said ·" when it came again after a compaction, and by
+"reworded ·" when its node said other words earlier in the context (the
+agent pack's `reworded`); what a run heard and was told changed is the
+node "Changed since heard" (`words/changed`).
 
 ## What the harness gave ([given.ts](given.ts))
 
@@ -203,7 +207,9 @@ say uses them; any other node shows what it last said. A trial shows the
 miss it came from and can be retired (`words.retire`). With the keep pack:
 its record against the thresholds, its checks, Keep and Retire
 (`keep.apply`). A node the map writes a file from shows the file and its
-rule (`written.rule`).
+rule (`written.rule`). A map node said at session start shows how,
+"said": whole, or listed (one line there, its whole words at its other
+places or from the words tool); a click flips it (`words.say`).
 
 The node shows in the view's left bar while one is picked, in place of
 the previews (or, one run looked at, beside the tree), under a way back:

@@ -94,6 +94,7 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }
     { id: "mcp", pack: "packs/mcp/index.ts" },
     { id: "docs", pack: "packs/docs/index.ts" },
     { id: "docs-tool", pack: "packs/docs/tool.ts" },
+    { id: "words-tool", pack: "packs/words/tool.ts" },
     { id: "archive", pack: "packs/archive/index.ts", config: { dir: join(data, "archives") } },
     {
       id: "bridge",
