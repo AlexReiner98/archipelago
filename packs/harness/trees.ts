@@ -27,7 +27,8 @@ import type { NodeInfo, RunInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { sheet } from "../../spec/style.ts";
 import { placementText, placementTip, type Placement } from "./agents.ts";
-import { Canvas, type Fire, type KeyFilter, type Standing } from "./canvas.ts";
+import { Canvas, type Fire, type Standing } from "./canvas.ts";
+import type { KeyFilter } from "./key.ts";
 import { radial, treeOf, type Grouping } from "./layout.ts";
 import { stateAt } from "./replay.ts";
 

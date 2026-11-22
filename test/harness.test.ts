@@ -594,3 +594,11 @@ test("the key filters: a channel, the map's own, or the harness's", async () => 
   assert.deepEqual(left(["context"]), ["w", "r", "run#hook:tool:Bash:guard"]);
   assert.deepEqual(left(["hook", "rule"]), ["run#system"]);
 });
+
+test("a channel's shape is bigger than a dot, and keeps a size on screen when zoomed out", async () => {
+  const { shapeRadius, SHAPE_MOST } = await import("../packs/harness/key.ts");
+  assert.equal(shapeRadius(2.5, 1, false), 4, "1.6 times a plain leaf");
+  assert.equal(shapeRadius(5, 1, false), SHAPE_MOST, "capped short of the name");
+  assert.equal(shapeRadius(2.5, 0.25, false) * 0.25, 4, "4 px on screen at a quarter zoom");
+  assert.equal(shapeRadius(2.5, 1, true), 5);
+});

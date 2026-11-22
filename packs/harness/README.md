@@ -116,7 +116,7 @@ from one "decided" bough as well, retired ones struck.
 | dot hue | its pack: the map's words purple, what grow learned gold |
 | hollow dot | its item is a trial |
 | orange dot, name and branch | given by the harness (Claude Code), not the map: read only (below) |
-| dot shape | its channel ([channels.ts](channels.ts)): ● hook, said at a moment by a hook; ◆ rule, a check that can refuse (a rule, the schema's refusal); ■ file, a skill or memory file the harness loads; ▲ context, there from the start (system prompt, tool definitions, MCP instructions, listings) |
+| dot shape | drawn bigger than a plain dot, and never under 4 px on screen however far out the zoom (`shapeRadius`): its channel ([channels.ts](channels.ts)): ● hook, said at a moment by a hook; ◆ rule, a check that can refuse (a rule, the schema's refusal); ■ file, a skill or memory file the harness loads; ▲ context, there from the start (system prompt, tool definitions, MCP instructions, listings) |
 | dot size, number | how often it was said: in the run, or all time |
 | ↑ ↓ ⊝ | the keep pack's standing: promote, retire, held back by a check |
 
@@ -124,7 +124,7 @@ A step of the playhead runs a light from the root to its node (red for a
 refusal), or sparks on the bough of an act's place (amber, red when it
 failed). Under reduced motion only the names light. Drag to move, wheel to
 zoom, double-click to fit; a press picks a node by its name, or anywhere
-within 22 px of its dot (`HIT_PX`); "key" shows the marks, over one run's
+within 22 px of its dot (`HIT_PX`); "key" ([key.ts](key.ts)) shows the marks, over one run's
 tree or the agent in focus. The key doubles as a filter: a click on a
 channel's row, on "the map's", or on Claude Code's orange hides those nodes
 from the trees (struck while hidden), and a second click shows them again
