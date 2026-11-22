@@ -31,6 +31,10 @@
  * count, but for the estimate of its replies and calls.
  */
 import type { Place } from "../../spec/agent.ts";
+import type { Slim, SlimBlock } from "../claude-code/slim.ts";
+
+// An image is counted where it is, by the hook (its pixels): these stay for who read them here.
+export { IMAGE_TOKENS, imageTokens } from "../claude-code/slim.ts";
 
 /** The session's own context: counted by its size, never read. */
 const PRIVATE_NOTES = ["session_context", "environment", "credential_org"];
@@ -38,8 +42,6 @@ const PRIVATE_NOTES = ["session_context", "environment", "credential_org"];
 const GIVEN_NOTES = ["skill_listing", "agent_listing_delta", "deferred_tools_delta", "model", "mcp_instructions_delta", "hook_additional_context"];
 /** How many pieces' places one node keeps, for its text; the latest win. */
 const SPOTS_MAX = 20;
-/** An image the size can't be read from: about what a screenshot costs. */
-export const IMAGE_TOKENS = 1600;
 
 /** Which part of a record a piece of the conversation is. */
 export type TalkPick = { part: "block"; index: number } | { part: "content" } | { part: "rendered" };
@@ -94,58 +96,18 @@ interface Entry {
 
 export const textTokens = (chars: number) => Math.ceil(Math.max(0, chars) / 4);
 
-/** An image's tokens from its base64 data: its pixels, scaled to fit, / 750. */
-export function imageTokens(data: unknown): number {
-  if (typeof data !== "string" || !data) return IMAGE_TOKENS;
-  let bytes: Buffer;
-  try {
-    bytes = Buffer.from(data.slice(0, 87_384), "base64");
-  } catch {
-    return IMAGE_TOKENS;
+/** Characters, and their tokens. */
+const chars = (n: number) => ({ chars: n, tokens: textTokens(n) });
+/** Blocks' characters and tokens, an image by its own. */
+function blocks(list: SlimBlock[]): { chars: number; tokens: number } {
+  let c = 0;
+  let t = 0;
+  for (const b of list) {
+    const n = "n" in b ? b.n : 0;
+    c += n;
+    t += textTokens(n) + ("img" in b ? b.img : 0);
   }
-  const size = pngSize(bytes) ?? jpegSize(bytes);
-  if (!size) return IMAGE_TOKENS;
-  let [w, h] = size;
-  const long = Math.max(w, h);
-  if (long > 1568) [w, h] = [(w * 1568) / long, (h * 1568) / long];
-  const px = w * h;
-  const fit = px > 1_150_000 ? 1_150_000 / px : 1;
-  return Math.max(1, Math.ceil((px * fit) / 750));
-}
-
-function pngSize(b: Buffer): [number, number] | undefined {
-  if (b.length < 24 || b.readUInt32BE(0) !== 0x89504e47) return undefined;
-  return [b.readUInt32BE(16), b.readUInt32BE(20)];
-}
-
-function jpegSize(b: Buffer): [number, number] | undefined {
-  if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return undefined;
-  let i = 2;
-  while (i + 9 < b.length) {
-    if (b[i] !== 0xff) return undefined;
-    const m = b[i + 1]!;
-    const len = b.readUInt16BE(i + 2);
-    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return [b.readUInt16BE(i + 7), b.readUInt16BE(i + 5)];
-    i += 2 + len;
-  }
-  return undefined;
-}
-
-/** A tool result's or a block's content: its characters and tokens. */
-function measure(content: unknown): { chars: number; tokens: number } {
-  if (typeof content === "string") return { chars: content.length, tokens: textTokens(content.length) };
-  if (!Array.isArray(content)) return { chars: 0, tokens: 0 };
-  let chars = 0;
-  let tokens = 0;
-  for (const c of content) {
-    if (c?.type === "image") tokens += imageTokens(c.source?.data);
-    else {
-      const n = typeof c?.text === "string" ? c.text.length : JSON.stringify(c ?? "").length;
-      chars += n;
-      tokens += textTokens(n);
-    }
-  }
-  return { chars, tokens };
+  return { chars: c, tokens: t };
 }
 
 const toolBy = (name: string) => /^mcp__(.+?)__/.exec(name)?.[1] ?? "Claude Code";
@@ -174,8 +136,9 @@ export class TalkIndex {
 
   private time: string | undefined;
 
-  take(e: any, line: { offset: number; length: number }): void {
-    const time = typeof e?.timestamp === "string" ? e.timestamp : undefined;
+  /** A record as numbers (slim, packs/claude-code/slim.ts), at its place in the file. */
+  take(e: Slim, line: { offset: number; length: number }): void {
+    const time = e.timestamp;
     this.time = time;
     const spot = (pick: TalkPick): TalkSpot => ({ offset: line.offset, length: line.length, pick });
     const add = (name: string, make: () => Omit<Entry, "pieces" | "spots">, m: { chars: number; tokens: number }, s: TalkSpot | undefined, always = false): Piece | undefined => {
@@ -184,7 +147,7 @@ export class TalkIndex {
       const piece: Piece = { t: ms(time), ...(time ? { time } : {}), ...m };
       entry.pieces.push(piece);
       // What reached the model, not what it said: scaled to the window's real growth at its next message.
-      if (e?.type !== "assistant") this.pending.push(piece);
+      if (e.type !== "assistant") this.pending.push(piece);
       if (s) {
         entry.spots.push(s);
         if (entry.spots.length > SPOTS_MAX) entry.spots.shift();
@@ -193,7 +156,7 @@ export class TalkIndex {
       return piece;
     };
 
-    if (e?.type === "system" && e.subtype === "compact_boundary") {
+    if (e.type === "system" && e.subtype === "compact_boundary") {
       // A new window: the next request's input is a new base.
       this.lastMessage = undefined;
       this.pending = [];
@@ -201,28 +164,29 @@ export class TalkIndex {
       return;
     }
 
-    if (e?.type === "assistant" && Array.isArray(e.message?.content)) {
-      const id = typeof e.message.id === "string" ? e.message.id : undefined;
-      if (id && !this.messages.has(id)) this.calibrate(e.message.usage, id);
+    if (e.type === "assistant" && e.message?.content) {
+      const m = e.message;
+      const id = m.id;
+      if (id && !this.messages.has(id)) this.calibrate(m.usage, id);
       const msg = id ? (this.messages.get(id) ?? (this.messages.set(id, { output: 0, other: 0, thinking: [] }), this.messages.get(id)!)) : undefined;
       if (this.messages.size > CALLS_MAX) this.messages.delete(this.messages.keys().next().value!);
-      const other = (m: { chars: number; tokens: number }) => (msg && (msg.other += m.tokens), m);
-      e.message.content.forEach((b: any, index: number) => {
-        if (b?.type === "text" && typeof b.text === "string") add("talk:reply", () => ({ name: "talk:reply", title: "Claude's replies", by: "Claude", at: "reply_end" }), other(measure(b.text)), spot({ part: "block", index }));
-        else if (b?.type === "thinking" || b?.type === "redacted_thinking") {
-          const piece = add("talk:thinking", () => ({ name: "talk:thinking", title: "Claude's thinking", by: "Claude", at: "reply_end" }), measure(typeof b.thinking === "string" ? b.thinking : ""), spot({ part: "block", index }), true);
+      const other = (x: { chars: number; tokens: number }) => (msg && (msg.other += x.tokens), x);
+      m.content!.forEach((b, index) => {
+        if (b.type === "text") add("talk:reply", () => ({ name: "talk:reply", title: "Claude's replies", by: "Claude", at: "reply_end" }), other(chars(b.n)), spot({ part: "block", index }));
+        else if (b.type === "thinking" || b.type === "redacted_thinking") {
+          const piece = add("talk:thinking", () => ({ name: "talk:thinking", title: "Claude's thinking", by: "Claude", at: "reply_end" }), chars(b.type === "thinking" ? b.n : 0), spot({ part: "block", index }), true);
           if (piece && msg) msg.thinking.push(piece);
-        } else if (b?.type === "tool_use" && typeof b.name === "string") {
-          if (typeof b.id === "string") {
+        } else if (b.type === "tool_use") {
+          if (b.id) {
             this.calls.set(b.id, b.name);
             if (this.calls.size > CALLS_MAX) this.calls.delete(this.calls.keys().next().value!);
           }
           const name = `talk:call:${b.name}`;
-          add(name, () => ({ name, title: `${toolShort(b.name)} calls`, by: "Claude", at: `tool:${b.name}` }), other(measure(JSON.stringify(b.input ?? {}))), spot({ part: "block", index }));
+          add(name, () => ({ name, title: `${toolShort(b.name)} calls`, by: "Claude", at: `tool:${b.name}` }), other(chars(b.n)), spot({ part: "block", index }));
         }
       });
       // The message's real output, less its other blocks: its thinking, shared among its thinking blocks.
-      const out = e.message.usage?.output_tokens;
+      const out = m.usage?.output_tokens;
       if (msg && typeof out === "number" && out >= 0) msg.output = out;
       if (msg?.thinking.length) {
         const share = Math.max(0, msg.output - msg.other) / msg.thinking.length;
@@ -231,50 +195,49 @@ export class TalkIndex {
       return;
     }
 
-    if (e?.type === "user" && e.message) {
-      const c = e.message.content;
+    if (e.type === "user" && e.message) {
+      const m = e.message;
       if (e.isCompactSummary) {
-        add("talk:summary", () => ({ name: "talk:summary", title: "Compaction summary", by: "Claude Code", at: "compact" }), measure(typeof c === "string" ? c : c), spot(typeof c === "string" ? { part: "content" } : { part: "block", index: 0 }));
+        add("talk:summary", () => ({ name: "talk:summary", title: "Compaction summary", by: "Claude Code", at: "compact" }), m.str !== undefined ? chars(m.str) : blocks(m.content ?? []), spot(m.str !== undefined ? { part: "content" } : { part: "block", index: 0 }));
         return;
       }
       const prompt = () => (e.isMeta ? { name: "talk:note:meta", title: "Claude Code's notes", by: "Claude Code", at: "prompt" } : { name: "talk:prompt", title: "Your prompts", by: "you", at: "prompt" });
-      if (typeof c === "string") {
+      if (m.str !== undefined) {
         const p = prompt();
-        add(p.name, () => p, measure(c), spot({ part: "content" }));
+        add(p.name, () => p, chars(m.str), spot({ part: "content" }));
         return;
       }
-      if (!Array.isArray(c)) return;
-      c.forEach((b: any, index: number) => {
-        if (b?.type === "tool_result") {
-          const tool = (typeof b.tool_use_id === "string" && this.calls.get(b.tool_use_id)) || "unknown";
+      (m.content ?? []).forEach((b, index) => {
+        if (b.type === "tool_result") {
+          const tool = (b.tool_use_id && this.calls.get(b.tool_use_id)) || "unknown";
           const name = `talk:result:${tool}`;
-          add(name, () => ({ name, title: `${toolShort(tool)} results`, by: toolBy(tool), at: `tool_result:${tool}` }), measure(b.content), spot({ part: "block", index }));
+          add(name, () => ({ name, title: `${toolShort(tool)} results`, by: toolBy(tool), at: `tool_result:${tool}` }), { chars: b.n, tokens: textTokens(b.n) + b.img }, spot({ part: "block", index }));
         } else {
           const p = prompt();
-          add(p.name, () => p, b?.type === "image" ? { chars: 0, tokens: imageTokens(b.source?.data) } : measure(typeof b?.text === "string" ? b.text : ""), spot({ part: "block", index }));
+          add(p.name, () => p, b.type === "image" ? { chars: 0, tokens: b.img } : chars("n" in b ? b.n : 0), spot({ part: "block", index }));
         }
       });
       return;
     }
 
     // A note Claude Code attached, as the model was sent it (`rendered`).
-    if (e?.type === "attachment" && e.attachment && Array.isArray(e.rendered)) {
-      const type = typeof e.attachment.type === "string" ? e.attachment.type : "other";
-      const text = e.rendered.map((r: any) => (typeof r?.content === "string" ? r.content : Array.isArray(r?.content) ? r.content.map((x: any) => (typeof x?.text === "string" ? x.text : "")).join("") : "")).join("");
+    if (e.type === "attachment" && e.attachment && e.rendered !== undefined) {
+      const type = e.attachment.type;
+      const n = e.rendered;
       if (GIVEN_NOTES.includes(type)) {
-        this.pendingGiven += textTokens(text.length);
+        this.pendingGiven += textTokens(n);
         return;
       }
       if (PRIVATE_NOTES.includes(type)) {
-        add("talk:note:private", () => ({ name: "talk:note:private", title: "Session context (private)", by: "Claude Code", at: "session_start", private: true }), measure(text), undefined);
+        add("talk:note:private", () => ({ name: "talk:note:private", title: "Session context (private)", by: "Claude Code", at: "session_start", private: true }), chars(n), undefined);
         return;
       }
       if (type === "queued_command") {
-        add("talk:prompt", () => ({ name: "talk:prompt", title: "Your prompts", by: "you", at: "prompt" }), measure(text), spot({ part: "rendered" }));
+        add("talk:prompt", () => ({ name: "talk:prompt", title: "Your prompts", by: "you", at: "prompt" }), chars(n), spot({ part: "rendered" }));
         return;
       }
       const name = `talk:note:${type}`;
-      add(name, () => ({ name, title: `${type.replaceAll("_", " ")} notes`, by: "Claude Code", at: type === "instructions" ? "session_start" : "prompt" }), measure(text), spot({ part: "rendered" }));
+      add(name, () => ({ name, title: `${type.replaceAll("_", " ")} notes`, by: "Claude Code", at: type === "instructions" ? "session_start" : "prompt" }), chars(n), spot({ part: "rendered" }));
     }
   }
 

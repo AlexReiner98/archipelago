@@ -17,6 +17,7 @@
  * agent as actor and the session id as run, so every call is the run's.
  */
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 import { open, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -35,6 +36,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { refuse, type LocalAccess } from "../../runtime/guard.ts";
 import { handle, lastAssistantText, refusalText, runIdOf, spoken, trim, type HookInput, type HookOutput, type Load, type RecordedCall, type RunPort } from "./mapping.ts";
 import { rpc, type JsonRpc } from "./mcp.ts";
+import { TRANSCRIPT_FIELD, TRANSCRIPT_HEADER, transcriptPath, type Sent } from "./slim.ts";
 
 /** The places a run without hooks reaches: its start, and each tool call and result. */
 export const MCP_REACHES = ["session_start", "tool:<name>", "tool_result:<name>"];
@@ -59,7 +61,15 @@ export interface ClaudeCodeConfig extends LocalAccess {
   name?: string;
   /** Told the port once listening (tests use port 0). */
   onListen?: (port: number) => void;
+  /**
+   * Whether the transcript a hook names is opened on this server's own disk. Default true. A server elsewhere
+   * sets false: a hook's path names a file on another machine, and it reads only the pages the hook sends.
+   */
+  files?: boolean;
 }
+
+/** The transcript pack's action for a page a hook sent (packs/transcript). */
+const TAKE = "transcript.take";
 
 const BODY_MAX = 32 * 1024 * 1024;
 
@@ -137,6 +147,9 @@ async function lastReply(input: HookInput): Promise<string | undefined> {
   return text === undefined ? undefined : lastAssistantText(text);
 }
 
+/** Nothing: a transcript this server doesn't open. */
+const unread = async () => undefined;
+
 const claudeCode: Pack<ClaudeCodeConfig> = {
   id: "claude-code",
   about: "Connects Claude Code: its sessions report here and hear what the map says.",
@@ -144,6 +157,27 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
   async apply(ctx: Context, config: ClaudeCodeConfig = {}) {
     const actor: Actor = config.agent ?? { id: "claude-code", kind: "agent" };
     const actions = ctx.get<ActionList>("action.list");
+    const files = config.files !== false;
+    /**
+     * What a hook is told of its transcript (`x-archipelago-transcript`): `own` when this server reads the
+     * file itself, or keeps no transcript; else `send <bytes>`, where the run's next page starts, after the
+     * page it sent, if any, is taken.
+     */
+    const pageAnswer = async (input: HookInput, page: Sent | undefined): Promise<string> => {
+      if (!actions.list().some((a) => a.name === TAKE)) return "own";
+      const sub = typeof input.agent_id === "string" && !!input.agent_id;
+      const path = transcriptPath(input, sub);
+      if (files && path && existsSync(path)) return "own";
+      const run = runIdOf(input);
+      const sent: Sent = page && typeof page === "object" ? page : { from: 0, to: 0, size: 0, lines: [] };
+      const out = await runOf(run).invoke.invoke({
+        action: TAKE,
+        input: { run, from: sent.from, to: sent.to, lines: sent.lines as never, ...(typeof sent.size === "number" ? { size: sent.size } : {}), ...(typeof sent.skipped === "number" ? { skipped: sent.skipped } : {}) },
+        authority: { of: "agent", basis: "Claude Code's hook read its transcript where it ran" },
+        reason: "A page of the run's transcript, as numbers",
+      });
+      return out.ok ? `send ${(out.output as { at: number }).at}` : "send 0";
+    };
     const read = ctx.get<ExchangeRead>("exchange.read");
     const tree = ctx.get<AgentTree>("agent.tree");
     /** Who a node is, as loaded now: its title tags its words, its kind orders session_start. */
@@ -203,10 +237,8 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
       }
       const next = state.queue.then(() => handle(input, state, {
         actor,
-        lastReply,
-        transcript,
+        ...(files ? { lastReply, transcript, transcriptFrom } : { lastReply: unread, transcript: unread, transcriptFrom: unread }),
         recorded,
-        transcriptFrom,
         loadedSaid,
         home,
         speakers,
@@ -332,10 +364,14 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
       const path = (req.url ?? "/").split("?")[0];
       try {
         if (req.method === "POST" && path === "/hook") {
-          const input = JSON.parse(await body(req)) as HookInput;
+          const input = JSON.parse(await body(req)) as HookInput & { [TRANSCRIPT_FIELD]?: Sent };
           if (typeof input?.session_id !== "string" || typeof input.hook_event_name !== "string") {
             return send(res, 400, { error: "a hook input needs session_id and hook_event_name" });
           }
+          // A page of the transcript, as numbers, goes to the transcript pack, never into the run's record.
+          const page = input[TRANSCRIPT_FIELD];
+          delete input[TRANSCRIPT_FIELD];
+          res.setHeader(TRANSCRIPT_HEADER, await pageAnswer(input, page).catch(() => "send 0"));
           return send(res, 200, await hook(input));
         }
         if (path === "/mcp") {

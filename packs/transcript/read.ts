@@ -10,81 +10,17 @@
  * is a line that isn't JSON.
  */
 import { open } from "node:fs/promises";
-import { createHash } from "node:crypto";
 import type { Place } from "../../spec/agent.ts";
+import { slim, type Line, type Slim } from "../claude-code/slim.ts";
 import { TalkIndex } from "./talk.ts";
 import { TokenIndex } from "./tokens.ts";
 
 export * from "./tokens.ts";
+// Reading a page, a record as numbers, who a hook is: the hook carries them (packs/claude-code/slim.ts).
+export { hookWho, isOurs, LINE_MAX, PAGE_BYTES, readPage, slim, type Line, type Slim } from "../claude-code/slim.ts";
 
-/** How much of the file one page reads. */
-export const PAGE_BYTES = 256 * 1024;
-/** The longest line read; a longer one is skipped. A request's shape (system prompt and tools) runs to a few hundred kB. */
-export const LINE_MAX = 16 * 1024 * 1024;
 /** The most text one node answers with. */
 export const TEXT_MAX = 200_000;
-
-export interface Line {
-  /** Where the line starts in the file, in bytes. */
-  offset: number;
-  /** Its length in bytes, without the newline. */
-  length: number;
-  text: string;
-}
-
-/**
- * One page of whole lines from `from`, and where the next page starts. A
- * line longer than the page grows the read, up to LINE_MAX; a line longer
- * than that is skipped. A last line without its newline yet is left for the
- * next read. Missing file: nothing.
- */
-export async function readPage(path: string, from: number, bytes = PAGE_BYTES): Promise<{ lines: Line[]; next: number; size: number } | undefined> {
-  let file;
-  try {
-    file = await open(path, "r");
-  } catch {
-    return undefined;
-  }
-  try {
-    const size = (await file.stat()).size;
-    if (from >= size) return { lines: [], next: Math.min(from, size), size };
-    let want = Math.min(bytes, size - from);
-    for (;;) {
-      const buf = Buffer.alloc(want);
-      const { bytesRead } = await file.read(buf, 0, want, from);
-      const got = buf.subarray(0, bytesRead);
-      const last = got.lastIndexOf(10);
-      if (last >= 0) {
-        const lines: Line[] = [];
-        let start = 0;
-        while (start <= last) {
-          const nl = got.indexOf(10, start);
-          const end = got[nl - 1] === 13 ? nl - 1 : nl;
-          if (end > start) lines.push({ offset: from + start, length: end - start, text: got.subarray(start, end).toString("utf8") });
-          start = nl + 1;
-        }
-        return { lines, next: from + last + 1, size };
-      }
-      // No newline yet: the line is unfinished at the end of the file, or longer than the read.
-      if (from + bytesRead >= size) return { lines: [], next: from, size };
-      if (want >= LINE_MAX) return { lines: [], next: await skipLine(file, from + want, size), size };
-      want = Math.min(want * 4, LINE_MAX, size - from);
-    }
-  } finally {
-    await file.close();
-  }
-}
-
-/** Past the next newline from `at`: a line too long to read. */
-async function skipLine(file: Awaited<ReturnType<typeof open>>, at: number, size: number): Promise<number> {
-  const buf = Buffer.alloc(PAGE_BYTES);
-  for (let pos = at; pos < size; pos += PAGE_BYTES) {
-    const { bytesRead } = await file.read(buf, 0, PAGE_BYTES, pos);
-    const nl = buf.subarray(0, bytesRead).indexOf(10);
-    if (nl >= 0) return pos + nl + 1;
-  }
-  return at;
-}
 
 /** One line again, by where the index put it. */
 export async function readLine(path: string, at: { offset: number; length: number }): Promise<string | undefined> {
@@ -160,7 +96,6 @@ export const PIECES_MAX = 5000;
 /** How many places one hook node keeps texts from; older ones drop off. */
 const SPOTS_MAX = 20;
 
-const hash = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 12);
 
 /** The place a hook's context is given at. */
 export function hookPlace(event: string | undefined, name: string | undefined): Place {
@@ -183,28 +118,6 @@ export function hookPlace(event: string | undefined, name: string | undefined): 
   }
 }
 
-/**
- * Who a hook is, from its command: a plugin's name when it runs from a
- * plugin's folder, else its script's name, never a path.
- */
-export function hookWho(command: string | undefined): string {
-  if (!command) return "unnamed";
-  const c = command.replaceAll("\\", "/");
-  const plugin = /\/plugins\/(?:cache|marketplaces)\/[^/"' ]+\/(?:plugins\/)?([^/"' ]+)/.exec(c);
-  if (plugin) return plugin[1]!;
-  const script = /([^/"' ]+)\.(?:m?[jt]s|cjs|py|sh|ps1|cmd|bat|exe)\b/i.exec(c);
-  if (script) return script[1]!;
-  const first = c.trim().split(/\s+/)[0] ?? "";
-  return first.split("/").pop()?.replace(/["']/g, "") || "unnamed";
-}
-
-/** Archipelago's own adapter (packs/claude-code/hook.ts, or its http hook): what it said is the map's, already in the tree. */
-export function isOurs(command: string | undefined): boolean {
-  if (!command) return false;
-  const c = command.replaceAll("\\", "/");
-  return /claude-code\/hook\.ts/.test(c) || /hook\.ts["']?\s+https?:\/\/\S+\/hook\b/.test(c);
-}
-
 const toolTitle = (name: string) => {
   const mcp = /^mcp__(.+?)__(.+)$/.exec(name);
   return `${mcp ? mcp[2] : name} definition`;
@@ -219,15 +132,16 @@ const toolBy = (name: string) => /^mcp__(.+?)__/.exec(name)?.[1] ?? CLAUDE_CODE;
  */
 export class GivenIndex {
   private entries = new Map<string, Entry>();
-  /** The latest hook runs that printed context: their event, command and output. */
-  private hookRuns: { event?: string; command?: string; stdout: string }[] = [];
-  /** Hook contexts not placed yet: placed at `list`, once their hook's run may be known. */
-  private pending: { event?: string; hook?: string; content: string; spot: Spot; time?: string }[] = [];
+  /** The latest hook runs that printed context: their event, who they are, whether the map's, their contexts' prints. */
+  private hookRuns: { event?: string; who: string; ours: boolean; fps: string[] }[] = [];
+  /** Hook contexts not placed yet: placed at `list`, once their hook's run may be known. `text` only from a file here. */
+  private pending: { event?: string; hook?: string; fp: string; h: string; n: number; text?: string; spot: Spot; time?: string }[] = [];
   /** Token use and compactions, from the same records (TokenIndex). */
   readonly tokens = new TokenIndex();
   /** The conversation after the start, from the same records (talk.ts). */
   readonly talk = new TalkIndex();
 
+  /** A line of a file read here: as numbers, with its hook contexts' text kept to tell the map's own words. */
   add(line: Line): void {
     let e: any;
     try {
@@ -235,71 +149,66 @@ export class GivenIndex {
     } catch {
       return;
     }
-    if (!e || typeof e !== "object" || e.isSidechain) return;
+    const s = slim(e);
+    if (!s) return;
+    const texts = e.type === "attachment" && e.attachment?.type === "hook_additional_context" ? (Array.isArray(e.attachment.content) ? e.attachment.content : [e.attachment.content]) : undefined;
+    this.take(s, line, texts);
+  }
+
+  /** A record as numbers (a line read here, or one a hook sent), at its place in the file. */
+  take(e: Slim, line: { offset: number; length: number }, texts?: unknown[]): void {
     this.tokens.take(e);
     this.talk.take(e, line);
-    const time = typeof e.timestamp === "string" ? e.timestamp : undefined;
+    const time = e.timestamp;
     this.time = time;
     const at = (pick: Pick): Spot => ({ offset: line.offset, length: line.length, pick });
-    if (e.type === "api-request-shape" && e.shape && typeof e.shape === "object") {
-      const system = Array.isArray(e.shape.system) ? e.shape.system : [];
-      if (system.length) this.one("system", "System prompt", CLAUDE_CODE, "session_start", system.reduce((n: number, b: any) => n + (typeof b?.text === "string" ? b.text.length : 0), 0), at({ part: "system" }));
-      if (Array.isArray(e.shape.tools)) {
-        // The latest shape is what the agent has now: a tool gone from it is gone.
-        const now = new Set<string>();
-        for (const t of e.shape.tools) {
-          if (typeof t?.name !== "string") continue;
-          now.add(t.name);
-          this.one(`tool:${t.name}`, toolTitle(t.name), toolBy(t.name), `tool:${t.name}`, (t.description?.length ?? 0) + JSON.stringify(t.input_schema ?? {}).length, at({ part: "tool", name: t.name }));
-        }
-        for (const name of [...this.entries.keys()]) if (name.startsWith("tool:") && !now.has(name.slice(5))) this.entries.delete(name);
+    if (e.type === "api-request-shape" && e.shape) {
+      if (e.shape.system) this.one("system", "System prompt", CLAUDE_CODE, "session_start", e.shape.system, at({ part: "system" }));
+      // The latest shape is what the agent has now: a tool gone from it is gone.
+      const now = new Set<string>();
+      for (const t of e.shape.tools) {
+        now.add(t.name);
+        this.one(`tool:${t.name}`, toolTitle(t.name), toolBy(t.name), `tool:${t.name}`, t.n, at({ part: "tool", name: t.name }));
       }
+      for (const name of [...this.entries.keys()]) if (name.startsWith("tool:") && !now.has(name.slice(5))) this.entries.delete(name);
       return;
     }
-    if (e.type !== "attachment" || !e.attachment || typeof e.attachment !== "object") return;
     const a = e.attachment;
-    if (PRIVATE.includes(a.type)) return;
+    if (e.type !== "attachment" || !a || PRIVATE.includes(a.type)) return;
     switch (a.type) {
       case "skill_listing":
-        if (typeof a.content === "string") this.more("skills", "Skill listing", CLAUDE_CODE, "skill:*", a.content.length, at({ part: "listing" }));
+        if (a.n) this.more("skills", "Skill listing", CLAUDE_CODE, "skill:*", a.n, at({ part: "listing" }));
         return;
       case "agent_listing_delta":
-        if (Array.isArray(a.addedLines) && a.addedLines.length) this.more("agents", "Agent listing", CLAUDE_CODE, "tool:Agent", a.addedLines.join("\n").length, at({ part: "lines" }));
+        if (a.n) this.more("agents", "Agent listing", CLAUDE_CODE, "tool:Agent", a.n, at({ part: "lines" }));
         return;
       case "deferred_tools_delta":
-        if (Array.isArray(a.addedLines) && a.addedLines.length) this.more("deferred", "Deferred tools", CLAUDE_CODE, "tool:ToolSearch", a.addedLines.join("\n").length, at({ part: "lines" }));
+        if (a.n) this.more("deferred", "Deferred tools", CLAUDE_CODE, "tool:ToolSearch", a.n, at({ part: "lines" }));
         return;
       case "model":
-        if (typeof a.text === "string") this.one("model", "Model", CLAUDE_CODE, "session_start", a.text.length, at({ part: "model" }));
+        if (a.n !== undefined) this.one("model", "Model", CLAUDE_CODE, "session_start", a.n, at({ part: "model" }));
         return;
-      case "mcp_instructions_delta": {
-        const names: unknown[] = Array.isArray(a.addedNames) ? a.addedNames : [];
-        const blocks: unknown[] = Array.isArray(a.addedBlocks) ? a.addedBlocks : [];
-        names.forEach((n, i) => {
-          if (typeof n !== "string" || typeof blocks[i] !== "string") return;
-          this.one(`mcp:${n}`, `${n} instructions`, n, `tool:mcp__${n}__*`, (blocks[i] as string).length, at({ part: "mcp", server: n }));
-        });
-        for (const n of Array.isArray(a.removedNames) ? a.removedNames : []) this.entries.delete(`mcp:${n}`);
+      case "mcp_instructions_delta":
+        for (const m of a.added ?? []) this.one(`mcp:${m.name}`, `${m.name} instructions`, m.name, `tool:mcp__${m.name}__*`, m.n, at({ part: "mcp", server: m.name }));
+        for (const n of a.removed ?? []) this.entries.delete(`mcp:${n}`);
         return;
-      }
       case "hook_success":
       case "hook_non_blocking_error":
-        if (typeof a.stdout === "string" && a.stdout.includes("additionalContext")) {
-          this.hookRuns.push({ event: a.hookEvent, ...(typeof a.command === "string" ? { command: a.command } : {}), stdout: a.stdout });
+        if (a.fps?.length) {
+          this.hookRuns.push({ ...(a.hookEvent ? { event: a.hookEvent } : {}), who: a.who ?? "unnamed", ours: !!a.ours, fps: a.fps });
           // Kept small: only the hooks that printed context, and only the latest.
           if (this.hookRuns.length > 200) this.hookRuns.shift();
         }
         return;
-      case "hook_additional_context": {
-        const content: unknown[] = Array.isArray(a.content) ? a.content : typeof a.content === "string" ? [a.content] : [];
-        content.forEach((c, index) => {
-          if (typeof c !== "string" || !c.trim()) return;
-          this.pending.push({ event: a.hookEvent, hook: a.hookName, content: c, spot: at({ part: "hook", index }), ...(time ? { time } : {}) });
+      case "hook_additional_context":
+        (a.content ?? []).forEach((c, index) => {
+          if (!c.n) return;
+          const t = texts?.[index];
+          this.pending.push({ ...(a.hookEvent ? { event: a.hookEvent } : {}), ...(a.hookName ? { hook: a.hookName } : {}), fp: c.fp, h: c.h, n: c.n, ...(typeof t === "string" ? { text: t } : {}), spot: at({ part: "hook", index }), ...(time ? { time } : {}) });
         });
         return;
-      }
       default:
-        // Anything else (prompts, replies, tool results, the session's own context) is not indexed here.
+        // Anything else (prompts, replies, tool results, the session's own context) is the conversation's (talk.ts).
         return;
     }
   }
@@ -308,24 +217,22 @@ export class GivenIndex {
   list(ours: (text: string) => boolean = () => false): Given[] {
     for (const p of this.pending.splice(0)) {
       // Its hook: the latest run of that event whose output holds its words (a context's hook name and id may differ from its run's).
-      const needle = JSON.stringify(p.content.slice(0, 60)).slice(1, -1);
-      const run = [...this.hookRuns].reverse().find((r) => r.event === p.event && r.stdout.includes(needle));
-      if (isOurs(run?.command) || ours(p.content)) continue;
-      const who = hookWho(run?.command);
+      const run = [...this.hookRuns].reverse().find((r) => r.event === p.event && r.fps.includes(p.fp));
+      if (run?.ours || (p.text !== undefined && ours(p.text))) continue;
+      const who = run?.who ?? "unnamed";
       const place = hookPlace(p.event, p.hook);
       const name = `hook:${place}:${who}`;
       const entry = this.entries.get(name) ?? { name, title: `${who} hook`, by: who, at: place, count: 0, size: 0, spots: [], seen: new Set<string>() };
       entry.count++;
       if (p.time) Object.assign(entry, { first: entry.first ?? p.time, last: p.time });
-      const h = hash(p.content);
-      if (!entry.seen!.has(h)) {
-        entry.seen!.add(h);
+      if (!entry.seen!.has(p.h)) {
+        entry.seen!.add(p.h);
         entry.spots.push(p.spot);
-        entry.size += p.content.length;
+        entry.size += p.n;
         if (entry.spots.length > SPOTS_MAX) entry.spots.shift();
       }
       this.entries.set(name, entry);
-      this.piece(name, p.content.length, p.time);
+      this.piece(name, p.n, p.time);
     }
     return [...this.entries.values()].map(({ spots: _s, seen: _h, ...g }) => g).sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0));
   }

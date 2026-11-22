@@ -29,7 +29,9 @@ first run begins ─▶ ◐ First run · <its name>  open ─▶ Harness, on tha
 
 Where a hook script is served (`script`), the hooks row is instead one
 command, the same in bash, PowerShell and cmd: `node -e "…"` fetches the
-script to `~/.archipelago/hook.ts` and merges a hook per event into
+script to `~/.archipelago/hook.ts`, and `slim.ts` from beside it (the
+transcript as numbers, [claude-code](../claude-code/README.md)) to
+`~/.archipelago/slim.ts`, and merges a hook per event into
 `~/.claude/settings.json`, replacing an earlier one of its own and keeping
 everything else, with the token in its `env`. Run again, it changes
 nothing. An address that isn't safe inside the command is refused.

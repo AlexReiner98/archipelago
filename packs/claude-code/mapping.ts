@@ -41,6 +41,7 @@
  * What is already on the record is read back from the exchange, not only
  * remembered, so a restart mid-turn never records a call twice.
  */
+import { transcriptPath } from "./slim.ts";
 import type { Act, AgentRun, Answer, Moment, Place, RunStart } from "../../spec/agent.ts";
 import type { Actor, Json, Time } from "../../spec/common.ts";
 import { refusalTold, told, type Speakers } from "./context.ts";
@@ -332,15 +333,8 @@ function startFacts(input: HookInput, sub: boolean): Record<string, string> {
  * `transcript_path`; a subagent's is beside it, in the session's
  * `subagents` folder, named by its agent id.
  */
-export function transcriptPath(input: Pick<HookInput, "transcript_path" | "agent_transcript_path" | "session_id" | "agent_id">, sub: boolean): string | undefined {
-  if (sub && typeof input.agent_transcript_path === "string" && input.agent_transcript_path) return input.agent_transcript_path;
-  const main = typeof input.transcript_path === "string" ? input.transcript_path : undefined;
-  if (!main || !sub) return main || undefined;
-  const at = /^(.*[\\/])([^\\/]+)\.jsonl$/i.exec(main);
-  if (!at || !input.agent_id) return undefined;
-  const sep = main.includes("\\") ? "\\" : "/";
-  return `${at[1]}${at[2]}${sep}subagents${sep}agent-${input.agent_id}.jsonl`;
-}
+/** The transcript a hook's run reads: the hook carries the rule (slim.ts). */
+export { transcriptPath };
 
 /** Handles one hook: calls `agent.run` and answers what the hook prints. */
 export async function handle(input: HookInput, port: RunPort, options: Options): Promise<HookOutput> {

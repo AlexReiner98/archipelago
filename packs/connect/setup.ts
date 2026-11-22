@@ -83,15 +83,18 @@ const SAFE = /^[^"'$`!%\\\s]*$/;
  * rest), with the token in its env when there is one.
  */
 export function install(script: string, hook: string, token: boolean): string {
-  for (const s of [script, hook]) if (!SAFE.test(s)) throw new Error(`Not safe in a command: ${s}`);
+  // The hook's transcript, as numbers, is a file beside it: fetched with it, from beside it.
+  const slim = script.replace(/hook\.ts$/, "slim.ts");
+  for (const s of [script, slim, hook]) if (!SAFE.test(s)) throw new Error(`Not safe in a command: ${s}`);
   const list = (xs: Iterable<string>) => `[${[...xs].map((x) => `'${x}'`).join(",")}]`;
   const env = token ? `c.env=Object.assign(c.env||{},{ARCHIPELAGO_TOKEN:'${TOKEN}'});` : "";
   const js =
     `const f=require('fs'),p=require('path'),o=require('os');` +
     `const d=p.join(o.homedir(),'.archipelago'),h=p.join(d,'hook.ts'),s=p.join(o.homedir(),'.claude','settings.json');` +
     `const E=${list(EVENTS)},M=${list(MATCHED)};` +
-    `fetch('${script}').then(r=>{if(r.ok)return r.text();throw new Error('hook.ts: '+r.status)}).then(t=>{` +
-    `f.mkdirSync(d,{recursive:true});f.writeFileSync(h,t);` +
+    `const get=u=>fetch(u).then(r=>{if(r.ok)return r.text();throw new Error(u+': '+r.status)});` +
+    `Promise.all([get('${script}'),get('${slim}')]).then(([t,sl])=>{` +
+    `f.mkdirSync(d,{recursive:true});f.writeFileSync(h,t);f.writeFileSync(p.join(d,'slim.ts'),sl);` +
     `let c={};try{c=JSON.parse(f.readFileSync(s,'utf8'))}catch(e){}` +
     `const cmd='node '+JSON.stringify(h.split(p.sep).join('/'))+' ${hook}';` +
     `c.hooks=c.hooks||{};` +

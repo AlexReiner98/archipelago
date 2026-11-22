@@ -45,6 +45,8 @@ export interface GivenRow {
   window?: number;
   /** Of `tokens`, fitted to the model's real counts. */
   fitted?: number;
+  /** From what the session's hook sent: its words stay on the machine the run ran on. */
+  elsewhere?: true;
 }
 
 /** A given node: a node of the tree, with who said it. */
@@ -55,6 +57,8 @@ export interface GivenInfo extends NodeInfo {
   tokens?: number;
   window?: number;
   fitted?: number;
+  /** Its words stay on the machine the run ran on: only their sizes came (transcript.take). */
+  elsewhere?: true;
   /** A tool or server: in how many runs it was given and used (use.ts). */
   use?: Use;
   /** An MCP tool's server's use. */
@@ -116,6 +120,7 @@ export function givenNodes(run: string, rows: GivenRow[], extras?: Extras): Give
     ...(r.tokens !== undefined ? { tokens: r.tokens } : {}),
     ...(r.window !== undefined ? { window: r.window } : {}),
     ...(r.fitted !== undefined ? { fitted: r.fitted } : {}),
+    ...(r.elsewhere ? { elsewhere: true as const } : {}),
     ...useOf(extras, r.name),
     ...(outOf(extras, r.name) ? { out: outOf(extras, r.name)! } : {}),
   }));
@@ -147,8 +152,8 @@ export function useGiven(invoke: ActionInvoke, has: boolean, on: boolean, runs: 
           reason: "Show what the harness gave the agent",
         });
         if (!out.ok) return undefined;
-        const o = out.output as { nodes?: GivenRow[]; next?: string; reading?: boolean };
-        rows.push(...(o.nodes ?? []));
+        const o = out.output as { nodes?: GivenRow[]; next?: string; reading?: boolean; elsewhere?: boolean };
+        rows.push(...(o.nodes ?? []).map((r) => (o.elsewhere ? { ...r, elsewhere: true as const } : r)));
         if (!o.next) return { rows, reading: !!o.reading };
         after = o.next;
       }
@@ -196,9 +201,11 @@ export function GivenPane({ invoke, id, info, hasWindow, playhead }: { invoke: A
   const win = useNodeWindow(invoke, !!hasWindow, at?.run, id, playhead, info?.count);
   const [text, setText] = useState<{ text?: string; error?: string; cut?: boolean }>({});
   const [tries, setTries] = useState(0);
+  const away = !!info?.elsewhere;
   useEffect(() => {
     setText({});
-    if (!at) return;
+    // Its words stay where the run ran: nothing to read here.
+    if (!at || away) return;
     let gone = false;
     // A server that is down never answers: say so after a while, never "reading…" for good.
     const late = setTimeout(() => !gone && setText({ error: "no answer from the server" }), READ_MS);
@@ -223,7 +230,7 @@ export function GivenPane({ invoke, id, info, hasWindow, playhead }: { invoke: A
       gone = true;
       clearTimeout(late);
     };
-  }, [id, tries]);
+  }, [id, tries, away]);
   const title = info?.title ?? at?.name ?? id;
   return html`
     <div class="hv-pane">
@@ -239,7 +246,9 @@ export function GivenPane({ invoke, id, info, hasWindow, playhead }: { invoke: A
         <${NodeWindowPart} got=${win} colour="var(--harness)" />
         <${UseRows} invoke=${invoke} use=${info?.use} server=${info?.server} out=${info?.out} canSet=${!!info?.out} />
         <div class="hv-given">
-          ${text.error ? html`<div class="hv-empty">Not read: ${text.error} <button class="hv-fold" onClick=${() => setTries((n) => n + 1)}>try again</button></div>` : text.text === undefined ? html`<div class="hv-empty">reading…</div>` : html`<${PartRow} p=${{ label: text.cut ? "text, cut: the rest is in the transcript" : info?.tokens !== undefined && info.count > 20 ? "the latest 20" : "text", text: text.text || "empty" }} />`}
+          ${away
+            ? html`<div class="hv-empty" title="Its words stay on the machine the run ran on: its hook sent only their sizes, times and counts">⌂ on its machine</div>`
+            : text.error ? html`<div class="hv-empty">Not read: ${text.error} <button class="hv-fold" onClick=${() => setTries((n) => n + 1)}>try again</button></div>` : text.text === undefined ? html`<div class="hv-empty">reading…</div>` : html`<${PartRow} p=${{ label: text.cut ? "text, cut: the rest is in the transcript" : info?.tokens !== undefined && info.count > 20 ? "the latest 20" : "text", text: text.text || "empty" }} />`}
         </div>
       </div>
     </div>`;

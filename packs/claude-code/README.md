@@ -166,8 +166,9 @@ SessionStart, which Claude Code runs only as a command:
 [hook.ts](hook.ts) forwards it. If the adapter isn't running, every hook
 says nothing and the agent carries on.
 
-`ARCHIPELAGO_TOKEN`, when set, goes with every post as `Authorization:
-Bearer`, for a server that takes a token. A map with no run yet shows what
+`ARCHIPELAGO_TOKEN`, when set, else the file `ARCHIPELAGO_TOKEN_FILE`
+(default `~/.archipelago/token`) when it is there, goes with every post as
+`Authorization: Bearer`, for a server that takes a token. A map with no run yet shows what
 to copy, this server's own ([connect](../connect/README.md)).
 
 hook.ts adds `git_remote`: origin of the session's folder as
@@ -181,6 +182,33 @@ else `<session>/subagents/agent-<agent_id>.jsonl` beside the session's).
 The transcript pack reads what the agent was given from it
 ([transcript](../transcript/README.md)). It is a path on this machine, so
 the sensory interface never shows it.
+
+A server elsewhere can't open that path, so hook.ts reads the transcript
+where the session runs and sends it with each hook, as numbers: the next
+page from a byte cursor it keeps per session (in the temp folder, by a
+hash; `ARCHIPELAGO_HOOK_STATE` moves it), at most 1 MB a call, each record
+made `slim` (its kind, time, sizes, tool names and token counts; a hook's
+context by a hash of its start; never text, a path or an address). A page
+that comes to more than 256 kB is not sent: the hook says how many bytes it
+skipped. One call of a session holds the cursor at a time; another goes
+without a page, and doesn't wait. The page is `archipelago_transcript` in
+the hook input. The adapter takes it out before the hook is handled (it is
+never in the run's record), gives it to the transcript pack
+(`transcript.take`), and answers with a header, `x-archipelago-transcript`:
+`own` when it reads the file itself (a map on the same machine: the hook
+then sends no more for that session), else `send <bytes>`, where the
+run's next page starts, so a page that didn't land, or a server that
+started again with nothing, is sent again. `ARCHIPELAGO_TRANSCRIPT=off`
+stops the sending. hook.ts and [slim.ts](slim.ts) beside it import
+nothing else from the repository, so a server elsewhere serves the two as
+they are (`/hook.ts`, `/slim.ts`). `slim`, `readPage` and who a hook is
+live in slim.ts, and the transcript pack reads local files through the same
+`slim`. The hook loads slim.ts only when it is there: without it, it
+forwards as before and sends no transcript.
+
+| Setting | Default | |
+|---|---|---|
+| `files` | true | Whether a transcript a hook names is opened on this server's disk (also the last reply, read from it). A server elsewhere sets false: a hook's path names a file on another machine, and it reads only the pages the hook sends |
 
 ## Every session
 

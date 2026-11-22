@@ -40,13 +40,14 @@ import { Refused } from "../../spec/common.ts";
 import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { GivenIndex, partOf, readLine, readPage, shown, tokensPage, type Given } from "./read.ts";
+import { GivenIndex, partOf, readLine, readPage, shown, tokensPage, type Given, type Slim } from "./read.ts";
 import { talkOf, type Talk } from "./talk.ts";
 
 export const GIVEN = "transcript.given";
 export const TEXT = "transcript.text";
 export const TOKENS = "transcript.tokens";
 export const PIECES = "transcript.pieces";
+export const TAKE = "transcript.take";
 /** How a node stays in the window: given at the start (each request carries it), only named in a listing, or said at a moment (a compaction sums it up). */
 export type Stays = "start" | "listed" | "said";
 const LISTINGS = ["skills", "agents", "deferred"];
@@ -67,15 +68,38 @@ const fingerprint = (text: string | undefined) => {
 interface RunState {
   path?: string;
   offset: number;
-  index: GivenIndex;
+  /** What the file read here shows. */
+  file: GivenIndex;
+  /** Whether the file opened here, at the last call: else, what a hook sent stands for it. */
+  opened: boolean;
   /** Whether the file was read to its end, at the last call. */
   done: boolean;
+  /** What the session's hook sent of the transcript (`transcript.take`), for a file this server can't open. */
+  fed?: Fed;
   /** What the map said in the run. */
   said: Set<string>;
   /** How far the run's events were read for what the map said. */
   events?: { after?: string; done: boolean };
   busy: Promise<unknown>;
 }
+
+/** What a hook sent of a run's transcript: the records as numbers, how far into the file, what was skipped. */
+interface Fed {
+  index: GivenIndex;
+  /** The byte place in the file the records reach: the next page starts here. */
+  at: number;
+  /** Bytes a hook read but didn't send (a page past its size cap). */
+  skipped: number;
+}
+
+/** The pack's settings. */
+export interface TranscriptConfig {
+  /** Whether a transcript a run names is opened on this server's disk. Default true. A server elsewhere sets false: it reads only what the hooks send. */
+  files?: boolean;
+}
+
+/** The most records one page a hook sends may hold. */
+export const TAKE_MAX = 20_000;
 
 /** A transcript path as a run's facts give it: a `.jsonl` file, absolute. */
 export function transcriptOf(facts: Json | undefined): string | undefined {
@@ -84,19 +108,25 @@ export function transcriptOf(facts: Json | undefined): string | undefined {
   return typeof p === "string" && /\.jsonl$/i.test(p) && (/^[a-z]:[\\/]/i.test(p) || p.startsWith("/")) ? p : undefined;
 }
 
-const transcript: Pack = {
+const transcript: Pack<TranscriptConfig> = {
   id: "transcript",
   about: "What Claude Code's transcript shows an agent was given (system prompt, tools, MCP instructions, listings, other hooks' context), as read-only nodes.",
   inject: ["exchange.read", "exchange.watch", "action.register"],
-  apply(ctx: Context) {
+  apply(ctx: Context, config: TranscriptConfig = {}) {
+    const files = config.files !== false;
     const read = ctx.get<ExchangeRead>("exchange.read");
     const runs = new Map<string, RunState>();
-    const stateOf = (run: string) => runs.get(run) ?? (runs.set(run, { offset: 0, index: new GivenIndex(), done: false, said: new Set(), busy: Promise.resolve() }), runs.get(run)!);
+    const stateOf = (run: string) => runs.get(run) ?? (runs.set(run, { offset: 0, file: new GivenIndex(), opened: false, done: false, said: new Set(), busy: Promise.resolve() }), runs.get(run)!);
+    /** What the run's transcript shows: the file read here, else what its hook sent. */
+    const ix = (s: RunState) => (s.opened || !s.fed ? s.file : s.fed.index);
+    /** The words stay where the run ran: nodes from what a hook sent, no file here. */
+    const elsewhere = (s: RunState) => !s.opened && !!s.fed;
+    const has = (s: RunState) => s.opened || !!s.fed;
 
     const take = (s: RunState, e: ExchangeEvent) => {
       if (e.kind === "begin") {
         const p = transcriptOf((e.detail as { facts?: Json } | undefined)?.facts);
-        if (p && p !== s.path) Object.assign(s, { path: p, offset: 0, index: new GivenIndex(), done: false });
+        if (p && p !== s.path) Object.assign(s, { path: p, offset: 0, file: new GivenIndex(), opened: false, done: false });
       } else if (e.kind === "say") {
         const f = fingerprint(e.text);
         if (f) s.said.add(f);
@@ -124,12 +154,13 @@ const transcript: Pack = {
       const s = stateOf(run);
       const next = s.busy.then(async () => {
         await learn(run, s);
-        if (!s.path) return s;
+        if (!s.path || !files) return s;
         s.done = false;
         for (let pages = 0; pages < PAGES; pages++) {
           const page = await readPage(s.path, s.offset);
           if (!page) break;
-          for (const line of page.lines) s.index.add(line);
+          s.opened = true;
+          for (const line of page.lines) s.file.add(line);
           const moved = page.next !== s.offset;
           s.offset = page.next;
           if (page.next >= page.size || !moved) {
@@ -148,7 +179,7 @@ const transcript: Pack = {
      * reached it, over the start's estimate (system prompt, tools, MCP instructions, model), within 0.5 to 3.
      */
     const startScale = (s: RunState, list: Given[]) => {
-      const first = s.index.talk.first;
+      const first = ix(s).talk.first;
       if (!first) return 1;
       const t0 = first.time ? Date.parse(first.time) : NaN;
       const est = list.filter((g) => staysOf(g.name) === "start" && (Number.isNaN(t0) || !g.first || Date.parse(g.first) <= t0)).reduce((n, g) => n + Math.ceil(g.size / 4), 0);
@@ -159,15 +190,15 @@ const transcript: Pack = {
     const nodesOf = (s: RunState, until?: string): (Given | Talk)[] => {
       const t = until ? Date.parse(until) : NaN;
       let cut = -Infinity;
-      for (const r of s.index.tokens.rows()) {
+      for (const r of ix(s).tokens.rows()) {
         const rt = r.time ? Date.parse(r.time) : NaN;
         if (r.kind === "compact" && !Number.isNaN(rt) && (Number.isNaN(t) || rt <= t)) cut = Math.max(cut, rt);
       }
-      const list = s.index.list(ours(s));
+      const list = ix(s).list(ours(s));
       const f = startScale(s, list);
-      const fit = !!s.index.talk.first;
+      const fit = !!ix(s).talk.first;
       const given = list.map((g) => (staysOf(g.name) === "start" ? { ...g, tokens: Math.round(Math.ceil(g.size / 4) * f), ...(fit ? { fitted: Math.round(Math.ceil(g.size / 4) * f) } : {}) } : g));
-      return [...given, ...s.index.talk.rows(t, cut)].sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0));
+      return [...given, ...ix(s).talk.rows(t, cut)].sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0));
     };
 
     const reg = ctx.get<ActionRegister>("action.register");
@@ -195,8 +226,10 @@ const transcript: Pack = {
         return {
           nodes: nodes as unknown as Json,
           ...(from.length > limit ? { next: nodes[nodes.length - 1]!.name } : {}),
-          ...(!s.path ? { none: true } : {}),
-          ...(s.path && !s.done ? { reading: true } : {}),
+          ...(!has(s) ? { none: true } : {}),
+          ...(s.opened && !s.done ? { reading: true } : {}),
+          ...(elsewhere(s) ? { elsewhere: true } : {}),
+          ...(s.fed?.skipped ? { skipped: s.fed.skipped } : {}),
         };
       },
     });
@@ -208,11 +241,12 @@ const transcript: Pack = {
       async run(input: { run: string; name: string }) {
         const s = await sync(String(input.run ?? ""));
         const node = nodesOf(s).find((g) => g.name === input.name);
-        if (!node || !s.path) throw refuse("transcript.name", `No ${JSON.stringify(input.name)} in that run's transcript.`);
+        if (!node || !has(s)) throw refuse("transcript.name", `No ${JSON.stringify(input.name)} in that run's transcript.`);
+        if (elsewhere(s) || !s.path) throw refuse("transcript.elsewhere", "The words stay on the machine the run ran on: only their sizes came here.");
         if ("private" in node && node.private) throw refuse("transcript.private", "The session's own context is counted, never shown.");
         const parts: string[] = [];
         const talk = node.name.startsWith("talk:");
-        for (const spot of talk ? s.index.talk.spots(node.name) : s.index.spots(node.name)) {
+        for (const spot of talk ? ix(s).talk.spots(node.name) : ix(s).spots(node.name)) {
           const line = await readLine(s.path, spot);
           let part: string | undefined;
           if (line !== undefined && talk) {
@@ -240,15 +274,15 @@ const transcript: Pack = {
         const s = await sync(input.run);
         const node = nodesOf(s).find((g) => g.name === input.name);
         if (!node) throw refuse("transcript.name", `No ${JSON.stringify(input.name)} in that run's transcript.`);
-        const f = staysOf(node.name) === "start" ? startScale(s, s.index.list(ours(s))) : 1;
-        const fit = staysOf(node.name) === "start" && !!s.index.talk.first;
+        const f = staysOf(node.name) === "start" ? startScale(s, ix(s).list(ours(s))) : 1;
+        const fit = staysOf(node.name) === "start" && !!ix(s).talk.first;
         const all = node.name.startsWith("talk:")
-          ? s.index.talk.piecesOf(node.name).map((p) => ({ ...(p.time ? { time: p.time } : {}), tokens: p.tokens, ...(p.fit ? { fit: true } : {}) }))
-          : s.index.piecesOf(node.name).map((p) => ({ ...(p.time ? { time: p.time } : {}), tokens: Math.round(Math.ceil(p.chars / 4) * f), ...(fit ? { fit: true } : {}) }));
+          ? ix(s).talk.piecesOf(node.name).map((p) => ({ ...(p.time ? { time: p.time } : {}), tokens: p.tokens, ...(p.fit ? { fit: true } : {}) }))
+          : ix(s).piecesOf(node.name).map((p) => ({ ...(p.time ? { time: p.time } : {}), tokens: Math.round(Math.ceil(p.chars / 4) * f), ...(fit ? { fit: true } : {}) }));
         const limit = Math.max(1, Math.min(LIMIT_MAX, Number(input.limit) || LIMIT_MAX));
         const from = Math.max(0, Math.floor(Number(input.after) || 0));
         const page = all.slice(from, from + limit).map((p, i) => ({ n: from + i + 1, ...p }));
-        return { name: node.name, stays: staysOf(node.name), count: all.length, pieces: page as unknown as Json, ...(from + limit < all.length ? { next: from + limit } : {}), ...(s.path && !s.done ? { reading: true } : {}) };
+        return { name: node.name, stays: staysOf(node.name), count: all.length, pieces: page as unknown as Json, ...(from + limit < all.length ? { next: from + limit } : {}), ...(s.opened && !s.done ? { reading: true } : {}) };
       },
     });
     reg.register({
@@ -271,13 +305,50 @@ const transcript: Pack = {
         if (input.kind !== undefined && input.kind !== "usage" && input.kind !== "compact") throw refuse("transcript.kind", "A kind is usage or compact.");
         const s = await sync(input.run);
         const limit = Math.max(1, Math.min(LIMIT_MAX, Number(input.limit) || LIMIT_MAX));
-        const page = tokensPage(s.index.tokens.rows(), {
+        const page = tokensPage(ix(s).tokens.rows(), {
           limit,
           ...(input.kind ? { kind: input.kind } : {}),
           ...(typeof input.until === "string" ? { until: input.until } : {}),
           ...(typeof input.after === "number" ? { after: input.after } : {}),
         });
-        return { ...(page as unknown as Record<string, Json>), ...(!s.path ? { none: true } : {}), ...(s.path && !s.done ? { reading: true } : {}) };
+        return { ...(page as unknown as Record<string, Json>), ...(!has(s) ? { none: true } : {}), ...(s.opened && !s.done ? { reading: true } : {}) };
+      },
+    });
+    reg.register({
+      name: TAKE,
+      title: "Take a page of a run's transcript, as numbers, from its hook",
+      doc: "For a run whose transcript this server can't open (it ran elsewhere): the records between two byte places of the file, each as numbers (`slim`, packs/claude-code/slim.ts: kinds, sizes, tool names, token counts, never text). Kept in memory, never in the graph. A page that starts past where the run is (a page lost) is left, and a page from 0 begins it again. Answers `at`: where the run's next page starts. Writes nothing.",
+      input: {
+        type: "object",
+        properties: {
+          run: { type: "string" },
+          from: { type: "number" },
+          to: { type: "number" },
+          size: { type: "number" },
+          lines: { type: "array", description: "Each record: [offset, length, the record as numbers]" },
+          skipped: { type: "number", description: "Bytes read and not sent: a page past the hook's size cap" },
+        },
+        required: ["run", "from", "to", "lines"],
+      },
+      async run(input: { run: string; from: number; to: number; size?: number; lines: [number, number, Slim][]; skipped?: number }) {
+        if (typeof input.run !== "string" || !input.run) throw refuse("transcript.run", "Say which run.");
+        const { from, to } = input;
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < from) throw refuse("transcript.page", "A page runs from one byte place to a later one.");
+        if (!Array.isArray(input.lines) || input.lines.length > TAKE_MAX) throw refuse("transcript.page", `A page holds at most ${TAKE_MAX} records.`);
+        const s = stateOf(input.run);
+        // A page from the start begins it again: the file was begun again, or the hook lost its place.
+        if (!s.fed || (from === 0 && to > 0 && s.fed.at > 0)) s.fed = { index: new GivenIndex(), at: 0, skipped: 0 };
+        const fed = s.fed;
+        // A page past where the run is: one before it didn't land. Left, and the hook is told where to go on from.
+        if (from > fed.at) return { at: fed.at };
+        for (const l of input.lines) {
+          if (!Array.isArray(l) || typeof l[0] !== "number" || typeof l[1] !== "number" || !l[2] || typeof l[2] !== "object" || typeof l[2].type !== "string") continue;
+          if (l[0] < fed.at) continue;
+          fed.index.take(l[2], { offset: l[0], length: l[1] });
+        }
+        if (typeof input.skipped === "number" && input.skipped > 0 && to > fed.at) fed.skipped += input.skipped;
+        fed.at = Math.max(fed.at, to);
+        return { at: fed.at };
       },
     });
     ctx.effect(() => () => runs.clear());

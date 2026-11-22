@@ -257,7 +257,10 @@ so it is never shown.
 The conversation since the start is nodes too, from the same pack: your
 prompts, Claude's replies and thinking, each tool's calls and its results
 (hung at that tool's place, beside its definition), Claude Code's notes
-and a compaction's summary, each a hexagon (talk). Picked, one says how
+and a compaction's summary, each a hexagon (talk). A run from a machine the server can't see (its hook
+sent the transcript as numbers) has every node, but its words stay where it
+ran: the pane marks it "⌂ on its machine", with why in its tooltip, and
+reads no text. Picked, one says how
 many pieces and tokens it holds, how many are in the window and how many
 a compaction dropped, and its latest 20 pieces' text.
 

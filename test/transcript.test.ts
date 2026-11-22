@@ -13,7 +13,7 @@ import claudeCode from "../packs/claude-code/index.ts";
 import exchange from "../packs/exchange/index.ts";
 import graph from "../packs/graph/index.ts";
 import transcript, { transcriptOf } from "../packs/transcript/index.ts";
-import { GivenIndex, hookPlace, hookWho, isOurs, partOf, readLine, readPage, shown, TokenIndex, tokensPage, windowOf, type Line } from "../packs/transcript/read.ts";
+import { GivenIndex, hookPlace, hookWho, isOurs, partOf, readLine, readPage, shown, slim, TokenIndex, tokensPage, windowOf, type Line } from "../packs/transcript/read.ts";
 import { givenNodes, givenOnly, isGiven, parseGiven } from "../packs/harness/given.ts";
 import { treeOf } from "../packs/harness/layout.ts";
 
@@ -206,6 +206,9 @@ test("the pack: a run's transcript fact from the adapter, read on demand, nothin
     loader.fiber("probe")!.ctx.get<ActionInvoke>("action.invoke").invoke({ action, input: input as never, authority: { of: "human", basis: "test" }, reason: "test" });
   try {
     await hook("SessionStart", { source: "startup" });
+    // A map on this machine reads the file itself: the hook is told so, and sends nothing more.
+    const asked = await fetch(`http://127.0.0.1:${port}/hook`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hook_event_name: "Stop", session_id: "sess-t", cwd: dir, transcript_path: path }) });
+    assert.equal(asked.headers.get("x-archipelago-transcript"), "own");
     await appendFile(
       path,
       [
@@ -313,7 +316,7 @@ test("talk: the conversation as nodes at their places, counted as of a moment, w
     { type: "assistant", timestamp: T(7), message: { content: [{ type: "text", text: "Fixed it." }] } },
   ];
   const index = new TalkIndex();
-  recs.forEach((r, i) => index.take(r, { offset: i * 1000, length: 10 }));
+  recs.forEach((r, i) => { const s = slim(r); if (s) index.take(s, { offset: i * 1000, length: 10 }); });
   const cut = Date.parse(T(5));
   const rows = index.rows(NaN, cut);
   assert.deepEqual(
@@ -369,7 +372,7 @@ test("talk sums to the model's own count: thinking from its real output, what re
     { type: "assistant", timestamp: T(4), message: { id: "m2", content: [{ type: "text", text: "done" }], usage: { input_tokens: 10, cache_read_input_tokens: 1290, output_tokens: 3 } } },
   ];
   const index = new TalkIndex();
-  recs.forEach((r, i) => index.take(r, { offset: i, length: 1 }));
+  recs.forEach((r, i) => { const s = slim(r); if (s) index.take(s, { offset: i, length: 1 }); });
   const row = (name: string) => index.rows().find((r) => r.name === name)!;
   // m1 put out 100: its reply is 10, its call 1, so its thinking is the other 89, though its text isn't kept.
   assert.equal(row("talk:thinking").tokens, 89);
@@ -379,4 +382,71 @@ test("talk sums to the model's own count: thinking from its real output, what re
   assert.deepEqual(index.first, { time: T(2), input: 1000, given: 20, talk: 10 });
   // Fitted: the thinking (from real output) and the result (from real growth); the prompt before the first message stays an estimate.
   assert.deepEqual([row("talk:thinking").fitted, row("talk:result:Bash").fitted, row("talk:prompt").fitted, row("talk:reply").fitted], [89, 200, 0, 0]);
+});
+
+test("a server elsewhere: the hook sends its transcript as numbers, the tree has Claude Code's nodes, their words stay where the run ran", async () => {
+  const { spawn } = await import("node:child_process");
+  const { readFile } = await import("node:fs/promises");
+  const dir = await mkdtemp(join(tmpdir(), "transcript-sent-"));
+  const path = join(dir, "sess.jsonl");
+  await writeFile(path, "");
+  const probe: Pack = { id: "probe", inject: ["action.invoke"], apply() {} };
+  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "transcript.ts": transcript, "cc.ts": claudeCode, "probe.ts": probe };
+  let port = 0;
+  const rt = new Runtime();
+  const errors: unknown[] = [];
+  rt.onError = (_f, e) => errors.push(e);
+  const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
+  // A server elsewhere: it never opens a path a hook names, even one on its own disk.
+  await loader.apply([
+    { id: "graph", pack: "graph.ts", config: { db: join(dir, "graph.sqlite") } },
+    { id: "action", pack: "action.ts" },
+    { id: "exchange", pack: "exchange.ts", config: { journal: join(dir, "exchange.jsonl") } },
+    { id: "agent", pack: "agent.ts" },
+    { id: "transcript", pack: "transcript.ts", config: { files: false } },
+    { id: "claude-code", pack: "cc.ts", config: { port: 0, files: false, onListen: (p: number) => (port = p) } },
+    { id: "probe", pack: "probe.ts" },
+  ]);
+  const env: Record<string, string | undefined> = { ...process.env, ARCHIPELAGO_HOOK_STATE: join(dir, "state"), ARCHIPELAGO_TOKEN_FILE: join(dir, "no-token") };
+  delete env.ARCHIPELAGO_TOKEN;
+  const hook = async (event: string) => {
+    const child = spawn(process.execPath, ["packs/claude-code/hook.ts", `http://127.0.0.1:${port}/hook`], { env });
+    child.stdin.end(JSON.stringify({ hook_event_name: event, session_id: "sess-far", cwd: dir, transcript_path: path, source: "startup" }));
+    return new Promise((ok) => child.on("close", ok));
+  };
+  const invoke = (a: string, input: object) =>
+    loader.fiber("probe")!.ctx.get<ActionInvoke>("action.invoke").invoke({ action: a, input: input as never, authority: { of: "human", basis: "test" }, reason: "test" });
+  try {
+    await appendFile(path, FIXTURE.join("\n") + "\n");
+    await hook("SessionStart");
+    // The next hook goes on from where the server says it is: the talk added since joins.
+    await appendFile(path, [line({ type: "user", timestamp: "2026-11-01T10:01:00Z", message: { content: "Fix the parser, please." } })].join("\n") + "\n");
+    await hook("UserPromptSubmit");
+    const out = await invoke("transcript.given", { run: "sess-far" });
+    assert.ok(out.ok, JSON.stringify(out));
+    const o = out.output as { nodes: { name: string; by: string }[]; elsewhere?: boolean; none?: boolean };
+    assert.equal(o.elsewhere, true);
+    assert.equal(o.none, undefined);
+    const names = o.nodes.map((n) => n.name);
+    for (const n of ["system", "tool:Bash", "tool:mcp__archipelago__act", "mcp:archipelago", "skills", "agents", "deferred", "model", "hook:session_start:guard-plugin", "hook:tool:Bash:output-guard", "talk:prompt", "talk:reply"]) assert.ok(names.includes(n), `${n} came`);
+    assert.ok(!names.some((n) => n.startsWith("hook:tool:Bash:hook")), "the map's own hook context is left out, by its command");
+    // Its words stay where it ran.
+    const text = await invoke("transcript.text", { run: "sess-far", name: "system" });
+    assert.ok(!text.ok && text.refused.code === "transcript.elsewhere");
+    const pieces = await invoke("transcript.pieces", { run: "sess-far", name: "talk:prompt" });
+    assert.ok(pieces.ok && (pieces.output as { count: number }).count === 2);
+    // Nothing of the text reached the server: not the record, not the journal.
+    const journal = await readFile(join(dir, "exchange.jsonl"), "utf8");
+    assert.ok(!journal.includes("archipelago_transcript") && !journal.includes("You are Claude Code") && !journal.includes("Fix the parser"));
+    // A page past where the run is (one lost) is left, and the hook told where to go on from; one from 0 begins it again.
+    const at = await invoke("transcript.take", { run: "sess-far", from: 10_000_000, to: 10_000_100, lines: [] });
+    assert.ok(at.ok && (at.output as { at: number }).at < 10_000_000);
+    const again = await invoke("transcript.take", { run: "sess-far", from: 0, to: 5, lines: [] });
+    assert.ok(again.ok && (again.output as { at: number }).at === 5);
+    assert.ok(!(await invoke("transcript.take", { run: "sess-far", from: 5, to: 1, lines: [] })).ok);
+    assert.deepEqual(errors, []);
+  } finally {
+    await loader.apply([]);
+    await rm(dir, { recursive: true, force: true });
+  }
 });

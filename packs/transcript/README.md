@@ -26,7 +26,18 @@ sensory interface hangs them into each agent's tree
 
 - **Where.** A run's `transcript` fact, which the Claude Code adapter adds
   from the hook's `transcript_path` ([claude-code](../claude-code/README.md)),
-  read from the run's `begin` events.
+  read from the run's `begin` events. On a server that can't open it (it
+  ran on another machine, or `files: false`), what the session's hook sent
+  stands for it (`transcript.take`): the same records, made `slim` where it
+  ran, the same nodes, sizes, history and token counts, but no text. Such a
+  run's nodes say so (`elsewhere`), and its text is refused
+  (`transcript.elsewhere`): the words stay on the machine it ran on.
+- **Records as numbers.** Every record is read through `slim`
+  ([slim.ts](../claude-code/slim.ts), which the hook carries): a local
+  file's lines are made slim here, a server elsewhere gets them slim. A
+  hook's context is matched to its hook's run by a hash of its start; the
+  map's own is left out by its command, and, from a file here, by its
+  words.
 - **Reading** ([read.ts](read.ts)). A page at a time from a byte cursor
   kept per run (256 kB, a long line up to 16 MB, longer ones skipped), so
   each call reads only what was added, and at most 64 pages. A record of a
@@ -70,14 +81,19 @@ sensory interface hangs them into each agent's tree
 
 ## Actions
 
-All four read; they write nothing.
+They write nothing in the graph.
 
 | Action | Input | Answers |
 |---|---|---|
 | `transcript.given` | `run`, `until?` (a time: the nodes as they were then), `after?`, `limit?` | a page of nodes by name (`name`, `title`, `by`, `at`, `count`, `size`, `first` and `last`: when it was first and last given; `tokens` and `fitted` for what is there from the start and the conversation; the conversation's also `window` and `fittedWindow`, those after the last compaction), `next`, `reading` while the file is still being read, `none` when the run has no transcript |
 | `transcript.pieces` | `run`, `name`, `after?` (how many the pages before held), `limit?` | a page of one node's pieces in order (`n`, `time`, `tokens`, `fit`), `stays` (`start`: each request carries its latest; `listed`; `said`: until a compaction), `count`, `next` |
 | `transcript.tokens` | `run`, `kind?` (`usage` or `compact`), `until?` (a time), `after?` (a row's `n`), `limit?` | a page of rows in order (`usage`: `input`, `cacheRead`, `cacheWrite`, `output`, `model`; `compact`: `trigger`, `pre`, `post`, `dropped`; each with `n` and `time`), `next`, `last` (the latest usage up to `until`), `compactions` (how many by then), `reading`, `none` |
+| `transcript.take` | `run`, `from`, `to` (byte places), `lines` (each `[offset, length, record as numbers]`, at most 20,000), `size?`, `skipped?` | `at`: where the run's next page starts. Kept in memory: a page past `at` is left (one before it was lost), one from 0 begins the run again |
 | `transcript.text` | `run`, `name` | the node's text (each distinct text, latest last), `cut` past 200,000 letters |
+
+| Setting | Default | |
+|---|---|---|
+| `files` | true | Whether a run's transcript is opened on this server's disk. A server elsewhere sets false: it reads only what the hooks send |
 
 The transcript's format is Claude Code's own, undocumented and internal to
 its version: when it changes, nodes go missing, nothing breaks. Tested in

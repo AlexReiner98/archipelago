@@ -734,3 +734,72 @@ test("two runs with the same nodes get the same leading text at session_start, w
   assert.equal(first, `${lead}\n\n[Since you last heard] Run 1: something changed.`, "what changes per run comes after the standing words");
   assert.notEqual(first, second, "only the tail differs");
 });
+
+test("the hook's transcript, as numbers: no text, no path; a page at a time from a cursor it holds; the server's word moves it", async () => {
+  const { slim, contextsIn, contextPrint, pageFrom, TRANSCRIPT_FIELD } = await import("../packs/claude-code/slim.ts");
+  const { holdCursor, nextCursor, withTranscript } = await import("../packs/claude-code/hook.ts");
+  const secret = "Secret words: pat@example.org in C:/Users/pat/proj";
+  const recs = [
+    { type: "attachment", timestamp: "2026-11-01T10:00:00Z", attachment: { type: "hook_success", hookEvent: "SessionStart", command: 'node "C:/Users/pat/.claude/hooks/guard.mjs"', stdout: JSON.stringify({ hookSpecificOutput: { additionalContext: secret } }) } },
+    { type: "attachment", timestamp: "2026-11-01T10:00:00Z", attachment: { type: "hook_additional_context", hookEvent: "SessionStart", hookName: "SessionStart", content: [secret] } },
+    { type: "attachment", timestamp: "2026-11-01T10:00:00Z", attachment: { type: "environment", snapshot: { cwd: "C:/Users/pat/proj" } }, rendered: [{ content: secret }] },
+    { type: "api-request-shape", shape: { system: [{ type: "text", text: secret }], tools: [{ name: "Bash", description: secret, input_schema: { type: "object" } }] } },
+    { type: "user", timestamp: "2026-11-01T10:01:00Z", message: { content: secret } },
+    { type: "assistant", timestamp: "2026-11-01T10:02:00Z", message: { id: "m1", model: "claude-x", usage: { input_tokens: 5, output_tokens: 9, service_tier: "standard" }, content: [{ type: "thinking", thinking: secret, signature: "sig" }, { type: "tool_use", id: "t1", name: "Bash", input: { command: secret } }] } },
+    { type: "user", timestamp: "2026-11-01T10:03:00Z", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: [{ type: "text", text: secret }] }] } },
+    { type: "queue-operation", content: secret },
+    { type: "user", isSidechain: true, message: { content: secret } },
+  ];
+  const slims = recs.map(slim);
+  const all = JSON.stringify(slims);
+  assert.ok(!all.includes("Secret") && !all.includes("pat") && !all.includes("Users") && !all.includes("example"), "no text, no address, no path");
+  assert.equal(slims[7], undefined, "a kind it doesn't read");
+  assert.equal(slims[8], undefined, "a side chain");
+  assert.deepEqual(slims[0]!.attachment, { type: "hook_success", hookEvent: "SessionStart", who: "guard", fps: [contextPrint(secret)] });
+  assert.deepEqual(slims[1]!.attachment!.content, [{ fp: contextPrint(secret), h: slims[1]!.attachment!.content![0]!.h, n: secret.length }]);
+  assert.deepEqual(slims[2]!.rendered, secret.length);
+  assert.deepEqual(slims[3]!.shape, { system: secret.length, tools: [{ name: "Bash", n: secret.length + JSON.stringify({ type: "object" }).length }] });
+  assert.deepEqual(slims[5]!.message, { id: "m1", model: "claude-x", usage: { input_tokens: 5, output_tokens: 9 }, content: [{ type: "thinking", n: secret.length }, { type: "tool_use", id: "t1", name: "Bash", n: JSON.stringify({ command: secret }).length }] });
+  assert.deepEqual(contextsIn('{"hookSpecificOutput":{"additionalContext":"a"}}'), ["a"]);
+  assert.deepEqual(contextsIn('noise {"additionalContext":"b\\nc"} noise'), ["b\nc"]);
+
+  const dir = await mkdtemp(join(tmpdir(), "hook-page-"));
+  try {
+    const path = join(dir, "s.jsonl");
+    await writeFile(path, recs.map((r) => JSON.stringify(r)).join("\n") + "\n" + '{"type":"user","message":{"content":"unfinished');
+    // A page: whole lines as numbers, the unfinished last line left for later.
+    const page = (await pageFrom(path, 0))!;
+    assert.equal(page.lines.length, 7);
+    assert.equal(page.to, Buffer.byteLength(recs.map((r) => JSON.stringify(r)).join("\n") + "\n"));
+    assert.ok(!JSON.stringify(page).includes("Secret"));
+    // Past the size cap: skipped, and said so.
+    const big = (await pageFrom(path, 0, undefined, 100))!;
+    assert.deepEqual([big.lines.length, big.skipped], [0, page.to]);
+    assert.equal(await pageFrom(join(dir, "none.jsonl"), 0), undefined);
+    // The cursor: one call holds it; another of the same session doesn't wait.
+    const state = join(dir, "state");
+    const a = holdCursor("s|p", state)!;
+    assert.equal(holdCursor("s|p", state), undefined);
+    a.save({ offset: 42, answer: "send" });
+    a.release();
+    const b = holdCursor("s|p", state)!;
+    assert.deepEqual(b.cursor, { offset: 42, answer: "send" });
+    b.release();
+    // The server's word: where its next page starts; `own` stops; nothing, on after this page.
+    assert.deepEqual(nextCursor({ offset: 10 }, { to: 90 }, "send 30"), { offset: 30, answer: "send" });
+    assert.deepEqual(nextCursor({ offset: 10 }, { to: 90 }, "own"), { offset: 10, answer: "own" });
+    assert.deepEqual(nextCursor({ offset: 10 }, { to: 90 }, null), { offset: 90 });
+    // The hook input with its page; saved only once the server took it.
+    const input = JSON.stringify({ session_id: "s2", hook_event_name: "Stop", transcript_path: path });
+    const w = await withTranscript(input, state);
+    assert.equal((JSON.parse(w.body) as Record<string, { lines: unknown[] }>)[TRANSCRIPT_FIELD]!.lines.length, 7);
+    w.answered(null, false);
+    const again = await withTranscript(input, state);
+    assert.equal((JSON.parse(again.body) as Record<string, { from: number }>)[TRANSCRIPT_FIELD]!.from, 0, "a page that didn't land is sent again");
+    again.answered("own", true);
+    assert.equal((await withTranscript(input, state)).body, input, "the server reads it itself: nothing sent");
+    assert.equal((await withTranscript(JSON.stringify({ session_id: "s3", hook_event_name: "Stop" }), state)).body, JSON.stringify({ session_id: "s3", hook_event_name: "Stop" }), "no transcript named");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
