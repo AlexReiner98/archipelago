@@ -113,7 +113,7 @@ from one "decided" bough as well, retired ones struck.
 | ring | its verdict in the run (blue held, red failed, dashed quiet), once looked at to the end |
 | dot hue | its pack: the map's words purple, what grow learned gold |
 | hollow dot | its item is a trial |
-| square dot, plain name | given by the harness, not the map: read only (below) |
+| grey: square dot, plain name, its branch | given by the harness, not the map: read only (below) |
 | dot size, number | how often it was said: in the run, or all time |
 | ↑ ↓ ⊝ | the keep pack's standing: promote, retire, held back by a check |
 
@@ -165,7 +165,10 @@ skill, agent and deferred tool listings, the model, and other hooks'
 context, each at its place (`transcript.given`). They are the run's own
 (id `transcript/<run>#<name>`), square and plain, named with who said
 them (a tool's definition by its bough), and counted apart over the tree
-("72 / 72 + 65"). Picked, the left bar shows who gave it, where, how often,
+("72 / 72 + 65"). They are grey, not a pack's hue, and so is every bough
+that holds nothing else (`givenOnly`): what the map supplies and controls
+keeps its colour, and what Claude Code does on its own reads as grey; a
+bough both speak on (`tool:Bash`) stays the map's. Picked, the left bar shows who gave it, where, how often,
 and its text, read only and folded (`transcript.text`). "given · by the
 harness" in the ⋯ menu hides them. The run's `transcript` fact is a path,
 so it is never shown.

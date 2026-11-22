@@ -260,7 +260,8 @@ const harness: Pack = {
       const treeNodes = useMemo(() => (!live && shownGiven.length ? [...nodes, ...shownGiven] : nodes), [live, nodes, shownGiven]);
       const tree = useMemo(() => treeOf(treeNodes, { by, unsaid, profiles: membership, decided }), [treeNodes, by, unsaid, membership, decided]);
       const placed = useMemo(() => radial(tree), [tree]);
-      const hues = useMemo(() => packHues([...nodes.map((n) => n.pack), ...(given.size ? ["transcript"] : [])]), [nodes, given.size > 0]);
+      // The harness's given nodes are grey, not a pack hue (canvas.ts).
+      const hues = useMemo(() => packHues(nodes.map((n) => n.pack)), [nodes]);
       // Live: each run an agent with a tree of its own (what it hears), in its colour, its profile over it.
       const dials = useDials(here);
       const acting = useMemo(() => new Set(liveEvents.map((e) => e.run)), [liveEvents]);

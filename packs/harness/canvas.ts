@@ -21,7 +21,7 @@
  * when first laid out, and then only on a double-click (`shouldFit`): the
  * map changing under it never moves it. A click picks a node,
  */
-import { isGiven } from "./given.ts";
+import { givenOnly, isGiven } from "./given.ts";
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
@@ -58,8 +58,9 @@ export const CANVAS_STYLE = sheet(`
 .rx-bough .rx-dot { fill-opacity:.5; }
 .rx-node { cursor:pointer; }
 .rx-trial .rx-dot { fill:none !important; stroke-width:1.2; }
+.rx-branch.given { stroke:var(--dim); }
 .rx-given .rx-name { fill:var(--dim); font-weight:400; }
-.rx-given .rx-dot { fill-opacity:.7; }
+.rx-given .rx-dot { fill:var(--dim); fill-opacity:.8; }
 .rx-ring { fill:none; stroke-width:1.6; stroke:none; }
 .rx-ring.v-held { stroke:${C.say}; } .rx-ring.v-failed { stroke:${C.fail}; } .rx-ring.v-quiet { stroke:var(--quiet); stroke-dasharray:1.5 1.5; }
 .rx-name { fill:var(--fg); font:var(--bold) ${S.nameText}px var(--font); dominant-baseline:middle; pointer-events:none; }
@@ -237,7 +238,7 @@ export const Key = ({ hues }: { hues: Map<string, string> }) => html`
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-failed" cx="7" cy="5" r="3.5" /></svg>`, "failed")}
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle class="rx-ring v-quiet" cx="7" cy="5" r="3.5" /></svg>`, "quiet")}
     ${KeyRow(html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3" style=${`fill:none;stroke:${v("fg")};stroke-width:1.2`} /></svg>`, "trial")}
-    ${KeyRow(html`<svg viewBox="0 0 14 10"><rect x="4" y="2" width="6" height="6" style=${`fill:${v("dim")}`} /></svg>`, "given by the harness, read only")}
+    ${KeyRow(html`<svg viewBox="0 0 14 10"><path d="M1 5H8" style=${`stroke:${v("dim")};stroke-width:2`} /><rect x="8" y="2" width="6" height="6" style=${`fill:${v("dim")}`} /></svg>`, "grey: the harness gave it, not the map")}
     ${[...hues].map(([p, c]) => KeyRow(html`<svg viewBox="0 0 14 10"><circle cx="7" cy="5" r="3.5" style=${`fill:${c}`} /></svg>`, p === "words" ? "the map's words" : p === "grow" ? "learned" : p))}
   </div>
 `;
@@ -400,6 +401,8 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     return s;
   }, [picked, tree]);
   const statusOf = (n?: NodeInfo) => (n?.source ? statuses.get(n.source) : undefined);
+  // What the harness gave, and every bough that holds nothing else: grey, so the map's own stands out in colour.
+  const theirs = useMemo(() => givenOnly(tree), [tree]);
   const rest = tree.order.filter((t) => t.parent);
   return html`
     <div class=${`rx-canvas${panning ? " panning" : ""}${small ? " rx-small" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${() => ((manual.current = false), (ask.current = true), refit((n) => n + 1))} title="Click a node to pick it; drag to move; wheel to zoom; double-click to fit">
@@ -407,7 +410,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
         <g>
           ${rest.map((t) => {
             const b = branchAt(t.depth);
-            return html`<path key=${`b:${t.id}`} data-b=${t.id} class=${`rx-branch${way.has(t.id) ? " way" : ""}`} d=${placed.branch.get(t.id)} style=${`stroke-width:${way.has(t.id) ? b.width + 1 : b.width};stroke-opacity:${b.ink}`} />`;
+            return html`<path key=${`b:${t.id}`} data-b=${t.id} class=${`rx-branch${way.has(t.id) ? " way" : ""}${theirs.has(t.id) ? " given" : ""}`} d=${placed.branch.get(t.id)} style=${`stroke-width:${way.has(t.id) ? b.width + 1 : b.width};stroke-opacity:${b.ink}`} />`;
           })}
         </g>
         <g>
@@ -428,17 +431,16 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
             const cls = [
               id ? "rx-node" : "rx-bough",
               trial && "rx-trial",
-              given && "rx-given",
+              theirs.has(t.id) && "rx-given",
               hear && `rx-${hear}`,
               hold && `rx-${hold}`,
               t.decided && !t.decided.up && "rx-retired",
               picked && picked === id && "rx-pick",
             ].filter(Boolean).join(" ");
             const tip = given
-              ? `${n!.title}
-given by ${given.by} · read only
-${n!.at.join(", ")}${given.count > 1 ? `
-given ${given.count} times` : ""}`
+              ? `${n!.title}\ngiven by ${given.by}, not the map · read only\n${n!.at.join(", ")}${given.count > 1 ? `\ngiven ${given.count} times` : ""}`
+              : !n && theirs.has(t.id)
+              ? `${t.title}\nonly what the harness gave`
               : n
               ? `${n.title}\n${n.kind} · ${n.pack}${trial ? " · trial" : ""}${hear ? ` · ${hear}` : ""}${hold ? ` · ${hold === "held" ? "held back" : "a shadow would hold it back"}` : ""}${ver ? ` · ${ver}` : ""}\n${n.at.join(", ") || "said nowhere"}${said ? `\nsaid ${said} times` : ""}`
               : t.decided ? `${t.title}\n${t.decided.up ? "kept" : "retired"}` : t.title;
@@ -447,7 +449,7 @@ given ${given.count} times` : ""}`
                 <title>${tip}</title>
                 ${ver && html`<circle class=${`rx-ring v-${ver}`} r=${r + 2.5} />`}
                 ${given
-                  ? html`<rect class="rx-dot" x=${-r} y=${-r} width=${2 * r} height=${2 * r} style=${hue ? `fill:${hue}` : ""} />`
+                  ? html`<rect class="rx-dot" x=${-r} y=${-r} width=${2 * r} height=${2 * r} />`
                   : html`<circle class="rx-dot" r=${r} style=${hue ? (trial ? `stroke:${hue}` : `fill:${hue}`) : ""} />`}
                 <text class="rx-name" transform=${`rotate(${l.turn})`} x=${l.dx} y=${l.dy} text-anchor=${l.anchor}>${
                   l.anchor === "end"

@@ -16,6 +16,7 @@ import type { ActionInvoke } from "../../spec/action.ts";
 import type { NodeInfo } from "../../spec/agent.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import { PartRow } from "./events.ts";
+import type { Tree, TreeNode } from "./layout.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -55,6 +56,28 @@ export function parseGiven(id: string | undefined): { run: string; name: string 
 }
 
 export const isGiven = (n: NodeInfo | undefined): n is GivenInfo => n?.kind === KIND && n.pack === PACK;
+
+/**
+ * What is the harness's alone, by tree id: each given node, and each bough
+ * every leaf under which is given. Drawn grey, so what the map says (and the
+ * boughs that lead to it) keeps its colour. The root is never in it.
+ */
+export function givenOnly(tree: Tree): Set<string> {
+  const out = new Set<string>();
+  const walk = (t: TreeNode): boolean => {
+    if (!t.kids.length) {
+      const theirs = isGiven(t.node);
+      if (theirs) out.add(t.id);
+      return theirs;
+    }
+    let all = true;
+    for (const k of t.kids) all = walk(k) && all;
+    if (all && t.parent) out.add(t.id);
+    return all;
+  };
+  walk(tree.root);
+  return out;
+}
 
 /**
  * Each row as a node of the run's tree. Its name says who said it, except a

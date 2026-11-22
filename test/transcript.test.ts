@@ -14,7 +14,7 @@ import exchange from "../packs/exchange/index.ts";
 import graph from "../packs/graph/index.ts";
 import transcript, { transcriptOf } from "../packs/transcript/index.ts";
 import { GivenIndex, hookPlace, hookWho, isOurs, partOf, readLine, readPage, shown, type Line } from "../packs/transcript/read.ts";
-import { givenNodes, isGiven, parseGiven } from "../packs/harness/given.ts";
+import { givenNodes, givenOnly, isGiven, parseGiven } from "../packs/harness/given.ts";
 import { treeOf } from "../packs/harness/layout.ts";
 
 const line = (o: object) => JSON.stringify(o);
@@ -161,6 +161,14 @@ test("the sensory interface hangs given nodes at their places, a run's own, mark
   assert.equal(pathOf(nodes[1]!.id), "tool / Bash");
   assert.equal(pathOf(nodes[2]!.id), "tool / archipelago", "a server's instructions hang beside its tools");
   assert.equal(pathOf(nodes[3]!.id), "tool / Bash", "a hook's context at the hook's place");
+  // Grey: what the harness gave, and the boughs holding nothing else; a bough the map speaks on too keeps its colour.
+  const map = { id: "words/w1", name: "w1", pack: "words", kind: "instruction", title: "Quote paths", at: ["tool:Bash"] };
+  const mixed = treeOf([...nodes, map]);
+  const grey = givenOnly(mixed);
+  assert.ok(nodes.every((n) => grey.has(n.id)));
+  assert.ok(!grey.has("words/w1"));
+  assert.ok(grey.has("~:session_start") && grey.has("~:tool:mcp__archipelago"));
+  assert.ok(!grey.has("~:tool:Bash") && !grey.has("~:tool") && !grey.has("~root"));
 });
 
 test("the pack: a run's transcript fact from the adapter, read on demand, nothing written, the map's words left out", async () => {
