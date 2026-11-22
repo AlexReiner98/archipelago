@@ -12,3 +12,8 @@ Injects `exchange.append`, so it waits until an exchange is loaded.
   throws, or refuses where refusing can't stop anything, is a `miss`.
 - A run the pack doesn't know (it began before the pack reloaded) is taken
   up as it is, with a miss saying so: a reload never breaks a run.
+- A say whose node already said other words in this context at the same
+  kind of place (`prompt`, `tool:`, `file:` …) is recorded with
+  `detail.reworded: true`: the node was reworded while the run heard it.
+  A `repeat: "every"` node is never marked. A compaction forgets it, as it
+  does what was said.
