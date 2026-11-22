@@ -754,3 +754,14 @@ test("the wire names give way the same through the grid: a crowded name hides, t
   assert.deepEqual(crowded(names, shown), [false, true, false, true, true]);
   assert.deepEqual(crowded([], shown), []);
 });
+
+test("a drawn node draws again only when one of its values changed", async () => {
+  const { memo } = await import("../packs/harness/nodes.ts");
+  const C = memo((p: { a: number; b?: string }) => String(p.a));
+  const c = new C({ a: 1, b: "x" });
+  c.props = { a: 1, b: "x" };
+  assert.equal(c.shouldComponentUpdate!({ a: 1, b: "x" }, {}, {}), false, "the same values: left as it was");
+  assert.equal(c.shouldComponentUpdate!({ a: 2, b: "x" }, {}, {}), true);
+  assert.equal(c.shouldComponentUpdate!({ a: 1 }, {}, {}), true, "a value gone");
+  assert.equal(c.shouldComponentUpdate!({ a: 1, b: "x", c: 3 } as never, {}, {}), true, "a value added");
+});

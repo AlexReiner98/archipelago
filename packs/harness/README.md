@@ -171,6 +171,14 @@ once more when it settles (140 ms after the last, `SETTLE_MS`), for what
 depends on the zoom (the shapes' least size on screen) and for the wire
 names giving way, which stay as they were while it moves.
 
+A live event draws only what it changed: each node and branch is its own
+component ([nodes.ts](nodes.ts)) that draws again only when one of its
+values does (lit, said, counted, picked, its window mark), so the rest of
+the tree, and of each preview, is left as it was. The wire names give way
+only when the tree, its places or the camera change, never in a preview
+(where they are always hidden). The camera's pure parts are in
+[camera.ts](camera.ts).
+
 ## The window ([windowbar.ts](windowbar.ts))
 
 With the context pack ([context](../context/README.md)), a bar over the

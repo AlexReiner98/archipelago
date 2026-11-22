@@ -22,11 +22,9 @@
  * when first laid out, and then only on a double-click (`shouldFit`): the
  * map changing under it never moves it. A click picks a node,
  */
-import { channelDoc, channelOf, shapeOf, shapePath } from "./channels.ts";
-import { useLine } from "./use.ts";
-import { Key, marksIn, shapeRadius, type KeyFilter } from "./key.ts";
+import { Key, marksIn, type KeyFilter } from "./key.ts";
 export type { KeyFilter } from "./key.ts";
-import { givenOnly, isGiven } from "./given.ts";
+import { givenOnly } from "./given.ts";
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
@@ -34,10 +32,13 @@ import type { NodeInfo } from "../../spec/agent.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { fadeCrowded } from "./labels.ts";
+import { Branch, Node, type Standing } from "./nodes.ts";
+import { cameraOf, HIT_PX, nearest, SETTLE_MS, shouldFit, fitKey } from "./camera.ts";
+export { fitKey, HIT_PX, nearest, shouldFit } from "./camera.ts";
 import { branchAt, dotsBox, lightOf, pointAt, route, STYLE, type Placed, type Tree } from "./layout.ts";
 import type { Verdict } from "./hooks.ts";
 import type { Heard, Hold } from "./replay.ts";
-import { WINDOW_TIP, windowShown, type WindowMark } from "./windowbar.ts";
+import { windowShown, type WindowMark } from "./windowbar.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -249,35 +250,7 @@ function lighter(group: SVGGElement, svg: SVGSVGElement, get: () => { tree: Tree
   };
 }
 
-/** A node's standing as a mark after its name. */
-export type Standing = "up" | "down" | "gone";
-const STANDING: Record<Standing, string> = { up: "↑", down: "↓", gone: "⊝" };
-
-/**
- * What a fit depends on: how many nodes, and the bounds, rounded. A tree
- * read again with the same shape keeps the camera where it is.
- */
-export function fitKey(count: number, b: Placed["box"]): string {
-  return `${count}|${[b.x, b.y, b.width, b.height].map((n) => Math.round(n)).join(",")}`;
-}
-
-/** Whether the camera fits now: when asked (a double-click), always; else only its first time, if not moved by hand. */
-export function shouldFit(s: { fitted: boolean; manual: boolean; asked: boolean }): boolean {
-  return s.asked || (!s.manual && !s.fitted);
-}
-
-/** How far round a dot, in screen px, a press still picks its node. */
-export const HIT_PX = 22;
-
-/** The nearest of the points within `r` of `p`, by id; none further. */
-export function nearest(points: { id: string; x: number; y: number }[], p: { x: number; y: number }, r: number): string | undefined {
-  let best: string | undefined, d = r;
-  for (const q of points) {
-    const dd = Math.hypot(q.x - p.x, q.y - p.y);
-    if (dd < d) (d = dd), (best = q.id);
-  }
-  return best;
-}
+export type { Standing } from "./nodes.ts";
 
 export interface CanvasProps {
   tree: Tree;
@@ -305,11 +278,6 @@ export interface CanvasProps {
   /** Each node's place in the agent's window at the playhead: in it, listed only, dropped (windowbar.ts). */
   window?: ReadonlyMap<string, WindowMark>;
 }
-
-/** How long after the last wheel or move the picture is drawn again for its zoom. */
-export const SETTLE_MS = 140;
-/** The camera as the picture's transform. */
-export const cameraOf = (v: { x: number; y: number; k: number }) => `scale(${v.k}) translate(${-v.x} ${-v.y})`;
 
 export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
@@ -436,11 +404,13 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
 
   // The names on the wires give way: after each draw, those that overlap anything fade (labels.ts). Not while
   // moving: the names scale with the picture, so what overlaps stays the same until it settles.
+  // Only when what it measures changed: the tree, its places, the camera settled. Never in a preview, where the
+  // wire names are always hidden: measuring them would only force a layout on every event.
   useEffect(() => {
-    if (moving.current) return;
+    if (moving.current || small) return;
     const f = requestAnimationFrame(() => svg.current && fadeCrowded(svg.current));
     return () => cancelAnimationFrame(f);
-  });
+  }, [tree, placed, view.k, view.x, view.y, small, picked]);
 
   // The picked node's way from the root.
   const way = useMemo(() => {
@@ -463,61 +433,36 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
         <g>
           ${rest.map((t) => {
             const b = branchAt(t.depth);
-            return html`<path key=${`b:${t.id}`} data-b=${t.id} class=${`rx-branch${way.has(t.id) ? " way" : ""}${theirs.has(t.id) ? " given" : ""}`} d=${placed.branch.get(t.id)} style=${`stroke-width:${way.has(t.id) ? b.width + 1 : b.width};stroke-opacity:${b.ink}`} />`;
+            return html`<${Branch} key=${`b:${t.id}`} id=${t.id} d=${placed.branch.get(t.id)} width=${b.width} ink=${b.ink} way=${way.has(t.id)} theirs=${theirs.has(t.id)} />`;
           })}
         </g>
         <g>
           ${rest.map((t) => {
             const p = placed.xy.get(t.id)!;
-            const l = placed.labels.get(t.id)!;
             const n = t.node;
             const id = n?.id ?? t.decided?.node;
-            const trial = statusOf(n) === "trial";
-            const given = isGiven(n) ? n : undefined;
-            const channel = n ? channelOf(n) : undefined;
-            const ver = id ? rings?.get(id) : undefined;
-            const said = id ? counts.get(id) : undefined;
-            const r = id ? S.leaf + Math.min(3, Math.log2(1 + (said ?? 0)) * 0.45) : S.node;
-            const hue = n ? hues.get(n.pack) : undefined;
-            const hear = n ? heard.get(n.id) : undefined;
-            // A given tool a lean profile would leave out: a shadow's hold, or held once written (use.ts).
-            const hold = given?.out ? (given.out.applied ? "held" : "shadow") : n ? held.get(n.id) : undefined;
-            const st = id ? standing.get(id) : undefined;
-            const wm = id ? win?.get(id) : undefined;
-            const cls = [
-              id ? "rx-node" : "rx-bough",
-              trial && "rx-trial",
-              theirs.has(t.id) && "rx-given",
-              given?.use?.used === 0 && "rx-unused",
-              hear && `rx-${hear}`,
-              hold && `rx-${hold}`,
-              t.decided && !t.decided.up && "rx-retired",
-              picked && picked === id && "rx-pick",
-            ].filter(Boolean).join(" ");
-            const tip0 = given
-              ? `${n!.title}\ngiven by ${given.by}, not the map · read only\n${channel}: ${channelDoc(channel!)}\n${n!.at.join(", ")}${given.count > 1 ? `\ngiven ${given.count} times` : ""}${given.use ? `\n${useLine(given.use)}` : ""}${given.out ? `\n${given.out.applied ? "left out by" : "would be left out by"} ${given.out.title}` : ""}`
-              : !n && theirs.has(t.id)
-              ? `${t.title}\nonly what the harness gave`
-              : n
-              ? `${n.title}\n${n.kind} · ${n.pack} · ${channel}: ${channelDoc(channel!)}${trial ? " · trial" : ""}${hear ? ` · ${hear}` : ""}${hold ? ` · ${hold === "held" ? "held back" : "a shadow would hold it back"}` : ""}${ver ? ` · ${ver}` : ""}\n${n.at.join(", ") || "said nowhere"}${said ? `\nsaid ${said} times` : ""}`
-              : t.decided ? `${t.title}\n${t.decided.up ? "kept" : "retired"}` : t.title;
-            const tip = wm ? `${tip0}\n${WINDOW_TIP[wm]}` : tip0;
-            return html`
-              <g key=${`n:${t.id}`} data-id=${t.id} data-depth=${t.depth} class=${cls} transform=${`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}>
-                <title>${tip}</title>
-                ${wm === "in" ? html`<circle class="rx-win w-in" r=${r + 5} />` : wm === "listed" ? html`<circle class="rx-win w-listed" r=${r + 4.5} />` : ""}
-                ${ver && html`<circle class=${`rx-ring v-${ver}`} r=${r + 2.5} />`}
-                ${channel
-                  ? html`<path class="rx-dot" d=${shapePath(shapeOf(channel), shapeRadius(r, view.k, !!small))} style=${!given && hue ? (trial ? `stroke:${hue}` : `fill:${hue}`) : ""} />`
-                  : html`<circle class="rx-dot" r=${r} style=${hue ? (trial ? `stroke:${hue}` : `fill:${hue}`) : ""} />`}
-                ${wm === "dropped" && html`<path class="rx-win w-dropped" d=${`M${-(r + 3)} ${r + 3}L${r + 3} ${-(r + 3)}`} />`}
-                <text class="rx-name" transform=${`rotate(${l.turn})`} x=${l.dx} y=${l.dy} text-anchor=${l.anchor}>${
-                  l.anchor === "end"
-                    ? html`${st && html`<tspan class=${st}>${STANDING[st]} </tspan>`}${said ? html`<tspan class="c">${said} </tspan>` : ""}${l.text}`
-                    : html`${l.text}${said ? html`<tspan class="c"> ${said}</tspan>` : ""}${st && html`<tspan class=${st}> ${STANDING[st]}</tspan>`}`
-                }</text>
-              </g>
-            `;
+            // Plain values only: a node draws again when one of them changes (nodes.ts).
+            return html`<${Node}
+              key=${`n:${t.id}`}
+              t=${t}
+              x=${p.x}
+              y=${p.y}
+              label=${placed.labels.get(t.id)!}
+              leaf=${S.leaf}
+              bough=${S.node}
+              hue=${n ? hues.get(n.pack) : undefined}
+              trial=${statusOf(n) === "trial"}
+              theirs=${theirs.has(t.id)}
+              hear=${n ? heard.get(n.id) : undefined}
+              held=${n ? held.get(n.id) : undefined}
+              standing=${id ? standing.get(id) : undefined}
+              window=${id ? win?.get(id) : undefined}
+              ring=${id ? rings?.get(id) : undefined}
+              said=${id ? counts.get(id) : undefined}
+              picked=${!!picked && picked === id}
+              k=${n ? view.k : 1}
+              small=${!!small}
+            />`;
           })}
         </g>
         <circle class="rx-root" r=${S.root} />
