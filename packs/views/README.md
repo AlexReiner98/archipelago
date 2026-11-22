@@ -64,4 +64,5 @@ own.
   way: the hash is kept, and the view shows as soon as its pack loads. The
   hash is never dropped for home.
 - **`here.view`** set by something else (an agent, a panel) shows the
-  view of that kind. `views.view` (page) says which view shows.
+  view of that kind; not while the shown view's own fill is gone, when the
+  frame is only standing another fill in for it. `views.view` (page) says which view shows.

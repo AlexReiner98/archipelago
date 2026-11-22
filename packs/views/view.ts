@@ -150,6 +150,8 @@ const views_: Pack<Config> = {
       else if (JSON.stringify(fresh) !== JSON.stringify(now)) pick(fresh, !auto); // an agent changed it
       else tell();
     };
+    /** Whether a view's center fill is gone now, so whatever the frame shows stands in for it. */
+    const standIn = (center: string | undefined) => !!center && !read.fills("center").some((f) => `${f.pack}/${f.name}` === center);
     const fromHash = () => {
       const v = byHash(list(), location.hash);
       if (v && v.id !== show.shown()?.id) pick(v);
@@ -162,6 +164,9 @@ const views_: Pack<Config> = {
         here.watch(KEYS.view, (c) => {
           // While the view picked is away, the frame shows another center fill for the moment: not a pick.
           if (!settled || away || typeof c.value !== "string" || c.value === show.shown()?.center) return;
+          // The shown view's own fill is gone (its pack reloading): the frame stands another fill in and says
+          // so in here.view. That is not a pick; follow() holds the view away and brings it back.
+          if (standIn(show.shown()?.center)) return;
           const kind = list().find((v) => v.kind && v.center === c.value);
           if (kind) pick(kind);
         }) as () => void,

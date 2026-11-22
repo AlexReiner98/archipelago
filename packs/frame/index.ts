@@ -118,7 +118,9 @@ const frame: Pack = {
       const shown = center.find((f) => fillKey(f) === view) ?? center[0];
       const key = shown && fillKey(shown);
       useEffect(() => {
-        if (key && key !== view) set.set(KEYS.view, key);
+        // Read the fills again: a pack reloading takes its fill away and puts it back, and a render made
+        // in between would stand another fill in for a view that is already back.
+        if (key && key !== view && !read.fills("center").some((f) => fillKey(f) === view)) set.set(KEYS.view, key);
       }, [key, view]);
       return html`
         <div class="fr">

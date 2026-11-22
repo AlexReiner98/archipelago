@@ -23,8 +23,10 @@ regions and nothing in them. Any pack that fills `root` can take its place.
   page starts with the config's `folded` (none, as shipped), and any pack
   opens one by taking its fill out of the list.
 - **Center:** one fill at a time, the one `here.view` names, else the first.
-  The frame sets `here.view` to what it shows. The [views](../views/README.md)
-  pick it.
+  The frame sets `here.view` to what it shows, read again first: a pack
+  reloading takes its fill away and puts it back, and a render made in
+  between never stands another fill in for a view already back. The
+  [views](../views/README.md) pick it.
 - **Over:** a layer above the page. Only its fills take the pointer.
 
 Injects `slot.fill`, `slot.read`, `here.read`, `here.set` and
