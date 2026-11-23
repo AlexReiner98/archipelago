@@ -32,7 +32,8 @@ What it checks (check.ts):
   field's kind: `schema.field_kind`. A `status` not among its base's:
   `schema.status`. An `id` field naming nothing: `schema.id_missing`.
 - A link needs `from` and `to` naming items that exist, of the bases the
-  kind of link allows: `schema.link_end`. An item that isn't a link has
+  kind of link allows: `schema.link_end`. A link given a new type is checked
+  with the ends it already had, read from the graph like any other. An item that isn't a link has
   neither: `schema.not_a_link`. Fields but no type: `schema.type_missing`.
 - A type nobody defines passes unchecked, unless `config.strict`
   (`schema.type_unknown`). The harness packs write such types today.

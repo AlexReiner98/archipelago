@@ -253,3 +253,18 @@ test("unloading the schema pack takes its stage: writes are no longer checked", 
     await s.stop();
   }
 });
+
+test("a link given a new type is checked with the ends it already had, which exist", async () => {
+  const s = await setup();
+  try {
+    defined.set("tie", { name: "tie", pack: "types" });
+    await s.ok(s.write(["+", "n1", "type", "note"], ["+", "n1", "title", "Undeclared"], ...task("t1")));
+    await s.ok(s.write(["+", "l1", "type", "old_tie"], ["+", "l1", "from", "n1"], ["+", "l1", "to", "t1"]));
+    await s.ok(s.write(["-", "l1", "type", "old_tie"], ["+", "l1", "type", "tie"]));
+    const [l1] = await s.read.get(["l1"]);
+    assert.equal(l1?.type, "tie");
+    assert.deepEqual(await s.held(), []);
+  } finally {
+    await s.stop();
+  }
+});
