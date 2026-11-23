@@ -309,7 +309,7 @@ export function paint(c: CanvasRenderingContext2D, scene: Scene, cam: Camera, vi
     const L = nameLayout(m, ink, widths, state.small, ni.weight, ni.italic);
     const color = ink.color(ni.color);
     const ink2 = (kind: string) => (kind === "name" ? color : ink.color(runInk(kind as never, ni.color)));
-    const halo = state.small ? ink.color(INK.bg) : undefined;
+    const halo = state.small || m.bough ? ink.color(INK.bg) : undefined;
     const mid = widths.middle(L.runs[0]!.font);
     const start = m.label.anchor === "end" ? m.label.dx - L.total : m.label.dx;
     c.save();

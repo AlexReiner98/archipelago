@@ -231,7 +231,7 @@ export function nameInk(m: Mark, s: { waiting: boolean; lit?: Lit; small: boolea
   let color = INK.fg;
   let weight = "bold";
   if (m.theirs) (color = INK.harness), (weight = "400");
-  if (m.bough) (color = INK.dim), (weight = "500");
+  if (m.bough) (color = INK.fg), (weight = "500");
   if (said) color = INK.say;
   if (refused) color = INK.fail;
   if (m.retired) color = INK.dim;

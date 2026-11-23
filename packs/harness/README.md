@@ -97,7 +97,8 @@ words show beside it (`tip_ms`, 0 for never), how many sizes names
 take per doubling while the tree zooms (`name_steps`, 0 for every size),
 the size on screen below which a node's name shows only if the run said
 it, refused with it, or it is picked (`quiet_px`, 0 for every name, as it starts),
-the most characters a name shows (`name_most`, 28; 0 for whole), so
+the most characters a name shows (`name_most`, 28; 0 for whole),
+whether wire names give way where they overlap (`give_way`, 0: they always show), so
 a tree seen whole reads by its shape and what it was told, and how long a run may be
 quiet and still be live (`quiet_min`). Its value is `harness.dials` (page scope), so an agent can
 set it; the browser remembers it. Colours are style tokens only.
@@ -177,7 +178,9 @@ double-click; once moved by hand it stays where it is put, and the map
 changing under it never moves it otherwise (`shouldFit`, `outgrown`).
 
 The names on the wires (a bough's, along its branch) grow and shrink with
-the zoom, and give way ([labels.ts](labels.ts)): one that overlaps a
+the zoom, and always show, in the text's colour over a halo of the page,
+so they read over the wires (23 Nov 2026: they must be clear and visible).
+With the `give_way` dial at 1 they give way instead ([labels.ts](labels.ts)): one that overlaps a
 node's name or dot, a bough's dot, the root or a wire name nearer the
 root fades out over a quarter second, and comes back when zoom clears it.
 Each is tested by its turned outline, worked out from its measured text,
