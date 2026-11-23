@@ -7,7 +7,7 @@ what it does, and shows each run live, so you can shape what it plans,
 remembers and learns. It runs on your own machine, with your data in one
 ignored folder.
 
-![The Landscape view of a fresh local map](guide/images/landscape.png)
+![A fresh local map filling as a Claude Code session plans a release](guide/images/map-filling.gif)
 
 ## What you need
 
@@ -42,6 +42,8 @@ the agent the map's tools. Open **Sensory interface** to watch the run live.
 To have every session report, a map with no run opens on **Field** with the
 lines to copy into `~/.claude/settings.json`;
 [First run](guide/first-run.md) has more.
+
+![The Landscape view after one short run](guide/images/landscape.png)
 
 ## How it is built
 
