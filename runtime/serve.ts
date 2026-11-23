@@ -8,7 +8,8 @@
  * module graph. When a file changes, the change and every module that
  * imports it get new versions (Algorithm 8), and `/@hmr` tells every page
  * which modules were accepted, at what version. The page's loader then
- * re-imports the entries built on them.
+ * re-imports the entries built on them. `/` sends the browser to the app,
+ * `/app/`.
  *
  *   node runtime/serve.ts [port] [root]
  */
@@ -70,6 +71,10 @@ export async function serve(options: { port?: number; root?: string; watch?: boo
       res.write(": hmr\n\n");
       clients.add(res);
       req.on("close", () => clients.delete(res));
+      return;
+    }
+    if (url.pathname === "/") {
+      res.writeHead(302, { location: "/app/" }).end();
       return;
     }
     let path = decodeURIComponent(url.pathname);

@@ -669,17 +669,17 @@ test("an MCP client without hooks gets a session, and the session is its own rec
 test("each node's words come under a short tag naming it: its title, never a path or an id", () => {
   const who: Speakers = (id) =>
     ({
-      "words/e_3bxzdaq4": { title: "Branch up to date before merge", kind: "instruction" },
+      "words/e_5mrg7up2": { title: "Branch up to date before merge", kind: "instruction" },
       "loaded/m1": { title: "project memory ~/repo/CLAUDE.md", kind: "memory" },
       "words/e_untitled": { title: "e_untitled", kind: "reflex" },
       "words/long": { title: "A very long title that goes on and on past what a tag should hold", kind: "reflex" },
     })[id];
-  assert.equal(tagOf("words/e_3bxzdaq4", who), "Branch up to date before merge");
+  assert.equal(tagOf("words/e_5mrg7up2", who), "Branch up to date before merge");
   assert.equal(tagOf("loaded/m1", who), "project memory CLAUDE.md", "a path is cut to its last name");
   assert.equal(tagOf("words/e_untitled", who), "reflex", "an id is no name: its kind stands in");
   assert.ok(tagOf("words/long", who).length <= 48 && tagOf("words/long", who).endsWith("…"));
-  assert.equal(taggedText("words/e_3bxzdaq4", "Merge main first.", who), "[Branch up to date before merge] Merge main first.", "one line, one line");
-  assert.equal(taggedText("words/e_3bxzdaq4", "Merge main first.\n\n## Why\nIt deploys.", who), "[Branch up to date before merge]\nMerge main first.\n\n## Why\nIt deploys.");
+  assert.equal(taggedText("words/e_5mrg7up2", "Merge main first.", who), "[Branch up to date before merge] Merge main first.", "one line, one line");
+  assert.equal(taggedText("words/e_5mrg7up2", "Merge main first.\n\n## Why\nIt deploys.", who), "[Branch up to date before merge]\nMerge main first.\n\n## Why\nIt deploys.");
   assert.equal(taggedText("gone/x", "Words.", who), "Words.", "a node no longer loaded: its words as they are");
   const said = [
     { node: "words/b", text: "B." },

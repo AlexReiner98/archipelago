@@ -22,7 +22,7 @@ export type Speakers = (node: string) => Speaker | undefined;
 /** A tag's length at most, in characters. */
 export const TAG_MAX = 48;
 
-/** A map item id (`e_3pneg4cc`, `i_mwrzeubx09b3m`) or a node id (`words/e_…`). */
+/** A map item id (`e_7k2m9q4w`, `i_mw0demo0item1`) or a node id (`words/e_…`). */
 const ID = /^(?:[a-z]+\/)?[a-z]_[a-z0-9]{6,}$/i;
 
 /** A node's tag: its title, short, with no path or id in it. Its kind when the title is nothing else. */

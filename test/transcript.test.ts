@@ -128,7 +128,7 @@ test("who a hook is and where it is given, from its command and event", () => {
   assert.equal(hookWho("my-hook --flag"), "my-hook");
   assert.equal(hookWho(undefined), "unnamed");
   assert.ok(isOurs('node "$CLAUDE_PROJECT_DIR/packs/claude-code/hook.ts" http://127.0.0.1:5281/hook'));
-  assert.ok(isOurs('node "C:/x/archipelago-next-hosted/hook.ts" https://app.example.tools/hook'));
+  assert.ok(isOurs('node "C:/x/my-host/hook.ts" https://app.example.tools/hook'));
   assert.ok(!isOurs("node C:/x/other/hook.ts"));
   assert.deepEqual(
     [hookPlace("UserPromptSubmit", "UserPromptSubmit"), hookPlace("PostToolUse", "PostToolUse:Read"), hookPlace("Stop", "Stop"), hookPlace("PreCompact", "PreCompact"), hookPlace("Elsewhere", undefined)],

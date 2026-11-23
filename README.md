@@ -1,89 +1,77 @@
-# Archipelago (next)
+# Archipelago
 
 **Sculpt the landscape around your agents.**
 
-Build views into their world, so you can decide how they plan, remember, and
-evolve.
+A map that sits beside Claude Code: it records what your agent is told and
+what it does, and shows each run live, so you can shape what it plans,
+remembers and learns. It runs on your own machine, with your data in one
+ignored folder.
 
-- It gives each agent what it needs and the actions it can take, and records
-  both, with everything the agent does.
-- What works is kept. What doesn't is retired.
-- What a run is given depends on the run.
-- Its types, rules, views and interface are defined while it runs, and
-  removed without residue.
-- Every part sits behind a versioned contract ([spec/](spec/README.md)) and
-  can be replaced.
+![A fresh local map filling as a Claude Code session plans a release](guide/images/map-filling.gif)
 
-## Status
+## What you need
 
-Early. The first build is a live **harness view** for Claude Code sessions. It
-shows what is said to the agent, where it was said, by which pack, and whether
-it worked.
+- [Node.js](https://nodejs.org/) 22.18 or later (it runs the TypeScript
+  directly and keeps the map in `node:sqlite`; no build step).
+- [Claude Code](https://docs.claude.com/en/docs/claude-code), to connect an
+  agent to it.
 
-## Running it
+## Quickstart
 
-One process ([app/server.ts](app/server.ts)) runs the server's packs (graph,
-action, exchange, agent, verdict, words, loaded, transcript, used, lean, context, written, grow, keep, the Claude
-Code adapter, the bridge) and the page's dev server. The page's own packs
-(bridge client, here, renderer, frame, views, harness) are in
-[app/boot.ts](app/boot.ts).
-
-It runs twice, so that editing the code never touches what real sessions
-report to:
-
-| | Live | Dev |
-|---|---|---|
-| Runs | a fixed commit, from its own git worktree (`../archipelago-live`, or `ARCHIPELAGO_LIVE`) | this checkout |
-| Hot reload | off | on |
-| Page, adapter, bridge | 5180, 5181, 5182 | 5280, 5281, 5282 |
-| Data | `<worktree>/app/.data/`, the real one | `app/.data/` here, copied from live on demand |
-| Writes skill and memory files | yes | no (`--no-write`) |
-| Who reports to it | every session, through the user-level hooks and MCP server | sessions started with `packs/claude-code/settings.json` |
-
-### Live
+Clone this repository, then in its folder:
 
 ```
 npm install
-npm run live:setup        # the worktree at main's head, its own npm ci
-npm run live:start        # also live:stop, live:status
+npm run serve
 ```
 
-Open http://127.0.0.1:5180/app/. Point the user-level hooks and MCP server
-at it ([packs/claude-code/README.md](packs/claude-code/README.md), "Every
-session"): the hook command runs the worktree's `packs/claude-code/hook.ts`,
-not this checkout's.
+Open http://127.0.0.1:5280/app/ (or http://127.0.0.1:5280/, which sends
+you there). The map is kept in `app/.data/`, which git ignores.
 
-To move live to new code:
+## Connect Claude Code
 
-```
-npm run promote               # main's head
-npm run promote -- <commit>   # or any commit
-npm run rollback              # back to the commit before the last move
-```
-
-`promote` refuses when this checkout has uncommitted changes or the tests
-(and `npm run check`) fail at the commit, run in a throwaway worktree. Then
-it stops live, checks the commit out in the worktree (installing packages if
-the lockfile changed), and starts it again; if it doesn't come up, it goes
-back. Each move is a line in `promotions.log` in live's data, which
-`rollback` reads. Live's data is ignored by git, so it stays across moves.
-
-### Dev
-
-```
-npm run dev:copy          # live's data into app/.data (dev stopped)
-npm run dev:start         # detached, also dev:stop, dev:status
-npm run serve             # or in this terminal
-```
-
-Open http://127.0.0.1:5280/app/ and start Claude Code against it:
+In the same folder, start a session that reports to your map, without
+touching your own settings:
 
 ```
 claude --settings packs/claude-code/settings.json --mcp-config packs/claude-code/mcp.json
 ```
 
-That session reports to dev as well as to live, through the user-level
-hooks.
+Its hooks report each prompt, tool call and answer, and its MCP server gives
+the agent the map's tools. Open **Sensory interface** to watch the run live.
+To have every session report, a map with no run opens on **Field** with the
+lines to copy into `~/.claude/settings.json`;
+[First run](guide/first-run.md) has more.
+
+![The Landscape view after one short run](guide/images/landscape.png)
+
+## How it is built
+
+- It gives each agent what it needs and the actions it can take, and records
+  both, with everything the agent does.
+- What works is kept. What doesn't is retired.
+- Its types, rules, views and interface are packs, added and removed while
+  it runs, without residue.
+- Every part sits behind a versioned contract ([spec/](spec/README.md)) and
+  can be replaced.
+
+One process ([app/server.ts](app/server.ts)) runs the server's packs and the
+page's dev server; the page's own packs are in [app/boot.ts](app/boot.ts).
+The [guide](guide/README.md) walks through the concepts and how to write a
+pack. To work on Archipelago while your own sessions report to it, see
+[Live and dev](guide/live-and-dev.md).
+
+## Status
+
+Early. The first build is a live **harness view** for Claude Code sessions:
+what is said to the agent, where it was said, by which pack, and whether it
+worked.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Packs are code that runs with the
+server's rights, so only load packs you trust; security reports go through
+[SECURITY.md](SECURITY.md).
 
 ## Licence
 

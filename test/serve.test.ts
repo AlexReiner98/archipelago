@@ -25,6 +25,12 @@ test("serves TypeScript with its types stripped and its imports recorded", async
   assert.deepEqual(server.graph.classify(["/packs/word.ts"], () => false).accepted, new Set(["/packs/word.ts", "/packs/provider.ts"]));
 });
 
+test("the root sends the browser to the app", async () => {
+  const res = await fetch(server.url, { redirect: "manual" });
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get("location"), "/app/");
+});
+
 test("a change is pushed to pages, and importers then ask for the new version", async () => {
   const res = await fetch(new URL("@hmr", server.url));
   const reader = res.body!.getReader();

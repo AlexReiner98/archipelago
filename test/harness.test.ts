@@ -528,7 +528,7 @@ test("nameOf: a name never shows a path, but says whose it is: the project, and 
   assert.equal(nameOf("project memory ~/Documents/Github/archipelago-next/CLAUDE.md"), "project memory · archipelago-next");
   assert.equal(nameOf("local memory ~/Documents/Github/archipelago/CLAUDE.local.md"), "local memory · archipelago");
   assert.equal(nameOf("project memory ~/Documents/Github/Aperture/.claude/pelago.md"), "project memory · Aperture pelago.md");
-  assert.equal(nameOf("auto memory ~/.claude/projects/C--Users-imjyx-Documents-Github-archipelago-next/memory/MEMORY.md"), "auto memory · archipelago-next");
+  assert.equal(nameOf("auto memory ~/.claude/projects/C--Users-me-Documents-Github-archipelago-next/memory/MEMORY.md"), "auto memory · archipelago-next");
   assert.equal(nameOf("project memory ~/Documents/CLAUDE.md"), "project memory · Documents", "only plain folders: the last of them");
   assert.equal(nameOf("C:\\work\\notes\\todo.md"), "notes todo.md");
   assert.equal(nameOf("~/x/CLAUDE.md"), "x");

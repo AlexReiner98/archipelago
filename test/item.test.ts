@@ -45,7 +45,7 @@ test("a note: the lead before the first heading, each heading a section to fold"
 });
 
 test("inline: code, bold, emphasis, links, and ids drawn as items", () => {
-  assert.deepEqual(inline("See `x` and **y**, *z* in [the hub](i_mwpn5n9o72axz) or e_3pneg4cc."), [
+  assert.deepEqual(inline("See `x` and **y**, *z* in [the hub](i_mw0demo0hub01) or e_7k2m9q4w."), [
     { k: "t", text: "See " },
     { k: "code", text: "x" },
     { k: "t", text: " and " },
@@ -53,9 +53,9 @@ test("inline: code, bold, emphasis, links, and ids drawn as items", () => {
     { k: "t", text: ", " },
     { k: "i", text: "z" },
     { k: "t", text: " in " },
-    { k: "ref", id: "i_mwpn5n9o72axz", text: "the hub" },
+    { k: "ref", id: "i_mw0demo0hub01", text: "the hub" },
     { k: "t", text: " or " },
-    { k: "ref", id: "e_3pneg4cc" },
+    { k: "ref", id: "e_7k2m9q4w" },
     { k: "t", text: "." },
   ]);
   assert.deepEqual(inline("[site](https://example.com) [file](../a.md)"), [
@@ -63,7 +63,7 @@ test("inline: code, bold, emphasis, links, and ids drawn as items", () => {
     { k: "t", text: " file" },
   ]);
   assert.deepEqual(inline("snake_case_name stays"), [{ k: "t", text: "snake_case_name stays" }]);
-  assert.deepEqual(refs("e_3pneg4cc then i_mwpn5n9o72axz and e_3pneg4cc"), ["e_3pneg4cc", "i_mwpn5n9o72axz"]);
+  assert.deepEqual(refs("e_7k2m9q4w then i_mw0demo0hub01 and e_7k2m9q4w"), ["e_7k2m9q4w", "i_mw0demo0hub01"]);
 });
 
 test("fields as marks: by kind, besides title, note and status; a no is left out", () => {
