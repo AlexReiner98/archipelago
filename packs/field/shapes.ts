@@ -70,3 +70,45 @@ export function fill(side: number): 0 | 1 | 2 {
   const s = SIDES[side] as Side | undefined;
   return s === "fresh" ? 0 : s === "moving" ? 1 : 2;
 }
+
+const f2 = (v: number) => +v.toFixed(2);
+const ring = (pts: [number, number][]) => `M${pts.map(([x, y]) => `${f2(x)} ${f2(y)}`).join("L")}Z`;
+
+/** A shape's corners round (x, y) at radius r; null for a circle. */
+function corners(shape: number, x: number, y: number, r: number): [number, number][] | null {
+  const p = polyOf(shape);
+  if (!p) return null;
+  return Array.from({ length: p.n }, (_, k) => {
+    const a = p.at + (k * 2 * Math.PI) / p.n;
+    return [x + p.R * r * Math.cos(a), y + p.R * r * Math.sin(a)];
+  });
+}
+
+/** A polygon cut to its part right of x = cx (one half-plane, Sutherland–Hodgman). */
+function rightOf(pts: [number, number][], cx: number): [number, number][] {
+  const out: [number, number][] = [];
+  for (let k = 0; k < pts.length; k++) {
+    const a = pts[k]!, b = pts[(k + 1) % pts.length]!, ina = a[0] >= cx, inb = b[0] >= cx;
+    if (ina) out.push(a);
+    if (ina !== inb) {
+      const t = (cx - a[0]) / (b[0] - a[0]);
+      out.push([cx, a[1] + t * (b[1] - a[1])]);
+    }
+  }
+  return out;
+}
+
+/**
+ * A particle as the canvas draws it (`particle` in paint.ts), as an SVG path
+ * to fill with `fill-rule: evenodd`: the shape, with its middle cut out by
+ * `line` (a share of r, the hollow outline) when `how` is 0 (hollow), or only
+ * its right half cut out when 1 (half, ◐). The legend draws its keys with it.
+ */
+export function markPath(shape: number, how: 0 | 1 | 2, x: number, y: number, r: number, line: number): string {
+  const outer = corners(shape, x, y, r);
+  const whole = outer ? ring(outer) : `M${f2(x - r)} ${f2(y)}a${f2(r)} ${f2(r)} 0 1 0 ${f2(2 * r)} 0a${f2(r)} ${f2(r)} 0 1 0 ${f2(-2 * r)} 0Z`;
+  if (how === 2) return whole;
+  const ri = r * (1 - line), inner = corners(shape, x, y, ri);
+  if (how === 0) return whole + (inner ? ring(inner) : `M${f2(x - ri)} ${f2(y)}a${f2(ri)} ${f2(ri)} 0 1 0 ${f2(2 * ri)} 0a${f2(ri)} ${f2(ri)} 0 1 0 ${f2(-2 * ri)} 0Z`);
+  return whole + (inner ? ring(rightOf(inner, x)) : `M${f2(x)} ${f2(y - ri)}A${f2(ri)} ${f2(ri)} 0 0 1 ${f2(x)} ${f2(y + ri)}Z`);
+}

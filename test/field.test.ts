@@ -287,3 +287,35 @@ test("link names grow with the zoom between a least and a most, and fade in and 
   easeWires(fades, [], 1);
   assert.equal(fades.has(1), false, "gone once faded out");
 });
+
+test("the legend's keys: each base by its shape, each status by how full it is drawn", async () => {
+  const { facets } = await import("../packs/field/filter.ts");
+  const { markPath } = await import("../packs/field/shapes.ts");
+  // task and bug share the base work (square, 0); question is its own base (diamond, 1). Sides: 0 fresh, 1 moving, 2 done.
+  const input: FieldIn = {
+    items: [
+      { id: "a", title: "a", type: "task", status: "todo", closed: false, base: "work", shape: 0, side: 0 },
+      { id: "b", title: "b", type: "task", status: "doing", closed: false, base: "work", shape: 0, side: 1 },
+      { id: "c", title: "c", type: "task", status: "done", closed: true, base: "work", shape: 0, side: 2 },
+      { id: "d", title: "d", type: "bug", status: "open", closed: false, base: "work", shape: 0, side: 0 },
+      { id: "e", title: "e", type: "question", status: "open", closed: false, base: "question", shape: 1, side: 0 },
+    ],
+    links: [],
+  };
+  const f = facets(input, { types: ["bug"] });
+  assert.deepEqual(f.bases.map((b) => [b.name, b.shape, b.types.join("+"), b.n, b.shown]), [["work", 0, "bug+task", 4, 3], ["question", 1, "question", 1, 1]]);
+  const task = f.types.find((t) => t.name === "task")!;
+  assert.deepEqual([task.base, task.shape], ["work", 0]);
+  // A type's statuses in the order they are drawn: hollow, half, then closed.
+  assert.deepEqual(task.statuses.map((s) => [s.name, s.side]), [["todo", 0], ["doing", 1], ["done", 2]]);
+  assert.deepEqual([f.fresh.n, f.fresh.shown, f.moving.n], [3, 2, 1]);
+  // The mark: full is one ring, hollow two, half two with the inner cut at the middle.
+  const rings = (d: string) => d.split("M").length - 1;
+  assert.equal(rings(markPath(0, 2, 6, 6, 4, 0.4)), 1);
+  assert.equal(rings(markPath(0, 0, 6, 6, 4, 0.4)), 2);
+  const half = markPath(1, 1, 6, 6, 4, 0.4);
+  assert.equal(rings(half), 2);
+  const xs = half.split("M")[2]!.split(/[LZ]/).filter(Boolean).map((p) => +p.trim().split(" ")[0]!);
+  assert.ok(xs.every((x) => x >= 6 - 1e-9), "half: only the right of the inner shape is cut out");
+  assert.equal(rings(markPath(2, 1, 6, 6, 4, 0.4)), 2);
+});

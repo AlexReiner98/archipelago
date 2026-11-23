@@ -10,8 +10,8 @@ import { CIRCLE } from "./shapes.ts";
 
 /** What the field draws: items and the links among them. No item belongs to a group: clusters come from the links. */
 export interface FieldIn {
-  /** `shape`: the base's mark shape, an index in SHAPES (absent: circle); `side`: where the status sits, an index in SIDES (absent: done). */
-  items: { id: Id; title: string; type: string; status: string; closed: boolean; kind?: string; shape?: number; side?: number }[];
+  /** `base`: the type's base; `shape`: the base's mark shape, an index in SHAPES (absent: circle); `side`: where the status sits, an index in SIDES (absent: done). */
+  items: { id: Id; title: string; type: string; status: string; closed: boolean; kind?: string; base?: string; shape?: number; side?: number }[];
   /**
    * The order types take their colours in: the whole map's types, so a
    * type keeps its colour whatever a filter leaves out. Absent, the items'.

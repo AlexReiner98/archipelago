@@ -187,7 +187,7 @@ const fieldPack: Pack = {
       const bases = index.types().filter((t) => t.base === t.name).map((t) => t.name);
       const mark = (r: Row) => {
         const t = index.type(r.type);
-        return { shape: SHAPES.indexOf(shapeOf(bases, t)), side: SIDES.indexOf(sideOf(t, r.fields.status)) };
+        return { base: t?.base ?? r.type, shape: SHAPES.indexOf(shapeOf(bases, t)), side: SIDES.indexOf(sideOf(t, r.fields.status)) };
       };
       return {
         items: result.items.map((r) => ({ id: r.id, title: String(r.fields.title ?? r.id), type: r.type, status: String(r.fields.status ?? ""), closed: index.closed(r), kind: typeof r.fields.kind === "string" ? r.fields.kind : "", ...mark(r) })),
@@ -283,7 +283,7 @@ const fieldPack: Pack = {
         <div class="fl-canvas">
           <canvas ref=${box}></canvas>
           ${tip && html`<div class="fl-tip" style=${`left:${tip.x + 14}px; top:${tip.y + 12}px`}><div>${tip.title}</div><div class="s">${tip.sub}</div></div>`}
-          ${input.items.length > 0 && html`<${Legend} facets=${facets} hide=${hide} set=${setHide} dials=${() => html`<${Dials} />`} />`}
+          ${input.items.length > 0 && html`<${Legend} facets=${facets} hide=${hide} set=${setHide} look=${S} dials=${() => html`<${Dials} />`} />`}
           ${!result.items.length && html`<div class="fl-empty">${index.ready()
             ? html`<div class="fl-none"><div class="fl-say" title="Items come as agents and people add them.">Nothing on the map yet</div><${Slot} name=${EMPTY} /></div>`
             : html`<div class="fl-say">Reading the map…</div>`}</div>`}

@@ -1,9 +1,12 @@
 /**
- * The legend, and the filter: each type with its colour, each side (open,
- * closed), each kind of link, and items with no links, each with how many
+ * The legend, and the filter: each type with its colour and shape, each
+ * base by its shape, each side (open, closed) with how full it is drawn,
+ * each kind of link, and items with no links, each with how many
  * the map has and how many show. A box switches each one; a type opens to
  * its statuses and kinds, each switched the same way. Every switch settles
- * the graph again with what is shown. Its other tab is the layout's dials
+ * the graph again with what is shown. Every mark is drawn as the canvas draws
+ * its particle (shapes.ts `markPath`), by the drawing's own dials (shapes,
+ * hollow outline, closed fade), so the key never says other than the map. Its other tab is the layout's dials
  * (panel.ts): how it settles and draws. Closed, it is one line (the count
  * and the two tabs); either tab opens it to the same size.
  */
@@ -11,6 +14,8 @@ import { h } from "preact";
 import { useState } from "preact/hooks";
 import htm from "htm";
 import { toggle, type Count, type Facets, type Hide } from "./filter.ts";
+import type { Settings } from "./graph.ts";
+import { CIRCLE, fill, markPath } from "./shapes.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -50,13 +55,25 @@ export const LEGEND_STYLE = `
 .fl-key i.open { background:var(--dim); }
 .fl-key i.ring { background:transparent; border:2px solid var(--pick); width:7px; height:7px; }
 .fl-key svg { width:20px; height:8px; flex:none; }
+.fl-key svg.mk { width:11px; height:11px; fill-rule:evenodd; }
+.fl-key svg.mk.ink { fill:var(--dim); }
+.fl-key .key { display:flex; align-items:center; gap:5px; white-space:nowrap; line-height:1.6; padding-left:18px; }
+.fl-key .key .nm { color:var(--dim); }
 .fl-key .note { padding:3px 8px 5px; display:flex; align-items:center; gap:5px; }
 .fl-key .note .sp { flex:1; }
 `;
 
 const num = (c: Count) => (c.shown === c.n ? String(c.n) : `${c.shown} of ${c.n}`);
 
-export function Legend({ facets, hide, set, dials }: { facets: Facets; hide: Hide; set: (next: Hide | undefined) => void; dials: () => unknown }) {
+/** The mark's radius and middle in its 12 × 12 box: a triangle's corner reaches 1.56 r. */
+const MARK_R = 3.7, MARK_AT = 6;
+
+export function Legend({ facets, hide, set, dials, look }: { facets: Facets; hide: Hide; set: (next: Hide | undefined) => void; dials: () => unknown; look: Settings }) {
+  /** A particle's mark: `shape` (SHAPES), `side` (SIDES; absent: full), in `colour` (absent: the dim ink), faded as closed when `shut`. */
+  const mark = (shape: number | undefined, side: number | undefined, colour?: string, shut = false) => {
+    const sh = look.shapes ? (shape ?? CIRCLE) : CIRCLE, how = look.shapes && side !== undefined ? fill(side) : 2;
+    return html`<svg class=${`mk${colour ? "" : " ink"}`} viewBox="0 0 12 12" style=${shut ? `opacity:${look.closed_fade}` : ""}><path d=${markPath(sh, how, MARK_AT, MARK_AT, MARK_R, look.hollow_line ?? 0.4)} style=${colour ? `fill:${colour}` : ""} /></svg>`;
+  };
   const [open, setOpenTab] = useState<false | "filter" | "dials">(false);
   const tabs = html`
     <button class=${`ln${open === "filter" ? " on" : ""}`} onClick=${() => setOpenTab(open === "filter" ? false : "filter")} title="Every type, status, kind and link, each a switch">filter ${open === "filter" ? "▾" : "▴"}</button>
@@ -72,7 +89,16 @@ export function Legend({ facets, hide, set, dials }: { facets: Facets; hide: Hid
     </label>
   `;
   const typeBox = (t: Facets["types"][number]) =>
-    box(!hide.types?.includes(t.name), () => set(toggle(hide, "types", t.name)), html`<i style=${`background:${t.colour}`}></i><span class="nm">${t.name}</span>`, t, `Show or hide every ${t.name}`);
+    box(!hide.types?.includes(t.name), () => set(toggle(hide, "types", t.name)), html`${mark(t.shape, undefined, t.colour)}<span class="nm">${t.name}</span>`, t, `Show or hide every ${t.name}${look.shapes ? `, drawn as its base ${t.base}'s shape` : ""}`);
+  // A base's switch shows all its types, or hides them all when any shows.
+  const baseOn = (types: string[]) => types.some((t) => !hide.types?.includes(t));
+  const flipBase = (types: string[]) => {
+    const on = baseOn(types), rest = (hide.types ?? []).filter((t) => !types.includes(t)), next = { ...hide };
+    const now = on ? [...rest, ...types] : rest;
+    if (now.length) next.types = now;
+    else delete next.types;
+    set(next);
+  };
 
   // One header, always: the count, show all, and the two tabs. Opened, either tab's body is the same size.
   const head = html`
@@ -102,7 +128,7 @@ export function Legend({ facets, hide, set, dials }: { facets: Facets; hide: Hid
               ${opened[t.name] &&
               html`<div class="sub">
                 <div class="gt">status</div>
-                ${t.statuses.map((s) => box(!hide.statuses?.includes(`${t.name}:${s.name}`), () => set(toggle(hide, "statuses", `${t.name}:${s.name}`)), html`<i class=${s.closed ? "shut" : "open"}></i><span class="nm">${s.name || "no status"}</span>`, s, `${t.name} that is ${s.name || "without a status"}${s.closed ? " (closed)" : ""}`))}
+                ${t.statuses.map((s) => box(!hide.statuses?.includes(`${t.name}:${s.name}`), () => set(toggle(hide, "statuses", `${t.name}:${s.name}`)), html`${mark(t.shape, s.side, t.colour, s.closed)}<span class="nm">${s.name || "no status"}</span>`, s, `${t.name} that is ${s.name || "without a status"}: ${s.closed ? "closed, drawn full and faded" : s.side === 0 ? "its first status, drawn hollow" : "a later open status, drawn half"}`))}
                 ${t.kinds.length > 1 &&
                 html`<div class="gt">kind</div>
                   ${t.kinds.map((k) => box(!hide.kinds?.includes(`${t.name}:${k.name}`), () => set(toggle(hide, "kinds", `${t.name}:${k.name}`)), html`<span class="nm">${k.name}</span>`, k, `${t.name} of kind ${k.name}`))}`}
@@ -111,10 +137,17 @@ export function Legend({ facets, hide, set, dials }: { facets: Facets; hide: Hid
           `,
         )}
       </div>
+      ${look.shapes ? html`<div class="grp">
+        <div class="gt">shape · base</div>
+        ${facets.bases.map((b) => box(baseOn(b.types), () => flipBase(b.types), html`${mark(b.shape, undefined)}<span class="nm">${b.name}</span>`, b, `Every type built on ${b.name} is drawn in this shape: ${b.types.join(", ")}`))}
+      </div>` : null}
       <div class="grp">
-        <div class="gt">state</div>
-        ${box(!hide.open, () => set(toggle(hide, "open")), html`<i class="open"></i><span class="nm">open</span>`, facets.open, "Items whose status is on the open side: drawn full")}
-        ${box(!hide.closed, () => set(toggle(hide, "closed")), html`<i class="shut"></i><span class="nm">closed</span>`, facets.closed, "Items whose status is on the closed side (done, dropped, decided): drawn faded")}
+        <div class="gt">state${look.shapes ? " · fill" : ""}</div>
+        ${box(!hide.open, () => set(toggle(hide, "open")), html`${mark(undefined, undefined)}<span class="nm">open</span>`, facets.open, "Items whose status is on the open side: drawn in full colour")}
+        ${look.shapes ? html`
+        <div class="key" title="Open at its type's first status (todo, open, proposed): drawn hollow">${mark(undefined, 0)}<span class="nm">first status</span><span class="n">${num(facets.fresh)}</span></div>
+        <div class="key" title="Open at a later status (doing, in review): drawn half, solid on the left">${mark(undefined, 1)}<span class="nm">later status</span><span class="n">${num(facets.moving)}</span></div>` : null}
+        ${box(!hide.closed, () => set(toggle(hide, "closed")), html`${mark(undefined, undefined, undefined, true)}<span class="nm">closed</span>`, facets.closed, `Items whose status is on the closed side (done, dropped, decided): drawn ${look.shapes ? "full and " : ""}faded`)}
         ${box(!hide.lone, () => set(toggle(hide, "lone")), html`<span class="nm">with no links</span>`, facets.lone, "Items with no link to any other drawn item")}
       </div>
       <div class="grp">
