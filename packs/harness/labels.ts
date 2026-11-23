@@ -71,40 +71,37 @@ export function crowded(names: Quad[], shown: Quad[]): boolean[] {
   });
 }
 
-/** An element's outline on screen, its box turned and scaled as it is drawn, `pad` pixels in. */
-function quadOf(el: SVGGraphicsElement, pad = 1): Quad | undefined {
-  const m = el.getScreenCTM();
-  if (!m) return undefined;
-  const b = el.getBBox();
-  if (!b.width && !b.height) return undefined;
-  const pts: [number, number][] = [[b.x, b.y], [b.x + b.width, b.y], [b.x + b.width, b.y + b.height], [b.x, b.y + b.height]];
-  const q = pts.map(([x, y]) => {
-    const p = new DOMPoint(x, y).matrixTransform(m);
-    return [p.x, p.y] as [number, number];
-  });
-  // Pulled in a little, so names that only touch both stay.
-  const cx = q.reduce((s, p) => s + p[0], 0) / 4, cy = q.reduce((s, p) => s + p[1], 0) / 4;
+/** A quad pulled in toward its middle by `pad` (a negative pad grows it), so names that only touch both stay. */
+export function pullIn(q: Quad, pad: number): Quad {
+  if (!pad) return q;
+  const cx = q.reduce((s, p) => s + p[0], 0) / q.length, cy = q.reduce((s, p) => s + p[1], 0) / q.length;
   return q.map(([x, y]) => {
     const d = Math.hypot(x - cx, y - cy) || 1;
     return [x - ((x - cx) / d) * pad, y - ((y - cy) / d) * pad] as [number, number];
   });
 }
 
-const shownNow = (el: Element) => getComputedStyle(el).opacity !== "0" && !el.closest(".rx-wait");
+/**
+ * A name's outline at zoom k, in screen pixels from the picture's origin: its
+ * line from `from` to `to` along its turn, `h` tall round `dy`, at (x, y).
+ */
+export function nameQuad(n: { x: number; y: number; turn: number; from: number; to: number; dy: number; h: number }, k: number): Quad {
+  const a = (n.turn * Math.PI) / 180, cos = Math.cos(a), sin = Math.sin(a);
+  const y0 = n.dy - n.h / 2, y1 = n.dy + n.h / 2;
+  return ([[n.from, y0], [n.to, y0], [n.to, y1], [n.from, y1]] as [number, number][]).map(([u, w]) => [(n.x + u * cos - w * sin) * k, (n.y + u * sin + w * cos) * k]);
+}
 
-/** Fades the wire names that overlap anything, in the svg as drawn now. */
-export function fadeCrowded(svg: SVGSVGElement): void {
-  const boughs = Array.from(svg.querySelectorAll<SVGGElement>("g.rx-bough")).sort((a, b) => Number(a.dataset.depth ?? 0) - Number(b.dataset.depth ?? 0));
-  const names = boughs.map((g) => g.querySelector<SVGTextElement>(".rx-name")).filter((t): t is SVGTextElement => !!t);
-  const others: Quad[] = [];
-  // Everything shown that a name may not cover: the nodes' names and dots, the boughs' dots, the root.
-  for (const el of Array.from(svg.querySelectorAll<SVGGraphicsElement>("g.rx-node .rx-name, g.rx-node .rx-dot, g.rx-bough .rx-dot, circle.rx-root"))) {
-    if (!shownNow(el)) continue;
-    const q = quadOf(el, 0);
-    if (q) others.push(q);
-  }
-  // Names keep a little room round them (a negative pad grows the outline).
-  const quads = names.map((t) => quadOf(t, -2));
-  const hide = crowded(quads.map((q) => q ?? []), others);
-  names.forEach((t, i) => t.classList.toggle("rx-hide", !!quads[i] && hide[i]!));
+/** A box's outline at zoom k, in screen pixels. */
+export const boxQuad = (x0: number, y0: number, x1: number, y1: number, k: number): Quad => [[x0 * k, y0 * k], [x1 * k, y0 * k], [x1 * k, y1 * k], [x0 * k, y1 * k]];
+
+/**
+ * Which wire names to hide at zoom k: each that overlaps a node's name or
+ * dot, a bough's dot, the root, or a wire name kept before it (nearer the
+ * root first). `names` are the boughs' names, `others` what is shown and
+ * may not be covered; names keep 2 px of room round them.
+ */
+export function crowdedNames(names: { id: string; depth: number; quad: Quad }[], others: Quad[]): Set<string> {
+  const order = names.map((n, i) => ({ n, i })).sort((a, b) => a.n.depth - b.n.depth || a.i - b.i).map((x) => x.n);
+  const hide = crowded(order.map((n) => pullIn(n.quad, -2)), others);
+  return new Set(order.filter((_, i) => hide[i]).map((n) => n.id));
 }

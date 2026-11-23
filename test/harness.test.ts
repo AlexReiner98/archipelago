@@ -768,15 +768,67 @@ test("the wire names give way the same through the grid: a crowded name hides, t
   assert.deepEqual(crowded([], shown), []);
 });
 
-test("a drawn node draws again only when one of its values changed", async () => {
-  const { memo } = await import("../packs/harness/nodes.ts");
-  const C = memo((p: { a: number; b?: string }) => String(p.a));
-  const c = new C({ a: 1, b: "x" });
-  c.props = { a: 1, b: "x" };
-  assert.equal(c.shouldComponentUpdate!({ a: 1, b: "x" }, {}, {}), false, "the same values: left as it was");
-  assert.equal(c.shouldComponentUpdate!({ a: 2, b: "x" }, {}, {}), true);
-  assert.equal(c.shouldComponentUpdate!({ a: 1 }, {}, {}), true, "a value gone");
-  assert.equal(c.shouldComponentUpdate!({ a: 1, b: "x", c: 3 } as never, {}, {}), true, "a value added");
+test("the scene: a branch and a mark for each node, the way to the picked node, a said node larger and its count", async () => {
+  const { sceneOf } = await import("../packs/harness/scene.ts");
+  const tree = treeOf(NODES);
+  const placed = radial(tree);
+  const none = new Map();
+  const scene = sceneOf({ tree, placed, hues: packHues(NODES.map((n) => n.pack)), statuses: none, heard: new Map([["words/bash", "said" as const]]), held: none, counts: new Map([["words/bash", 7]]), standing: new Map([["words/bash", "up" as const]]), picked: "words/bash", window: new Map([["words/bash", "in" as const]]), theirs: new Set() });
+  assert.equal(scene.wires.length, tree.order.length - 1);
+  assert.equal(scene.marks.length, tree.order.length - 1);
+  const bash = scene.marks.find((m) => m.node === "words/bash")!;
+  const plain = scene.marks.find((m) => m.node === "words/spec")!;
+  assert.ok(bash.r > plain.r, "said seven times: larger");
+  assert.deepEqual([bash.hear, bash.said, bash.standing, bash.picked, bash.window, bash.shape], ["said", 7, "up", true, "in", "circle"]);
+  assert.match(bash.tip, /said 7 times\nin the window now$/);
+  const way = scene.wires.filter((w) => w.way).map((w) => w.id);
+  assert.deepEqual(way, ["~:tool", "~:tool:Bash", "words/bash"].filter((id) => tree.byId.has(id)));
+  assert.ok(scene.marks.filter((m) => m.bough).every((m) => !m.node && m.r === STYLE.node));
+});
+
+test("a dot's ink: a trial is hollow in its hue, a given never used is faint, a pick is outlined, a light on its way holds back the said", async () => {
+  const { dotInk, INK } = await import("../packs/harness/scene.ts");
+  const m = { id: "x", node: "x", x: 0, y: 0, depth: 2, bough: false, r: 2.5, shape: "circle" as const, trial: false, theirs: false, given: false, unused: false, retired: false, picked: false, label: { text: "x", turn: 0, dx: 8, dy: 0, anchor: "start" as const }, tip: "" };
+  assert.deepEqual(dotInk({ ...m, hue: "red" }, false), { fill: "red", fillAlpha: 0.85, strokeWidth: 1 });
+  assert.deepEqual(dotInk({ ...m, hue: "red", trial: true }, false), { fillAlpha: 0.85, stroke: "red", strokeWidth: 1.2 });
+  assert.deepEqual(dotInk({ ...m, given: true, theirs: true, unused: true, hue: "red" }, false), { fill: INK.harness, fillAlpha: 0.15, stroke: INK.harness, strokeWidth: 1.2 });
+  assert.deepEqual(dotInk({ ...m, picked: true }, false), { fill: INK.fg, fillAlpha: 0.85, stroke: INK.pick, strokeWidth: 2 });
+  assert.equal(dotInk({ ...m, hear: "said" }, false).fillAlpha, 1);
+  assert.equal(dotInk({ ...m, hear: "said" }, true).fillAlpha, 0.85, "the light is on its way");
+  assert.deepEqual(dotInk({ ...m, hold: "shadow" }, false).dash, [1.5, 1]);
+  assert.equal(dotInk({ ...m, bough: true, node: undefined, shape: undefined }, false).fillAlpha, 0.5);
+});
+
+test("a name's ink: said in blue, refused in red until the light arrives; lit in the run's colour; small names only what is lit, said or picked", async () => {
+  const { nameInk, nameRuns, INK } = await import("../packs/harness/scene.ts");
+  const m = { id: "x", node: "x", x: 0, y: 0, depth: 2, bough: false, r: 2.5, trial: false, theirs: false, given: false, unused: false, retired: false, picked: false, label: { text: "x", turn: 0, dx: 8, dy: 0, anchor: "start" as const }, tip: "" };
+  const big = { waiting: false, small: false };
+  assert.deepEqual(nameInk(m, big), { color: INK.fg, weight: "bold", alpha: 1, italic: false, struck: false });
+  assert.equal(nameInk({ ...m, hear: "said" }, big).color, INK.say);
+  assert.equal(nameInk({ ...m, hear: "refused" }, { ...big, waiting: true }).color, INK.fg, "not before the light gets there");
+  assert.equal(nameInk(m, { ...big, lit: { tone: "say", color: "green" } }).color, "green");
+  assert.equal(nameInk(m, { ...big, lit: { tone: "fail", color: "green" } }).color, INK.fail);
+  assert.deepEqual(nameInk({ ...m, bough: true, theirs: true }, { ...big, small: true }), { color: INK.harness, weight: "500", alpha: 0.8, italic: false, struck: false });
+  assert.equal(nameInk(m, { ...big, small: true }).alpha, 0);
+  assert.equal(nameInk({ ...m, picked: true }, { ...big, small: true }).alpha, 1);
+  assert.deepEqual([nameInk({ ...m, trial: true }, big).italic, nameInk({ ...m, hold: "held" }, big).struck, nameInk({ ...m, retired: true }, big).color], [true, true, INK.dim]);
+  // On the left half a name reads toward its dot: its standing and count come first.
+  assert.deepEqual(nameRuns({ ...m, said: 3, standing: "up" }).map((r) => r.text), ["x", " 3", " ↑"]);
+  assert.deepEqual(nameRuns({ ...m, said: 3, standing: "up", label: { ...m.label, anchor: "end" } }).map((r) => r.text), ["↑ ", "3 ", "x"]);
+});
+
+test("the wire names give way by their turned outlines: a deeper name over a nearer one hides, one clear of all stays", async () => {
+  const { crowdedNames, nameQuad, boxQuad } = await import("../packs/harness/labels.ts");
+  const at = (x: number, y: number, turn = 0) => nameQuad({ x, y, turn, from: 0, to: 40, dy: 0, h: 12 }, 1);
+  const names = [
+    { id: "deep", depth: 3, quad: at(10, 4) },
+    { id: "near", depth: 1, quad: at(0, 0) },
+    { id: "clear", depth: 2, quad: at(200, 200) },
+    { id: "on-dot", depth: 1, quad: at(400, 0, 90) },
+  ];
+  assert.deepEqual([...crowdedNames(names, [boxQuad(398, 20, 402, 24, 1)])].sort(), ["deep", "on-dot"]);
+  // Twice the zoom: twice the outline, in screen pixels.
+  assert.deepEqual(nameQuad({ x: 1, y: 0, turn: 0, from: 0, to: 2, dy: 0, h: 2 }, 2), [[2, -2], [6, -2], [6, 2], [2, 2]]);
 });
 
 test("a time is written once per input, and nothing for none", async () => {
@@ -787,4 +839,21 @@ test("a time is written once per input, and nothing for none", async () => {
   assert.equal(day(t), day(t));
   assert.equal(day(undefined), "");
   assert.equal(time("not a time"), "");
+});
+
+test("while zooming, names come from an atlas: a zoom stepped to a few sizes per doubling, pictures placed shelf by shelf", async () => {
+  const { textZoom } = await import("../packs/harness/paint.ts");
+  const { Shelves } = await import("../packs/harness/sprites.ts");
+  assert.equal(textZoom(1.3, 0), 1.3, "no steps: the zoom itself");
+  assert.equal(textZoom(1, 4), 1);
+  assert.equal(textZoom(1.15, 4), 2 ** 0.25, "the nearest quarter of a doubling");
+  assert.equal(textZoom(1.05, 4), 1);
+  const s = new Shelves(100);
+  assert.deepEqual(s.take(60, 10), { x: 0, y: 0, w: 60, h: 10 });
+  assert.deepEqual(s.take(30, 20), { x: 61, y: 0, w: 30, h: 20 });
+  assert.deepEqual(s.take(50, 10), { x: 0, y: 21, w: 50, h: 10 }, "a new shelf under the tallest");
+  assert.equal(s.take(101, 1), undefined, "too wide for the atlas: drawn as text");
+  assert.equal(s.take(10, 90), undefined, "full");
+  s.reset();
+  assert.deepEqual(s.take(10, 90), { x: 0, y: 0, w: 10, h: 90 });
 });

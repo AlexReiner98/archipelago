@@ -164,6 +164,9 @@ export interface TreesProps {
   /** The window of the agent in focus, live, and each node's place in it (windowbar.ts). */
   win?: WindowRead;
   winMarks?: ReadonlyMap<string, WindowMark>;
+  /** How long the pointer rests on a node before its words show (the `tip_ms` dial). */
+  tipMs?: number;
+  nameSteps?: number;
 }
 
 const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
@@ -185,7 +188,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
       <span class="n" title=${`The nodes it hears, of all${extra?.length ? `; and ${extra.length} the harness gave it` : ""}`}>${a.hears ? (big ? `${heard.length} / ${p.nodes.length}` : heard.length) : ""}${extra?.length ? ` + ${extra.length}` : ""}</span>
     </div>
     ${big && p.win && html`<${WindowBar} w=${p.win} filter=${p.keyFilter} hues=${p.hues} picked=${p.picked} onPick=${p.onPick} />`}
-    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} />
+    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} />
   </div>`;
 };
 

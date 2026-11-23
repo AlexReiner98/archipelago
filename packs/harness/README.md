@@ -91,8 +91,11 @@ the light gets there; an act sparks on the bough of its place. The light
 and spark are the tree's own (see the tree, below).
 
 The dials, in the bar's ⋯ menu: how long a switch of focus takes
-(`switch_s`), and how long a run may be quiet and still be live
-(`quiet_min`). Its value is `harness.dials` (page scope), so an agent can
+(`switch_s`), how long the pointer rests on a node or a bough before its
+words show beside it (`tip_ms`, 0 for never), how many sizes names
+take per doubling while the tree zooms (`name_steps`, 0 for every size),
+and how long a run may be
+quiet and still be live (`quiet_min`). Its value is `harness.dials` (page scope), so an agent can
 set it; the browser remembers it. Colours are style tokens only.
 
 Over each agent's tree, its profile from `profile.read.of`: ● the one it
@@ -101,7 +104,7 @@ click on it lists the profiles, and picking one moves the agent there
 through the profile pack's `profile.place`, and its tree changes to match;
 the page never writes itself.
 
-## The tree ([layout.ts](layout.ts), [canvas.ts](canvas.ts))
+## The tree ([layout.ts](layout.ts), [canvas.ts](canvas.ts), [scene.ts](scene.ts), [paint.ts](paint.ts))
 
 Every node in `agent.tree` hangs under one root at its first place: tool,
 then the MCP server, then the tool; file, then its glob's top folders;
@@ -160,30 +163,35 @@ Names are whole, never cut, and never show a path: a path is said as
 whose it is, after a dot (`nameOf`, `placeName`): its project's folder,
 and the file when it isn't the usual CLAUDE.md or MEMORY.md, so
 "project memory · archipelago-next", "auto memory · Aperture". The whole
-title is in the tooltip. The camera fits the dots, not the names, so a long name never shrinks the
+title is in its words, shown beside it when the pointer rests on it. The camera fits the dots, not the names, so a long name never shrinks the
 picture. Every tree, big or a preview, fits once, when first laid out,
 and then only on a double-click: the map changing under it never moves
 it (`shouldFit`).
 
 The names on the wires (a bough's, along its branch) grow and shrink with
-the zoom, and give way ([labels.ts](labels.ts)): after each draw, one that
-overlaps a node's name or dot, a bough's dot, the root or a wire name
-nearer the root fades out, and comes back when zoom or a move clears it.
-Each is tested only against what shares its cells of a 64 px grid.
+the zoom, and give way ([labels.ts](labels.ts)): one that overlaps a
+node's name or dot, a bough's dot, the root or a wire name nearer the
+root fades out over a quarter second, and comes back when zoom clears it.
+Each is tested by its turned outline, worked out from its measured text,
+only against what shares its cells of a 64 px grid.
 
-Moving and zooming draw nothing again: the camera is set straight on the
-picture's transform while a wheel or a drag goes on, and the tree is drawn
-once more when it settles (140 ms after the last, `SETTLE_MS`), for what
-depends on the zoom (the shapes' least size on screen) and for the wire
-names giving way, which stay as they were while it moves.
+Every tree, big or a preview, is painted on one 2D canvas, as the
+Landscape is ([paint.ts](paint.ts)): no element per node. What it draws is
+a scene ([scene.ts](scene.ts)), made again only when what it shows changes:
+each branch, then each node in the tree's order (its window mark, verdict
+ring, dot and name, so a later dot covers an earlier name), the root, then
+the lights ([lights.ts](lights.ts)). Which colour a dot or a name takes
+where marks meet is decided there (`dotInk`, `nameInk`), rule for rule as
+the style sheet decided it for the SVG this replaced. Colours are the
+style's tokens, resolved once and again when the style changes.
 
-A live event draws only what it changed: each node and branch is its own
-component ([nodes.ts](nodes.ts)) that draws again only when one of its
-values does (lit, said, counted, picked, its window mark), so the rest of
-the tree, and of each preview, is left as it was. The wire names give way
-only when the tree, its places or the camera change, never in a preview
-(where they are always hidden). The camera's pure parts are in
-[camera.ts](camera.ts).
+Moving and zooming paint each frame from the camera, and only what is in
+view. A turned name drawn at a new size has every letter drawn anew, so
+while the zoom changes each name is a picture instead, drawn upright once
+into one atlas at one of `name_steps` sizes per doubling (4) and turned
+into place ([sprites.ts](sprites.ts)); at rest the names are text again; the wire names are placed again once it settles (140 ms after the
+last, `SETTLE_MS`). A live event paints the tree again, never a diff of its
+nodes. The camera's pure parts are in [camera.ts](camera.ts).
 
 ## The window ([windowbar.ts](windowbar.ts))
 

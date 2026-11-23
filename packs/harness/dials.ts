@@ -21,6 +21,8 @@ export interface Dial {
 
 export const DIALS: readonly Dial[] = [
   { key: "switch_s", label: "switch s", min: 0, max: 1.5, step: 0.05, value: 0.4, doc: "Seconds a tree takes to grow into focus while the old one shrinks into the column; 0 switches at once." },
+  { key: "tip_ms", label: "words after ms", min: 0, max: 3000, step: 50, value: 600, doc: "How long the pointer rests on a node or a bough before its words show beside it; 0 shows none." },
+  { key: "name_steps", label: "name sizes", min: 0, max: 16, step: 1, value: 4, doc: "While the tree zooms, its names are drawn at this many sizes for each doubling, not at every size the zoom passes, so the letters drawn for one frame serve the next; they settle to their true size when it stops. 0 draws every size." },
   { key: "quiet_min", label: "live for min", min: 1, max: 240, step: 1, value: 15, doc: "Minutes a run may go unheard and still be live; past it, it is a past run in the list, not an agent in the previews." },
 ];
 
