@@ -70,6 +70,11 @@ Early. The first build is a live **harness view** for Claude Code sessions:
 what is said to the agent, where it was said, by which pack, and whether it
 worked.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports:
+[SECURITY.md](SECURITY.md).
+
 ## Licence
 
 MIT

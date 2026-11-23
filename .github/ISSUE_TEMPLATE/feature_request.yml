@@ -1,0 +1,20 @@
+name: Feature request
+description: An idea for a pack, a view or a change.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you want to do
+      description: The problem or the workflow, before any solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+      description: How it could work. A new idea is usually a pack; say if it needs a change to an interface in spec/.
+  - type: textarea
+    id: else
+    attributes:
+      label: Anything else
