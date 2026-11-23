@@ -54,6 +54,7 @@ import { day } from "./clock.ts";
 import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
 import { useWindow, WINDOW, WindowBar, WINDOWBAR_STYLE, windowMarks } from "./windowbar.ts";
 import { NODE as NODE_WINDOW, TREND_STYLE } from "./trend.ts";
+import { KEY_OFF, offOf, store, stored } from "./keyoff.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -273,10 +274,12 @@ const harness: Pack = {
       // What the harness gave each agent shown (packs/transcript): read-only nodes in its tree, a toggle in the ⋯ menu.
       const hasGiven = hk.useHas(GIVEN);
       // The key doubles as a filter: a channel, the map's own, or the harness's (canvas.ts Key, channels.ts shows).
-      const [off, setOff] = useState<Set<string>>(new Set());
+      // The browser remembers what is turned off, as it does the key's being open: a view switch keeps it.
+      const [off, setOff] = useState<Set<string>>(() => offOf(stored(KEY_OFF)));
       const toggle = (f: string) => setOff((was) => {
         const next = new Set(was);
         if (!next.delete(f)) next.add(f);
+        store(KEY_OFF, JSON.stringify([...next]));
         return next;
       });
       const showGiven = !off.has("harness");

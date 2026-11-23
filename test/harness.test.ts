@@ -892,3 +892,12 @@ test("easeView: a fit glides from where the camera is to where it fits, eased, t
   assert.ok(Math.abs(c(easeView(a, b, 0.5, 800, 600)) - (c(a) + c(b)) / 2) < 1e-9, "the centre goes in a straight line");
   assert.ok(easeView(a, b, 0.1, 800, 600).k - 1 < (4 - 1) * 0.1, "it starts slowly");
 });
+
+test("harness: the key's turned-off marks are read back from what the browser stored, and nothing else", async () => {
+  const { offOf } = await import("../packs/harness/keyoff.ts");
+  assert.deepEqual([...offOf('["harness","words"]')], ["harness", "words"]);
+  assert.deepEqual([...offOf(null)], []);
+  assert.deepEqual([...offOf("not json")], []);
+  assert.deepEqual([...offOf('{"harness":true}')], []);
+  assert.deepEqual([...offOf('["harness", 3]')], ["harness"]);
+});

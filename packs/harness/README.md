@@ -146,7 +146,7 @@ zoom, double-click to fit; a press picks a node by its name, or anywhere
 within 22 px of its dot (`HIT_PX`). The key ([key.ts](key.ts)) is always
 there, bottom left of one run's tree or the agent in focus: collapsed by
 its head ("key ▸") to one line of the marks that filter until it is
-opened, or open, every mark with its words; the browser remembers which. It lists only the marks
+opened, or open, every mark with its words; the browser remembers which, and what its marks have turned off ([keyoff.ts](keyoff.ts)), so a view switch keeps both. It lists only the marks
 the tree in sight shows (`marksIn`): a new user's key is who and how, and
 held-back, shadow, verdict and trial marks join it as they appear. Its
 rows stand in titled sections, each a line apart, with what it means in
