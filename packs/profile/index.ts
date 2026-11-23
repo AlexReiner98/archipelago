@@ -35,7 +35,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { placeMatches } from "../agent/index.ts";
 import { type Model, type Profile, hearing, matchNode, nodeProfiles, placing, runProfiles } from "./model.ts";
 
-/** On the map a profile is an umwelt (Alex, 23 Nov 2026); the pack, its actions and `profile.read` keep the name. */
+/** On the map a profile is an umwelt (since 23 Nov 2026); the pack, its actions and `profile.read` keep the name. */
 export const TYPE = "umwelt";
 export const IN = "in_umwelt";
 export const OUT = "out_of_umwelt";
@@ -127,7 +127,7 @@ const profile: Pack = {
       const out = await invoke.invoke({
         action: RENAME,
         input: {},
-        authority: { of: "human", basis: "Alex, 23 Nov 2026: \"umwelt is the name\" for a profile on the map" },
+        authority: { of: "agent", basis: "the profile pack: a profile is an umwelt on the map now, so its old names are renamed on load" },
         reason: "A profile is an umwelt on the map now",
       });
       if (!out.ok) {

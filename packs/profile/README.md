@@ -8,7 +8,7 @@ UI rules are kept, but said only in the runs they fit. Provides
 
 ## On the map
 
-On the map a profile is an **umwelt** (Alex, 23 Nov 2026): what a run
+On the map a profile is an **umwelt** (since 23 Nov 2026): what a run
 senses of the map. The pack, its actions and `profile.read` keep the name
 profile, as the harness pack kept its own.
 
@@ -37,7 +37,7 @@ the item as it is.
 
 `profile.umwelt` gives every item of type `profile`, `in_profile` or
 `out_of_profile` its new type, up to 500 of each per change set. The pack
-runs it on load while any are left, on Alex's authority; `history.undo`
+runs it on load while any are left, on its own authority; `history.undo`
 takes a change set back.
 
 `members` is a find-line over nodes: `at:file:packs/**`, `at:skill:rhino*`,
