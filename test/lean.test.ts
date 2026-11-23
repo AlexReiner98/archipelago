@@ -129,7 +129,7 @@ test("a lean profile: planned always; set as a change set; written into its runs
   };
   const disk = async () => JSON.parse(await readFile(settings, "utf8")) as Record<string, unknown>;
   try {
-    const pid = ((await ok("items.create", { type: "profile", title: "Lean" })).output as { id: string }).id;
+    const pid = ((await ok("items.create", { type: "umwelt", title: "Lean" })).output as { id: string }).id;
     for (const r of ["r1", "r2", "r3", "r4", "r5"]) {
       await ctx(r).get<AgentRun>("agent.run").begin({ run: r, agent: { id: "e_agent", kind: "agent" }, harness: "test", reaches: [], facts: { transcript: `/t/${r}.jsonl`, cwd: proj, profiles: pid } });
       await ctx(r).get<AgentRun>("agent.run").act({ run: r, place: "tool:Bash", time: T, kind: "tool", by: "agent", ok: true });

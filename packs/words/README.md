@@ -6,6 +6,20 @@ with the item as its `source`. Its words are read from the graph at every
 say, so an edit takes effect the next time it speaks. A node with `when` (a
 reflex's condition) speaks only when the moment's input holds that text.
 
+## Any item, through its umwelt link
+
+Any item, of any type, is said like a node when an `in_umwelt` link (the
+[profile](../profile/README.md) pack's) gives it places. The link is the
+node's `source`, and its name: `words/<link id>`. It says the item's
+`words`, or else its `note`, under the item's title; its kind is the
+item's `kind`, else its type. The link holds how it is said: `at`, `when`,
+`refuse`, `say`, `repeat`, `trial` (said marked as a trial) and `retired`
+(not said). A change to the item or the link is followed: the words at the
+next say, a new title, kind or places by registering it again. `said(link,
+item)` makes that view, which the change node and `words.heard` read too.
+The words actions (`words.set`, `words.retire`, …) stay for `node` items;
+an ordinary item is edited as itself (`items.set`), its link likewise.
+
 | Action | Does |
 |---|---|
 | `words.set` `{ node, words }` | Changes what a node says |
