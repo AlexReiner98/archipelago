@@ -227,7 +227,9 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     return () => {
       cancelAnimationFrame(raf);
       P.lights.stop();
-      fires.current = undefined;
+      // Only its own: when an agent comes into focus its new canvas has taken `fires` already, and the
+      // preview's going after it must not leave the agent with no lights.
+      if (fires.current === P.lights.fire) fires.current = undefined;
       off();
       scheme.removeEventListener("change", restyle);
       ink.dispose();
