@@ -1,13 +1,14 @@
 /**
  * The types pack: the broker of spec/types.md. Provides types.define,
- * types.read and types.mark (edition 10: the shape each base is drawn in). Holds bases, flavours and kinds of link as the defining
+ * types.read, types.mark (edition 10: the shape each base is drawn in) and
+ * types.acyclic (edition 11: kinds of link that may never close a loop). Holds bases, flavours and kinds of link as the defining
  * packs' effects, so each goes when its pack unloads; it knows no type of
  * its own. A flavour is refused when its base isn't there or when it
  * declares a field its base already has.
  */
 import type { Caller, Dispose } from "../../spec/common.ts";
 import { Refused, byPosition } from "../../spec/common.ts";
-import type { BaseDef, FieldDef, FlavourDef, LinkDef, LinkInfo, TypeInfo, TypesDefine, TypesMark, TypesRead } from "../../spec/types.ts";
+import type { BaseDef, FieldDef, FlavourDef, LinkDef, LinkInfo, TypeInfo, TypesAcyclic, TypesDefine, TypesMark, TypesRead } from "../../spec/types.ts";
 import { MARK_SHAPES, type MarkShape } from "../../spec/style.ts";
 import { COMMON } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
@@ -128,6 +129,33 @@ const types: Pack = {
         let k = 0;
         for (const b of bases) out[b] = named.get(b) ?? (k < free.length ? free[k++]! : MARK_SHAPES[k++ % MARK_SHAPES.length]!);
         return out;
+      },
+      watch(on): Dispose {
+        return from.effect(() => {
+          watchers.add(on);
+          return () => watchers.delete(on);
+        });
+      },
+    }));
+
+    // Kinds of link held acyclic, with how many holds each has: it stays held until the last is let go.
+    const acyclic = new Map<string, number>();
+    ctx.provide<TypesAcyclic>("types.acyclic", (_caller, from) => ({
+      hold(link) {
+        if (!link || typeof link !== "string") refuse("name", "Name the kind of link to hold acyclic.");
+        return from.effect(() => {
+          acyclic.set(link, (acyclic.get(link) ?? 0) + 1);
+          changed();
+          return () => {
+            const k = (acyclic.get(link) ?? 1) - 1;
+            if (k > 0) acyclic.set(link, k);
+            else acyclic.delete(link);
+            changed();
+          };
+        });
+      },
+      held() {
+        return [...acyclic.keys()].sort();
       },
       watch(on): Dispose {
         return from.effect(() => {

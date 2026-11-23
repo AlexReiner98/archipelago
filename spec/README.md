@@ -5,7 +5,7 @@ be changed silently. Each contract is a TypeScript module (the types) and a
 short doc.
 
 <!-- contracts: written by scripts/contracts.ts from the spec -->
-This is **edition 10**. A capability that came after edition 1 shows the edition it came in.
+This is **edition 11**. A capability that came after edition 1 shows the edition it came in.
 
 | Contract | Capabilities | What it is |
 |---|---|---|
@@ -16,7 +16,7 @@ This is **edition 10**. A capability that came after edition 1 shows the edition
 | [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` `slot.arrange` (8) | How the UI is put together out of packs. |
 | [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | How large graphs are drawn. |
 | [here](here.md) | `here.declare` `here.read` `here.set` | What is being looked at, now. |
-| [types](types.md) | `types.define` `types.read` `types.mark` (10) | What kinds of item and link the map holds. |
+| [types](types.md) | `types.define` `types.read` `types.mark` (10) `types.acyclic` (11) | What kinds of item and link the map holds. |
 | [profile](profile.md) | `profile.read` (5) | Not every node fits every run. |
 | [loader](loader.md) | `loader.tree` (7) | The config tree as a capability. |
 | [changeset](changeset.md) | (a format) | A change, written in full. |
@@ -34,7 +34,9 @@ surface, and the spec owns the six places of edition 1 and edition 2's
 Edition 3 adds the place `compact` and the person's acts, `decision` and
 `notice` ([agent](agent.md)). Edition 4 says a node's same words once per
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
-([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 10 adds
+([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 11 adds
+`types.acyclic`, kinds of link a pack holds acyclic, which the schema pack
+keeps from closing a loop ([types](types.md)). Edition 10 adds
 `types.mark`, the shape each base is drawn in, named by its pack, and two
 mark shapes, pentagon and hexagon ([types](types.md), [style](style.md));
 from it a contract's `Capabilities` map is frozen one key at a time, as its

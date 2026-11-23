@@ -1,7 +1,8 @@
 # types
 
 The types broker ([spec/types.md](../../spec/types.md)): provides
-`types.define` and `types.read`. It holds bases, flavours and kinds of link
+`types.define`, `types.read`, `types.mark` and `types.acyclic` (edition
+11: kinds of link held acyclic, each while any pack holds it). It holds bases, flavours and kinds of link
 as the defining packs' effects, and defines none itself.
 
 - A taken name is refused, never replaced.

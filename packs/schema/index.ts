@@ -12,9 +12,10 @@ import type { Id, Json } from "../../spec/common.ts";
 import { Refused } from "../../spec/common.ts";
 import type { GraphRead, GraphStage } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
-import type { TypesRead } from "../../spec/types.ts";
+import type { TypesAcyclic, TypesRead } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { check, type Fields } from "./check.ts";
+import { after, check, type Fields } from "./check.ts";
+import { cycles, type Edge } from "./cycle.ts";
 import { Quarantine, type State } from "./quarantine.ts";
 
 export { check } from "./check.ts";
@@ -32,7 +33,7 @@ const RELEASE = "schema.release";
 const schema: Pack<SchemaConfig> = {
   id: "schema",
   about: "Checks every change against the kinds of item, and holds back what doesn't fit.",
-  inject: ["graph.stage", "graph.read", "types.read", "action.register"],
+  inject: ["graph.stage", "graph.read", "types.read", "types.acyclic", "action.register"],
   async apply(ctx: Context, config: SchemaConfig = {}) {
     if (config.db) {
       const { mkdir } = await import("node:fs/promises");
@@ -41,6 +42,18 @@ const schema: Pack<SchemaConfig> = {
     }
     const graph = ctx.get<GraphRead>("graph.read");
     const types = ctx.get<TypesRead>("types.read");
+    const acyclic = ctx.get<TypesAcyclic>("types.acyclic");
+    /** Links of a kind going out of an item, every page. */
+    const out = async (id: Id, kind: string): Promise<Edge[]> => {
+      const edges: Edge[] = [];
+      let after: string | undefined;
+      do {
+        const page = await graph.links(id, { type: kind, dir: "out" }, { limit: LIMIT_MAX, ...(after ? { after } : {}) });
+        for (const l of page.items) if (l.from === id) edges.push({ id: l.id, from: l.from, to: l.to });
+        after = page.next;
+      } while (after);
+      return edges;
+    };
     const quarantine = new Quarantine(config.db);
     ctx.effect(() => () => quarantine.close());
     /** Releases in flight, by their facts, so the stage can mark each applied once it is. */
@@ -72,6 +85,7 @@ const schema: Pack<SchemaConfig> = {
         typeOf: (id) => known.get(id) ?? null,
         strict: config.strict ?? false,
       });
+      if (!problems.length) problems.push(...(await cycles(after(now, facts), new Set(acyclic.held()), out)));
       return { problems, now };
     };
 

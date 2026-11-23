@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ActionInvoke } from "../spec/action.ts";
 import type { GraphRead } from "../spec/graph.ts";
-import type { LinkInfo, TypeInfo, TypesDefine, TypesMark, TypesRead } from "../spec/types.ts";
+import type { LinkInfo, TypeInfo, TypesAcyclic, TypesDefine, TypesMark, TypesRead } from "../spec/types.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
 import action from "../packs/action/index.ts";
@@ -16,7 +16,7 @@ import types from "../packs/types/index.ts";
 import work from "../packs/work/index.ts";
 
 const BASE = "mem:/packs/";
-const probe: Pack = { id: "probe", inject: ["types.define", "types.read", "types.mark", "action.invoke", "graph.read"], apply() {} };
+const probe: Pack = { id: "probe", inject: ["types.define", "types.read", "types.mark", "types.acyclic", "action.invoke", "graph.read"], apply() {} };
 const modules: Record<string, Pack> = { graph, action, types, work, question, record, actor, links, items, probe };
 
 const TREE: Entry[] = ["graph", "action", "types", "work", "question", "record", "actor", "links", "items", "probe"].map((id) => ({ id, pack: `${id}.ts` }));
@@ -33,6 +33,7 @@ async function setup(tree = TREE) {
     define: () => ctx().get<TypesDefine>("types.define"),
     read: () => ctx().get<TypesRead>("types.read"),
     mark: () => ctx().get<TypesMark>("types.mark"),
+    acyclic: () => ctx().get<TypesAcyclic>("types.acyclic"),
     invoke: (a: string, input: unknown) =>
       ctx().get<ActionInvoke>("action.invoke").invoke({ action: a, input: input as never, authority: { of: "human", basis: "test" }, reason: "test" }),
     get: async (id: string) => (await ctx().get<GraphRead>("graph.read").get([id]))[0],
@@ -178,4 +179,21 @@ test("items.link checks the ends' bases; items.unlink takes the link away whole"
   assert.equal(await p.get(linkId), null);
   const notLink = await p.invoke("items.unlink", { id: task });
   assert.ok(!notLink.ok && notLink.refused.code === "items.not_a_link");
+});
+
+test("a kind of link is held acyclic while any pack holds it", async () => {
+  const { p } = await setup();
+  let heard = 0;
+  p.acyclic().watch(() => heard++);
+  assert.deepEqual(p.acyclic().held(), []);
+  const one = p.acyclic().hold("depends_on");
+  const two = p.acyclic().hold("depends_on");
+  p.acyclic().hold("needs");
+  assert.deepEqual(p.acyclic().held(), ["depends_on", "needs"]);
+  await one();
+  assert.deepEqual(p.acyclic().held(), ["depends_on", "needs"]);
+  await two();
+  assert.deepEqual(p.acyclic().held(), ["needs"]);
+  assert.equal(heard, 5);
+  assert.throws(() => p.acyclic().hold(""), /Name the kind of link/);
 });
