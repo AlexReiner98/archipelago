@@ -18,9 +18,9 @@ ignored folder.
 
 ## Quickstart
 
-Clone this repository, then in its folder:
-
 ```
+git clone https://github.com/AlexReiner98/archipelago.git
+cd archipelago
 npm install
 npm run serve
 ```
