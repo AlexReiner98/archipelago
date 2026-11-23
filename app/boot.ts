@@ -38,6 +38,7 @@ const host = await startBrowser({
     { id: "command", pack: "packs/command/index.ts" },
     { id: "page", pack: "packs/page/view.ts" },
     { id: "field", pack: "packs/field/index.ts" },
+    { id: "arrange", pack: "packs/arrange/index.ts" },
     { id: "connect", pack: "packs/connect/view.ts" },
     { id: "gate", pack: "packs/gate/view.ts" },
     // Map (packs/map) and its legend (packs/legend) are kept but not loaded, so no one sees them

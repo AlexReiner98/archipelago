@@ -8,6 +8,8 @@
  * - `in:<id>`: the item and everything part_of it, at any depth;
  * - `near:<id>`: the item and what it is linked to directly;
  * - `id:<id>`: the item alone.
+ * - `profile:<title>`: a context profile, read by the pack that arranges
+ *   the Landscape into it (packs/arrange); it filters nothing here.
  *
  * An empty query is `is:open`. At most `limit` items come back, and the
  * links among them.
@@ -46,12 +48,14 @@ export interface Parsed {
   in?: Id;
   near?: Id;
   id?: Id;
+  /** A profile's title: not a filter here (packs/arrange reads it). */
+  profile?: string;
 }
 
 export function parse(q: string): Parsed {
   const p: Parsed = { words: [] };
   for (const tok of q.trim().split(/\s+/).filter(Boolean)) {
-    const m = /^(is|status|type|in|near|id):(.+)$/.exec(tok);
+    const m = /^(is|status|type|in|near|id|profile):(.+)$/.exec(tok);
     if (!m) p.words.push(tok.toLowerCase());
     else if (m[1] === "is") p.is = m[2] === "closed" ? "closed" : "open";
     else (p as unknown as Record<string, string>)[m[1]!] = m[2]!;

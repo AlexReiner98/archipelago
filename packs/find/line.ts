@@ -167,7 +167,7 @@ export function makeLine(d: LineDeps) {
           autoFocus=${!!command}
           value=${q}
           placeholder=${command ? "Go to a view or an item, or find: words, is:open, type:…" : "find: words, is:open, type:question, in:<id>"}
-          title="words match titles · is:open is:closed · status:x · type:x · in:<id> · near:<id> · Ctrl+K jumps"
+          title="words match titles · is:open is:closed · status:x · type:x · in:<id> · near:<id> · profile:<title> arranges the Landscape into that context profile · Ctrl+K jumps"
           onInput=${(e: Event) => type((e.target as HTMLInputElement).value)}
           onFocus=${() => setOpen(true)}
           onBlur=${() => !command && setOpen(false)}

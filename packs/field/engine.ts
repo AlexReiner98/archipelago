@@ -18,6 +18,7 @@ import { onStyle } from "../../spec/style.ts";
 import { ink, Light, paint, palette, type Cam, type Ink } from "./paint.ts";
 import { step, warm } from "./step.ts";
 import { FAINT, FOUND } from "./filter.ts";
+import { arrived, paintTree, targetsOf, type Arranged } from "./treeover.ts";
 
 export interface Stats {
   n: number;
@@ -40,6 +41,8 @@ export interface Field {
   input(next: FieldIn, warmTo?: number, refit?: boolean): void;
   /** How each item is drawn while the find line has words (filter.ts FOUND, NEAR, FAINT), or null for none. */
   found(levels: Map<Id, number> | null): void;
+  /** A context profile's tree to arrange the items into (packs/arrange), or null for none. */
+  arranged(a: Arranged | null): void;
   settings(S: Settings, then: Dial["then"] | "none"): void;
   reseed(): void;
   fit(): void;
@@ -67,6 +70,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   let pal = palette(canvas);
   let hover = -1, dirty = true, awake = false, stopped = false;
   let levels: Map<Id, number> | null = null, match: Uint8Array | null = null;
+  let tree: Arranged | null = null;
+  const scale = () => S.tree_scale ?? 1.4;
   const remark = () => {
     match = levels ? Uint8Array.from(g.id, (id) => levels!.get(id) ?? FAINT) : null;
     dirty = true;
@@ -171,6 +176,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
         return [r.left - at.left - 4, r.top - at.top - 4, r.right - at.left + 4, r.bottom - at.top + 4] as [number, number, number, number];
       });
       paint(c, g, cam, S, light, colours, pick, s, match, clear);
+      // Arranged into a profile: its tree comes in under the items as they reach their places.
+      if (tree) paintTree(c, tree, cam, s.dpr, scale(), arrived(g, scale()), colours, S);
       // A link name still fading keeps the view painting.
       dirty = easing || following || light.wiresMoving;
     }
@@ -279,6 +286,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     input(next, warmTo, refit) {
       const first = !g.n;
       g = build(next, g.n ? g : null, pal);
+      g.target = targetsOf(g, tree, scale());
       seed(g, S);
       if (first) g.sim = { alpha: 1, steps: 0 };
       else warm(g, S, warmTo);
@@ -293,8 +301,16 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       levels = next;
       remark();
     },
+    arranged(a) {
+      tree = a;
+      g.target = targetsOf(g, tree, scale());
+      warm(g, S, S.alpha_filter);
+      wake();
+      dirty = true;
+    },
     settings(next, then) {
       S = next;
+      if (tree) g.target = targetsOf(g, tree, scale());
       if (then === "seed") return this.reseed();
       if (then === "size") sizes(g, S);
       if (then === "warm" || then === "size") warm(g, S), wake();

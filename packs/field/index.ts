@@ -30,13 +30,14 @@ import type { LinkInfo, TypeInfo } from "../../spec/types.ts";
 import type { Dial } from "./behaviour.ts";
 import { field, type Field } from "./engine.ts";
 import type { FieldIn, Settings } from "./graph.ts";
-import { around, facets as facetsOf, FIND, shown, type Hide } from "./filter.ts";
+import { around, facets as facetsOf, FIND, FOUND, shown, type Hide } from "./filter.ts";
 import { Legend, LEGEND_STYLE } from "./legend.ts";
 import { DRAW, palette } from "./paint.ts";
 import { Panel, PANEL_STYLE, type Section } from "./panel.ts";
 import { BEHAVIOURS, RUN, defaults, step } from "./step.ts";
 import { build, seed } from "./graph.ts";
 import { descends, type Verdict } from "./descends.ts";
+import type { Arranged } from "./treeover.ts";
 
 export { BEHAVIOURS, step } from "./step.ts";
 
@@ -62,6 +63,8 @@ const DIALS = "field.dials";
 /** The slot under the empty state, on a map with no items. */
 const EMPTY = "field.empty";
 const QUERY = "find.query";
+/** A context profile's tree to arrange the map into, set by packs/arrange (`profile:<title>` on the find line). */
+const ARRANGE = "arrange.tree";
 const REMEMBER = "archipelago.field.dials";
 const HIDE = "field.hide";
 const REMEMBER_HIDE = "archipelago.field.hide";
@@ -223,12 +226,17 @@ const fieldPack: Pack = {
         const vis = shown(input, by);
         return { items: input.items.filter((it) => vis.items.has(it.id)), links: input.links.filter((l) => vis.links.has(l.id)), types: input.types };
       }, [input, hideKey, !!found]);
+      // Arranged into a profile's tree (packs/arrange): only its items stay, whatever the legend hides, each found.
+      const arranged = (useHere<Json>(ARRANGE) ?? null) as Arranged | null;
+      const arrangedKey = arranged ? JSON.stringify(arranged) : "";
+      const treeLevels = useMemo(() => (arranged ? new Map(input.items.filter((it) => it.id in arranged.items).map((it) => [it.id, FOUND] as const)) : null), [input, arrangedKey]);
       // While the find line has words, only what it finds and what lies near it stay: each by how it is drawn.
-      const levels = useMemo(() => (found ? around(visible, found, S.find_steps!, S.find_faint!) : null), [visible, found, S.find_steps, S.find_faint]);
+      const levels = useMemo(() => treeLevels ?? (found ? around(visible, found, S.find_steps!, S.find_faint!) : null), [treeLevels, visible, found, S.find_steps, S.find_faint]);
       const laid = useMemo<FieldIn>(() => {
+        if (treeLevels) return { items: input.items.filter((it) => treeLevels.has(it.id)), links: input.links.filter((l) => treeLevels.has(l.from) && treeLevels.has(l.to)), types: input.types };
         if (!levels) return visible;
         return { items: visible.items.filter((it) => levels.has(it.id)), links: visible.links.filter((l) => levels.has(l.from) && levels.has(l.to)), types: visible.types };
-      }, [visible, levels]);
+      }, [visible, levels, treeLevels]);
       // Kept as it is, {} included (show everything); only the start is absent.
       const setHide = (next: Hide | undefined) => {
         const v = (next ?? {}) as Json;
@@ -256,8 +264,9 @@ const fieldPack: Pack = {
         lastHide.current = hideKey;
         lastFind.current = levels;
         engineNow?.found(levels);
+        engineNow?.arranged(arranged);
         engineNow?.input(laid, byFilter ? S.alpha_filter : undefined, byFind);
-      }, [laid]);
+      }, [laid, arrangedKey]);
 
       // A dial's change does what it needs: a seed, new sizes, a warm run, or a paint.
       const last = useRef<Settings>(S);
