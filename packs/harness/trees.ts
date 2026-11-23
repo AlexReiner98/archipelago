@@ -86,9 +86,11 @@ html.hv-switching { view-transition-name:none; }
 ::view-transition-old(*.hv-agent), ::view-transition-new(*.hv-agent) { height:100%; object-fit:contain; animation-duration:var(--hv-switch, .4s); }
 ::view-transition-old(*.hv-agent) { animation:hv-gone .12s ease-out both; }
 @keyframes hv-gone { to { opacity:0; } }
-.hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); }
-.hv-trees.many { grid-template-columns:minmax(180px, max(22%, calc(var(--peek, 140px) * 4 / 3))) minmax(0,1fr); }
-.hv-peeks { order:-1; min-height:0; overflow-y:auto; border-right:1px solid var(--line); scrollbar-width:thin; }
+.hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-template-columns:0px minmax(0,1fr); grid-template-rows:minmax(0,1fr); transition:grid-template-columns var(--hv-open, .35s) cubic-bezier(.2,.7,.2,1); }
+.hv-trees.many { grid-template-columns:max(180px, 22%, calc(var(--peek, 140px) * 4 / 3)) minmax(0,1fr); }
+.hv-trees > :not(.hv-peeks) { grid-column:2; grid-row:1; min-width:0; }
+.hv-peeks { grid-column:1; grid-row:1; min-width:0; min-height:0; overflow-y:auto; border-right:1px solid var(--line); scrollbar-width:thin; animation:hv-peeks-in var(--hv-open, .35s) ease-out both; }
+@keyframes hv-peeks-in { from { opacity:0; } }
 .hv-peeks > .hv-tree { height:var(--peek, 140px); }
 .hv-side { display:flex; flex-direction:column; }
 .hv-side > .hv-pane { flex:1; min-height:0; }
@@ -175,6 +177,8 @@ export interface TreesProps {
   fitMs?: number;
   /** How long the wheel's zoom eases, in ms (the wheel_ms dial). */
   wheelMs?: number;
+  /** Seconds the previews' column takes to open (the open_s dial). */
+  openS?: number;
   /** Each preview's height in px (the peek_px dial); the column is as wide as a preview a third wider. */
   peekPx?: number;
   /** The most characters a name shows (the name_most dial); 0 or none, whole. */
@@ -211,7 +215,8 @@ export const Trees = (p: TreesProps) => {
   const big = p.agents.find((a) => a.run.run === focus);
   // The previews stand at a fixed height and scroll, however many agents are live.
   // The left bar is one: the previews, or, while a node is picked, the node in their place.
-  return html`<div class="hv-trees${p.side || rest.length || p.rows?.length ? " many" : ""}" style=${p.peekPx ? `--peek:${p.peekPx}px` : ""}>
+  // The previews' column opens over open_s, from nothing, as a second agent arrives.
+  return html`<div class="hv-trees${p.side || rest.length || p.rows?.length ? " many" : ""}" style=${`${p.peekPx ? `--peek:${p.peekPx}px;` : ""}--hv-open:${p.openS ?? 0.35}s`}>
     ${big && html`<${One} key=${big.run.run} a=${big} p=${p} big=${true} />`}
     ${p.side ? html`<div class="hv-peeks hv-side">${p.side}</div>` : (rest.length > 0 || !!p.rows?.length) && html`<div class="hv-peeks">
       ${rest.map((a) => html`<${One} key=${a.run.run} a=${a} p=${p} big=${false} />`)}
