@@ -9,8 +9,9 @@ tree of places and nodes. It lands on every live run: each agent has a tree
 of its own, holding the nodes its profile lets it hear, under its name in
 its colour and its profile, and what it is told colours that tree. Nothing
 moves. Two fills, linked through `here`; the run pane shows beside the
-view while it does (`when: { "here.view": "harness/view" }`), open from
-the start. Inside the view, one bar on the left holds the previews, or,
+view while it does (`when: { "here.view": "harness/view" }`), folded to
+its rail at the start (the frame's `folded` in app/boot.ts), so the tree
+has the room; a click on the rail opens it. Inside the view, one bar on the left holds the previews, or,
 while a node is picked, the node in their place; a click on the
 background, picking none, brings the previews back.
 
@@ -94,7 +95,9 @@ The dials, in the bar's ⋯ menu: how long a switch of focus takes
 (`switch_s`), how long the pointer rests on a node or a bough before its
 words show beside it (`tip_ms`, 0 for never), how many sizes names
 take per doubling while the tree zooms (`name_steps`, 0 for every size),
-and how long a run may be
+the size on screen below which a node's name shows only if the run said
+it, refused with it, or it is picked (`quiet_px`, 9; 0 for every name), so
+a tree seen whole reads by its shape and what it was told, and how long a run may be
 quiet and still be live (`quiet_min`). Its value is `harness.dials` (page scope), so an agent can
 set it; the browser remembers it. Colours are style tokens only.
 
@@ -138,9 +141,9 @@ refusal), or sparks on the bough of an act's place (amber, red when it
 failed). Under reduced motion only the names light. Drag to move, wheel to
 zoom, double-click to fit; a press picks a node by its name, or anywhere
 within 22 px of its dot (`HIT_PX`). The key ([key.ts](key.ts)) is always
-there, bottom left of one run's tree or the agent in focus: open, every
-mark with its words, or collapsed by its head ("key ▾") to one line of the
-marks that filter; the browser remembers which. It lists only the marks
+there, bottom left of one run's tree or the agent in focus: collapsed by
+its head ("key ▸") to one line of the marks that filter until it is
+opened, or open, every mark with its words; the browser remembers which. It lists only the marks
 the tree in sight shows (`marksIn`): a new user's key is who and how, and
 held-back, shadow, verdict and trial marks join it as they appear. Its
 rows stand in titled sections, each a line apart, with what it means in
@@ -199,7 +202,9 @@ With the context pack ([context](../context/README.md)), a bar over the
 agent in focus, and over one run's tree, says how full its context window
 is at the playhead, or live (`context.window`): the tokens in it of the
 window's size and the share that is, "≈" when it is an estimate (no usage
-in the transcript yet), and how many compactions. Under it two thin rows
+in the transcript yet), and how many compactions. It starts folded to that
+one line; its head ("window ▸") opens the rows below, and the browser
+remembers which (`harness.window-open`). Under it two thin rows
 on the window's one scale: its share by source (the map's, Claude Code's,
 the conversation, and what the model counts beyond those), and by channel
 (hook, rule, file, context, talk). A share's tooltip says its tokens, its
