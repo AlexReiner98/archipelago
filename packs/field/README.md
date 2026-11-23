@@ -38,10 +38,12 @@ find line has words, only what it finds and what lies near it.
   each item's rank is its longest chain of what it waits on, and what it
   waits on is to the left) and `collide` (by each shape's edge along the
   line between two particles), and `tree` (while the Landscape is
-  arranged into a context profile, packs/arrange's page key
-  `arrange.tree`, each of its items pulled to its place in that profile's
-  tree; only those items are laid out, and the tree's branches and names
-  ([treeover.ts](treeover.ts)) come in under them as they arrive).
+  arranged into an umwelt, packs/arrange's page key `arrange.tree`, each
+  of its items flies from where it stood to its place in that umwelt's
+  tree over `tree_ms`, eased, however fast the run steps; only those items
+  are laid out, the camera keeps the whole tree in view, and the tree's
+  branches and names ([treeover.ts](treeover.ts)) come in under them as
+  they arrive).
 - **Every number is a dial**, in the legend's dials tab: each behaviour's,
   then the start, find, the run and the drawing, in sections that start
   closed and say how many of their dials are changed; springs and flow are

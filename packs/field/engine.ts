@@ -18,7 +18,7 @@ import { onStyle } from "../../spec/style.ts";
 import { ink, Light, paint, palette, type Cam, type Ink } from "./paint.ts";
 import { step, warm } from "./step.ts";
 import { FAINT, FOUND } from "./filter.ts";
-import { arrived, paintTree, targetsOf, type Arranged } from "./treeover.ts";
+import { arrived, fly, paintTree, takeOff, targetsOf, treeBox, type Arranged, type Flight } from "./treeover.ts";
 
 export interface Stats {
   n: number;
@@ -70,8 +70,14 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   let pal = palette(canvas);
   let hover = -1, dirty = true, awake = false, stopped = false;
   let levels: Map<Id, number> | null = null, match: Uint8Array | null = null;
-  let tree: Arranged | null = null;
+  let tree: Arranged | null = null, flight: Flight | null = null, flying = false;
   const scale = () => S.tree_scale ?? 1.4;
+  /** New places in a tree: the items set off for them from where they stand. */
+  const aim = () => {
+    g.target = targetsOf(g, tree, scale());
+    flight = takeOff(g, performance.now());
+    flying = !!flight;
+  };
   const remark = () => {
     match = levels ? Uint8Array.from(g.id, (id) => levels!.get(id) ?? FAINT) : null;
     dirty = true;
@@ -81,7 +87,13 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
 
   /** The camera that fits the picture now: while the find line has words, what it finds (what is near may run past the edges). */
   const fitted = (): Cam => {
-    const [x0, y0, x1, y1] = bounds(g, match ? (i) => match![i] === FOUND : undefined), { width, height } = size();
+    let [x0, y0, x1, y1] = bounds(g, match ? (i) => match![i] === FOUND : undefined);
+    const { width, height } = size();
+    // Arranged into a tree: the whole tree is in view, names and all, and the items on their way to it.
+    if (tree) {
+      const [a0, b0, a1, b1] = treeBox(tree, scale(), S);
+      [x0, y0, x1, y1] = [Math.min(x0, a0), Math.min(y0, b0), Math.max(x1, a1), Math.max(y1, b1)];
+    }
     const pad = S.fit_pad!;
     const w = Math.max(1, width - 2 * pad), h = Math.max(1, height - 2 * pad);
     const k = Math.min(w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0), S.fit_zoom_most ?? Infinity);
@@ -121,6 +133,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     if (stopped || !awake) return;
     const t0 = performance.now();
     let steps = 0, energy = 0;
+    // In flight the run moves for as long as the flight lasts, whatever its step count.
+    if (flight && flying && (flying = fly(g, flight, t0, S.tree_ms ?? 0))) g.sim.from = g.sim.steps;
     do {
       energy = step(g, S);
       steps++;
@@ -129,13 +143,13 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     stepMs = stepMs ? stepMs * 0.8 + per * 0.2 : per;
     pick = grid(g);
     dirty = true;
-    if (!energy && !press) {
+    if (!energy && !press && !flying) {
       awake = false;
       settledIn = { steps: g.sim.steps - runStart.steps, ms: performance.now() - runStart.at };
       return;
     }
     // Held by a hand, a sleeping run waits for the next move instead of spinning.
-    if (!energy) return;
+    if (!energy && !flying) return;
     queued = true;
     chan.port2.postMessage(0);
   };
@@ -177,7 +191,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       });
       paint(c, g, cam, S, light, colours, pick, s, match, clear);
       // Arranged into a profile: its tree comes in under the items as they reach their places.
-      if (tree) paintTree(c, tree, cam, s.dpr, scale(), arrived(g, scale()), colours, S);
+      if (tree) paintTree(c, tree, cam, s.dpr, scale(), arrived(g, scale(), flight), colours, S);
       // A link name still fading keeps the view painting.
       dirty = easing || following || light.wiresMoving;
     }
@@ -286,7 +300,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     input(next, warmTo, refit) {
       const first = !g.n;
       g = build(next, g.n ? g : null, pal);
-      g.target = targetsOf(g, tree, scale());
+      aim();
       seed(g, S);
       if (first) g.sim = { alpha: 1, steps: 0 };
       else warm(g, S, warmTo);
@@ -303,14 +317,14 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     },
     arranged(a) {
       tree = a;
-      g.target = targetsOf(g, tree, scale());
+      aim();
       warm(g, S, S.alpha_filter);
       wake();
       dirty = true;
     },
     settings(next, then) {
       S = next;
-      if (tree) g.target = targetsOf(g, tree, scale());
+      if (tree) aim();
       if (then === "seed") return this.reseed();
       if (then === "size") sizes(g, S);
       if (then === "warm" || then === "size") warm(g, S), wake();
