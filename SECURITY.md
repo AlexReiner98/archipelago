@@ -8,5 +8,7 @@ for it.
 
 - Archipelago runs on one machine for one person. Its servers listen on
   127.0.0.1 only.
-- Installing a pack means trusting its code: packs are not sandboxed.
+- Packs are code, and they run with the server's rights: they can read and
+  write what your user account can. They are not sandboxed, so only load
+  packs you trust.
 - Data lives in the ignored `.data/` folder, never in the repository.

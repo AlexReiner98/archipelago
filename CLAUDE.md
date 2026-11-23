@@ -20,8 +20,7 @@ human or agent) when working in this repository. The
   the journal.
 - No pack owns a part of the data. A grouping is a link or a query.
 - This repository holds everything one person needs on their own machine, a
-  basic map UI included. Running it for others (sign-in, multiple users,
-  hosted sync) is out of its scope.
+  basic map UI included.
 - Nothing private is ever committed: no tokens, no local paths, no personal
   names, and no one's own content such as skills, memory or map data. Data
   stays in the ignored `.data/` folder. Tests use neutral fixtures

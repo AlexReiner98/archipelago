@@ -43,11 +43,6 @@ To have every session report, a map with no run opens on **Field** with the
 lines to copy into `~/.claude/settings.json`;
 [First run](guide/first-run.md) has more.
 
-## Hosted
-
-Don't want to run it yourself? [archipelago.tools](https://archipelago.tools)
-is the hosted app.
-
 ## How it is built
 
 - It gives each agent what it needs and the actions it can take, and records
@@ -72,7 +67,8 @@ worked.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Security reports:
+See [CONTRIBUTING.md](CONTRIBUTING.md). Packs are code that runs with the
+server's rights, so only load packs you trust; security reports go through
 [SECURITY.md](SECURITY.md).
 
 ## Licence
