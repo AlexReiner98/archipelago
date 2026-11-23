@@ -107,8 +107,13 @@ The spec has editions: 1, 2, 3… Packs don't declare versions of anything.
 - Each capability says the edition it arrived in (`since`) and, if
   retired, the edition and what replaces it. The list is the spec's
   history.
-- Edition 1 is accepted (20 Nov 2026): its capabilities' meanings
-  are fixed.
+- Editions 1 to 9 are accepted (edition 1 on 20 Nov 2026, up to 9 on
+  23 Nov 2026, the first public release): their capabilities' meanings are
+  fixed. `ACCEPTED` in common.ts says up to which edition.
+- A test holds it: `test/spec-frozen.test.ts` compares every accepted
+  type, capability and term with `test/spec-frozen.json` and fails on any
+  change. Accepting an edition (`node scripts/spec-surface.ts --accept`)
+  adds what it brought and never rewrites what is there.
 
 Cordis links by key alone and leaves versioning open (§6.6). It names two
 problems: drift (a key's interface changing under a consumer) and

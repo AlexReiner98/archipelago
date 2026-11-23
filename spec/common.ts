@@ -145,6 +145,9 @@ export type Edition = number;
 /** The edition these files are. */
 export const EDITION: Edition = 9;
 
+/** Every edition up to this one is accepted: what it says is frozen (test/spec-frozen.json). */
+export const ACCEPTED: Edition = 9;
+
 /**
  * A capability: one key in the Cordis context, and what it means. A pack
  * asks for capabilities (its `inject`), never for a version of a pack, and
