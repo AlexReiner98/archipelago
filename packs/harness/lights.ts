@@ -30,9 +30,9 @@ export class Lights {
   private still = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /** `get`: the tree as drawn now; `changed`: something to paint. */
-  private get: () => { tree: Tree; placed: Placed };
+  private get: () => { tree: Tree; placed: Placed; sparkS?: number };
   private changed: () => void;
-  constructor(get: () => { tree: Tree; placed: Placed }, changed: () => void) {
+  constructor(get: () => { tree: Tree; placed: Placed; sparkS?: number }, changed: () => void) {
     this.get = get;
     this.changed = changed;
   }
@@ -118,13 +118,15 @@ export class Lights {
     } else {
       const p = placed.xy.get(l.at);
       if (!p) return;
-      this.light(l.at, l.tone, color);
+      // How long a spark lasts: the spark_s dial, else the style's.
+      const life = this.get().sparkS || S.sparkLife;
+      this.light(l.at, l.tone, color, Math.max(S.linger, life));
       this.fx.push({
         start: performance.now(),
         draw: (c, age, k, inks) => {
-          if (age >= S.sparkLife) return false;
-          const r = (S.spark + S.sparkGrow * Math.sqrt(age)) / Math.sqrt(k);
-          Lights.glow(c, p.x, p.y, r, 1 - age / S.sparkLife, ink(inks));
+          if (age >= life) return false;
+          const r = (S.spark + S.sparkGrow * Math.sqrt(age / life * S.sparkLife)) / Math.sqrt(k);
+          Lights.glow(c, p.x, p.y, r, 1 - age / life, ink(inks));
           return true;
         },
       });
