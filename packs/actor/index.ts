@@ -1,7 +1,7 @@
 /**
  * The actor base (spec/types.md): someone who acts, a person or an agent.
  */
-import type { BaseDef, TypesDefine } from "../../spec/types.ts";
+import type { BaseDef, TypesDefine, TypesMark } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 
 export const ACTOR: BaseDef = {
@@ -16,9 +16,11 @@ export const ACTOR: BaseDef = {
 const actor: Pack = {
   id: "actor",
   about: "Actors: the people and agents who work on the map.",
-  inject: ["types.define"],
+  inject: ["types.define", "types.mark"],
   apply(ctx: Context) {
     ctx.get<TypesDefine>("types.define").base(ACTOR);
+    // Edition 10: drawn as a triangle wherever its marks are.
+    ctx.get<TypesMark>("types.mark").mark(ACTOR.name, "triangle");
   },
 };
 

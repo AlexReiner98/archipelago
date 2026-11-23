@@ -8,13 +8,37 @@ UI rules are kept, but said only in the runs they fit. Provides
 
 ## On the map
 
+On the map a profile is an **umwelt** (Alex, 23 Nov 2026): what a run
+senses of the map. The pack, its actions and `profile.read` keep the name
+profile, as the harness pack kept its own.
+
 | | |
 |---|---|
-| `profile` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members`, `fallback`, `leave_out` (what Claude Code is to leave out of its runs: the [lean](../lean/README.md) pack's) |
-| `in_profile` | A node item → the profile that holds it |
-| `out_of_profile` | A node item → a profile it is taken out of |
-| `uses` | An item → a profile: runs with that item in their facts (a repo, a hub) are in it |
-| `part_of` | A profile → a larger one: a run in the part is in the whole |
+| `umwelt` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members`, `fallback`, `leave_out` (what Claude Code is to leave out of its runs: the [lean](../lean/README.md) pack's) |
+| `in_umwelt` | Any item → the umwelt that holds it. With places, the link is said there itself (below) |
+| `out_of_umwelt` | An item → an umwelt it is taken out of |
+| `uses` | An item → an umwelt: runs with that item in their facts (a repo, a hub) are in it |
+| `part_of` | An umwelt → a larger one: a run in the part is in the whole |
+
+### Said through its link
+
+Any item, of any type, is context by query: `members` holds what its line
+finds. An `in_umwelt` link can also say how the item is activated, in its
+own fields: `at` (the places: `tool:Bash`, `file:packs/**`,
+`session_start`), `kind` (how it is said here: `instruction` is standing,
+said first at `session_start`; absent, what the item is), `when`, `refuse`, `say` (`listed` or `whole`), `repeat`
+(`every`), `trial` and `retired`. A link with places is a node of its own
+(the [words](../words/README.md) pack's), whose source is the link, and
+this umwelt alone holds it: one item can be said at different places in
+different umwelts. Retiring it there (`retired: true`, or unlinking) leaves
+the item as it is.
+
+### Renamed on load
+
+`profile.umwelt` gives every item of type `profile`, `in_profile` or
+`out_of_profile` its new type, up to 500 of each per change set. The pack
+runs it on load while any are left, on Alex's authority; `history.undo`
+takes a change set back.
 
 `members` is a find-line over nodes: `at:file:packs/**`, `at:skill:rhino*`,
 `kind:`, `pack:`, words in the title. `match` is a find-line over a run's

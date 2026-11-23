@@ -57,14 +57,17 @@ find line has words, only what it finds and what lies near it.
   legend's open and closed switches do not apply while it has words, so a
   plan shows its done steps.
 - **Shapes** ([shapes.ts](shapes.ts)). A particle is its base's mark shape
-  (spec/style.ts: square, diamond, circle, triangle), each the area of its
+  (`types.mark`, edition 10: square, diamond, circle, triangle, pentagon,
+  hexagon, as the base's pack names it), each the area of its
   circle: hollow while its status is the first open one, half (◐, one
   shape, open on the right) while later open, full once closed, as the
   item marks are. `shapes` turns them to circles; one smaller than
   `hollow_px` on screen is drawn full.
 - **Wires** ([wires.ts](wires.ts)). Each link has an arrowhead at the end
   it points to, its tip on that particle's edge ("A depends_on B" points at
-  B). A link long enough on screen, whose ends are big enough to be
+  B). A head is `arrow_strength` times as strong as its line, keeps
+  `arrow_keep` of that while a pointer dims the rest or find fades its
+  edge, and is `arrow_lit` times bigger on a lit link. A link long enough on screen, whose ends are big enough to be
   titled, or lit, has its type's name along its middle, over no title and
   no other name. A name grows and shrinks with the zoom (`link_name_size`
   times the zoom, between `link_name_least_px` and `link_name_most_px`),
@@ -72,9 +75,15 @@ find line has words, only what it finds and what lies near it.
   room, never popping.
 - **The legend is the filter, and holds the dials** ([legend.ts](legend.ts),
   [panel.ts](panel.ts)). Closed, one line: the count and two tabs.
-  `filter` opens each type (with its colour), each of a type's statuses
-  and kinds, open and closed, items with no links, and each link type as a
-  switch, with how many the map has and how many show. What is hidden is
+  `filter` opens each type (its mark in its colour and shape), each of a
+  type's statuses (its mark as full as it is drawn) and kinds, each base
+  by its shape (its switch shows or hides all its types), open (with how
+  many sit at the first status, hollow, and at a later one, half, each a
+  switch) and
+  closed (faded), items with no links, and each link type as a switch, with how many the map has and how many show. Each mark is drawn by
+  `markPath` ([shapes.ts](shapes.ts)) with the drawing's own dials
+  (`shapes`, `hollow_line`, `closed_fade`), so the key reads as the map
+  does; with shapes off, the shape and fill keys go. What is hidden is
   left out of the layout and the graph settles again with what is shown.
   What is hidden is `field.hide` (page scope); it starts with closed items
   hidden, so Field opens on the work still open, and `show all` shows

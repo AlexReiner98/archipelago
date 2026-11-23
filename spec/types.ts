@@ -6,6 +6,7 @@
  * verdicts and statuses know bases and field kinds, never a type's name.
  */
 import type { Capability, Dispose, PackId } from "./common.ts";
+import type { MarkShape } from "./style.ts";
 
 /** What a field holds. `id` is another item's id; `choice` is one of `values`. */
 export type FieldKind = "text" | "number" | "boolean" | "date" | "json" | "id" | "choice";
@@ -111,12 +112,32 @@ export interface TypesRead {
   watch(on: () => void): Dispose;
 }
 
+/**
+ * `types.mark`, edition 10: the shape each base is drawn in. The pack that
+ * defines a base names its shape; a base none names takes the first shape
+ * no base holds (MARK_SHAPES order, bases in the order they are defined),
+ * round again once all are held.
+ */
+export interface TypesMark {
+  /**
+   * Draws `base` as `shape`. The base need not be defined yet. Refused when
+   * another base holds that shape now, or when `base` is named already.
+   */
+  mark(base: string, shape: MarkShape): Dispose;
+  /** Every base defined now, by name, and its shape. */
+  marks(): Record<string, MarkShape>;
+  /** Calls `on` when a mark, or a base, comes or goes. */
+  watch(on: () => void): Dispose;
+}
+
 export interface Capabilities {
   "types.define": TypesDefine;
   "types.read": TypesRead;
+  "types.mark": TypesMark;
 }
 
 export const capabilities: Capability[] = [
   { key: "types.define", since: 1, doc: "Defines a base, a flavour of one, or a kind of link." },
   { key: "types.read", since: 1, doc: "The bases, flavours and links defined now, resolved, and when they change." },
+  { key: "types.mark", since: 10, doc: "The shape each base is drawn in: named by its pack, else the first shape no base holds." },
 ];

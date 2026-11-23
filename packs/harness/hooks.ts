@@ -312,14 +312,14 @@ export function hooks(c: Caps) {
       let gone = false;
       const load = async () => {
         const out: ProfileRow[] = [];
-        for (let p = await c.graph.of("profile", { limit: 500 }); ; p = await c.graph.of("profile", { limit: 500, after: p.next })) {
+        for (let p = await c.graph.of("umwelt", { limit: 500 }); ; p = await c.graph.of("umwelt", { limit: 500, after: p.next })) {
           for (const i of p.items) out.push({ id: i.id, title: String(i.fields.title ?? i.id), status: String(i.fields.status ?? "shadow"), ...(i.fields.fallback === true ? { fallback: true } : {}) });
           if (!p.next) break;
         }
         if (!gone) setList(out.sort((a, b) => a.title.localeCompare(b.title)));
       };
       void load();
-      const stop = c.graphLive.watch({ types: ["profile"] }, () => void load());
+      const stop = c.graphLive.watch({ types: ["umwelt"] }, () => void load());
       return () => {
         gone = true;
         void stop();

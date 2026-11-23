@@ -21,7 +21,8 @@ import type { Dispose, Id, Json } from "../../spec/common.ts";
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
-import type { LinkInfo, TypeInfo, TypesRead } from "../../spec/types.ts";
+import type { LinkInfo, TypeInfo, TypesMark, TypesRead } from "../../spec/types.ts";
+import type { MarkShape } from "../../spec/style.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { KEYS } from "../../spec/here.ts";
 import { closed, run, type Index, type Result, type Row, type Wire } from "./query.ts";
@@ -47,6 +48,8 @@ export interface FindIndex {
   types(): TypeInfo[];
   links(): LinkInfo[];
   type(name: string): TypeInfo | undefined;
+  /** Every base's mark shape (types.mark, edition 10): draw a type with `markShape(marks(), t)`. */
+  marks(): Record<string, MarkShape>;
   /** Whether an item's status is on its base's closed side. */
   closed(row: Row): boolean;
   run(query: string, limit?: number): Result;
@@ -70,11 +73,12 @@ export interface FindOffer {
 const find: Pack = {
   id: "find",
   about: "The search line: finds items by words, kind, status and links.",
-  inject: ["graph.read", "graph.watch", "types.read", "here.declare", "here.read", "here.set", "slot.fill"],
+  inject: ["graph.read", "graph.watch", "types.read", "types.mark", "here.declare", "here.read", "here.set", "slot.fill"],
   async apply(ctx: Context) {
     const graph = ctx.get<GraphRead>("graph.read");
     const live = ctx.get<GraphWatch>("graph.watch");
     const typesRead = ctx.get<TypesRead>("types.read");
+    const typesMark = ctx.get<TypesMark>("types.mark");
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
     ctx.get<HereDeclare>("here.declare").declare({ key: QUERY, scope: "page", doc: "The query the map draws." });
@@ -104,9 +108,13 @@ const find: Pack = {
     /** Applies a committed set's facts to the copy, item by item. */
     const apply = (c: Committed) => {
       const touched = new Map<Id, Record<string, Json> | null>();
+      // An item the index didn't hold (its type wasn't shown) that this set gives a shown type: read it whole, since
+      // the set holds only what changed (a node moved to a record keeps its title).
+      const unseen = new Set<Id>();
       for (const [op, id, field, value] of c.facts) {
         if (!touched.has(id)) {
           const had = items.get(id) ?? links.get(id);
+          if (!had) unseen.add(id);
           touched.set(id, had ? { type: had.type, ...had.fields } : {});
         }
         const f = touched.get(id) ?? {};
@@ -115,14 +123,22 @@ const find: Pack = {
         touched.set(id, f);
       }
       const known = (t: unknown) => typeof t === "string" && (byType.has(t) || linkTypes.some((l) => l.name === t));
+      const whole: Id[] = [];
       for (const [id, f] of touched) {
         items.delete(id);
         links.delete(id);
         if (!f || !known(f.type)) continue;
         const { type, ...fields } = f;
         put({ id, type: String(type), fields });
+        if (unseen.has(id)) whole.push(id);
       }
       changed();
+      for (let i = 0; i < whole.length; i += 500) {
+        void graph.get(whole.slice(i, i + 500)).then((got) => {
+          for (const it of got) if (it && known(it.type) && (items.has(it.id) || links.has(it.id))) put(it);
+          changed();
+        });
+      }
     };
 
     const loadTypes = () => {
@@ -168,6 +184,7 @@ const find: Pack = {
       types: () => [...byType.values()],
       links: () => linkTypes,
       type: (n) => byType.get(n),
+      marks: () => typesMark.marks(),
       closed: (r) => closed(byType.get(r.type), r.fields.status),
       run: (q, limit) => run(index, q, limit),
       watch: (on) =>
@@ -186,7 +203,7 @@ const find: Pack = {
       if (!DRAWS.includes(here.get<string>(KEYS.view) ?? "")) set.set(KEYS.view, DRAWS[0]);
     };
     const offers = new Set<Offer>();
-    const Line = makeLine({ index, types: () => [...byType.values()], watchers, here, set, query: QUERY, jump, offers });
+    const Line = makeLine({ index, types: () => [...byType.values()], marks: () => typesMark.marks(), watchers, here, set, query: QUERY, jump, offers });
     ctx.provide<FindLine>("find.line", () => ({ Line, jump }));
     // Rows another pack offers the command line; each is gone when its pack is.
     ctx.provide<FindOffer>("find.offer", (_caller, from) => ({

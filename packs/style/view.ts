@@ -14,7 +14,7 @@ import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { glyph, HUES, onStyle, read, SHAPES, SIDES, sheet, VERDICTS, verdictGlyph, type Token } from "../../spec/style.ts";
+import { HUES, MARK_SHAPES, markGlyph, onStyle, read, SIDES, sheet, VERDICTS, verdictGlyph, type Token } from "../../spec/style.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -62,8 +62,8 @@ const styleView: Pack = {
           `,
         )}
         <div class="sv-group">marks: fresh, moving, done, gone</div>
-        ${SHAPES.map(
-          (s) => html`<div class="sv-row"><span>${SIDES.map((side) => html`<span class=${`sv-mk s-${side}`} title=${`--${glyph(s, side)}`}>${read(glyph(s, side))}</span>`)}</span><span class="sv-n">${s}</span></div>`,
+        ${MARK_SHAPES.map(
+          (s) => html`<div class="sv-row"><span>${SIDES.map((side) => html`<span class=${`sv-mk s-${side}`} title=${`--${markGlyph(s, side)}`}>${read(markGlyph(s, side))}</span>`)}</span><span class="sv-n">${s}</span></div>`,
         )}
         <div class="sv-row">${VERDICTS.map((x) => html`<span><span class=${`sv-mk v-${x}`} title=${`--${verdictGlyph(x)}`}>${read(verdictGlyph(x))}</span><span class="sv-n">${x}</span></span>`)}</div>
         <div class="sv-group">type</div>

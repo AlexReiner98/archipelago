@@ -2,7 +2,7 @@
  * The question base (spec/types.md): something to decide. Open until
  * decided or dropped. A decision is a question with its outcome.
  */
-import type { BaseDef, TypesDefine } from "../../spec/types.ts";
+import type { BaseDef, TypesDefine, TypesMark } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 
 export const QUESTION: BaseDef = {
@@ -21,9 +21,11 @@ export const QUESTION: BaseDef = {
 const question: Pack = {
   id: "question",
   about: "Questions: what is still to be decided, and what was.",
-  inject: ["types.define"],
+  inject: ["types.define", "types.mark"],
   apply(ctx: Context) {
     ctx.get<TypesDefine>("types.define").base(QUESTION);
+    // Edition 10: drawn as a diamond wherever its marks are.
+    ctx.get<TypesMark>("types.mark").mark(QUESTION.name, "diamond");
   },
 };
 

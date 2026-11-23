@@ -6,6 +6,21 @@ with the item as its `source`. Its words are read from the graph at every
 say, so an edit takes effect the next time it speaks. A node with `when` (a
 reflex's condition) speaks only when the moment's input holds that text.
 
+## Any item, through its umwelt link
+
+Any item, of any type, is said like a node when an `in_umwelt` link (the
+[profile](../profile/README.md) pack's) gives it places. The link is the
+node's `source`, and its name: `words/<link id>`. It says the item's
+`words`, or else its `note`, under the item's title. Its kind is how
+it is said, the link's `kind` (`instruction`: standing), else what the item
+is: its `kind`, else its type. The link holds how it is said: `at`, `kind`, `when`,
+`refuse`, `say`, `repeat`, `trial` (said marked as a trial) and `retired`
+(not said). A change to the item or the link is followed: the words at the
+next say, a new title, kind or places by registering it again. `said(link,
+item)` makes that view, which the change node and `words.heard` read too.
+The words actions (`words.set`, `words.retire`, …) stay for `node` items;
+an ordinary item is edited as itself (`items.set`), its link likewise.
+
 | Action | Does |
 |---|---|
 | `words.set` `{ node, words }` | Changes what a node says |
@@ -42,7 +57,9 @@ each: a rewording with the new words, a retired (or emptied, or gone) node
 as no longer applying. A node told that way doesn't say the same new words
 again at its place in that context. Reached at its place before the
 prompt, a reworded node says its new words itself, and the agent pack
-records that say `reworded`. At most 200 runs are held.
+records that say `reworded`. A node item moved to an ordinary type, said
+now by its umwelt link, is compared with what that link says: the move
+itself isn't told as a retirement. At most 200 runs are held.
 
 A node whose item has `held` (a reason) is held as written: `words.set`,
 `words.title` and `words.retire` refuse it, with the reason (`words.held`). The

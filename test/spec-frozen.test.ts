@@ -45,6 +45,15 @@ test("an edition may add a capability or retire one; changing one, or a type, sh
     const widened = surface(dir + "/");
     assert.notEqual(widened["a.ts:A"], was["a.ts:A"]);
     assert.notEqual(widened["a.ts:capabilities[a.read]"], was["a.ts:capabilities[a.read]"]);
+    // A contract's map of capabilities grows by a key; changing a key's interface shows.
+    write(`export interface Capabilities { "a.read": A }\n`);
+    const map = surface(dir + "/");
+    write(`export interface Capabilities { "a.read": A; "a.mark": B }\n`);
+    const grown = surface(dir + "/");
+    assert.equal(grown["a.ts:Capabilities[a.read]"], map["a.ts:Capabilities[a.read]"]);
+    assert.ok("a.ts:Capabilities[a.mark]" in grown);
+    write(`export interface Capabilities { "a.read": C }\n`);
+    assert.notEqual(surface(dir + "/")["a.ts:Capabilities[a.read]"], map["a.ts:Capabilities[a.read]"]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

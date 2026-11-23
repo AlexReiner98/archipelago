@@ -5,7 +5,8 @@ it.
 
 - Provides `find.index`: every item and link of a type defined now
   (`types.read`), read in bounded pages through `graph.read` and kept live
-  by `graph.watch`; `run(query)` answers a query over it (query.ts).
+  by `graph.watch` (an item it didn't hold that a change gives a shown type,
+  such as a node moved to a record, is read whole); `run(query)` answers a query over it (query.ts).
 - Declares `find.query` (page): the query the canvas draws. Its line, in
   the region `top` while Map or Landscape shows, sets it; anything else may too.
 - Provides `find.line`: the line, to draw anywhere (the

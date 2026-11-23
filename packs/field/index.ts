@@ -24,7 +24,7 @@ import type { Id, Json } from "../../spec/common.ts";
 import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
 import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
-import { onStyle, shape as shapeOf, SHAPES, sheet, side as sideOf, SIDES } from "../../spec/style.ts";
+import { MARK_SHAPES, markShape, onStyle, sheet, side as sideOf, SIDES, type MarkShape } from "../../spec/style.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import type { LinkInfo, TypeInfo } from "../../spec/types.ts";
 import type { Dial } from "./behaviour.ts";
@@ -55,6 +55,8 @@ interface FindIndex {
   links(): LinkInfo[];
   types(): TypeInfo[];
   type(name: string): TypeInfo | undefined;
+  /** Every base's mark shape (types.mark, edition 10). */
+  marks(): Record<string, MarkShape>;
   run(query: string, limit?: number): { items: Row[]; links: (Row & { from: Id; to: Id })[]; more: number };
   watch(on: () => void): () => void;
 }
@@ -187,10 +189,10 @@ const fieldPack: Pack = {
 
     /** What the field lays out, from rows: each particle's shape is its base's mark shape, and how full it is where its status sits (spec/style.ts). */
     const inputOf = (result: ReturnType<typeof whole>): FieldIn => {
-      const bases = index.types().filter((t) => t.base === t.name).map((t) => t.name);
+      const marks = index.marks();
       const mark = (r: Row) => {
         const t = index.type(r.type);
-        return { shape: SHAPES.indexOf(shapeOf(bases, t)), side: SIDES.indexOf(sideOf(t, r.fields.status)) };
+        return { base: t?.base ?? r.type, shape: MARK_SHAPES.indexOf(markShape(marks, t)), side: SIDES.indexOf(sideOf(t, r.fields.status)) };
       };
       return {
         items: result.items.map((r) => ({ id: r.id, title: String(r.fields.title ?? r.id), type: r.type, status: String(r.fields.status ?? ""), closed: index.closed(r), kind: typeof r.fields.kind === "string" ? r.fields.kind : "", ...mark(r) })),
@@ -292,7 +294,7 @@ const fieldPack: Pack = {
         <div class="fl-canvas">
           <canvas ref=${box}></canvas>
           ${tip && html`<div class="fl-tip" style=${`left:${tip.x + 14}px; top:${tip.y + 12}px`}><div>${tip.title}</div><div class="s">${tip.sub}</div></div>`}
-          ${input.items.length > 0 && html`<${Legend} facets=${facets} hide=${hide} set=${setHide} dials=${() => html`<${Dials} />`} />`}
+          ${input.items.length > 0 && html`<${Legend} facets=${facets} hide=${hide} set=${setHide} look=${S} dials=${() => html`<${Dials} />`} />`}
           ${!result.items.length && html`<div class="fl-empty">${index.ready()
             ? html`<div class="fl-none"><div class="fl-say" title="Items come as agents and people add them.">Nothing on the map yet</div><${Slot} name=${EMPTY} /></div>`
             : html`<div class="fl-say">Reading the map…</div>`}</div>`}
