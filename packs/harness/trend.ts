@@ -49,7 +49,7 @@ const STAYS: Record<NodeWindow["stays"], string> = {
 };
 
 const ask = async (invoke: ActionInvoke, run: string, id: string, at?: string) => {
-  const out = await invoke.invoke({ action: NODE, input: { run, id, limit: 12, ...(at ? { at } : {}) }, authority: { of: "human", basis: "read in the sensory interface" }, reason: "Show one node's share of the window" });
+  const out = await invoke.invoke({ action: NODE, input: { run, id, limit: 12, ...(at ? { at } : {}) }, authority: { of: "human", basis: "read in the context interface" }, reason: "Show one node's share of the window" });
   return out.ok ? (out.output as unknown as NodeWindow) : undefined;
 };
 

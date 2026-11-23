@@ -1,6 +1,6 @@
 # field
 
-Page side: the map as particles, the view "Landscape" (the world every agent's sensory interface
+Page side: the map as particles, the view "Landscape" (the world every agent's context interface
 touches) in the frame's `center` (home). Each item is a particle in its type's colour and its base's shape,
 and links are faint lines with arrows. It lays out the whole map, open and
 closed, up to `field_limit` items, less what the legend hides (closed

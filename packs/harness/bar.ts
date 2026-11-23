@@ -1,5 +1,5 @@
 /**
- * The Sensory interface's bar, kept quiet: the run picker (every live run, every
+ * The Context interface's bar, kept quiet: the run picker (every live run, every
  * run, or one), the live dot and the verdict tally in sight; the rest (the
  * profile looked at, how the tree hangs, nodes never said, Claude Code's given nodes, and the
  * view's dials) in one ⋯ menu.

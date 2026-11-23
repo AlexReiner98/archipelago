@@ -139,7 +139,7 @@ test("who a hook is and where it is given, from its command and event", () => {
   assert.equal(transcriptOf({ transcript: "/etc/passwd" }), undefined);
 });
 
-test("the sensory interface hangs given nodes at their places, a run's own, marked by who said them", () => {
+test("the context interface hangs given nodes at their places, a run's own, marked by who said them", () => {
   const nodes = givenNodes("run-1", [
     { name: "system", title: "System prompt", by: "Claude Code", at: "session_start", count: 1, size: 20 },
     { name: "tool:Bash", title: "Bash definition", by: "Claude Code", at: "tool:Bash", count: 1, size: 9 },

@@ -1,8 +1,8 @@
 /**
- * The Sensory interface: one view of every run, live or replayed, and every
+ * The Context interface: one view of every run, live or replayed, and every
  * profile. Three fills, linked through `here`:
  *
- * - Center (the view "Sensory interface"): the tree of places and nodes (canvas.ts),
+ * - Center (the view "Context interface"): the tree of places and nodes (canvas.ts),
  *   lit by what the run looked at heard, refused and did up to the
  *   playhead, with the timeline under it (timeline.ts). The bar (bar.ts)
  *   picks every live run at once (`harness.live`, live.ts: where the view
@@ -136,7 +136,7 @@ const values = (v: string | string[] | undefined) => (v === undefined ? [] : Arr
 
 const harness: Pack = {
   id: "harness",
-  about: "The Sensory interface: every run, live or replayed, on the tree of what the map tells agents; and every profile.",
+  about: "The Context interface: every run, live or replayed, on the tree of what the map tells agents; and every profile.",
   inject: ["slot.fill", "here.read", "here.set", "here.declare", "agent.tree", "exchange.read", "exchange.watch", "verdict.read", "action.list", "action.invoke", "graph.read", "graph.watch", "profile.read"],
   apply(ctx: Context) {
     const here = ctx.get<HereRead>("here.read");
@@ -148,11 +148,11 @@ const harness: Pack = {
     const graphLive = ctx.get<GraphWatch>("graph.watch");
     const profiles = ctx.get<ProfileRead>("profile.read");
     const declare = ctx.get<HereDeclare>("here.declare");
-    ctx.effect(() => declare.declare({ key: PROFILE, scope: "page", doc: "The profile the sensory interface shows: its holds over the tree." }));
-    ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the sensory interface looks at every run, with all-time totals, not one run." }));
-    ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The Sensory interface's dials, those moved from where they start." }));
+    ctx.effect(() => declare.declare({ key: PROFILE, scope: "page", doc: "The profile the context interface shows: its holds over the tree." }));
+    ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the context interface looks at every run, with all-time totals, not one run." }));
+    ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The Context interface's dials, those moved from where they start." }));
     ctx.effect(() => declare.declare({ key: FOCUS, scope: "page", doc: "Live: the run whose tree is big; the run pane shows its events." }));
-    ctx.effect(() => declare.declare({ key: LIVE, scope: "page", doc: "True: the sensory interface looks at every live run at once, a colour each." }));
+    ctx.effect(() => declare.declare({ key: LIVE, scope: "page", doc: "True: the context interface looks at every live run at once, a colour each." }));
     // A run picked anywhere (here, the node's runs, Activity) is looked at alone, with its own profiles.
     ctx.effect(() =>
       here.watch(KEYS.run, () => {
@@ -235,12 +235,12 @@ const harness: Pack = {
       const review = kp.useReview();
       const [by, setBy] = useState<Grouping>("place");
       const [unsaid, setUnsaid] = useState(false);
-      // The key is always there: open, or collapsed to one line; the browser remembers which.
+      // The key is always there: collapsed to one line until opened, or open; the browser remembers which.
       const [keyOpen, setKeyOpenState] = useState(() => {
         try {
-          return localStorage.getItem(KEY_OPEN) !== "0";
+          return localStorage.getItem(KEY_OPEN) === "1";
         } catch {
-          return true;
+          return false;
         }
       });
       const setKeyOpen = (open: boolean) => {
@@ -352,7 +352,7 @@ const harness: Pack = {
         const who = found ? runName(found) : r.slice(0, 8);
         const to = profileList.find((p) => p.id === profile)?.title ?? profile;
         void invoke
-          .invoke({ action: "profile.place", input: { run: r, profile }, authority: { of: "human", basis: "moved in the sensory interface" }, reason: `Move ${who} into ${to}` })
+          .invoke({ action: "profile.place", input: { run: r, profile }, authority: { of: "human", basis: "moved in the context interface" }, reason: `Move ${who} into ${to}` })
           .then((out) => (out.ok ? setMenu(undefined) : setMenu((m) => m && { ...m, error: out.refused.message })));
       };
 
@@ -428,11 +428,11 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} />`
+              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} />`
               : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
                   <div class="hv-onerun">
                     ${run ? html`<${WindowBar} w=${win} filter=${keyFilter} hues=${hues} picked=${picked} onPick=${pick} />` : html`<span></span>`}
-                    <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} window=${run ? marks : undefined} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} />
+                    <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} window=${run ? marks : undefined} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} />
                   </div>
                   ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} run=${windowRun} /></div>`}
                 </div>`}
@@ -530,7 +530,7 @@ const harness: Pack = {
     // The run takes the right, the wider side: an opened line needs the room.
     const fill = ctx.get<SlotFill>("slot.fill");
     const whileShown = { "here.view": "harness/view" };
-    fill.fill({ slot: "center", name: "view", title: "Sensory interface", view: Center });
+    fill.fill({ slot: "center", name: "view", title: "Context interface", view: Center });
     fill.fill({ slot: "right", name: "run", title: "Run", when: whileShown, view: RunFill });
   },
 };

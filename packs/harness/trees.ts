@@ -167,6 +167,7 @@ export interface TreesProps {
   /** How long the pointer rests on a node before its words show (the `tip_ms` dial). */
   tipMs?: number;
   nameSteps?: number;
+  quietPx?: number;
 }
 
 const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
@@ -188,7 +189,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
       <span class="n" title=${`The nodes it hears, of all${extra?.length ? `; and ${extra.length} the harness gave it` : ""}`}>${a.hears ? (big ? `${heard.length} / ${p.nodes.length}` : heard.length) : ""}${extra?.length ? ` + ${extra.length}` : ""}</span>
     </div>
     ${big && p.win && html`<${WindowBar} w=${p.win} filter=${p.keyFilter} hues=${p.hues} picked=${p.picked} onPick=${p.onPick} />`}
-    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} />
+    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} quietPx=${p.quietPx} />
   </div>`;
 };
 
@@ -200,7 +201,7 @@ export const Trees = (p: TreesProps) => {
   // The left bar is one: the previews, or, while a node is picked, the node in their place.
   return html`<div class="hv-trees${p.side || rest.length || p.rows?.length ? " many" : ""}">
     ${big && html`<${One} key=${big.run.run} a=${big} p=${p} big=${true} />`}
-    ${p.side ? html`<div class="hv-peeks hv-side">${p.side}</div>` : (rest.length > 0 || p.rows?.length) && html`<div class="hv-peeks">
+    ${p.side ? html`<div class="hv-peeks hv-side">${p.side}</div>` : (rest.length > 0 || !!p.rows?.length) && html`<div class="hv-peeks">
       ${rest.map((a) => html`<${One} key=${a.run.run} a=${a} p=${p} big=${false} />`)}
       ${p.rows?.length ? html`<div class="hv-rows">
         <div class="h" title="Live, but not among the last active: a run that stopped without ending stays live">${p.rows.length} more live</div>

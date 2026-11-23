@@ -148,7 +148,7 @@ export function useGiven(invoke: ActionInvoke, has: boolean, on: boolean, runs: 
         const out = await invoke.invoke({
           action: GIVEN,
           input: { run, limit: LIMIT_MAX, ...(after ? { after } : {}) },
-          authority: { of: "human", basis: "read in the sensory interface" },
+          authority: { of: "human", basis: "read in the context interface" },
           reason: "Show what the harness gave the agent",
         });
         if (!out.ok) return undefined;
@@ -210,7 +210,7 @@ export function GivenPane({ invoke, id, info, hasWindow, playhead }: { invoke: A
     // A server that is down never answers: say so after a while, never "reading…" for good.
     const late = setTimeout(() => !gone && setText({ error: "no answer from the server" }), READ_MS);
     void invoke
-      .invoke({ action: GIVEN_TEXT, input: { run: at.run, name: at.name }, authority: { of: "human", basis: "read in the sensory interface" }, reason: "Read what the harness gave the agent" })
+      .invoke({ action: GIVEN_TEXT, input: { run: at.run, name: at.name }, authority: { of: "human", basis: "read in the context interface" }, reason: "Read what the harness gave the agent" })
       .then(
         (out) => {
           if (gone) return;

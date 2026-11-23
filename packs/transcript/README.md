@@ -2,7 +2,7 @@
 
 What Claude Code's transcript shows an agent was given, beside what the
 map said: read-only nodes, each at a place, marked by who said it. The
-sensory interface hangs them into each agent's tree
+context interface hangs them into each agent's tree
 ([harness](../harness/README.md)). Injects `exchange.read`,
 `exchange.watch` and `action.register`.
 

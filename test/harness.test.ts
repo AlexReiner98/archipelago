@@ -841,6 +841,15 @@ test("a time is written once per input, and nothing for none", async () => {
   assert.equal(time("not a time"), "");
 });
 
+test("seen whole, a node's name shows only if it matters: below quiet_px on screen it fades out over two px", async () => {
+  const { quietShown } = await import("../packs/harness/paint.ts");
+  assert.equal(quietShown(5, 0), 1, "0: every name");
+  assert.equal(quietShown(9, 9), 1, "whole from the dial's size");
+  assert.equal(quietShown(8, 9), 0.5, "half a step below");
+  assert.equal(quietShown(7, 9), 0, "gone two px below");
+  assert.equal(dialsOf({}).quiet_px, 9, "the dial starts at 9 px");
+});
+
 test("while zooming, names come from an atlas: a zoom stepped to a few sizes per doubling, pictures placed shelf by shelf", async () => {
   const { textZoom } = await import("../packs/harness/paint.ts");
   const { Shelves } = await import("../packs/harness/sprites.ts");

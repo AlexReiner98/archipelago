@@ -1,5 +1,5 @@
 /**
- * The Sensory interface's tree, drawn: every node as one circular tree grown
+ * The Context interface's tree, drawn: every node as one circular tree grown
  * from its root (layout.ts), lit by the run up to the event looked at. It is
  * painted on a 2D canvas, as the Landscape is (paint.ts, scene.ts): no
  * element per node, so a zoom, a move or an event is one repaint.
@@ -110,6 +110,8 @@ export interface CanvasProps {
   tipMs?: number;
   /** While moving, names are drawn at this many sizes per doubling of the zoom (the `name_steps` dial); 0, every size. */
   nameSteps?: number;
+  /** Below this size on screen a node's name shows only if it matters (paint.ts `quiet`). */
+  quietPx?: number;
 }
 
 /** A name's outline in the picture's units, along its own line: where it starts, how long, how tall. */
@@ -145,7 +147,7 @@ function crowdedAt(scene: Scene, k: number, ink: Ink, widths: Widths, waiting: R
   return crowdedNames(names, others);
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, tipMs = 600, nameSteps = 4 }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, tipMs = 600, nameSteps = 4, quietPx = 0 }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   const tipEl = useRef<HTMLDivElement>(null);
@@ -158,8 +160,8 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     () => sceneOf({ tree, placed, hues, statuses, ...(rings ? { rings } : {}), heard, held, counts, standing, ...(picked ? { picked } : {}), ...(win ? { window: win } : {}), theirs }),
     [tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, win, theirs],
   );
-  const now = useRef({ tree, placed, scene, small: !!small, tipMs, nameSteps });
-  now.current = { tree, placed, scene, small: !!small, tipMs, nameSteps };
+  const now = useRef({ tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx });
+  now.current = { tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx };
 
   // The painter: made once, outside Preact, as the Landscape's engine is.
   type Painter = { schedule(): void; recrowd(): void; lights: Lights; ink: Ink; widths: Widths; moving: boolean; zooming: boolean };
@@ -206,7 +208,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
         if (next !== goal) fading = true;
       }
       const v = viewRef.current;
-      paint(c, now.current.scene, v, { width, height, dpr }, ink, widths, { waiting: P.lights.waiting, lit: P.lights.lit, shown, small: now.current.small, steps: now.current.nameSteps, zooming: P.zooming }, paths, (cx) => P.lights.draw(cx, v.k, ink, t), atlas);
+      paint(c, now.current.scene, v, { width, height, dpr }, ink, widths, { waiting: P.lights.waiting, lit: P.lights.lit, shown, small: now.current.small, steps: now.current.nameSteps, zooming: P.zooming, quiet: now.current.quietPx }, paths, (cx) => P.lights.draw(cx, v.k, ink, t), atlas);
       if (fading || P.lights.running) P.schedule();
       else last = 0;
     };

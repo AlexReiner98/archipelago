@@ -125,6 +125,16 @@ export interface PaintState {
   steps: number;
   /** The zoom is changing: names are drawn from the atlas. */
   zooming: boolean;
+  /**
+   * The on-screen size, in px, below which a node's name fades out unless it is said, refused, lit or
+   * picked (the `quiet_px` dial), so a tree seen whole reads by its shape and what the run was told. 0: every name.
+   */
+  quiet?: number;
+}
+
+/** How far a node's name shows at an on-screen size of `px`: whole from `quiet`, gone two px below it. */
+export function quietShown(px: number, quiet: number): number {
+  return quiet > 0 ? Math.min(1, Math.max(0, (px - quiet + 2) / 2)) : 1;
 }
 
 /** The zoom a name is drawn at: k itself, or the nearest of `steps` sizes per doubling. */
@@ -292,7 +302,8 @@ export function paint(c: CanvasRenderingContext2D, scene: Scene, cam: Camera, vi
     // Its name.
     const lit = state.lit.get(m.id);
     const ni = nameInk(m, { waiting, ...(lit ? { lit } : {}), small: state.small });
-    const shown = m.bough && !state.small ? (state.shown.get(m.id) ?? 1) : 1;
+    const loud = !!lit || m.hear === "said" || m.hear === "refused" || m.picked;
+    const shown = m.bough && !state.small ? (state.shown.get(m.id) ?? 1) : !state.small && !loud ? quietShown(S.nameText * k, state.quiet ?? 0) : 1;
     const alpha = base * ni.alpha * shown;
     if (alpha <= 0.004) continue;
     const L = nameLayout(m, ink, widths, state.small, ni.weight, ni.italic);

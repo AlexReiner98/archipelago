@@ -3,7 +3,7 @@
 Which tools and MCP servers Claude Code gave its runs, and which they
 used, across runs: about half of what an agent is given is tool
 definitions, and one tool can be 37k letters. Shown on a given node's pane
-in the Sensory interface ([harness](../harness/README.md)): "used in 3 of
+in the Context interface ([harness](../harness/README.md)): "used in 3 of
 40 runs · 36k letters", and on the tree as a hollow orange dot when no run
 used it.
 

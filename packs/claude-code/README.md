@@ -34,7 +34,7 @@ changed since it last heard) comes after them. So the start of what the map
 says is the same from run to run with the same nodes. Elsewhere the order is
 the answer's (config-tree order).
 
-The Sensory interface's run pane shows, on an opened say or refusal, the
+The Context interface's run pane shows, on an opened say or refusal, the
 whole block as the agent got it, rebuilt with the same `context.ts` from the
 moment's events (with the nodes' titles as loaded now). Words said at
 `skill:` and `memory:` places are not handed back, so they show none.
@@ -181,7 +181,7 @@ The run's transcript is its `transcript` fact: the hook's
 else `<session>/subagents/agent-<agent_id>.jsonl` beside the session's).
 The transcript pack reads what the agent was given from it
 ([transcript](../transcript/README.md)). It is a path on this machine, so
-the sensory interface never shows it.
+the context interface never shows it.
 
 A server elsewhere can't open that path, so hook.ts reads the transcript
 where the session runs and sends it with each hook, as numbers: the next

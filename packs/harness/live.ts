@@ -1,5 +1,5 @@
 /**
- * The Sensory interface's live mode (`harness.live`): every live run at once,
+ * The Context interface's live mode (`harness.live`): every live run at once,
  * each in a colour of its own. Its colours are the style's hues (`hue-1`…),
  * as tokens. A run keeps its colour while it stays live; a new one takes
  * the first colour free.

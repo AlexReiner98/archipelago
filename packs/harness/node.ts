@@ -1,5 +1,5 @@
 /**
- * The Sensory interface's left pane: the node looked at (`here.node`). Its
+ * The Context interface's left pane: the node looked at (`here.node`). Its
  * words, edited through `words.set` when made from a map item; a trial's
  * miss and its retiring (`words.retire`); its standing by the keep pack;
  * a written file's rule (`written.rule`); whether it is said whole or
@@ -81,7 +81,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
         const out = await invoke.invoke({
           action: EDIT,
           input: { node: info.source!, words: text },
-          authority: { of: "human", basis: "edited in the sensory interface" },
+          authority: { of: "human", basis: "edited in the context interface" },
           reason: `Changed what ${info.title} says`,
         });
         if (out.ok) {
@@ -120,7 +120,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
       const out = await invoke.invoke({
         action: RETIRE,
         input: { node: info.source! },
-        authority: { of: "human", basis: "retired in the sensory interface" },
+        authority: { of: "human", basis: "retired in the context interface" },
         reason: `Retired the trial node ${info.title}`,
       });
       setStatus(out.ok ? "retired" : `refused: ${out.refused.message}`);
@@ -149,7 +149,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
       const out = await invoke.invoke({
         action: SAY,
         input: { node: info.source!, say: listed ? "whole" : "listed" },
-        authority: { of: "human", basis: "set in the sensory interface" },
+        authority: { of: "human", basis: "set in the context interface" },
         reason: listed ? `${info.title} is said whole at session start` : `${info.title} is listed at session start, one line`,
       });
       setStatus(out.ok ? "" : `refused: ${out.refused.message}`);
@@ -172,8 +172,8 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
       setStatus("…");
       const out = await invoke.invoke({
         action: RULE,
-        input: held ? { node: info.source!, refine: "open" } : { node: info.source!, refine: "held", why: "Held as written in the sensory interface." },
-        authority: { of: "human", basis: "set in the sensory interface" },
+        input: held ? { node: info.source!, refine: "open" } : { node: info.source!, refine: "held", why: "Held as written in the context interface." },
+        authority: { of: "human", basis: "set in the context interface" },
         reason: held ? `Opened ${info.title} to refinement inside the map` : `Held ${info.title} as written`,
       });
       setStatus(out.ok ? "" : `refused: ${out.refused.message}`);

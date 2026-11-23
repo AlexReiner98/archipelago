@@ -1,8 +1,8 @@
 # harness
 
-The Sensory interface: how each agent senses the landscape around it, and how it
+The Context interface: how each agent senses the landscape around it, and how it
 reaches back into it. (The pack's id, its page keys and its fills keep the
-name `harness`; the view was called Harness until 21 Nov 2026.) It is the
+name `harness`; the view was called Harness until 21 Nov 2026, and Sensory interface until 23 Nov 2026.) It is the
 hub to watch every agent at once, and every run, live or replayed, and
 every profile. What the map says to an agent is a
 tree of places and nodes. It lands on every live run: each agent has a tree
@@ -16,7 +16,7 @@ background, picking none, brings the previews back.
 
 | Fill | Region | Shows |
 |---|---|---|
-| Sensory interface (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline. Its left bar: the previews, or the node picked (its words, standing, places, pack, kind, record, and its verdict per run) |
+| Context interface (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline. Its left bar: the previews, or the node picked (its words, standing, places, pack, kind, record, and its verdict per run) |
 | Run (`harness/run`, "Run") | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: the events of the agent in focus, opening in place as one run's do. All runs: the runs, or a profile's |
 
 ## The bar ([bar.ts](bar.ts))
