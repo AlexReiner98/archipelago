@@ -78,6 +78,10 @@ test("a jump keeps the query when it draws the item, else shows the item among i
 });
 
 /** The find pack in a runtime, with the graph and slots as stubs. */
+/** What the stub graph holds beyond ITEMS (read by get), and the watcher find set, to hand it a change. */
+const WHOLE = new Map<string, { id: string; type: string; fields: Record<string, unknown> }>();
+let watcher: ((c: { facts: [string, string, string, unknown][] }) => void) | undefined;
+
 async function boot() {
   const g = globalThis as Record<string, unknown>;
   g.document ??= { createElement: () => ({ remove() {} }), head: { append() {} } };
@@ -92,8 +96,8 @@ async function boot() {
           ...LINKS.map(([t, from, to], i) => ({ id: `l${i}`, type: t, fields: { from, to } })).filter((l) => l.type === type),
         ],
       });
-      ctx.provide("graph.read", () => ({ of, now: async () => "0" }) as any);
-      ctx.provide("graph.watch", () => ({ watch: () => () => {} }));
+      ctx.provide("graph.read", () => ({ of, now: async () => "0", get: async (ids: string[]) => ids.map((id) => WHOLE.get(id) ?? null) }) as any);
+      ctx.provide("graph.watch", () => ({ watch: (_f: unknown, on: typeof watcher) => ((watcher = on), () => {}) }));
       ctx.provide("types.read", () => ({ all: () => all, get: () => undefined, watch: () => () => {} }));
       ctx.provide("types.mark", () => ({ marks: () => ({ work: "square" }), mark: () => () => {}, watch: () => () => {} }));
       ctx.provide<SlotFill>("slot.fill", () => ({ fill: (def) => (fills.push(def as FillDef<unknown>), () => {}) }));
@@ -107,7 +111,7 @@ async function boot() {
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   await loader.apply(["host", "here", "find"].map((id) => ({ id, pack: id })));
   for (let i = 0; i < 20 && !rt.root.get<FindLine | undefined>("find.line"); i++) await new Promise((r) => setTimeout(r, 5));
-  return { line: rt.root.get<FindLine>("find.line"), read: rt.root.get<HereRead>("here.read"), set: rt.root.get<HereSet>("here.set"), fills };
+  return { index: rt.root.get<{ item(id: string): { fields: Record<string, unknown> } | undefined }>("find.index"), line: rt.root.get<FindLine>("find.line"), read: rt.root.get<HereRead>("here.read"), set: rt.root.get<HereSet>("here.set"), fills };
 }
 
 test("find.line jumps: the item is looked at, shown in the view, and the line sits in top where the query is drawn", async () => {
@@ -152,4 +156,12 @@ test("the command line puts what packs offer (views) between the terms and the i
   const first = rows[0]!;
   if (first.kind === "offer") first.run();
   assert.deepEqual(ran, ["Map"]);
+});
+
+test("an item find didn't hold, given a type it shows, is read whole: a moved node keeps its title", async () => {
+  const { index } = await boot();
+  WHOLE.set("n1", { id: "n1", type: "work", fields: { title: "Moved rule", status: "todo", note: "Its words" } });
+  watcher!({ facts: [["-", "n1", "type", "node"], ["+", "n1", "type", "work"], ["+", "n1", "status", "todo"]] });
+  await new Promise((r) => setTimeout(r, 10));
+  assert.equal(index.item("n1")?.fields.title, "Moved rule");
 });

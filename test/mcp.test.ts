@@ -25,6 +25,7 @@ import record from "../packs/record/index.ts";
 import schema from "../packs/schema/index.ts";
 import types from "../packs/types/index.ts";
 import words from "../packs/words/index.ts";
+import interchange from "../packs/interchange/index.ts";
 import work from "../packs/work/index.ts";
 
 const BASE = "mem:/packs/";
@@ -57,13 +58,13 @@ async function setup() {
   const dir = await mkdtemp(join(tmpdir(), "mcp-"));
   const served = new Map<string, ToolDef>();
   const modules: Record<string, Pack> = {
-    graph, action, types, work, question, record, actor, links, items, schema, history, exchange, agent, words, host: hostPack(served), mcp, probe,
+    graph, action, types, work, question, record, actor, links, items, schema, history, exchange, agent, words, host: hostPack(served), mcp, probe, interchange,
   };
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length, -3)] }) });
-  const tree: Entry[] = ["graph", "action", "types", "work", "question", "record", "actor", "links", "items", "schema", "history", "exchange", "agent", "words", "host", "mcp", "probe"].map(
+  const tree: Entry[] = ["graph", "action", "types", "work", "question", "record", "actor", "links", "items", "schema", "history", "exchange", "agent", "words", "host", "mcp", "probe", "interchange"].map(
     (id) => ({ id, pack: `${id}.ts`, ...(id === "history" ? { config: { db: join(dir, "history.sqlite") } } : {}) }),
   );
   await loader.apply(tree);
@@ -259,6 +260,21 @@ test("run says what the run is on the exchange, keeping when it began", async ()
     assert.match((await s.call("run", { task: "i_none" })).text, /no item i_none/);
     await s.call("run", { end: true });
     assert.ok((await s.exchange().runs()).items.find((r) => r.run === RUN)!.ended);
+  } finally {
+    await s.close();
+  }
+});
+
+test("query finds a node item moved to a record by its title: the index reads it whole", async () => {
+  const s = await setup();
+  try {
+    const node = (await s.call("act", { action: "words.add", input: { title: "Moved rule", at: ["tool:Bash"], words: "Its words." } })).json.output.node as string;
+    assert.deepEqual((await s.call("query", { find: "moved" })).json.items, [], "a node item isn't a type query shows");
+    const facts = [["-", node, "type", "node"], ["+", node, "type", "record"], ["-", node, "words", "Its words."], ["-", node, "at", ["tool:Bash"]], ["-", node, "kind", "reflex"], ["+", node, "kind", "rule"], ["+", node, "note", "Its words."], ["+", node, "status", "current"]];
+    const out = await s.call("act", { action: "interchange.import", input: { facts } });
+    assert.ok(!out.isError, out.text);
+    await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual((await s.call("query", { find: "moved" })).json.items.map((i: any) => [i.id, i.title]), [[node, "Moved rule"]]);
   } finally {
     await s.close();
   }

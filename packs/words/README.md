@@ -57,7 +57,9 @@ each: a rewording with the new words, a retired (or emptied, or gone) node
 as no longer applying. A node told that way doesn't say the same new words
 again at its place in that context. Reached at its place before the
 prompt, a reworded node says its new words itself, and the agent pack
-records that say `reworded`. At most 200 runs are held.
+records that say `reworded`. A node item moved to an ordinary type, said
+now by its umwelt link, is compared with what that link says: the move
+itself isn't told as a retirement. At most 200 runs are held.
 
 A node whose item has `held` (a reason) is held as written: `words.set`,
 `words.title` and `words.retire` refuse it, with the reason (`words.held`). The
