@@ -319,3 +319,20 @@ test("the legend's keys: each base by its shape, each status by how full it is d
   assert.ok(xs.every((x) => x >= 6 - 1e-9), "half: only the right of the inner shape is cut out");
   assert.equal(rings(markPath(2, 1, 6, 6, 4, 0.4)), 2);
 });
+
+test("the legend's fill switches hide open items by how full they are drawn", async () => {
+  const { shown, toggle } = await import("../packs/field/filter.ts");
+  const input: FieldIn = {
+    items: [
+      { id: "a", title: "a", type: "task", status: "todo", closed: false, side: 0 },
+      { id: "b", title: "b", type: "task", status: "doing", closed: false, side: 1 },
+      { id: "c", title: "c", type: "task", status: "done", closed: true, side: 2 },
+    ],
+    links: [],
+  };
+  const ids = (h: Parameters<typeof shown>[1]) => [...shown(input, h).items].sort().join("");
+  assert.equal(ids({ sides: ["fresh"] }), "bc");
+  assert.equal(ids({ sides: ["moving"] }), "ac");
+  assert.equal(ids({ sides: ["fresh", "moving"] }), "c");
+  assert.deepEqual(toggle(toggle({}, "sides", "fresh"), "sides", "fresh"), {});
+});

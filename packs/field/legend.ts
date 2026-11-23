@@ -57,8 +57,7 @@ export const LEGEND_STYLE = `
 .fl-key svg { width:20px; height:8px; flex:none; }
 .fl-key svg.mk { width:11px; height:11px; fill-rule:evenodd; }
 .fl-key svg.mk.ink { fill:var(--dim); }
-.fl-key .key { display:flex; align-items:center; gap:5px; white-space:nowrap; line-height:1.6; padding-left:18px; }
-.fl-key .key .nm { color:var(--dim); }
+.fl-key .fills { padding-left:18px; }
 .fl-key .note { padding:3px 8px 5px; display:flex; align-items:center; gap:5px; }
 .fl-key .note .sp { flex:1; }
 `;
@@ -144,9 +143,10 @@ export function Legend({ facets, hide, set, dials, look }: { facets: Facets; hid
       <div class="grp">
         <div class="gt">state${look.shapes ? " · fill" : ""}</div>
         ${box(!hide.open, () => set(toggle(hide, "open")), html`${mark(undefined, undefined)}<span class="nm">open</span>`, facets.open, "Items whose status is on the open side: drawn in full colour")}
-        ${look.shapes ? html`
-        <div class="key" title="Open at its type's first status (todo, open, proposed): drawn hollow">${mark(undefined, 0)}<span class="nm">first status</span><span class="n">${num(facets.fresh)}</span></div>
-        <div class="key" title="Open at a later status (doing, in review): drawn half, solid on the left">${mark(undefined, 1)}<span class="nm">later status</span><span class="n">${num(facets.moving)}</span></div>` : null}
+        <div class="fills">
+          ${box(!hide.sides?.includes("fresh"), () => set(toggle(hide, "sides", "fresh")), html`${mark(undefined, 0)}<span class="nm">first status</span>`, facets.fresh, "Open at its type's first status (todo, open, proposed): drawn hollow")}
+          ${box(!hide.sides?.includes("moving"), () => set(toggle(hide, "sides", "moving")), html`${mark(undefined, 1)}<span class="nm">later status</span>`, facets.moving, "Open at a later status (doing, in review): drawn half, solid on the left")}
+        </div>
         ${box(!hide.closed, () => set(toggle(hide, "closed")), html`${mark(undefined, undefined, undefined, true)}<span class="nm">closed</span>`, facets.closed, `Items whose status is on the closed side (done, dropped, decided): drawn ${look.shapes ? "full and " : ""}faded`)}
         ${box(!hide.lone, () => set(toggle(hide, "lone")), html`<span class="nm">with no links</span>`, facets.lone, "Items with no link to any other drawn item")}
       </div>

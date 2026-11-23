@@ -7,6 +7,7 @@
  * again with what is shown.
  */
 import type { Id } from "../../spec/common.ts";
+import { SIDES } from "../../spec/style.ts";
 import type { Dial } from "./behaviour.ts";
 import { typeColours, type FieldIn } from "./graph.ts";
 
@@ -18,6 +19,8 @@ export interface Hide {
   kinds?: string[];
   open?: boolean;
   closed?: boolean;
+  /** Open items by how full they are drawn: `fresh` (a type's first status, hollow), `moving` (a later one, half). */
+  sides?: string[];
   links?: string[];
   /** Items with no link among the drawn ones. */
   lone?: boolean;
@@ -71,6 +74,7 @@ export function shown(input: FieldIn, hide: Hide): { items: Set<Id>; links: Set<
     if (has(hide.statuses, `${it.type}:${it.status}`)) continue;
     if (has(hide.kinds, `${it.type}:${it.kind || NO_KIND}`)) continue;
     if (it.closed ? hide.closed : hide.open) continue;
+    if (!it.closed && hide.sides?.length && has(hide.sides, SIDES[it.side ?? 2] ?? "")) continue;
     if (hide.lone && !degree.get(it.id)) continue;
     items.add(it.id);
   }
@@ -150,7 +154,7 @@ export function facets(input: FieldIn, hide: Hide, pal: string[] = []): Facets {
 }
 
 /** `hide` with one value switched: a list entry added or taken out, or a flag flipped. */
-export function toggle(hide: Hide, key: "types" | "statuses" | "kinds" | "links", value: string): Hide;
+export function toggle(hide: Hide, key: "types" | "statuses" | "kinds" | "links" | "sides", value: string): Hide;
 export function toggle(hide: Hide, key: "open" | "closed" | "lone"): Hide;
 export function toggle(hide: Hide, key: keyof Hide, value?: string): Hide {
   const next: Hide = { ...hide };
@@ -160,7 +164,7 @@ export function toggle(hide: Hide, key: keyof Hide, value?: string): Hide {
     else next[flag] = true;
     return next;
   }
-  const list = key as "types" | "statuses" | "kinds" | "links";
+  const list = key as "types" | "statuses" | "kinds" | "links" | "sides";
   const had = hide[list] ?? [];
   const now = had.includes(value) ? had.filter((v) => v !== value) : [...had, value];
   if (now.length) next[list] = now;

@@ -73,7 +73,8 @@ find line has words, only what it finds and what lies near it.
   `filter` opens each type (its mark in its colour and shape), each of a
   type's statuses (its mark as full as it is drawn) and kinds, each base
   by its shape (its switch shows or hides all its types), open (with how
-  many sit at the first status, hollow, and at a later one, half) and
+  many sit at the first status, hollow, and at a later one, half, each a
+  switch) and
   closed (faded), items with no links, and each link type as a switch, with how many the map has and how many show. Each mark is drawn by
   `markPath` ([shapes.ts](shapes.ts)) with the drawing's own dials
   (`shapes`, `hollow_line`, `closed_fade`), so the key reads as the map
