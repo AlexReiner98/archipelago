@@ -427,13 +427,14 @@ test("a live run keeps its colour slot while it stays; a new one takes the lowes
   assert.deepEqual([...many.values()], [0, 1, 2, 3, 4, 5, 6, 7, 8]);
 });
 
-test("colourOf: the hues but Claude Code's orange, then round again mixed toward the text, then the page; tokens only", () => {
+test("colourOf: the hues but the warm ones near Claude Code's orange, then round again mixed toward the text, then the page; tokens only", () => {
   assert.equal(colourOf(0), "var(--hue-1, CanvasText)");
   assert.equal(colourOf(1), "var(--hue-3, CanvasText)", "hue-2 is too near Claude Code's orange");
-  assert.equal(colourOf(4), "var(--hue-6, CanvasText)");
-  assert.match(colourOf(5), /^color-mix\(in srgb, var\(--hue-1, [^)]*\) \d+%, var\(--fg, [^)]*\)\)$/);
-  assert.match(colourOf(11), /var\(--hue-3, .*var\(--bg, /);
-  for (let i = 0; i < 40; i++) assert.ok(!colourOf(i).includes("hue-2"), "never hue-2");
+  assert.equal(colourOf(2), "var(--hue-5, CanvasText)", "and hue-4");
+  assert.equal(colourOf(3), "var(--hue-6, CanvasText)");
+  assert.match(colourOf(4), /^color-mix\(in srgb, var\(--hue-1, [^)]*\) \d+%, var\(--fg, [^)]*\)\)$/);
+  assert.match(colourOf(9), /var\(--hue-3, .*var\(--bg, /);
+  for (let i = 0; i < 40; i++) assert.ok(!/hue-[24]/.test(colourOf(i)), "never hue-2 or hue-4");
   const twenty = Array.from({ length: 24 }, (_, i) => colourOf(i));
   assert.equal(new Set(twenty).size, 24, "no two of the first 24 alike");
   for (const c of twenty) assert.ok(!/#|rgb\(/.test(c), "never a value of its own");

@@ -50,11 +50,11 @@ export function colours(runs: string[], had: Map<string, number> = new Map()): M
 }
 
 /**
- * The hues an agent takes: the style's, less `hue-2`, too near the orange
+ * The hues an agent takes: the style's, less the warm `hue-2` and `hue-4`, too near the orange
  * that marks what Claude Code gave (as the packs' hues leave it out, layout.ts),
  * so an agent's lights and sparks never read as Claude Code's.
  */
-export const AGENT_HUES: readonly Token[] = HUES.filter((t) => t !== "hue-2");
+export const AGENT_HUES: readonly Token[] = HUES.filter((t) => t !== "hue-2" && t !== "hue-4");
 
 /**
  * A slot's colour, from the style's tokens only: the agent hues, then round

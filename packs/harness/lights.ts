@@ -10,7 +10,7 @@
 import type { ExchangeEvent } from "../../spec/exchange.ts";
 import { lightOf, pointAt, route, STYLE, type Placed, type Tree } from "./layout.ts";
 import type { Ink } from "./paint.ts";
-import { TONE, type Lit } from "./scene.ts";
+import { INK, TONE, type Lit } from "./scene.ts";
 
 const S = STYLE;
 
@@ -127,6 +127,12 @@ export class Lights {
           if (age >= life) return false;
           const r = (S.spark + S.sparkGrow * Math.sqrt(age / life * S.sparkLife)) / Math.sqrt(k);
           Lights.glow(c, p.x, p.y, r, 1 - age / life, ink(inks));
+          // A white-hot core, so a spark reads on any branch, the orange of Claude Code's own too.
+          c.globalAlpha = 1 - age / life;
+          c.fillStyle = inks.color(INK.fg);
+          c.beginPath();
+          c.arc(p.x, p.y, (S.spark * 0.9) / Math.sqrt(k), 0, Math.PI * 2);
+          c.fill();
           return true;
         },
       });

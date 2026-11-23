@@ -47,7 +47,7 @@ come.
   ended and heard from within `quiet_min` minutes (15, as Activity counts
   live), of the last 50 active, each in its own colour: a session archived
   or killed without ending its run drops to the past runs
-  ([live.ts](live.ts)): the style's hues but `hue-2`, too near Claude Code's orange (an agent's lights would read as Claude Code's), then round again mixed toward
+  ([live.ts](live.ts)): the style's hues but the warm `hue-2` and `hue-4`, too near Claude Code's orange (an agent's lights would read as Claude Code's; a spark also has a white-hot core), then round again mixed toward
   the text colour, then toward the page, so there is no limit and every
   colour is made of tokens. A run keeps its colour while it stays live. Each is an agent with a tree of its own (below). The right pane shows the
   events of the agent in focus (`harness.focus`, this pack's own page
