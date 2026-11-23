@@ -33,9 +33,9 @@ export function placementOf(ps: ProfileInfo[], fallbacks: ReadonlySet<string>, s
 }
 
 export const PLACEMENT_MARK: Record<Placement["kind"], string> = { matched: "●", fallback: "○", none: "–" };
-export const placementText = (p: Placement) => `${PLACEMENT_MARK[p.kind]} ${p.kind === "none" ? "no profile" : p.title}`;
+export const placementText = (p: Placement) => `${PLACEMENT_MARK[p.kind]} ${p.kind === "none" ? "no umwelt" : p.title}`;
 export const placementTip = (p: Placement) =>
-  p.kind === "matched" ? `In ${p.title}, by its facts or its own say` : p.kind === "fallback" ? `In ${p.title}: the fallback, as nothing else placed it` : "In no profile: it hears every node";
+  p.kind === "matched" ? `In ${p.title}, by its facts or its own say` : p.kind === "fallback" ? `In ${p.title}: the fallback, as nothing else placed it` : "In no umwelt: it hears every node";
 
 export const AGENTS_STYLE = sheet(`
 .hv-menu { position:absolute; z-index:4; min-width:180px; max-width:280px; padding:var(--space-1) 0; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 6px 20px color-mix(in srgb, var(--bg) 60%, transparent); }

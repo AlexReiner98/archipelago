@@ -81,12 +81,12 @@ export const Bar = (p: BarProps) => {
       </select>
       ${p.info && p.current.some((x) => x.run === p.info!.run) && html`<span class="live" title="The run is live">●</span>`}
       ${!p.live && html`<span class="hv-n" title=${p.all ? "Every run's verdicts, node by run: held, failed, quiet" : "This run's verdicts: held, failed, quiet"}><span class="m-held">${token(verdictGlyph("held"))} ${p.sum.held}</span> <span class="m-failed">${token(verdictGlyph("failed"))} ${p.sum.failed}</span> <span class="m-quiet">${token(verdictGlyph("quiet"))} ${p.sum.quiet}</span></span>`}
-      ${p.profile && html`<span class="hv-dim hv-cut" title="The profile looked at: what it holds back">in ${p.profiles.find((x) => x.id === p.profile)?.title ?? p.profile}</span>`}
+      ${p.profile && html`<span class="hv-dim hv-cut" title="The umwelt looked at: what it holds back">in ${p.profiles.find((x) => x.id === p.profile)?.title ?? p.profile}</span>`}
       <span class="sp"></span>
       <span class="hv-more" ref=${more}>
-        <button class=${open ? "on" : ""} title="Profile, grouping, what shows, dials" onClick=${() => setOpen(!open)}>⋯</button>
+        <button class=${open ? "on" : ""} title="Umwelt, grouping, what shows, dials" onClick=${() => setOpen(!open)}>⋯</button>
         ${open && html`<div class="hv-menu">
-          <label class="row" title="A profile: what it holds back, over every run's totals"><span class="k">profile</span>
+          <label class="row" title="An umwelt: what it holds back, over every run's totals"><span class="k">umwelt</span>
             <select class="hv-select" value=${p.profile ?? ""} onChange=${(e: Event) => p.onProfile((e.target as HTMLSelectElement).value || undefined)}>
               <option value="">${p.all ? "none" : "the run's"}</option>
               ${p.profiles.map((x) => html`<option value=${x.id}>${x.status === "on" ? "●" : x.status === "off" ? "○" : "◌"} ${x.title}</option>`)}
