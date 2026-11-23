@@ -87,7 +87,7 @@ html.hv-switching { view-transition-name:none; }
 ::view-transition-old(*.hv-agent) { animation:hv-gone .12s ease-out both; }
 @keyframes hv-gone { to { opacity:0; } }
 .hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); }
-.hv-trees.many { grid-template-columns:minmax(180px,22%) minmax(0,1fr); }
+.hv-trees.many { grid-template-columns:minmax(180px, max(22%, calc(var(--peek, 140px) * 4 / 3))) minmax(0,1fr); }
 .hv-peeks { order:-1; min-height:0; overflow-y:auto; border-right:1px solid var(--line); scrollbar-width:thin; }
 .hv-peeks > .hv-tree { height:var(--peek, 140px); }
 .hv-side { display:flex; flex-direction:column; }
@@ -170,6 +170,9 @@ export interface TreesProps {
   quietPx?: number;
   giveWay?: boolean;
   sparkS?: number;
+  sparkX?: number;
+  /** Each preview's height in px (the peek_px dial); the column is as wide as a preview a third wider. */
+  peekPx?: number;
   /** The most characters a name shows (the name_most dial); 0 or none, whole. */
   nameMost?: number;
 }
@@ -194,7 +197,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
       <span class="n" title=${`The nodes it hears, of all${extra?.length ? `; and ${extra.length} the harness gave it` : ""}`}>${a.hears ? (big ? `${heard.length} / ${p.nodes.length}` : heard.length) : ""}${extra?.length ? ` + ${extra.length}` : ""}</span>
     </div>
     ${big && p.win && html`<${WindowBar} w=${p.win} filter=${p.keyFilter} hues=${p.hues} picked=${p.picked} onPick=${p.onPick} />`}
-    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} quietPx=${p.quietPx} giveWay=${p.giveWay} sparkS=${p.sparkS} />
+    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} quietPx=${p.quietPx} giveWay=${p.giveWay} sparkS=${p.sparkS} sparkX=${p.sparkX} />
   </div>`;
 };
 
@@ -204,7 +207,7 @@ export const Trees = (p: TreesProps) => {
   const big = p.agents.find((a) => a.run.run === focus);
   // The previews stand at a fixed height and scroll, however many agents are live.
   // The left bar is one: the previews, or, while a node is picked, the node in their place.
-  return html`<div class="hv-trees${p.side || rest.length || p.rows?.length ? " many" : ""}">
+  return html`<div class="hv-trees${p.side || rest.length || p.rows?.length ? " many" : ""}" style=${p.peekPx ? `--peek:${p.peekPx}px` : ""}>
     ${big && html`<${One} key=${big.run.run} a=${big} p=${p} big=${true} />`}
     ${p.side ? html`<div class="hv-peeks hv-side">${p.side}</div>` : (rest.length > 0 || !!p.rows?.length) && html`<div class="hv-peeks">
       ${rest.map((a) => html`<${One} key=${a.run.run} a=${a} p=${p} big=${false} />`)}

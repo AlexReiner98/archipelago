@@ -30,9 +30,9 @@ export class Lights {
   private still = typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /** `get`: the tree as drawn now; `changed`: something to paint. */
-  private get: () => { tree: Tree; placed: Placed; sparkS?: number };
+  private get: () => { tree: Tree; placed: Placed; sparkS?: number; sparkX?: number };
   private changed: () => void;
-  constructor(get: () => { tree: Tree; placed: Placed; sparkS?: number }, changed: () => void) {
+  constructor(get: () => { tree: Tree; placed: Placed; sparkS?: number; sparkX?: number }, changed: () => void) {
     this.get = get;
     this.changed = changed;
   }
@@ -120,18 +120,21 @@ export class Lights {
       if (!p) return;
       // How long a spark lasts: the spark_s dial, else the style's.
       const life = this.get().sparkS || S.sparkLife;
-      this.light(l.at, l.tone, color, Math.max(S.linger, life));
+      // How big: the spark_x dial, a multiple of the style's size.
+      const x = this.get().sparkX || 1;
+      // Its bough's name stays lit three times as long as the spark, so what was done can be read.
+      this.light(l.at, l.tone, color, Math.max(S.linger, life * 3));
       this.fx.push({
         start: performance.now(),
         draw: (c, age, k, inks) => {
           if (age >= life) return false;
-          const r = (S.spark + S.sparkGrow * Math.sqrt(age / life * S.sparkLife)) / Math.sqrt(k);
+          const r = (x * (S.spark + S.sparkGrow * Math.sqrt(age / life * S.sparkLife))) / Math.sqrt(k);
           Lights.glow(c, p.x, p.y, r, 1 - age / life, ink(inks));
           // A white-hot core, so a spark reads on any branch, the orange of Claude Code's own too.
           c.globalAlpha = 1 - age / life;
           c.fillStyle = inks.color(INK.fg);
           c.beginPath();
-          c.arc(p.x, p.y, (S.spark * 0.9) / Math.sqrt(k), 0, Math.PI * 2);
+          c.arc(p.x, p.y, (x * S.spark * 0.9) / Math.sqrt(k), 0, Math.PI * 2);
           c.fill();
           return true;
         },

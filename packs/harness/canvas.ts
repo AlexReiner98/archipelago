@@ -118,6 +118,8 @@ export interface CanvasProps {
   giveWay?: boolean;
   /** How long an act's spark lasts, in seconds (the spark_s dial); 0, the style's. */
   sparkS?: number;
+  /** How big an act's spark is, a multiple of the style's (the spark_x dial). */
+  sparkX?: number;
 }
 
 /** A name's outline in the picture's units, along its own line: where it starts, how long, how tall. */
@@ -153,7 +155,7 @@ function crowdedAt(scene: Scene, k: number, ink: Ink, widths: Widths, waiting: R
   return crowdedNames(names, others);
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, tipMs = 600, nameSteps = 4, quietPx = 0, giveWay = false, sparkS = 0 }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, tipMs = 600, nameSteps = 4, quietPx = 0, giveWay = false, sparkS = 0, sparkX = 1 }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   const tipEl = useRef<HTMLDivElement>(null);
@@ -166,8 +168,8 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     () => sceneOf({ tree, placed, hues, statuses, ...(rings ? { rings } : {}), heard, held, counts, standing, ...(picked ? { picked } : {}), ...(win ? { window: win } : {}), theirs }),
     [tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, win, theirs],
   );
-  const now = useRef({ tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx, giveWay, sparkS });
-  now.current = { tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx, giveWay, sparkS };
+  const now = useRef({ tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx, giveWay, sparkS, sparkX });
+  now.current = { tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx, giveWay, sparkS, sparkX };
 
   // The painter: made once, outside Preact, as the Landscape's engine is.
   type Painter = { schedule(): void; recrowd(): void; lights: Lights; ink: Ink; widths: Widths; moving: boolean; zooming: boolean };
