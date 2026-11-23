@@ -10,7 +10,7 @@ This is **edition 11**. A capability that came after edition 1 shows the edition
 | Contract | Capabilities | What it is |
 |---|---|---|
 | [graph](graph.md) | `graph.read` `graph.watch` `graph.stage` `graph.commit` | The graph pack stores items and links and is the truth. |
-| [action](action.md) | `action.register` `action.list` `action.invoke` | Every change goes through a declared action, whether a person or an agent makes it. |
+| [action](action.md) | `action.register` `action.list` `action.invoke` `action.attest` (11) | Every change goes through a declared action, whether a person or an agent makes it. |
 | [agent](agent.md) | `agent.node` `agent.tree` `agent.run` `agent.facts` (5) `agent.gate` (5) | Everything the map says to an agent and everything the agent does passes through one service. |
 | [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event for each thing that passes between the map and an agent. |
 | [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` `slot.arrange` (8) | How the UI is put together out of packs. |
@@ -36,7 +36,9 @@ Edition 3 adds the place `compact` and the person's acts, `decision` and
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
 ([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 11 adds
 `types.acyclic`, kinds of link a pack holds acyclic, which the schema pack
-keeps from closing a loop ([types](types.md)). Edition 10 adds
+keeps from closing a loop ([types](types.md)), and `action.attest`, a
+change made on a test's word at the version of its inputs
+([action](action.md)). Edition 10 adds
 `types.mark`, the shape each base is drawn in, named by its pack, and two
 mark shapes, pentagon and hexagon ([types](types.md), [style](style.md));
 from it a contract's `Capabilities` map is frozen one key at a time, as its

@@ -1,19 +1,20 @@
 /**
  * The action pack: the one way anyone changes anything. Provides
- * action.register, action.list and action.invoke (spec/action.md), and is
- * the only pack given graph.commit.
+ * action.register, action.list, action.invoke and action.attest (edition
+ * 11: a change on a test's word) (spec/action.md), and is the only pack
+ * given graph.commit.
  *
  * Who is calling is read from the calling context: the actor and run that
  * interception set, else the calling pack itself. Everything an action
  * writes, with the actions it calls, is one change set, committed when the
  * outermost action returns, or nothing at all.
  */
-import type { ActionContext, ActionDef, ActionInfo, ActionInvoke, ActionList, ActionRegister, Outcome } from "../../spec/action.ts";
+import type { ActionAttest, ActionContext, ActionDef, ActionInfo, ActionInvoke, ActionList, ActionRegister, Outcome } from "../../spec/action.ts";
 import type { Fact } from "../../spec/changeset.ts";
-import type { Actor, Caller, Dispose, Json, Refusal } from "../../spec/common.ts";
+import type { Actor, Authority, Caller, Dispose, Json, Refusal } from "../../spec/common.ts";
 import { Refused } from "../../spec/common.ts";
 import { UNDO } from "../../spec/action.ts";
-import type { GraphCommit } from "../../spec/graph.ts";
+import type { GraphCommit, GraphRead } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 
 interface Registered {
@@ -39,9 +40,10 @@ function missing(schema: Record<string, Json>, input: Json): string[] {
 const action: Pack = {
   id: "action",
   about: "Runs every change to the map, whoever asks for it, as one change that can be undone.",
-  inject: ["graph.commit"],
+  inject: ["graph.commit", "graph.read"],
   apply(ctx: Context) {
     const commit = ctx.get<GraphCommit>("graph.commit");
+    const graph = ctx.get<GraphRead>("graph.read");
     const actions = new Map<string, Registered>();
     const watchers = new Set<() => void>();
     const changed = () => {
@@ -91,8 +93,8 @@ const action: Pack = {
       },
     }));
 
-    ctx.provide<ActionInvoke>("action.invoke", (caller: Caller) => ({
-      async invoke<O extends Json = Json>(call: { action: string; input: Json; authority: ActionContext["authority"]; reason: string }): Promise<Outcome<O>> {
+    /** Runs an action as `caller`, its change set made by `by` (the caller's actor, else the pack itself). */
+    const invoke = async <O extends Json = Json>(caller: Caller, call: { action: string; input: Json; authority: Authority; reason: string }, by?: Actor): Promise<Outcome<O>> => {
         const outer = actions.get(call.action);
         if (!outer) {
           return { ok: false, refused: { code: "action.unknown", message: `No action ${call.action} is registered now.`, by: { pack: "action" } } };
@@ -120,7 +122,7 @@ const action: Pack = {
         try {
           const output = (await run(call.action, call.input)) as O;
           if (!facts.length) return { ok: true, output };
-          const actor: Actor = caller.actor ?? { id: `pack:${caller.pack}`, kind: "agent" };
+          const actor: Actor = by ?? caller.actor ?? { id: `pack:${caller.pack}`, kind: "agent" };
           const committed = await commit.commit({
             header: {
               actor,
@@ -138,6 +140,22 @@ const action: Pack = {
         } catch (err) {
           return { ok: false, refused: refusalOf(err, call.action) };
         }
+    };
+
+    ctx.provide<ActionInvoke>("action.invoke", (caller: Caller) => ({
+      invoke: <O extends Json = Json>(call: { action: string; input: Json; authority: ActionContext["authority"]; reason: string }) => invoke<O>(caller, call),
+    }));
+
+    // A change on a test's word: the test is the actor, its version the basis (edition 11).
+    ctx.provide<ActionAttest>("action.attest", (caller: Caller) => ({
+      async invoke<O extends Json = Json>(call: { action: string; input: Json; attest: { test: string; version: string }; reason: string }): Promise<Outcome<O>> {
+        const { test, version } = call.attest ?? ({} as { test: string; version: string });
+        const bad = (message: string): Outcome<O> => ({ ok: false, refused: { code: "action.attest", message, by: { pack: "action" } } });
+        if (typeof test !== "string" || !test || /\s/.test(test)) return bad("An attestation names its test by id.");
+        if (typeof version !== "string" || !version || /\s/.test(version)) return bad(`Test ${test}'s attestation needs the version of its inputs, one word.`);
+        if (!(await graph.get([test]))[0]) return bad(`Test ${test} isn't on the graph.`);
+        const by: Actor = { id: `test:${test}`, kind: "agent" };
+        return invoke<O>(caller, { action: call.action, input: call.input, authority: { of: "agent", basis: `test ${test} at ${version}` }, reason: call.reason }, by);
       },
     }));
   },

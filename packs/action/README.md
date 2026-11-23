@@ -1,8 +1,9 @@
 # action
 
 The one way anyone changes anything. Provides `action.register`,
-`action.list` and `action.invoke` ([spec](../../spec/action.md)); injects
-`graph.commit`, and should be the only pack given it.
+`action.list`, `action.invoke` and `action.attest` (edition 11)
+([spec](../../spec/action.md)); injects `graph.commit`, and should be the
+only pack given it, and `graph.read`, to find an attestation's test.
 
 - A name must start with the registering pack's id; a taken name is refused.
 - Who called is the calling context's: the actor and run interception set,
@@ -15,3 +16,8 @@ The one way anyone changes anything. Provides `action.register`,
   back as `{ ok: false, refused }`.
 - Input is checked only for its `required` keys; full schema checks are the
   schema pack's.
+- `action.attest` runs an action on a test's word: the actor is
+  `test:<id>` and the authority's basis `test <id> at <version>`. It is
+  refused (`action.attest`) when the test isn't on the graph or the
+  version is missing. The item page's history marks such a change ▲ with
+  the version.

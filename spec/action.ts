@@ -2,7 +2,7 @@
  * action: the one way anyone changes anything. See action.md.
  */
 import type { ChangeSetId, Committed, Fact } from "./changeset.ts";
-import type { Authority, Caller, Capability, Dispose, Json, PackId, Refusal } from "./common.ts";
+import type { Actor, Authority, Caller, Capability, Dispose, Id, Json, PackId, Refusal } from "./common.ts";
 
 /** A JSON Schema (2020-12) object. Kept loose here; the schema pack checks it. */
 export type JsonSchema = { [key: string]: Json };
@@ -104,14 +104,44 @@ export interface UndoInput {
   [key: string]: Json;
 }
 
+/** A test's word: the test item, and the version of its inputs its result is for. */
+export interface Attestation {
+  test: Id;
+  version: string;
+}
+
+/**
+ * `action.attest`, edition 11: a change made on a test's word, neither a
+ * person's nor an agent's. It runs an action as `action.invoke` does, but
+ * the change set's actor is the test (`test:<id>`, of kind agent, since no
+ * person decided it) and its authority is the test's at its version
+ * (`of: "agent"`, basis `test <id> at <version>`). The change set's header
+ * keeps its shape; `attested` reads the attestation back out of it.
+ * Refused when the test isn't on the graph.
+ */
+export interface ActionAttest {
+  invoke<O extends Json = Json>(call: { action: string; input: Json; attest: Attestation; reason: string }): Promise<Outcome<O>>;
+}
+
+const ATTESTED = /^test (\S+) at (\S+)$/;
+
+/** The attestation a change set was made on (`action.attest`), or undefined if a person or an agent made it. */
+export function attested(header: { actor: Actor; authority: Authority }): Attestation | undefined {
+  const m = header.authority.of === "agent" ? ATTESTED.exec(header.authority.basis ?? "") : null;
+  if (!m || header.actor.id !== `test:${m[1]}`) return undefined;
+  return { test: m[1]!, version: m[2]! };
+}
+
 export interface Capabilities {
   "action.register": ActionRegister;
   "action.list": ActionList;
   "action.invoke": ActionInvoke;
+  "action.attest": ActionAttest;
 }
 
 export const capabilities: Capability[] = [
   { key: "action.register", since: 1, doc: "Declares an action that persons, agents and packs can invoke." },
   { key: "action.list", since: 1, doc: "The declared actions, with their input and output schemas." },
   { key: "action.invoke", since: 1, doc: "Runs an action; everything it writes becomes one change set, applied or refused whole." },
+  { key: "action.attest", since: 11, doc: "Runs an action on a test's word at a version: the change set's actor is the test, its authority the test's." },
 ];

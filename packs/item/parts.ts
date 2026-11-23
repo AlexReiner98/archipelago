@@ -7,7 +7,7 @@ import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import type { ActionInvoke } from "../../spec/action.ts";
-import { UNDO } from "../../spec/action.ts";
+import { UNDO, attested } from "../../spec/action.ts";
 import type { Fact, Header } from "../../spec/changeset.ts";
 import type { Id, Json, Page } from "../../spec/common.ts";
 import type { Block, Span } from "./note.ts";
@@ -153,12 +153,14 @@ export function parts(d: Deps) {
     return html`
       <div class="ip-hist">
         ${entries.map((e) => {
-          const who = e.header.actor.kind === "person" ? e.header.actor.id.replace(/^person:/, "") : e.header.actor.id;
+          const test = attested(e.header);
+          const who = test ? `test at ${test.version.slice(0, 7)}` : e.header.actor.kind === "person" ? e.header.actor.id.replace(/^person:/, "") : e.header.actor.id;
+          const whose = test ? `a test's result · ${test.test} at ${test.version}` : `${e.header.actor.kind} · ${e.header.authority.of === "human" ? `told: ${e.header.authority.basis}` : "own judgment"}`;
           const undone = !!e.undoneBy;
           return html`
             <div class=${`ip-change${undone ? " undone" : ""}`} key=${e.id}>
               <div class="ip-change-head">
-                <span class="ip-who" title=${`${e.header.actor.kind} · ${e.header.authority.of === "human" ? `told: ${e.header.authority.basis}` : "own judgment"}`}>${e.header.actor.kind === "person" ? "●" : "◆"} ${who}</span>
+                <span class="ip-who" title=${whose}>${test ? "▲" : e.header.actor.kind === "person" ? "●" : "◆"} ${who}</span>
                 <span class="ip-dim" title=${e.committed}>${ago(e.committed)}</span>
                 ${e.header.undoes && html`<span class="ip-dim">undo</span>`}
                 ${undone

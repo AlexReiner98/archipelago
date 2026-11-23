@@ -12,6 +12,7 @@ a pack changing data does it through an action too. Types:
 | `action.register` | Declare an action |
 | `action.list` | The declared actions and their schemas |
 | `action.invoke` | Run one |
+| `action.attest` (11) | Run one on a test's word, at the version of its inputs |
 
 ## Declaring one
 
@@ -74,3 +75,24 @@ Claude Code adapter makes one child context per run with the agent and the
 run. A pack can't pass itself off as another or put words in a person's
 mouth through the call. Only the authority and the reason vary call by
 call, so only they are said.
+
+## On a test's word
+
+Edition 11. Some changes are neither a person's word nor an agent's
+judgement: a check's result, written by the pack that runs it. A pack that
+injects `action.attest` runs an action on a test's word:
+
+```ts
+ctx["action.attest"].invoke({ action, input, attest: { test, version }, reason })
+```
+
+- `test` is the id of the item that is the test; it must be on the graph.
+  `version` is the version of the test's inputs its result is for, one
+  word (a hash of them, say).
+- The change set's actor is the test (`test:<id>`, of kind `agent`: no
+  person decided it), and its authority is `of: "agent"` with basis
+  `test <id> at <version>`. The header keeps its shape, so everything that
+  reads change sets reads these; `attested(header)` gives the test and
+  version back, and undefined for anyone else's change.
+- Otherwise it is `action.invoke`: one change set, applied or refused
+  whole, and undone like any other.
