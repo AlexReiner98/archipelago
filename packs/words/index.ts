@@ -39,16 +39,19 @@ export const LINK = "in_umwelt";
 
 /**
  * What a link with places says, as a node item would: the item it brings
- * (`from`) with its words (or its note), and the link's own `at`, `when`,
- * `refuse`, `say`, `repeat`, and `trial` or `retired` as its status. Its id
- * is the link's, the node's source. Null when it has no places or no item.
+ * (`from`) with its words (or its note), and the link's own `at`, `kind`,
+ * `when`, `refuse`, `say`, `repeat`, and `trial` or `retired` as its status.
+ * The node's kind is how it is said (the link's `kind`: `instruction` is
+ * standing), else what the item is (its `kind`, else its type). Its id is
+ * the link's, the node's source. Null when it has no places or no item.
  */
 export function said(link: Item, item: Item | null | undefined): Item | null {
   const at = link.fields.at;
   if (!item || !Array.isArray(at) || !at.length) return null;
   const f = item.fields;
   const words = typeof f.words === "string" && f.words.trim() ? f.words : typeof f.note === "string" ? f.note : "";
-  const fields: Record<string, Json> = { title: f.title ?? item.id, kind: typeof f.kind === "string" && f.kind ? f.kind : item.type, at, words, of: item.id };
+  const text = (v: Json | undefined) => (typeof v === "string" && v ? v : undefined);
+  const fields: Record<string, Json> = { title: f.title ?? item.id, kind: text(link.fields.kind) ?? text(f.kind) ?? item.type, at, words, of: item.id };
   for (const k of ["when", "refuse", "say", "repeat"]) if (link.fields[k] !== undefined) fields[k] = link.fields[k]!;
   if (link.fields.retired === true) fields.status = "retired";
   else if (link.fields.trial === true) fields.status = "trial";

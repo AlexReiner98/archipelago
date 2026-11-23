@@ -11,8 +11,9 @@ reflex's condition) speaks only when the moment's input holds that text.
 Any item, of any type, is said like a node when an `in_umwelt` link (the
 [profile](../profile/README.md) pack's) gives it places. The link is the
 node's `source`, and its name: `words/<link id>`. It says the item's
-`words`, or else its `note`, under the item's title; its kind is the
-item's `kind`, else its type. The link holds how it is said: `at`, `when`,
+`words`, or else its `note`, under the item's title. Its kind is how
+it is said, the link's `kind` (`instruction`: standing), else what the item
+is: its `kind`, else its type. The link holds how it is said: `at`, `kind`, `when`,
 `refuse`, `say`, `repeat`, `trial` (said marked as a trial) and `retired`
 (not said). A change to the item or the link is followed: the words at the
 next say, a new title, kind or places by registering it again. `said(link,

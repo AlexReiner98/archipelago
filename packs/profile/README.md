@@ -25,7 +25,8 @@ profile, as the harness pack kept its own.
 Any item, of any type, is context by query: `members` holds what its line
 finds. An `in_umwelt` link can also say how the item is activated, in its
 own fields: `at` (the places: `tool:Bash`, `file:packs/**`,
-`session_start`), `when`, `refuse`, `say` (`listed` or `whole`), `repeat`
+`session_start`), `kind` (how it is said here: `instruction` is standing,
+said first at `session_start`; absent, what the item is), `when`, `refuse`, `say` (`listed` or `whole`), `repeat`
 (`every`), `trial` and `retired`. A link with places is a node of its own
 (the [words](../words/README.md) pack's), whose source is the link, and
 this umwelt alone holds it: one item can be said at different places in

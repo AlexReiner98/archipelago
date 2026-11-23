@@ -241,6 +241,8 @@ test("any item an umwelt link gives places is said there, as a node, to that umw
   assert.deepEqual(await said(apRepo), ["Name layers by trade, then phase."], "the item's words, read at each say");
   await act("items.set", { id: rule, fields: { title: "Layers" } });
   assert.equal(tree.nodes().find((n) => n.source === link)?.title, "Layers", "a new title registers it again");
+  await act("items.set", { id: link, fields: { kind: "instruction" } });
+  assert.equal(tree.nodes().find((n) => n.source === link)?.kind, "instruction", "how it is said is the link's");
   await act("items.set", { id: link, fields: { trial: true } });
   assert.deepEqual(await said(apRepo), [`${TRIAL_MARK} Name layers by trade, then phase.`]);
   await act("items.set", { id: link, fields: { trial: null, retired: true } });

@@ -68,6 +68,7 @@ export const LINKS: LinkDef[] = [
     to: [TYPE],
     fields: {
       at: { kind: "json", doc: "The places the item is said at (tool:Bash, file:packs/**, session_start)." },
+      kind: { kind: "text", doc: "How it is said here: instruction (standing, said first at session_start), reflex, rule. Absent, the item's kind, else its type." },
       when: { kind: "text", doc: "Said only when the moment's input holds this text." },
       refuse: { kind: "boolean", doc: "Its words are a refusal." },
       say: { kind: "choice", values: ["listed", "whole"], doc: "listed: one line at session_start, its whole words at its other places." },
