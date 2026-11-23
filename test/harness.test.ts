@@ -13,7 +13,7 @@ import { HUES } from "../spec/style.ts";
 import { colourOf, colours, isLive, keepLast, liveRuns, LIVE_MOST } from "../packs/harness/live.ts";
 import { groupsOf } from "../packs/harness/hooks.ts";
 import { DECIDED, dotsBox, nameOf, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
-import { fitKey, HIT_PX, nearest, shouldFit } from "../packs/harness/canvas.ts";
+import { easeView, fitKey, HIT_PX, nearest, shouldFit } from "../packs/harness/canvas.ts";
 import { crowded, quadsOverlap, type Quad } from "../packs/harness/labels.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 import { placementOf, placementText } from "../packs/harness/agents.ts";
@@ -880,4 +880,15 @@ test("while zooming, names come from an atlas: a zoom stepped to a few sizes per
   assert.equal(s.take(10, 90), undefined, "full");
   s.reset();
   assert.deepEqual(s.take(10, 90), { x: 0, y: 0, w: 10, h: 90 });
+});
+
+test("easeView: a fit glides from where the camera is to where it fits, eased, the zoom in proportion", () => {
+  const a = { x: 0, y: 0, k: 1 }, b = { x: 100, y: 50, k: 4 };
+  assert.deepEqual(easeView(a, b, 0, 800, 600), a);
+  const end = easeView(a, b, 1, 800, 600);
+  assert.ok(Math.abs(end.x - 100) < 1e-9 && Math.abs(end.y - 50) < 1e-9 && Math.abs(end.k - 4) < 1e-9);
+  assert.ok(Math.abs(easeView(a, b, 0.5, 800, 600).k - 2) < 1e-9, "halfway, the zoom is halfway by its logarithm");
+  const c = (v: { x: number; y: number; k: number }) => v.x + 400 / v.k;
+  assert.ok(Math.abs(c(easeView(a, b, 0.5, 800, 600)) - (c(a) + c(b)) / 2) < 1e-9, "the centre goes in a straight line");
+  assert.ok(easeView(a, b, 0.1, 800, 600).k - 1 < (4 - 1) * 0.1, "it starts slowly");
 });

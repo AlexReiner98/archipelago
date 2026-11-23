@@ -171,6 +171,10 @@ export interface TreesProps {
   giveWay?: boolean;
   sparkS?: number;
   sparkX?: number;
+  /** How long a fit glides, in ms (the fit_ms dial). */
+  fitMs?: number;
+  /** How long the wheel's zoom eases, in ms (the wheel_ms dial). */
+  wheelMs?: number;
   /** Each preview's height in px (the peek_px dial); the column is as wide as a preview a third wider. */
   peekPx?: number;
   /** The most characters a name shows (the name_most dial); 0 or none, whole. */
@@ -197,7 +201,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
       <span class="n" title=${`The nodes it hears, of all${extra?.length ? `; and ${extra.length} the harness gave it` : ""}`}>${a.hears ? (big ? `${heard.length} / ${p.nodes.length}` : heard.length) : ""}${extra?.length ? ` + ${extra.length}` : ""}</span>
     </div>
     ${big && p.win && html`<${WindowBar} w=${p.win} filter=${p.keyFilter} hues=${p.hues} picked=${p.picked} onPick=${p.onPick} />`}
-    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} quietPx=${p.quietPx} giveWay=${p.giveWay} sparkS=${p.sparkS} sparkX=${p.sparkX} />
+    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} quietPx=${p.quietPx} giveWay=${p.giveWay} sparkS=${p.sparkS} sparkX=${p.sparkX} fitMs=${p.fitMs} wheelMs=${p.wheelMs} />
   </div>`;
 };
 

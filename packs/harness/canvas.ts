@@ -35,8 +35,8 @@ import htm from "htm";
 import type { NodeInfo } from "../../spec/agent.ts";
 import { onStyle, sheet } from "../../spec/style.ts";
 import { crowdedNames, boxQuad, nameQuad, type Quad } from "./labels.ts";
-import { HIT_PX, nearest, outgrown, SETTLE_MS, shouldFit, fitKey } from "./camera.ts";
-export { fitKey, HIT_PX, nearest, shouldFit } from "./camera.ts";
+import { HIT_PX, nearest, outgrown, SETTLE_MS, shouldFit, fitKey, easeView } from "./camera.ts";
+export { easeView, fitKey, HIT_PX, nearest, shouldFit } from "./camera.ts";
 import { dotsBox, STYLE, type Placed, type Tree } from "./layout.ts";
 import type { Verdict } from "./hooks.ts";
 import type { Heard, Hold } from "./replay.ts";
@@ -120,6 +120,10 @@ export interface CanvasProps {
   sparkS?: number;
   /** How big an act's spark is, a multiple of the style's (the spark_x dial). */
   sparkX?: number;
+  /** How long a fit glides from where the camera is to where it fits, in ms (the `fit_ms` dial); 0, at once. The first fit is always at once. */
+  fitMs?: number;
+  /** How long the camera eases to where the wheel sends it, in ms (the `wheel_ms` dial); 0, at once. */
+  wheelMs?: number;
 }
 
 /** A name's outline in the picture's units, along its own line: where it starts, how long, how tall. */
@@ -155,7 +159,7 @@ function crowdedAt(scene: Scene, k: number, ink: Ink, widths: Widths, waiting: R
   return crowdedNames(names, others);
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, tipMs = 600, nameSteps = 4, quietPx = 0, giveWay = false, sparkS = 0, sparkX = 1 }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, tipMs = 600, nameSteps = 4, quietPx = 0, giveWay = false, sparkS = 0, sparkX = 1, fitMs = 0, wheelMs = 0 }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   const tipEl = useRef<HTMLDivElement>(null);
@@ -270,6 +274,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   const manual = useRef(false);
   const fitted = useRef(false);
   const ask = useRef(false);
+  const gliding = useRef(0);
   const shape = fitKey(tree.order.length, bounds);
   useEffect(() => {
     const W = box.current?.clientWidth ?? 0;
@@ -277,10 +282,24 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     if (!W || !H) return;
     if (!shouldFit({ fitted: fitted.current, manual: manual.current, asked: ask.current, outgrown: outgrown(bounds, viewRef.current, W, H) })) return;
     ask.current = false;
+    const first = !fitted.current;
     fitted.current = true;
     const k = Math.min(3, Math.max(0.1, Math.min(W / bounds.width, H / bounds.height)));
-    setView({ k, x: bounds.x - (W / k - bounds.width) / 2, y: bounds.y - (H / k - bounds.height) / 2 });
+    const goal = { k, x: bounds.x - (W / k - bounds.width) / 2, y: bounds.y - (H / k - bounds.height) / 2 };
+    cancelAnimationFrame(gliding.current);
+    wheelGoal.current = undefined;
+    if (first || !fitMs) return setView(goal);
+    // A fit after the first glides there, so the tree is seen to settle rather than jump.
+    const from = viewRef.current, t0 = performance.now();
+    const step = (t: number) => {
+      const k = (t - t0) / fitMs;
+      if (k >= 1) return setView(goal);
+      glide(easeView(from, goal, k, W, H));
+      gliding.current = requestAnimationFrame(step);
+    };
+    gliding.current = requestAnimationFrame(step);
   }, [shape, fits, small]);
+  useEffect(() => () => cancelAnimationFrame(gliding.current), []);
   // Fit again when the canvas changes size: it is first measured before the page has laid it out.
   useEffect(() => {
     let lastSize = "";
@@ -354,14 +373,35 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     }, now.current.tipMs);
   };
 
+  // The wheel sets where the zoom goes; the camera eases there over wheel_ms, so its notches don't show.
+  const wheelGoal = useRef<Camera | undefined>(undefined);
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
     hideTip();
+    cancelAnimationFrame(gliding.current);
     manual.current = true;
-    const p = toWorld(e);
-    const k = Math.min(6, Math.max(0.05, viewRef.current.k * Math.exp(-e.deltaY * 0.0015)));
     const r = box.current!.getBoundingClientRect();
-    glide({ k, x: p.x - (e.clientX - r.left) / k, y: p.y - (e.clientY - r.top) / k });
+    const from = wheelGoal.current ?? viewRef.current;
+    const sx = e.clientX - r.left, sy = e.clientY - r.top;
+    const p = { x: from.x + sx / from.k, y: from.y + sy / from.k };
+    const k = Math.min(6, Math.max(0.05, from.k * Math.exp(-e.deltaY * 0.0015)));
+    const goal = { k, x: p.x - sx / k, y: p.y - sy / k };
+    if (!wheelMs) return glide(goal);
+    wheelGoal.current = goal;
+    const W = r.width, H = r.height;
+    let last = performance.now();
+    const step = (t: number) => {
+      const g = wheelGoal.current;
+      if (!g) return;
+      const a = 1 - Math.exp(-Math.max(1, t - last) / (wheelMs / 3));
+      last = t;
+      const v = easeView(viewRef.current, g, a, W, H, false);
+      const done = Math.abs(Math.log(g.k / v.k)) < 0.002 && Math.hypot(g.x - v.x, g.y - v.y) * g.k < 0.5;
+      glide(done ? g : v);
+      if (done) wheelGoal.current = undefined;
+      else gliding.current = requestAnimationFrame(step);
+    };
+    gliding.current = requestAnimationFrame(step);
   };
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
@@ -376,6 +416,8 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
       if (!moved && Math.hypot(m.clientX - start.cx, m.clientY - start.cy) < 4) return;
       if (!moved) el.classList.add("panning");
       moved = true;
+      cancelAnimationFrame(gliding.current);
+      wheelGoal.current = undefined;
       manual.current = true;
       glide({ ...start.view, x: start.view.x - (m.clientX - start.cx) / start.view.k, y: start.view.y - (m.clientY - start.cy) / start.view.k });
     };

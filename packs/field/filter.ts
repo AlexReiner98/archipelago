@@ -185,6 +185,7 @@ export const FAINT = 0;
 export const FIND: Dial[] = [
   { key: "find_steps", label: "keeps steps", min: 0, max: 4, step: 1, value: 1, then: "paint", doc: "While the find line has words, what it finds stays, with what lies this many links from it, drawn in full; the rest of the map leaves the layout and what is kept settles again." },
   { key: "find_faint", label: "then faint steps", min: 0, max: 4, step: 1, value: 1, then: "paint", doc: "This many links further still stay too, drawn faint (the drawing's 'find fades rest to')." },
+  { key: "find_wait_ms", label: "waits for typing", min: 0, max: 1500, step: 50, value: 350, then: "paint", doc: "The map follows the find line's words once typing pauses this long, in ms, so each letter does not lay it out again (0: at every letter)." },
   { key: "find_follow_ms", label: "camera jumps in", min: 0, max: 3000, step: 50, value: 350, then: "paint", doc: "When the find line's words change, how fast the view goes to what is kept, in ms (about two thirds of the way in this time; 0: it snaps)." },
 ];
 
@@ -210,4 +211,28 @@ export function around(input: FieldIn, found: Set<Id>, steps: number, faint: num
     ring = out;
   }
   return level;
+}
+
+/**
+ * A value that is taken only once it has held still for `wait` ms: `put`
+ * each new one, `now` is the one taken. With no wait, each is taken at once.
+ */
+export class Settle<T> {
+  now: T;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private took: (v: T) => void;
+  constructor(first: T, took: (v: T) => void) {
+    this.now = first;
+    this.took = took;
+  }
+  put(v: T, wait: number): void {
+    clearTimeout(this.timer);
+    if (v === this.now) return;
+    const take = () => ((this.now = v), this.took(v));
+    if (wait > 0) this.timer = setTimeout(take, wait);
+    else take();
+  }
+  stop(): void {
+    clearTimeout(this.timer);
+  }
 }

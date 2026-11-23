@@ -20,6 +20,7 @@ export const DRAW: Dial[] = [
   { key: "hollow_line", label: "hollow outline", min: 0.1, max: 0.9, step: 0.01, value: 0.4, then: "paint", doc: "A hollow or half particle's outline, as a share of its size." },
   { key: "hollow_px", label: "hollow from", min: 0, max: 20, step: 0.5, value: 3, then: "paint", doc: "A particle smaller than this on screen (radius, px) is drawn full whatever its status: a hollow speck would vanish." },
   { key: "closed_fade", label: "closed fade", min: 0, max: 1, step: 0.01, value: 0.28, then: "paint", doc: "How faint a closed item (done, dropped, decided) is drawn." },
+  { key: "gone_ms", label: "gone fades", min: 0, max: 2000, step: 50, value: 600, then: "paint", doc: "How long an item that leaves the map (a filter turned off, a find that keeps fewer) takes to fade out where it stood, in ms (0: it vanishes at once)." },
   { key: "link_alpha", label: "link strength", min: 0, max: 1, step: 0.01, value: 0.18, then: "paint", doc: "How strong a link's line is." },
   { key: "link_width", label: "link width", min: 0.1, max: 4, step: 0.1, value: 0.6, then: "paint", doc: "A link's width, in screen px." },
   { key: "arrows", label: "arrows", min: 0, max: 1, step: 1, value: 1, choices: ["no", "yes"], then: "paint", doc: "Each link has an arrowhead at the end it points to (A depends_on B points at B)." },

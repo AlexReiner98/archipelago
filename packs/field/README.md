@@ -55,6 +55,10 @@ find line has words, only what it finds and what lies near it.
   full, and `find_faint` links further, drawn faint (`query_fade`); the
   rest of the map leaves the layout and what is kept settles again
   (`alpha_filter`). The view goes to what it finds (`find_follow_ms`).
+  The map follows the words once typing pauses (`find_wait_ms`, `Settle`),
+  not at every letter. Whatever leaves the map, by the find line or the
+  legend, fades out where it stood over `gone_ms` ([gone.ts](gone.ts)),
+  from as strong as it was drawn.
   What it finds is drawn whole, closed or not, and named first; the
   legend's open and closed switches do not apply while it has words, so a
   plan shows its done steps.

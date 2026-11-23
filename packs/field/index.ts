@@ -30,7 +30,7 @@ import type { LinkInfo, TypeInfo } from "../../spec/types.ts";
 import type { Dial } from "./behaviour.ts";
 import { field, type Field } from "./engine.ts";
 import type { FieldIn, Settings } from "./graph.ts";
-import { around, facets as facetsOf, FIND, FOUND, shown, type Hide } from "./filter.ts";
+import { around, facets as facetsOf, FIND, FOUND, Settle, shown, type Hide } from "./filter.ts";
 import { Legend, LEGEND_STYLE } from "./legend.ts";
 import { DRAW, palette } from "./paint.ts";
 import { Panel, PANEL_STYLE, type Section } from "./panel.ts";
@@ -205,8 +205,14 @@ const fieldPack: Pack = {
     /** `center`: the canvas and its legend. */
     const Canvas = () => {
       const version = useVersion();
-      const q = useHere<string>(QUERY) ?? "";
+      const typed = useHere<string>(QUERY) ?? "";
       const { all, S } = useDials();
+      // The map follows the find line once typing pauses (find_wait_ms), not at every letter.
+      const [q, setQ] = useState(typed);
+      const settle = useRef<Settle<string> | undefined>(undefined);
+      settle.current ??= new Settle(typed, setQ);
+      useEffect(() => settle.current!.put(typed, S.find_wait_ms!), [typed]);
+      useEffect(() => () => settle.current!.stop(), []);
 
       // Worked out again only when the map or the limit changes, never on a hover or a query.
       const result = useMemo(() => whole(S.field_limit!), [version, S.field_limit]);

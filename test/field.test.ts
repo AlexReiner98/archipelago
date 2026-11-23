@@ -339,3 +339,40 @@ test("the legend's fill switches hide open items by how full they are drawn", as
   assert.equal(ids({ sides: ["fresh", "moving"] }), "c");
   assert.deepEqual(toggle(toggle({}, "sides", "fresh"), "sides", "fresh"), {});
 });
+
+test("an item that leaves the map fades out where it stood over gone_ms, closed ones from their faintness", async () => {
+  const { goneOf, ghostFade } = await import("../packs/field/gone.ts");
+  const item = (id: string, closed = false) => ({ id, title: id, type: "work", status: "", closed });
+  const whole: FieldIn = { items: [item("a"), item("b", true), item("c")], links: [], types: ["work"] };
+  const S = { ...settings(), gone_ms: 600, closed_fade: 0.28, shapes: 0 };
+  const all = build(whole, null);
+  seed(all, S);
+  const less = build({ ...whole, items: [item("a")] }, all);
+  const ghosts = goneOf(all, less, 1000, S);
+  const at = (id: string) => [all.x[all.idIx.get(id)!], all.y[all.idIx.get(id)!]];
+  assert.deepEqual(ghosts.map((q) => [q.x, q.y, q.alpha, q.at]), [[...at("b"), 0.28, 1000], [...at("c"), 1, 1000]], "b and c left, each where it stood; b closed, so as faint as it was drawn");
+  assert.deepEqual(goneOf(all, less, 1000, { ...S, gone_ms: 0 }), [], "0: they vanish at once, no ghosts");
+  assert.deepEqual(goneOf(null, less, 1000, S), [], "a first map leaves nothing behind");
+  const { FAINT, FOUND } = await import("../packs/field/filter.ts");
+  const kept = goneOf(all, less, 1000, { ...S, query_fade: 0.1 }, Uint8Array.from([FOUND, FOUND, FAINT]));
+  assert.deepEqual(kept.map((q) => q.alpha), [1, 0.1], "found, a closed item is drawn whole; kept faint by the find line, it fades from faint");
+  assert.equal(ghostFade(0, 600), 1);
+  assert.equal(ghostFade(600, 600), 0);
+  assert.ok(ghostFade(150, 600) > 0.75 && ghostFade(450, 600) < 0.25, "eased: slow to start, slow to end");
+});
+
+test("the map follows the find line once typing pauses: a value is taken only after it holds still for find_wait_ms", async (t) => {
+  const { Settle } = await import("../packs/field/filter.ts");
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const took: string[] = [];
+  const s = new Settle("", (v) => took.push(v));
+  for (const q of ["c", "ca", "can"]) s.put(q, 350), t.mock.timers.tick(100);
+  assert.deepEqual(took, [], "still typing: nothing taken");
+  t.mock.timers.tick(350);
+  assert.deepEqual(took, ["can"], "a pause: the last words are taken, once");
+  s.put("x", 0);
+  assert.deepEqual(took, ["can", "x"], "no wait: taken at once");
+  s.put("x", 350);
+  t.mock.timers.tick(400);
+  assert.deepEqual(took, ["can", "x"], "the same words again: nothing new");
+});
