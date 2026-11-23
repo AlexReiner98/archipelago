@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { ActionInvoke } from "../spec/action.ts";
+import type { ActionContext, ActionInvoke, ActionRegister } from "../spec/action.ts";
+import type { Fact } from "../spec/changeset.ts";
+import type { Json } from "../spec/common.ts";
 import type { AgentRun, AgentTree, NodeInfo } from "../spec/agent.ts";
 import type { ExchangeRead } from "../spec/exchange.ts";
 import type { GraphRead } from "../spec/graph.ts";
@@ -15,7 +17,7 @@ import types from "../packs/types/index.ts";
 import record from "../packs/record/index.ts";
 import links from "../packs/links/index.ts";
 import items from "../packs/items/index.ts";
-import words from "../packs/words/index.ts";
+import words, { TRIAL_MARK } from "../packs/words/index.ts";
 import profile from "../packs/profile/index.ts";
 import { hearing, matchFacts, matchNode, placing, runProfiles, type Model, type Profile } from "../packs/profile/model.ts";
 
@@ -105,14 +107,27 @@ test("placing a run in one profile names it and drops every other it matches, ea
 
 const probe: Pack = { id: "probe", inject: ["agent.run", "agent.tree", "action.invoke", "graph.read", "exchange.read", "profile.read"], apply() {} };
 
-async function setup() {
+/** Writes facts as they are, before the profile pack loads: what the map held before umwelt. */
+const seeding = (facts: Fact[]): Pack => ({
+  id: "seed",
+  inject: ["action.register", "action.invoke"],
+  async apply(ctx) {
+    ctx.get<ActionRegister>("action.register").register({ name: "seed.raw", title: "Seed", input: { type: "object" }, async run(_i: Json, call: ActionContext) { call.write(facts); return {}; } });
+    const out = await ctx.get<ActionInvoke>("action.invoke").invoke({ action: "seed.raw", input: {}, authority: { of: "human", basis: "test" }, reason: "test" });
+    assert.ok(out.ok, JSON.stringify(out));
+  },
+});
+
+async function setup(seed?: Fact[]) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { graph, action, types, record, links, items, exchange, agent, words: words as Pack, profile, probe } as Record<string, Pack>;
+  const modules: Record<string, Pack> = { graph, action, types, record, links, items, exchange, agent, words: words as Pack, profile, probe, seed: seeding(seed ?? []) } as Record<string, Pack>;
   const BASE = "mem:/packs/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
-  const tree: Entry[] = ["graph", "action", "types", "record", "links", "items", "exchange", "agent", "words", "profile", "probe"].map((id) => ({ id, pack: id }));
+  const tree: Entry[] = ["graph", "action", "types", "record", "links", "items", "exchange", "agent", "words", ...(seed ? ["seed"] : []), "profile", "probe"].map((id) => ({ id, pack: id }));
+  // Packs load side by side: what was on the map is written first, as on a server that starts with it.
+  if (seed) await loader.apply(tree.filter((e) => e.id !== "profile" && e.id !== "probe"));
   await loader.apply(tree);
   await rt.settle();
   const ctx = (run: string) => loader.fiber("probe")!.ctx.intercept({ actor: { id: "e_agent", kind: "agent" }, run });
@@ -133,9 +148,9 @@ test("profiles on the map hold a node back from runs outside them; shadow record
   const plain = (await act("words.add", { title: "Plain", at: ["tool:Bash"], words: "Plain." })).node;
   const apRepo = (await act("items.create", { type: "record", title: "Studio repo" })).id;
   const archRepo = (await act("items.create", { type: "record", title: "Archipelago repo" })).id;
-  const studio = (await act("items.create", { type: "profile", title: "Studio" })).id;
-  const arch = (await act("items.create", { type: "profile", title: "Archipelago" })).id;
-  await act("items.link", { type: "in_profile", from: rhino, to: studio });
+  const studio = (await act("items.create", { type: "umwelt", title: "Studio" })).id;
+  const arch = (await act("items.create", { type: "umwelt", title: "Archipelago" })).id;
+  await act("items.link", { type: "in_umwelt", from: rhino, to: studio });
   await act("items.link", { type: "uses", from: apRepo, to: studio });
   await act("items.link", { type: "uses", from: archRepo, to: arch });
   const [p] = await graph.get([studio]);
@@ -180,8 +195,8 @@ test("profiles on the map hold a node back from runs outside them; shadow record
 test("profile.place moves a live run into one profile: begun again, out of the one it matched", async () => {
   const { errors, ctx, act, read } = await setup();
   const repo = (await act("items.create", { type: "record", title: "Studio repo" })).id;
-  const studio = (await act("items.create", { type: "profile", title: "Studio" })).id;
-  const biz = (await act("items.create", { type: "profile", title: "Business" })).id;
+  const studio = (await act("items.create", { type: "umwelt", title: "Studio" })).id;
+  const biz = (await act("items.create", { type: "umwelt", title: "Business" })).id;
   await act("items.link", { type: "uses", from: repo, to: studio });
   const run = ctx("r9").get<AgentRun>("agent.run");
   await run.begin({ ...start("r9", { repo }), title: "A session" });
@@ -194,5 +209,69 @@ test("profile.place moves a live run into one profile: begun again, out of the o
   assert.deepEqual((await read.of(info)).map((p) => p.title), ["Business"]);
   const refused = await ctx("r9").get<ActionInvoke>("action.invoke").invoke({ action: "profile.place", input: { run: "nope", profile: biz }, authority: { of: "human", basis: "test" }, reason: "test" });
   assert.ok(!refused.ok && refused.refused.code === "profile.no_run");
+  assert.deepEqual(errors, []);
+});
+
+test("any item an umwelt link gives places is said there, as a node, to that umwelt's runs only", async () => {
+  const { errors, ctx, act, tree, graph } = await setup();
+  const rule = (await act("items.create", { type: "record", title: "Layers by trade", fields: { note: "Name layers by trade." } })).id;
+  const apRepo = (await act("items.create", { type: "record", title: "Studio repo" })).id;
+  const archRepo = (await act("items.create", { type: "record", title: "Archipelago repo" })).id;
+  const studio = (await act("items.create", { type: "umwelt", title: "Studio", fields: { status: "on" } })).id;
+  const arch = (await act("items.create", { type: "umwelt", title: "Archipelago", fields: { status: "on" } })).id;
+  await act("items.link", { type: "uses", from: apRepo, to: studio });
+  await act("items.link", { type: "uses", from: archRepo, to: arch });
+  const plain = (await act("items.link", { type: "in_umwelt", from: rule, to: arch })).id;
+  assert.ok(!tree.nodes().some((n) => n.source === plain || n.source === rule), "a link without places says nothing");
+  const link = (await act("items.link", { type: "in_umwelt", from: rule, to: studio, fields: { at: ["tool:Bash"] } })).id;
+  const node = tree.nodes().find((n) => n.source === link);
+  assert.deepEqual(node && [node.id, node.kind, node.title, node.at], [`words/${link}`, "record", "Layers by trade", ["tool:Bash"]]);
+
+  let n = 0;
+  const said = async (repo: string) => {
+    const run = `u${++n}`;
+    const r = ctx(run).get<AgentRun>("agent.run");
+    await r.begin(start(run, { repo }));
+    return (await r.reach({ run, places: ["tool:Bash"], time: T })).said.map((s) => s.text);
+  };
+  assert.deepEqual(await said(apRepo), ["Name layers by trade."]);
+  assert.deepEqual(await said(archRepo), [], "held back where only the plain link holds it");
+
+  await act("items.set", { id: rule, fields: { note: "Name layers by trade, then phase." } });
+  assert.deepEqual(await said(apRepo), ["Name layers by trade, then phase."], "the item's words, read at each say");
+  await act("items.set", { id: rule, fields: { title: "Layers" } });
+  assert.equal(tree.nodes().find((n) => n.source === link)?.title, "Layers", "a new title registers it again");
+  await act("items.set", { id: link, fields: { kind: "instruction" } });
+  assert.equal(tree.nodes().find((n) => n.source === link)?.kind, "instruction", "how it is said is the link's");
+  await act("items.set", { id: link, fields: { trial: true } });
+  assert.deepEqual(await said(apRepo), [`${TRIAL_MARK} Name layers by trade, then phase.`]);
+  await act("items.set", { id: link, fields: { trial: null, retired: true } });
+  assert.deepEqual(await said(apRepo), []);
+  assert.ok(!tree.nodes().some((n) => n.source === link), "a retired link is no node");
+  const [item] = await graph.get([rule]);
+  assert.equal(item?.type, "record", "the item stays what it is");
+  assert.deepEqual(errors, []);
+});
+
+test("profiles and their links from before umwelt are renamed on load, as one change", async () => {
+  const seed: Fact[] = [
+    ["+", "p1", "type", "profile"],
+    ["+", "p1", "title", "Studio"],
+    ["+", "p1", "status", "on"],
+    ["+", "n1", "type", "node"],
+    ["+", "n1", "title", "Rhino"],
+    ["+", "n1", "at", ["tool:Bash"]],
+    ["+", "n1", "words", "Use RhinoCommon."],
+    ["+", "l1", "type", "in_profile"],
+    ["+", "l1", "from", "n1"],
+    ["+", "l1", "to", "p1"],
+    ["+", "l2", "type", "out_of_profile"],
+    ["+", "l2", "from", "n1"],
+    ["+", "l2", "to", "p1"],
+  ];
+  const { errors, graph, read } = await setup(seed);
+  const got = await graph.get(["p1", "l1", "l2"]);
+  assert.deepEqual(got.map((i) => i?.type), ["umwelt", "in_umwelt", "out_of_umwelt"]);
+  assert.deepEqual((await read.nodes("p1")).out, ["words/n1"]);
   assert.deepEqual(errors, []);
 });

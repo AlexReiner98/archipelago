@@ -2,12 +2,12 @@
  * The profile pack: which runs a node is for (spec/profile.md). The rules
  * are in model.ts; this file keeps the model from the graph and wires it.
  *
- * - The base `profile`: statuses `shadow` (the first: it only records what
+ * - The base `umwelt`: statuses `shadow` (the first: it only records what
  *   it would hold back) and `on` (it holds), closed `off`. Fields `match`
  *   (a find-line over a run's facts, an optional extra) and `members` (a
  *   find-line over nodes: `at:file:packs/**`, `at:skill:rhino*`).
- * - Links: `in_profile` (a node item → the profile that holds it),
- *   `out_of_profile` (takes one node out), `uses` (an item whose runs are in
+ * - On the map an umwelt (23 Nov 2026). Links: `in_umwelt` (any item → the umwelt that holds it; with places, `at`, the link is said there itself),
+ *   `out_of_umwelt` (takes one out), `uses` (an item whose runs are in
  *   it: a repo, a hub). A profile `part_of` another composes: a run in the
  *   part is in the whole too.
  * - Provides `profile.read`, and registers a gate (`agent.gate`) that holds
@@ -35,16 +35,23 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { placeMatches } from "../agent/index.ts";
 import { type Model, type Profile, hearing, matchNode, nodeProfiles, placing, runProfiles } from "./model.ts";
 
-export const TYPE = "profile";
-export const IN = "in_profile";
-export const OUT = "out_of_profile";
+/** On the map a profile is an umwelt (Alex, 23 Nov 2026); the pack, its actions and `profile.read` keep the name. */
+export const TYPE = "umwelt";
+export const IN = "in_umwelt";
+export const OUT = "out_of_umwelt";
 export const USES = "uses";
 export const MISSED = "profile.missed";
 export const PLACE = "profile.place";
+export const RENAME = "profile.umwelt";
+/** The names before 23 Nov 2026, renamed on load by `profile.umwelt`. */
+export const RENAMED: Record<string, string> = { profile: TYPE, in_profile: IN, out_of_profile: OUT };
+
+/** An `in_umwelt` link with places is said there itself: its fields say how (the words pack). */
+export const SAID = "at";
 
 export const PROFILE: BaseDef = {
   name: TYPE,
-  doc: "Which runs some nodes are for.",
+  doc: "Which runs some nodes are for: what those runs sense of the map.",
   statuses: { open: ["shadow", "on"], closed: ["off"] },
   fields: {
     match: { kind: "text", doc: "A find-line over a run's facts (remote:github.com/a/*): an extra way in, besides uses links." },
@@ -55,7 +62,21 @@ export const PROFILE: BaseDef = {
 };
 
 export const LINKS: LinkDef[] = [
-  { name: IN, doc: "A node the profile holds.", to: [TYPE] },
+  {
+    name: IN,
+    doc: "An item the umwelt holds. With places (`at`), the link is said there, to the umwelt's runs only.",
+    to: [TYPE],
+    fields: {
+      at: { kind: "json", doc: "The places the item is said at (tool:Bash, file:packs/**, session_start)." },
+      kind: { kind: "text", doc: "How it is said here: instruction (standing, said first at session_start), reflex, rule. Absent, the item's kind, else its type." },
+      when: { kind: "text", doc: "Said only when the moment's input holds this text." },
+      refuse: { kind: "boolean", doc: "Its words are a refusal." },
+      say: { kind: "choice", values: ["listed", "whole"], doc: "listed: one line at session_start, its whole words at its other places." },
+      repeat: { kind: "choice", values: ["every"], doc: "every: said each time its place is reached, not once per context." },
+      trial: { kind: "boolean", doc: "Said marked as a trial, until its record keeps or retires it." },
+      retired: { kind: "boolean", doc: "No longer said; the item stays in the umwelt." },
+    },
+  },
   { name: OUT, doc: "A node taken out of the profile.", to: [TYPE] },
   { name: USES, doc: "Runs that have this item in their facts (a repo, a hub) are in the profile.", to: [TYPE] },
 ];
@@ -84,6 +105,37 @@ const profile: Pack = {
     ctx.get<TypesMark>("types.mark").mark(PROFILE.name, "hexagon");
     for (const l of LINKS) define.link(l);
 
+    // The names before umwelt: each call renames up to LIMIT_MAX of each, as one change set.
+    ctx.get<ActionRegister>("action.register").register({
+      name: RENAME,
+      title: "Rename profiles and their links to umwelt",
+      doc: "Gives each item of type profile, in_profile or out_of_profile its new type: umwelt, in_umwelt, out_of_umwelt. Run on load; history.undo takes it back.",
+      input: { type: "object", properties: {} },
+      async run(_input: Json, call: ActionContext) {
+        const facts: [string, Id, string, Json][] = [];
+        for (const [was, now] of Object.entries(RENAMED)) {
+          for (const it of (await graph.of(was, { limit: LIMIT_MAX })).items) facts.push(["-", it.id, "type", was], ["+", it.id, "type", now]);
+        }
+        if (facts.length) call.write(facts as never);
+        return { renamed: facts.length / 2 };
+      },
+    });
+    for (let i = 0; i < 100; i++) {
+      let left = false;
+      for (const was of Object.keys(RENAMED)) if ((await graph.of(was, { limit: 1 })).items.length) left = true;
+      if (!left) break;
+      const out = await invoke.invoke({
+        action: RENAME,
+        input: {},
+        authority: { of: "human", basis: "Alex, 23 Nov 2026: \"umwelt is the name\" for a profile on the map" },
+        reason: "A profile is an umwelt on the map now",
+      });
+      if (!out.ok) {
+        ctx.runtime.report(ctx.fiber, new Error(out.refused.message));
+        break;
+      }
+    }
+
     // The model, read again whenever a profile or one of its links changes.
     let model: Model = { profiles: new Map() };
     let stale = true;
@@ -106,7 +158,8 @@ const profile: Pack = {
           ...(it.fields.fallback === true ? { fallback: true } : {}),
           parts: parts.map((l) => l.to),
           places: places.map((l) => l.from),
-          holds: holds.map((l) => l.from),
+          // A link with places is a node of its own (its source is the link), held by this umwelt only.
+          holds: [...holds.map((l) => l.from), ...holds.filter((l) => Array.isArray(l.fields[SAID]) && (l.fields[SAID] as Json[]).length).map((l) => l.id)],
           drops: drops.map((l) => l.from),
         });
       }
@@ -134,7 +187,8 @@ const profile: Pack = {
     ctx.get<GraphWatch>("graph.watch").watch({ types: [TYPE, IN, OUT, USES, "part_of"] }, (change) => {
       // A part_of matters only between profiles; anything else of ours always does.
       const touches = change.facts.some(([, id, field, value]) => field === "type" ? value !== "part_of" : model.profiles.has(id)) || change.facts.some(([, , field, value]) => (field === "from" || field === "to") && model.profiles.has(String(value)));
-      if (touches || change.facts.some(([, , f, v]) => f === "type" && v === TYPE)) changed();
+      // A link's places given or taken make it a node of its own, or not.
+      if (touches || change.facts.some(([, , f, v]) => (f === "type" && v === TYPE) || f === SAID)) changed();
     });
     await current();
 

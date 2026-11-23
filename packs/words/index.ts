@@ -1,7 +1,8 @@
 /**
  * The words pack: agent nodes whose words are on the map. Each graph item
  * of type `node` becomes a node (spec/agent.md) with that item as its
- * `source`. Its words are read from the item at every say, so changing them
+ * `source`; so does any item an `in_umwelt` link gives places (`said`), with
+ * the link as its source. Its words are read from the item at every say, so changing them
  * through `words.set` takes effect the next time the node speaks.
  *
  * An item `node` has: `title`, `kind` (instruction, reflex, rule, …), `at`
@@ -33,6 +34,30 @@ import { changes, Hearing, HEARD, listing, SAY_HOW, sayHow, wholeWords, type Say
 export { HEARD, listing, TOOL } from "./heard.ts";
 
 export const TYPE = "node";
+/** A link that brings any item into an umwelt; with places (`at`) it is said there (the profile pack defines it). */
+export const LINK = "in_umwelt";
+
+/**
+ * What a link with places says, as a node item would: the item it brings
+ * (`from`) with its words (or its note), and the link's own `at`, `kind`,
+ * `when`, `refuse`, `say`, `repeat`, and `trial` or `retired` as its status.
+ * The node's kind is how it is said (the link's `kind`: `instruction` is
+ * standing), else what the item is (its `kind`, else its type). Its id is
+ * the link's, the node's source. Null when it has no places or no item.
+ */
+export function said(link: Item, item: Item | null | undefined): Item | null {
+  const at = link.fields.at;
+  if (!item || !Array.isArray(at) || !at.length) return null;
+  const f = item.fields;
+  const words = typeof f.words === "string" && f.words.trim() ? f.words : typeof f.note === "string" ? f.note : "";
+  const text = (v: Json | undefined) => (typeof v === "string" && v ? v : undefined);
+  const fields: Record<string, Json> = { title: f.title ?? item.id, kind: text(link.fields.kind) ?? text(f.kind) ?? item.type, at, words, of: item.id };
+  for (const k of ["when", "refuse", "say", "repeat"]) if (link.fields[k] !== undefined) fields[k] = link.fields[k]!;
+  if (link.fields.retired === true) fields.status = "retired";
+  else if (link.fields.trial === true) fields.status = "trial";
+  if (f.held !== undefined) fields.held = f.held;
+  return { id: link.id, type: LINK, fields };
+}
 
 /** What a trial node's words are said after, so the agent knows it is one. */
 export const TRIAL_MARK = "(Trial node, written after a miss: it may be wrong.)";
@@ -92,11 +117,25 @@ const words: Pack<WordsConfig> = {
     const register = ctx.get<ActionRegister>("action.register");
     const registered = new Map<Id, { dispose: Dispose; shape: string }>();
     const hearing = new Hearing();
+    /** Each item an umwelt link says, and the links that say it, so a change to the item is followed. */
+    const sayers = new Map<Id, Set<Id>>();
+
+    /** What each id says now: a node item as it is, a link with places as `said` makes it, else null. At most LIMIT_MAX ids. */
+    const view = async (ids: Id[]): Promise<(Item | null)[]> => {
+      const got = await graph.get(ids);
+      const from = [...new Set(got.flatMap((i) => (i?.type === LINK && typeof i.fields.from === "string" ? [i.fields.from] : [])))];
+      const items = new Map<Id, Item | null>();
+      for (let i = 0; i < from.length; i += LIMIT_MAX) {
+        const part = from.slice(i, i + LIMIT_MAX);
+        (await graph.get(part)).forEach((it, j) => items.set(part[j]!, it));
+      }
+      return got.map((i) => (!i ? null : i.type === TYPE ? i : i.type === LINK ? said(i, items.get(String(i.fields.from))) : null));
+    };
 
     ctx.provide<WordsHeard>(HEARD, () => ({
       async heard(run, node) {
-        const [item] = await graph.get([node]);
-        if (!item || item.type !== TYPE) return;
+        const [item] = await view([node]);
+        if (!item) return;
         const text = wholeWords(item, TRIAL_MARK);
         if (text) hearing.note(run, node, { text, title: String(item.fields.title ?? node), listed: false });
       },
@@ -109,7 +148,7 @@ const words: Pack<WordsConfig> = {
         void had.dispose();
         registered.delete(id);
       }
-      if (!item || item.type !== TYPE || item.fields.status === "retired") return;
+      if (!item || (item.type !== TYPE && item.type !== LINK) || item.fields.status === "retired") return;
       // A voice item is the wording of a code-made node (words.voice): that node says it, not this pack.
       if (typeof item.fields.voice === "string" && item.fields.voice) return;
       const at = Array.isArray(item.fields.at) ? (item.fields.at as string[]) : [];
@@ -121,7 +160,7 @@ const words: Pack<WordsConfig> = {
         source: id,
         ...(item.fields.repeat === "every" ? { repeat: "every" as const } : {}),
         async speak(moment) {
-          const [now] = await graph.get([id]);
+          const [now] = await view([id]);
           const whole = now ? wholeWords(now, TRIAL_MARK) : "";
           if (!whole) return null;
           if (!holds(now!.fields.when, moment.input)) return null;
@@ -322,16 +361,48 @@ const words: Pack<WordsConfig> = {
     });
 
     // Follow the graph first, then read what is there, so nothing is missed.
-    ctx.get<GraphWatch>("graph.watch").watch({ types: [TYPE] }, async (change) => {
-      const ids = [...new Set(change.facts.map((f) => f[1]))];
-      const now = await graph.get(ids);
-      ids.forEach((id, i) => sync(id, now[i] ?? null));
+    // An umwelt link's node follows the link and the item it brings: a new title or kind registers it again.
+    const linkFrom = new Map<Id, Id>();
+    const follow = (id: Id, item: Item | null) => {
+      const was = linkFrom.get(id);
+      if (was !== undefined) {
+        linkFrom.delete(id);
+        const s = sayers.get(was);
+        if (s && s.delete(id) && !s.size) sayers.delete(was);
+      }
+      if (item?.type === LINK && typeof item.fields.from === "string") {
+        linkFrom.set(id, item.fields.from);
+        (sayers.get(item.fields.from) ?? sayers.set(item.fields.from, new Set()).get(item.fields.from)!).add(id);
+      }
+    };
+    const resync = async (ids: Id[]) => {
+      for (let i = 0; i < ids.length; i += LIMIT_MAX) {
+        const part = ids.slice(i, i + LIMIT_MAX);
+        const [raw, now] = await Promise.all([graph.get(part), view(part)]);
+        part.forEach((id, j) => {
+          follow(id, raw[j] ?? null);
+          sync(id, now[j] ?? null);
+        });
+      }
+    };
+    ctx.get<GraphWatch>("graph.watch").watch({}, async (change) => {
+      const touched = [...new Set(change.facts.map((f) => f[1]))];
+      const ids = new Set<Id>();
+      for (const id of touched) {
+        if (registered.has(id) || linkFrom.has(id)) ids.add(id);
+        for (const l of sayers.get(id) ?? []) ids.add(l);
+      }
+      for (const [, id, field, value] of change.facts) if (field === "type" && (value === TYPE || value === LINK)) ids.add(id);
+      if (ids.size) await resync([...ids]);
     });
-    let page = await graph.of(TYPE, { limit: LIMIT_MAX });
-    for (;;) {
-      for (const item of page.items) sync(item.id, item);
-      if (!page.next) break;
-      page = await graph.of(TYPE, { limit: LIMIT_MAX, after: page.next });
+    for (const type of [TYPE, LINK]) {
+      let page = await graph.of(type, { limit: LIMIT_MAX });
+      for (;;) {
+        if (type === TYPE) for (const item of page.items) sync(item.id, item);
+        else await resync(page.items.map((i) => i.id));
+        if (!page.next) break;
+        page = await graph.of(type, { limit: LIMIT_MAX, after: page.next });
+      }
     }
 
     // What changed in the nodes a run heard, told at its next prompt; a compaction forgets what it heard.
@@ -352,7 +423,7 @@ const words: Pack<WordsConfig> = {
         const now = new Map<Id, Item | null>();
         for (let i = 0; i < ids.length; i += LIMIT_MAX) {
           const part = ids.slice(i, i + LIMIT_MAX);
-          (await graph.get(part)).forEach((it, j) => now.set(part[j]!, it ?? null));
+          (await view(part)).forEach((it, j) => now.set(part[j]!, it ?? null));
         }
         const lines = changes(heard, now, TRIAL_MARK);
         return lines.length ? { say: [CHANGED_HEAD, ...lines.map((l) => `- ${l}`)].join("\n") } : null;
