@@ -15,6 +15,8 @@ export interface Arranged {
   profile: string;
   items: Record<string, Spot>;
   wires: Spot[][];
+  /** The branches as the context view draws them (curve, width, strength); without them, the wires as lines. */
+  branches?: { d: string; width: number; ink: number }[];
   boughs: { at: Spot; text: string }[];
   ghosts: { at: Spot; text: string }[];
 }
@@ -95,19 +97,44 @@ export function treeBox(a: Arranged, scale: number, S: Settings): [number, numbe
   return x0 < Infinity ? [x0, y0, x1, y1] : [0, 0, 1, 1];
 }
 
+const paths = new Map<string, Path2D>();
+/** A branch's curve, made once. */
+function pathOf(d: string): Path2D {
+  let p = paths.get(d);
+  if (!p) {
+    if (paths.size > 4000) paths.clear();
+    paths.set(d, (p = new Path2D(d)));
+  }
+  return p;
+}
+
 /** Paints the tree: branches, then the ghosts' dots and every name, at strength `alpha`. */
 export function paintTree(c: CanvasRenderingContext2D, a: Arranged, cam: Cam, dpr: number, scale: number, alpha: number, ink: Ink, S: Settings): void {
   if (alpha <= 0.01) return;
   c.save();
   c.setTransform(dpr * cam.k, 0, 0, dpr * cam.k, dpr * cam.tx, dpr * cam.ty);
   c.lineCap = "round";
-  c.strokeStyle = ink.muted;
-  c.globalAlpha = alpha * 0.8;
-  c.lineWidth = 1.4 / cam.k;
-  for (const w of a.wires) {
-    c.beginPath();
-    w.forEach(([x, y], j) => (j ? c.lineTo(x * scale, y * scale) : c.moveTo(x * scale, y * scale)));
-    c.stroke();
+  c.lineJoin = "round";
+  if (a.branches?.length) {
+    // The context view's own curves and strokes, in the tree's units, so the two draw the same tree.
+    c.save();
+    c.scale(scale, scale);
+    c.strokeStyle = ink.branch;
+    for (const b of a.branches) {
+      c.globalAlpha = alpha * b.ink;
+      c.lineWidth = b.width;
+      c.stroke(pathOf(b.d));
+    }
+    c.restore();
+  } else {
+    c.strokeStyle = ink.muted;
+    c.globalAlpha = alpha * 0.8;
+    c.lineWidth = 1.4 / cam.k;
+    for (const w of a.wires) {
+      c.beginPath();
+      w.forEach(([x, y], j) => (j ? c.lineTo(x * scale, y * scale) : c.moveTo(x * scale, y * scale)));
+      c.stroke();
+    }
   }
   const size = (S.tree_text ?? 11) * scale;
   c.font = `500 ${size}px ui-sans-serif, system-ui, sans-serif`;

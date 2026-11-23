@@ -70,10 +70,12 @@ export interface Ink {
   muted: string;
   line: string;
   accent: string;
+  /** A tree's branches: the context view's own ink for them. */
+  branch: string;
 }
 /** The page's colours, from the style tokens (their plain values when no style is loaded). */
 export function ink(el: Element): Ink {
-  return { sea: read("bg", el), text: read("fg", el), muted: read("dim", el), line: read("dim", el), accent: read("pick", el) };
+  return { sea: read("bg", el), text: read("fg", el), muted: read("dim", el), line: read("dim", el), accent: read("pick", el), branch: read("say", el) };
 }
 
 /** The style's hues, for types in order; a type past the sixth gets its own (graph.ts hue). */
