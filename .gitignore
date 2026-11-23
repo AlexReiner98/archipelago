@@ -7,3 +7,5 @@ CLAUDE.local.md
 .data/
 # Skills the map writes into this checkout for its runs (packs/placed)
 .claude/skills/
+# Local editor and preview settings
+.claude/launch.json

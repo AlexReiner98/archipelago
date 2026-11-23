@@ -1,53 +1,31 @@
-# Working rules
+# Working on Archipelago with an agent
 
-Where the work stands is kept on the owner's Archipelago map, the Focus
-workspace, on the island "Rebuild on Cordis" (hub e_3pneg4cc). Read the hub
-and its decisions before starting. Don't keep a second plan in files.
+This file is read by Claude Code (and is a fair guide for any contributor,
+human or agent) when working in this repository. The
+[guide](guide/README.md) explains the ideas; this is how changes are made.
 
-## Decided
+## How it is built
 
 - The kernel is the Cordis runtime and its loader, on the server and in the
   browser. Everything else is a pack at the same level: the graph, the schema,
   the history, the UI, the learning loop.
-- The spec owns the interfaces packs talk through, and versions them. Any
-  pack can be replaced; an interface cannot be changed silently.
+- The spec ([spec/](spec/README.md)) owns the interfaces packs talk through,
+  and versions them. Any pack can be replaced; an interface cannot be changed
+  silently.
 - No human gates. Every change applies, and anything can be undone.
-- No sandbox. Installing a pack means trusting it; when hosted, each
-  workspace runs in its own process.
+- No sandbox. Installing a pack means trusting it.
 - History is a journal pack. Each change set is written in full (actor,
   authority, pack, reason, and its facts as `[op, id, field, value]`), and
   undo applies its inverse. The graph is the truth: nothing is rebuilt from
   the journal.
 - No pack owns a part of the data. A grouping is a link or a query.
-- This repo is public and MIT. Everything one person needs on their own
-  machine belongs here, a basic map UI included. What it takes to run it for
-  others goes in a separate private repo of packs: sign-in, multiple users,
-  hosted sync, a graph at scale, domain packs, connectors, sharing.
-- Nothing private is ever committed here: no tokens, no local paths, and no
-  owner content such as skills, memory or map data. Data stays in the ignored
-  `.data/` folder.
-
-## The first build
-
-A live harness view for Claude Code. Every say, refusal and action passes
-through the `agent` service and is recorded by `exchange`. A verdict per run
-says whether each node worked. The UI shows the tree, the live run and the
-node, linked to each other.
-
-## What does not apply here
-
-The map tells every session some of the owner's preferences at the start.
-These are about the old repository and do not apply here:
-
-- Start sessions from the main archipelago checkout
-- Iterate before full tests (the old `npm test` sets and the structure test)
-- Layouts judged by eye, and drawing controls in the panel (the old canvas)
-- Cross-island via a published finding, and nothing held in Archipelago
-- Live site edits without screenshots (archipelago.tools)
-
-The rest still holds: no PRs mid-work, plans as flows, diagrams not text,
-a feature ships with its UI, social prose is the owner's, and own runs for
-builders.
+- This repository holds everything one person needs on their own machine, a
+  basic map UI included. Running it for others (sign-in, multiple users,
+  hosted sync) is out of its scope.
+- Nothing private is ever committed: no tokens, no local paths, no personal
+  names, and no one's own content such as skills, memory or map data. Data
+  stays in the ignored `.data/` folder. Tests use neutral fixtures
+  (`C:\Users\me`, `/home/me`, `pat@example.org`).
 
 ## Rules
 
@@ -56,12 +34,21 @@ builders.
 - A pack's effects are revertible: when it unloads, everything it registered
   goes.
 - Keep it small. A new idea becomes a pack, not kernel code.
-- The spec is the contract between packs, and it is versioned. Ask the
-  owner before changing it, and say which capability and edition.
+- The spec is the contract between packs, and it is versioned. A change to
+  it is discussed first (in an issue) and says which capability and edition
+  it changes.
 - A pack's code comes with its tests, in `test/<pack>.test.ts`: input in,
   what it records or answers out.
 - Every read of the graph or the exchange is bounded: ids given, or a page
   with a limit and a cursor (`LIMIT_MAX` in `spec/graph.ts`).
 - Docs change in the same commit as the code: the pack's README, the
   interface's `spec/<name>.md`, and `spec/README.md` when the list changes.
-- Before you finish, `npm run check` passes.
+- A feature ships with the UI that shows it working.
+
+## Checking a change
+
+- `npm run check` (TypeScript, no emit) passes before you finish.
+- Run the tests you touched, `node --test test/<pack>.test.ts`, and the
+  whole set (`npm test`) before a pull request.
+- To see a change in the browser, `npm run serve` and open
+  http://127.0.0.1:5280/app/. It runs `.ts` directly: there is no build.
