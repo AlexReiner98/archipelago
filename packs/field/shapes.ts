@@ -1,6 +1,6 @@
 /**
- * A particle's shape: its base's mark shape (spec/style.ts SHAPES: square,
- * diamond, circle, triangle), and how full it is by where its status sits
+ * A particle's shape: its base's mark shape (spec/style.ts MARK_SHAPES:
+ * square, diamond, circle, triangle, pentagon, hexagon), and how full it is by where its status sits
  * (fresh hollow, moving half, done and gone full), as the item marks are.
  * Pure: the outline as a path, and how far the edge is from the middle in
  * a direction, which collide reads so flat sides pack closer than corners.
@@ -8,21 +8,25 @@
  * Each shape has the area of the circle of the particle's radius r, so no
  * base looks bigger than another of the same size.
  */
-import { SHAPES, SIDES, type Shape, type Side } from "../../spec/style.ts";
+import { MARK_SHAPES, SIDES, type MarkShape, type Side } from "../../spec/style.ts";
 
-/** A shape's index in SHAPES; CIRCLE when shapes are off. */
-export const CIRCLE = SHAPES.indexOf("circle");
+/** A shape's index in MARK_SHAPES; CIRCLE when shapes are off. */
+export const CIRCLE = MARK_SHAPES.indexOf("circle");
+
+/** A regular polygon of n sides with the area of a unit circle: (n/2) R² sin(2π/n) = π. */
+const regular = (n: number, at: number) => ({ n, at, R: Math.sqrt((2 * Math.PI) / (n * Math.sin((2 * Math.PI) / n))) });
 
 /** Regular polygons: sides, the angle of the first corner, and the circumradius for the area of a unit circle. */
-const POLY: Record<Exclude<Shape, "circle">, { n: number; at: number; R: number }> = {
-  // (2a)² = π → a = √π/2, corner at a√2.
-  square: { n: 4, at: Math.PI / 4, R: Math.sqrt(Math.PI / 2) },
-  diamond: { n: 4, at: 0, R: Math.sqrt(Math.PI / 2) },
-  // (3√3/4)R² = π.
-  triangle: { n: 3, at: -Math.PI / 2, R: Math.sqrt((4 * Math.PI) / (3 * Math.sqrt(3))) },
+const POLY: Record<Exclude<MarkShape, "circle">, { n: number; at: number; R: number }> = {
+  square: regular(4, Math.PI / 4),
+  diamond: regular(4, 0),
+  // Point up, as the marks' letters are.
+  triangle: regular(3, -Math.PI / 2),
+  pentagon: regular(5, -Math.PI / 2),
+  hexagon: regular(6, 0),
 };
 
-const polyOf = (shape: number) => (shape === CIRCLE ? null : POLY[SHAPES[shape] as Exclude<Shape, "circle">] ?? null);
+const polyOf = (shape: number) => (shape === CIRCLE ? null : POLY[MARK_SHAPES[shape] as Exclude<MarkShape, "circle">] ?? null);
 
 /** The farthest the edge reaches, as a share of r. */
 export function reach(shape: number): number {

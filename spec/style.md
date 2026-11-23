@@ -34,16 +34,21 @@ and font, and the page still reads.
 | Type | `font` `mono` `text-xs` `text-s` `text-m` `text` `text-l` `leading` `bold` |
 | Space | `space-1` … `space-5` `radius` |
 | Frame | `frame-left` `frame-right`: the widths of those regions (edition 7, [frame](frame.md)) |
-| Glyphs | `glyph-<shape>-<side>`, `glyph-<verdict>` |
+| Glyphs | `glyph-<shape>-<side>` (edition 10 adds `pentagon` and `hexagon`), `glyph-<verdict>` |
 
 ## Marks
 
 An item's mark comes from its base and where its status sits, never its
-type's name. Its shape is the base's place among the bases defined
-(`SHAPES`: square, diamond, circle, triangle, then round again). Its side
+type's name. Its shape is its base's (edition 10, `markShape`): the pack
+that defines a base names its shape with `types.mark`
+([types](types.md)), from `MARK_SHAPES` (square, diamond, circle,
+triangle, pentagon, hexagon), and a base none names takes the first shape
+no base holds. Until edition 10 it was the base's place among the bases
+(`SHAPES` and `shape`, retired: four shapes, round again, so a fifth base
+shared the first's). Its side
 is the status's place: the first open is `fresh`, a later open `moving`,
 the first closed `done`, a later closed `gone`. The glyph is
-`glyph-<shape>-<side>`, drawn in `mark-<side>`.
+`glyph-<shape>-<side>` (`markGlyph`), drawn in `mark-<side>`.
 
 A node's verdict in a run is `held`, `failed`, `quiet`, or `none` when it
 said nothing: glyph `glyph-<verdict>`, drawn in the verdict's colour.

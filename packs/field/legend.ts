@@ -68,7 +68,7 @@ const num = (c: Count) => (c.shown === c.n ? String(c.n) : `${c.shown} of ${c.n}
 const MARK_R = 3.7, MARK_AT = 6;
 
 export function Legend({ facets, hide, set, dials, look }: { facets: Facets; hide: Hide; set: (next: Hide | undefined) => void; dials: () => unknown; look: Settings }) {
-  /** A particle's mark: `shape` (SHAPES), `side` (SIDES; absent: full), in `colour` (absent: the dim ink), faded as closed when `shut`. */
+  /** A particle's mark: `shape` (MARK_SHAPES), `side` (SIDES; absent: full), in `colour` (absent: the dim ink), faded as closed when `shut`. */
   const mark = (shape: number | undefined, side: number | undefined, colour?: string, shut = false) => {
     const sh = look.shapes ? (shape ?? CIRCLE) : CIRCLE, how = look.shapes && side !== undefined ? fill(side) : 2;
     return html`<svg class=${`mk${colour ? "" : " ink"}`} viewBox="0 0 12 12" style=${shut ? `opacity:${look.closed_fade}` : ""}><path d=${markPath(sh, how, MARK_AT, MARK_AT, MARK_R, look.hollow_line ?? 0.4)} style=${colour ? `fill:${colour}` : ""} /></svg>`;

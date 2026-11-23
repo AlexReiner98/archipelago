@@ -10,6 +10,7 @@ against it in the write chain. Types: [types.ts](types.ts).
 |---|---|
 | `types.define` | Define a base, a flavour or a kind of link |
 | `types.read` | What is defined now, resolved, and when it changes |
+| `types.mark` (10) | The shape each base is drawn in |
 
 ## Few bases, flavours
 
@@ -30,6 +31,18 @@ Decided (20 Nov 2026, "How do types grow without creeping?"):
 
 Every base has `title`, `note` and `status` (`COMMON`); a base or flavour
 declares only what it adds. A new item takes its base's first open status.
+
+## Marks
+
+Edition 10: the pack that defines a base names the shape its items are
+drawn in (`types.mark` `mark(base, shape)`, one of the style's
+`MARK_SHAPES`), so no two bases look alike. A shape another base holds, or
+a second shape for one base, is refused. A base none names takes the first
+shape no base holds, in the order bases are defined; `marks()` gives every
+base defined now with its shape. Edition 1's packs name theirs: work a
+square, question a diamond, record a circle, actor a triangle; the profile
+pack's base is a hexagon. A shape is the naming pack's effect and goes
+when it unloads.
 
 ## Links
 

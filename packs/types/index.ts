@@ -1,13 +1,14 @@
 /**
- * The types pack: the broker of spec/types.md. Provides types.define and
- * types.read. Holds bases, flavours and kinds of link as the defining
+ * The types pack: the broker of spec/types.md. Provides types.define,
+ * types.read and types.mark (edition 10: the shape each base is drawn in). Holds bases, flavours and kinds of link as the defining
  * packs' effects, so each goes when its pack unloads; it knows no type of
  * its own. A flavour is refused when its base isn't there or when it
  * declares a field its base already has.
  */
 import type { Caller, Dispose } from "../../spec/common.ts";
 import { Refused, byPosition } from "../../spec/common.ts";
-import type { BaseDef, FieldDef, FlavourDef, LinkDef, LinkInfo, TypeInfo, TypesDefine, TypesRead } from "../../spec/types.ts";
+import type { BaseDef, FieldDef, FlavourDef, LinkDef, LinkInfo, TypeInfo, TypesDefine, TypesMark, TypesRead } from "../../spec/types.ts";
+import { MARK_SHAPES, type MarkShape } from "../../spec/style.ts";
 import { COMMON } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 
@@ -100,6 +101,39 @@ const types: Pack = {
       link(def) {
         checkFields(def.fields, def.name);
         return add(caller, from, { what: "link", def });
+      },
+    }));
+
+    // Each base's shape, as its pack names it; a base none names takes the first shape left.
+    const named = new Map<string, MarkShape>();
+    ctx.provide<TypesMark>("types.mark", (_caller, from) => ({
+      mark(base, shape) {
+        if (!MARK_SHAPES.includes(shape)) refuse("mark_shape", `${shape} is not a mark shape: one of ${MARK_SHAPES.join(", ")}.`);
+        if (named.has(base)) refuse("mark_named", `${base} is drawn as a ${named.get(base)} already.`);
+        const held = [...named].find(([, s]) => s === shape)?.[0];
+        if (held) refuse("mark_held", `${held} is drawn as a ${shape} already.`);
+        return from.effect(() => {
+          named.set(base, shape);
+          changed();
+          return () => {
+            if (named.get(base) === shape) named.delete(base);
+            changed();
+          };
+        });
+      },
+      marks() {
+        const bases = ordered().filter((e) => e.d.what === "base").map((e) => e.d.def.name);
+        const free = MARK_SHAPES.filter((s) => ![...named.values()].includes(s));
+        const out: Record<string, MarkShape> = {};
+        let k = 0;
+        for (const b of bases) out[b] = named.get(b) ?? (k < free.length ? free[k++]! : MARK_SHAPES[k++ % MARK_SHAPES.length]!);
+        return out;
+      },
+      watch(on): Dispose {
+        return from.effect(() => {
+          watchers.add(on);
+          return () => watchers.delete(on);
+        });
       },
     }));
 

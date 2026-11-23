@@ -35,7 +35,7 @@ export interface Count {
 }
 export interface TypeFacet extends Count {
   colour: string;
-  /** Its base, and the base's mark shape (an index in SHAPES; absent: circle). */
+  /** Its base, and the base's mark shape (an index in MARK_SHAPES; absent: circle). */
   base: string;
   shape?: number;
   /** Each status, with how full it is drawn (`side`, an index in SIDES; absent: done). */

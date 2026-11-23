@@ -53,7 +53,8 @@ find line has words, only what it finds and what lies near it.
   legend's open and closed switches do not apply while it has words, so a
   plan shows its done steps.
 - **Shapes** ([shapes.ts](shapes.ts)). A particle is its base's mark shape
-  (spec/style.ts: square, diamond, circle, triangle), each the area of its
+  (`types.mark`, edition 10: square, diamond, circle, triangle, pentagon,
+  hexagon, as the base's pack names it), each the area of its
   circle: hollow while its status is the first open one, half (◐, one
   shape, open on the right) while later open, full once closed, as the
   item marks are. `shapes` turns them to circles; one smaller than

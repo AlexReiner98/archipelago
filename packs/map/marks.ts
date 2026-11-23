@@ -6,12 +6,12 @@
  */
 import type { Json } from "../../spec/common.ts";
 import type { TypeInfo } from "../../spec/types.ts";
-import { glyph, read, shape, side } from "../../spec/style.ts";
+import { markGlyph, markShape, read, side, type MarkShape } from "../../spec/style.ts";
 
-export { shape, side, type Side } from "../../spec/style.ts";
+export { side, type Side } from "../../spec/style.ts";
 
-/** The glyph token of an item's mark. */
-export const markToken = (bases: string[], t: TypeInfo | undefined, status: Json | undefined) => glyph(shape(bases, t), side(t, status));
+/** The glyph token of an item's mark; `marks` is every base's shape (types.mark, edition 10). */
+export const markToken = (marks: Readonly<Record<string, MarkShape>>, t: TypeInfo | undefined, status: Json | undefined) => markGlyph(markShape(marks, t), side(t, status));
 
 /** The glyph of an item's mark, as the style draws it now. */
-export const mark = (bases: string[], t: TypeInfo | undefined, status: Json | undefined) => read(markToken(bases, t, status));
+export const mark = (marks: Readonly<Record<string, MarkShape>>, t: TypeInfo | undefined, status: Json | undefined) => read(markToken(marks, t, status));

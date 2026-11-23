@@ -2,7 +2,7 @@
 
 Server capabilities in the browser. [server.ts](server.ts) (Node) serves
 `agent.tree`, `exchange.read`, `exchange.watch`, `verdict.read`,
-`action.list`, `action.invoke`, `graph.read`, `graph.watch`, `types.read`, `profile.read` and `docs.read` over HTTP and
+`action.list`, `action.invoke`, `graph.read`, `graph.watch`, `types.read`, `types.mark` (edition 10), `profile.read` and `docs.read` over HTTP and
 one event stream; [client.ts](client.ts) (the page) provides the same keys
 by calling it. Packs in the page inject them as if they ran there.
 

@@ -138,7 +138,7 @@ test("the layout survives a cycle and links outside the drawn items", () => {
 });
 
 test("marks come from the base and the status's side, never the type's name", () => {
-  const bases = ["work", "question"];
+  const bases = { work: "square", question: "diamond", profile: "hexagon" } as const;
   const w = TYPES.get("work")!;
   const bug = TYPES.get("bug")!;
   assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => side(w, s)), ["fresh", "moving", "done", "gone"]);
@@ -147,4 +147,7 @@ test("marks come from the base and the status's side, never the type's name", ()
   assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => drawn(markToken(bases, w, s))), ['"□"', '"◧"', '"■"', '"■"'], "the style draws each side");
   assert.equal(markToken(bases, bug, "done"), markToken(bases, w, "done"), "a flavour is marked as its base");
   assert.equal(drawn(markToken(bases, TYPES.get("question")!, "open")), '"◇"');
+  // Edition 10: a base its pack draws as a hexagon has the hexagon's letters.
+  assert.equal(markToken(bases, { ...w, name: "profile", base: "profile" }, "todo"), "glyph-hexagon-fresh");
+  assert.equal(drawn("glyph-hexagon-fresh"), '"⬡"');
 });
