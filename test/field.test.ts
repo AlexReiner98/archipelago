@@ -61,9 +61,12 @@ test("every number a behaviour reads is one of its dials", () => {
   }
 });
 
+/** One settled sample of 600, shared: settling is the slow part (seconds on a slow runner), and both tests below read it. */
+let settled600: ReturnType<typeof settle> | undefined;
+const big = () => (settled600 ??= settle(sample(600, 15)));
+
 test("a run settles where the pushes balance, not where it cooled, and the same way twice", () => {
-  const input = sample(600, 15);
-  const a = settle(input);
+  const a = big();
   console.log(`settled: ${a.steps} steps, ${a.ms.toFixed(0)} ms (${(a.ms / a.steps).toFixed(1)} ms a step), moving ${a.g.sim.moved!.toFixed(3)} a step`);
   assert.equal(a.g.sim.settled, true, "it settled before steps_most");
   assert.ok(a.g.sim.push! < settings().settle_push!, "the pushes balance");
@@ -90,7 +93,7 @@ test("the rule: every behaviour's push is its energy's slope, and the energy onl
 });
 
 test("collide leaves no particle on another, and part_of keeps a tree together", () => {
-  const { g } = settle(sample(600, 12));
+  const { g } = big();
   let overlaps = 0;
   for (let i = 0; i < g.n; i++) for (let j = i + 1; j < g.n; j++) if (Math.hypot(g.x[i]! - g.x[j]!, g.y[i]! - g.y[j]!) < (g.r[i]! + g.r[j]!) * 0.9) overlaps++;
   assert.ok(overlaps <= g.n * 0.01, `${overlaps} overlaps`);
