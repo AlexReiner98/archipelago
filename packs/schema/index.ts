@@ -58,9 +58,14 @@ const schema: Pack<SchemaConfig> = {
         }
       };
       await read(ids);
-      // Items named by `id` fields and link ends, outside the set: read them too.
+      // Items named by `id` fields and link ends, outside the set: read them too. An item checked whole (made, or
+      // given a new type) is checked with the ends and ids it already had, so those are read as well.
       const named = new Set<Id>();
-      for (const [op, , , value] of facts) if (op === "+" && typeof value === "string" && !known.has(value) && value.length <= 200) named.add(value);
+      const name = (value: Json | undefined) => {
+        if (typeof value === "string" && !known.has(value) && value.length <= 200) named.add(value);
+      };
+      for (const [op, , , value] of facts) if (op === "+") name(value);
+      for (const fields of now.values()) for (const value of Object.values(fields)) name(value);
       await read([...named]);
       const problems = check(now, facts, {
         type: (name) => types.get(name),
