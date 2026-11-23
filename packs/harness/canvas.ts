@@ -408,13 +408,14 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     hideTip();
     const at = toWorld(e);
     const on = named(at)?.node ?? hit(at);
-    const start = { cx: e.clientX, cy: e.clientY, view: viewRef.current };
+    let start = { cx: e.clientX, cy: e.clientY, view: viewRef.current };
     let moved = false;
     const el = box.current!;
     el.setPointerCapture(e.pointerId);
     const move = (m: PointerEvent) => {
       if (!moved && Math.hypot(m.clientX - start.cx, m.clientY - start.cy) < 4) return;
-      if (!moved) el.classList.add("panning");
+      // The picture moves from where the drag is first seen, so it never jumps the few px a press may wander.
+      if (!moved) (start = { cx: m.clientX, cy: m.clientY, view: viewRef.current }), el.classList.add("panning");
       moved = true;
       cancelAnimationFrame(gliding.current);
       wheelGoal.current = undefined;

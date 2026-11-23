@@ -240,11 +240,13 @@ const fieldPack: Pack = {
       const treeLevels = useMemo(() => (arranged ? new Map(input.items.filter((it) => it.id in arranged.items).map((it) => [it.id, FOUND] as const)) : null), [input, arrangedKey]);
       // While the find line has words, only what it finds and what lies near it stay: each by how it is drawn.
       const levels = useMemo(() => treeLevels ?? (found ? around(visible, found, S.find_steps!, S.find_faint!) : null), [treeLevels, visible, found, S.find_steps, S.find_faint]);
-      const laid = useMemo<FieldIn>(() => {
-        if (treeLevels) return { items: input.items.filter((it) => treeLevels.has(it.id)), links: input.links.filter((l) => treeLevels.has(l.from) && treeLevels.has(l.to)), types: input.types };
-        if (!levels) return visible;
+      // Arranged, what is laid out is the tree's items alone: the find line's words settling mid-flight lay nothing out again.
+      const laidTree = useMemo<FieldIn | null>(() => (treeLevels ? { items: input.items.filter((it) => treeLevels.has(it.id)), links: input.links.filter((l) => treeLevels.has(l.from) && treeLevels.has(l.to)), types: input.types } : null), [input, treeLevels]);
+      const laidFound = useMemo<FieldIn>(() => {
+        if (!levels || treeLevels) return visible;
         return { items: visible.items.filter((it) => levels.has(it.id)), links: visible.links.filter((l) => levels.has(l.from) && levels.has(l.to)), types: visible.types };
       }, [visible, levels, treeLevels]);
+      const laid = laidTree ?? laidFound;
       // Kept as it is, {} included (show everything); only the start is absent.
       const setHide = (next: Hide | undefined) => {
         const v = (next ?? {}) as Json;
