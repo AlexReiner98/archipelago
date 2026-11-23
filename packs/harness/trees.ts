@@ -168,6 +168,8 @@ export interface TreesProps {
   tipMs?: number;
   nameSteps?: number;
   quietPx?: number;
+  /** The most characters a name shows (the name_most dial); 0 or none, whole. */
+  nameMost?: number;
 }
 
 const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
@@ -177,7 +179,8 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
   const heard = useMemo(() => heardBy(p.nodes, a.hears), [p.nodes, hearsKey]);
   const nodes = useMemo(() => (extra?.length ? [...heard, ...extra] : heard), [heard, extra]);
   const tree = useMemo(() => treeOf(nodes, { by: p.by }), [nodes, p.by]);
-  const placed = useMemo(() => radial(tree), [tree]);
+  const nameMost = p.nameMost || Infinity;
+  const placed = useMemo(() => radial(tree, { nameMost }), [tree, nameMost]);
   const mine = useMemo(() => p.events.filter((e) => e.run === a.run.run), [p.events, a.run.run]);
   const state = useMemo(() => stateAt(mine, mine.length - 1), [mine]);
   const title = runName(a.run);

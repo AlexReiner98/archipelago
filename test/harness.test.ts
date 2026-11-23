@@ -858,6 +858,8 @@ test("seen whole, a node's name shows only if it matters: below quiet_px on scre
   assert.equal(quietShown(8, 9), 0.5, "half a step below");
   assert.equal(quietShown(7, 9), 0, "gone two px below");
   assert.equal(dialsOf({}).quiet_px, 0, "the dial starts at 0: every name");
+  assert.equal(dialsOf({}).name_most, 28, "names cut at 28 characters");
+  assert.equal(radial(treeOf([{ id: "words/a", title: "A name far longer than twenty-eight characters", at: ["prompt"], pack: "words", kind: "reflex" } as never]), { nameMost: 28 }).labels.get("words/a")?.text.length, 28, "cut with an ellipsis");
 });
 
 test("while zooming, names come from an atlas: a zoom stepped to a few sizes per doubling, pictures placed shelf by shelf", async () => {

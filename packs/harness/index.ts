@@ -302,11 +302,12 @@ const harness: Pack = {
       const win = useWindow(invoke, hasWindow, windowRun, live || following.current ? undefined : event, live ? liveEvents.length : events.length);
       const marks = useMemo(() => windowMarks(win), [win]);
       const tree = useMemo(() => treeOf(treeNodes, { by, unsaid, profiles: membership, decided }), [treeNodes, by, unsaid, membership, decided]);
-      const placed = useMemo(() => radial(tree), [tree]);
+      const dials = useDials(here);
+      const nameMost = dials.name_most || Infinity;
+      const placed = useMemo(() => radial(tree, { nameMost }), [tree, nameMost]);
       // The harness's given nodes are grey, not a pack hue (canvas.ts).
       const hues = useMemo(() => packHues(nodes.map((n) => n.pack)), [nodes]);
       // Live: each run an agent with a tree of its own (what it hears), in its colour, its profile over it.
-      const dials = useDials(here);
       const acting = useMemo(() => new Set(liveEvents.map((e) => e.run)), [liveEvents]);
       // Trees for the agent in focus and the three last active besides; a line each for the rest.
       const focus = hk.useHere<string>(FOCUS);
@@ -428,7 +429,7 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} />`
+              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} nameMost=${dials.name_most} />`
               : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
                   <div class="hv-onerun">
                     ${run ? html`<${WindowBar} w=${win} filter=${keyFilter} hues=${hues} picked=${picked} onPick=${pick} />` : html`<span></span>`}

@@ -96,7 +96,8 @@ The dials, in the bar's ⋯ menu: how long a switch of focus takes
 words show beside it (`tip_ms`, 0 for never), how many sizes names
 take per doubling while the tree zooms (`name_steps`, 0 for every size),
 the size on screen below which a node's name shows only if the run said
-it, refused with it, or it is picked (`quiet_px`, 9; 0 for every name), so
+it, refused with it, or it is picked (`quiet_px`, 0 for every name, as it starts),
+the most characters a name shows (`name_most`, 28; 0 for whole), so
 a tree seen whole reads by its shape and what it was told, and how long a run may be
 quiet and still be live (`quiet_min`). Its value is `harness.dials` (page scope), so an agent can
 set it; the browser remembers it. Colours are style tokens only.
@@ -162,7 +163,9 @@ from the trees (struck while hidden), and a second click shows them again
 as "given" in the ⋯ menu. A node's text that the server doesn't answer for
 says so after 15 seconds, with "try again".
 
-Names are whole, never cut, and never show a path: a path is said as
+Names on the tree are cut to `name_most` characters with an ellipsis (28,
+a dial; 0 for whole: a long name otherwise shrinks the whole tree out of
+reading, 23 Nov 2026), the whole title in its words, and never show a path: a path is said as
 whose it is, after a dot (`nameOf`, `placeName`): its project's folder,
 and the file when it isn't the usual CLAUDE.md or MEMORY.md, so
 "project memory · archipelago-next", "auto memory · Aperture". The whole
