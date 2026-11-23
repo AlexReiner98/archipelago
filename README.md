@@ -7,7 +7,15 @@ what it does, and shows each run live, so you can shape what it plans,
 remembers and learns. It runs on your own machine, with your data in one
 ignored folder.
 
-![A fresh local map filling as a Claude Code session plans a release](guide/images/map-filling.gif)
+**The Sensory interface**: what Claude Code is told, where and by whom, live as
+the run goes.
+
+![The Sensory interface following a Claude Code run live](guide/images/sensory-interface.gif)
+
+**The Landscape**: the map the agent works on, laying itself out as the agent
+adds to it.
+
+![The Landscape laying itself out as a Claude Code session adds items and links](guide/images/landscape-solving.gif)
 
 ## What you need
 
