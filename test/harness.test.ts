@@ -481,7 +481,7 @@ test("placementOf: matched, the fallback, or none; a run that named the fallback
   assert.equal(placementOf([p("arch")], fallbacks, ["arch"]).kind, "matched");
   assert.deepEqual(placementOf([], fallbacks), { kind: "none", title: "", ids: [] });
   assert.equal(placementText(placementOf([p("arch")], fallbacks)), "○ Arch");
-  assert.equal(placementText(placementOf([], fallbacks)), "– no umwelt");
+  assert.equal(placementText(placementOf([], fallbacks)), "– no context filter");
 });
 
 test("landsLive: nothing picked watches every live run; a run, every run or live turned off doesn't", () => {

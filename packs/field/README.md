@@ -38,8 +38,8 @@ find line has words, only what it finds and what lies near it.
   each item's rank is its longest chain of what it waits on, and what it
   waits on is to the left) and `collide` (by each shape's edge along the
   line between two particles), and `tree` (while the Landscape is
-  arranged into an umwelt, packs/arrange's page key `arrange.tree`, each
-  of its items flies from where it stood to its place in that umwelt's
+  arranged into a context filter, packs/arrange's page key `arrange.tree`, each
+  of its items flies from where it stood to its place in that context filter's
   tree over `tree_ms`, eased, however fast the run steps; only those items
   are laid out, the camera keeps the whole tree in view, and the tree's
   branches and names ([treeover.ts](treeover.ts)) come in under them as

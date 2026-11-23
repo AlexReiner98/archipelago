@@ -2,12 +2,12 @@
  * The profile pack: which runs a node is for (spec/profile.md). The rules
  * are in model.ts; this file keeps the model from the graph and wires it.
  *
- * - The base `umwelt`: statuses `shadow` (the first: it only records what
+ * - The base `context_filter`: statuses `shadow` (the first: it only records what
  *   it would hold back) and `on` (it holds), closed `off`. Fields `match`
  *   (a find-line over a run's facts, an optional extra) and `members` (a
  *   find-line over nodes: `at:file:packs/**`, `at:skill:rhino*`).
- * - On the map an umwelt (23 Nov 2026). Links: `in_umwelt` (any item → the umwelt that holds it; with places, `at`, the link is said there itself),
- *   `out_of_umwelt` (takes one out), `uses` (an item whose runs are in
+ * - On the map a context filter (23 Nov 2026). Links: `in_context_filter` (any item → the context filter that holds it; with places, `at`, the link is said there itself),
+ *   `out_of_context_filter` (takes one out), `uses` (an item whose runs are in
  *   it: a repo, a hub). A profile `part_of` another composes: a run in the
  *   part is in the whole too.
  * - Provides `profile.read`, and registers a gate (`agent.gate`) that holds
@@ -35,18 +35,18 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { placeMatches } from "../agent/index.ts";
 import { type Model, type Profile, hearing, matchNode, nodeProfiles, placing, runProfiles } from "./model.ts";
 
-/** On the map a profile is an umwelt (Alex, 23 Nov 2026); the pack, its actions and `profile.read` keep the name. */
-export const TYPE = "umwelt";
-export const IN = "in_umwelt";
-export const OUT = "out_of_umwelt";
+/** On the map a profile is a context filter (23 Nov 2026); the pack, its actions and `profile.read` keep the name. */
+export const TYPE = "context_filter";
+export const IN = "in_context_filter";
+export const OUT = "out_of_context_filter";
 export const USES = "uses";
 export const MISSED = "profile.missed";
 export const PLACE = "profile.place";
-export const RENAME = "profile.umwelt";
-/** The names before 23 Nov 2026, renamed on load by `profile.umwelt`. */
-export const RENAMED: Record<string, string> = { profile: TYPE, in_profile: IN, out_of_profile: OUT };
+export const RENAME = "profile.rename";
+/** The names before (profile, then context filter), renamed on load by `profile.rename`. */
+export const RENAMED: Record<string, string> = { profile: TYPE, in_profile: IN, out_of_profile: OUT, umwelt: TYPE, in_umwelt: IN, out_of_umwelt: OUT };
 
-/** An `in_umwelt` link with places is said there itself: its fields say how (the words pack). */
+/** An `in_context_filter` link with places is said there itself: its fields say how (the words pack). */
 export const SAID = "at";
 
 export const PROFILE: BaseDef = {
@@ -64,7 +64,7 @@ export const PROFILE: BaseDef = {
 export const LINKS: LinkDef[] = [
   {
     name: IN,
-    doc: "An item the umwelt holds. With places (`at`), the link is said there, to the umwelt's runs only.",
+    doc: "An item the context filter holds. With places (`at`), the link is said there, to the context filter's runs only.",
     to: [TYPE],
     fields: {
       at: { kind: "json", doc: "The places the item is said at (tool:Bash, file:packs/**, session_start)." },
@@ -74,7 +74,7 @@ export const LINKS: LinkDef[] = [
       say: { kind: "choice", values: ["listed", "whole"], doc: "listed: one line at session_start, its whole words at its other places." },
       repeat: { kind: "choice", values: ["every"], doc: "every: said each time its place is reached, not once per context." },
       trial: { kind: "boolean", doc: "Said marked as a trial, until its record keeps or retires it." },
-      retired: { kind: "boolean", doc: "No longer said; the item stays in the umwelt." },
+      retired: { kind: "boolean", doc: "No longer said; the item stays in the context filter." },
     },
   },
   { name: OUT, doc: "A node taken out of the profile.", to: [TYPE] },
@@ -105,11 +105,11 @@ const profile: Pack = {
     ctx.get<TypesMark>("types.mark").mark(PROFILE.name, "hexagon");
     for (const l of LINKS) define.link(l);
 
-    // The names before umwelt: each call renames up to LIMIT_MAX of each, as one change set.
+    // The names before context filter: each call renames up to LIMIT_MAX of each, as one change set.
     ctx.get<ActionRegister>("action.register").register({
       name: RENAME,
-      title: "Rename profiles and their links to umwelt",
-      doc: "Gives each item of type profile, in_profile or out_of_profile its new type: umwelt, in_umwelt, out_of_umwelt. Run on load; history.undo takes it back.",
+      title: "Rename profiles and context filters and their links to context filter",
+      doc: "Gives each item of type profile or context filter (and their in_ and out_of_ links) its new type: context_filter, in_context_filter, out_of_context_filter. Run on load; history.undo takes it back.",
       input: { type: "object", properties: {} },
       async run(_input: Json, call: ActionContext) {
         const facts: [string, Id, string, Json][] = [];
@@ -127,8 +127,8 @@ const profile: Pack = {
       const out = await invoke.invoke({
         action: RENAME,
         input: {},
-        authority: { of: "human", basis: "Alex, 23 Nov 2026: \"umwelt is the name\" for a profile on the map" },
-        reason: "A profile is an umwelt on the map now",
+        authority: { of: "human", basis: "The owner, 23 Nov 2026: \"we should go to context filter\" for a profile on the map" },
+        reason: "A profile is a context filter on the map now",
       });
       if (!out.ok) {
         ctx.runtime.report(ctx.fiber, new Error(out.refused.message));
@@ -158,7 +158,7 @@ const profile: Pack = {
           ...(it.fields.fallback === true ? { fallback: true } : {}),
           parts: parts.map((l) => l.to),
           places: places.map((l) => l.from),
-          // A link with places is a node of its own (its source is the link), held by this umwelt only.
+          // A link with places is a node of its own (its source is the link), held by this context filter only.
           holds: [...holds.map((l) => l.from), ...holds.filter((l) => Array.isArray(l.fields[SAID]) && (l.fields[SAID] as Json[]).length).map((l) => l.id)],
           drops: drops.map((l) => l.from),
         });

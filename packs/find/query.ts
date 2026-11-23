@@ -8,7 +8,7 @@
  * - `in:<id>`: the item and everything part_of it, at any depth;
  * - `near:<id>`: the item and what it is linked to directly;
  * - `id:<id>`: the item alone.
- * - `umwelt:<title>`: an umwelt, read by the pack that arranges the
+ * - `context:<title>` (once `umwelt:`): a context filter, read by the pack that arranges the
  *   Landscape into its tree (packs/arrange); it filters nothing here.
  *
  * An empty query is `is:open`. At most `limit` items come back, and the
@@ -48,15 +48,16 @@ export interface Parsed {
   in?: Id;
   near?: Id;
   id?: Id;
-  /** An umwelt's title: not a filter here (packs/arrange reads it). */
-  umwelt?: string;
+  /** A context filter's title (`context:`, once `umwelt:`): not a filter here (packs/arrange reads it). */
+  context?: string;
 }
 
 export function parse(q: string): Parsed {
   const p: Parsed = { words: [] };
   for (const tok of q.trim().split(/\s+/).filter(Boolean)) {
-    const m = /^(is|status|type|in|near|id|umwelt):(.+)$/.exec(tok);
+    const m = /^(is|status|type|in|near|id|context|umwelt):(.+)$/.exec(tok);
     if (!m) p.words.push(tok.toLowerCase());
+    else if (m[1] === "umwelt") p.context = m[2]!;
     else if (m[1] === "is") p.is = m[2] === "closed" ? "closed" : "open";
     else (p as unknown as Record<string, string>)[m[1]!] = m[2]!;
   }

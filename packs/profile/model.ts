@@ -32,7 +32,7 @@ export interface Profile {
   parts: Id[];
   /** Items whose runs are in it (`uses`). */
   places: Id[];
-  /** Items it holds (`in_umwelt`, and each such link with places) and takes out (`out_of_umwelt`). */
+  /** Items it holds (`in_context_filter`, and each such link with places) and takes out (`out_of_context_filter`). */
   holds: Id[];
   drops: Id[];
 }

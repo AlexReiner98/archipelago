@@ -65,7 +65,7 @@ const DIALS = "field.dials";
 /** The slot under the empty state, on a map with no items. */
 const EMPTY = "field.empty";
 const QUERY = "find.query";
-/** An umwelt's tree to arrange the map into, set by packs/arrange (`umwelt:<title>` on the find line). */
+/** A context filter's tree to arrange the map into, set by packs/arrange (`context:<title>` on the find line). */
 const ARRANGE = "arrange.tree";
 const REMEMBER = "archipelago.field.dials";
 const HIDE = "field.hide";
