@@ -548,11 +548,21 @@ test("quadsOverlap: turned outlines, not boxes; crowded: a wire name that hits a
 });
 
 test("shouldFit: every tree fits once and then only when asked", () => {
-  const at = (o: Partial<{ fitted: boolean; manual: boolean; asked: boolean }>) => shouldFit({ fitted: false, manual: false, asked: false, ...o });
+  const at = (o: Partial<{ fitted: boolean; manual: boolean; asked: boolean; outgrown: boolean }>) => shouldFit({ fitted: false, manual: false, asked: false, ...o });
   assert.equal(at({}), true, "the first time");
   assert.equal(at({ fitted: true }), false, "the map changed: the camera stays");
   assert.equal(at({ manual: true }), false);
   assert.equal(at({ fitted: true, manual: true, asked: true }), true, "a double-click");
+  assert.equal(at({ fitted: true, outgrown: true }), true, "the tree outgrew the view: fit again");
+  assert.equal(at({ fitted: true, manual: true, outgrown: true }), false, "moved by hand: it stays");
+});
+
+test("outgrown: a box past any edge of the camera's view", async () => {
+  const { outgrown } = await import("../packs/harness/camera.ts");
+  const v = { x: 0, y: 0, k: 2 };
+  assert.equal(outgrown({ x: 10, y: 10, width: 100, height: 100 }, v, 400, 400), false, "inside the 200 by 200 seen");
+  assert.equal(outgrown({ x: 10, y: 10, width: 300, height: 100 }, v, 400, 400), true, "past the right");
+  assert.equal(outgrown({ x: -20, y: 10, width: 50, height: 50 }, v, 400, 400), true, "past the left");
 });
 
 test("atFoot: new lines keep the list at its foot only when it is already there", async () => {
@@ -847,7 +857,7 @@ test("seen whole, a node's name shows only if it matters: below quiet_px on scre
   assert.equal(quietShown(9, 9), 1, "whole from the dial's size");
   assert.equal(quietShown(8, 9), 0.5, "half a step below");
   assert.equal(quietShown(7, 9), 0, "gone two px below");
-  assert.equal(dialsOf({}).quiet_px, 9, "the dial starts at 9 px");
+  assert.equal(dialsOf({}).quiet_px, 0, "the dial starts at 0: every name");
 });
 
 test("while zooming, names come from an atlas: a zoom stepped to a few sizes per doubling, pictures placed shelf by shelf", async () => {
