@@ -57,4 +57,5 @@ of link), and that is said only when it is needed.
 
 `query` reads a copy of the map: every item and link of a type defined
 now, read in bounded pages through `graph.read` and kept live by
-`graph.watch`, as the page's find pack does.
+`graph.watch`, as the page's find pack does. An item it didn't hold that a
+change gives a shown type (a node moved to a record) is read whole.

@@ -108,9 +108,13 @@ const find: Pack = {
     /** Applies a committed set's facts to the copy, item by item. */
     const apply = (c: Committed) => {
       const touched = new Map<Id, Record<string, Json> | null>();
+      // An item the index didn't hold (its type wasn't shown) that this set gives a shown type: read it whole, since
+      // the set holds only what changed (a node moved to a record keeps its title).
+      const unseen = new Set<Id>();
       for (const [op, id, field, value] of c.facts) {
         if (!touched.has(id)) {
           const had = items.get(id) ?? links.get(id);
+          if (!had) unseen.add(id);
           touched.set(id, had ? { type: had.type, ...had.fields } : {});
         }
         const f = touched.get(id) ?? {};
@@ -119,14 +123,22 @@ const find: Pack = {
         touched.set(id, f);
       }
       const known = (t: unknown) => typeof t === "string" && (byType.has(t) || linkTypes.some((l) => l.name === t));
+      const whole: Id[] = [];
       for (const [id, f] of touched) {
         items.delete(id);
         links.delete(id);
         if (!f || !known(f.type)) continue;
         const { type, ...fields } = f;
         put({ id, type: String(type), fields });
+        if (unseen.has(id)) whole.push(id);
       }
       changed();
+      for (let i = 0; i < whole.length; i += 500) {
+        void graph.get(whole.slice(i, i + 500)).then((got) => {
+          for (const it of got) if (it && known(it.type) && (items.has(it.id) || links.has(it.id))) put(it);
+          changed();
+        });
+      }
     };
 
     const loadTypes = () => {

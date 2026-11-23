@@ -121,7 +121,7 @@ const words: Pack<WordsConfig> = {
     const sayers = new Map<Id, Set<Id>>();
 
     /** What each id says now: a node item as it is, a link with places as `said` makes it, else null. At most LIMIT_MAX ids. */
-    const view = async (ids: Id[]): Promise<(Item | null)[]> => {
+    const view = async (ids: Id[], moved = false): Promise<(Item | null)[]> => {
       const got = await graph.get(ids);
       const from = [...new Set(got.flatMap((i) => (i?.type === LINK && typeof i.fields.from === "string" ? [i.fields.from] : [])))];
       const items = new Map<Id, Item | null>();
@@ -129,12 +129,26 @@ const words: Pack<WordsConfig> = {
         const part = from.slice(i, i + LIMIT_MAX);
         (await graph.get(part)).forEach((it, j) => items.set(part[j]!, it));
       }
-      return got.map((i) => (!i ? null : i.type === TYPE ? i : i.type === LINK ? said(i, items.get(String(i.fields.from))) : null));
+      const out = got.map((i) => (!i ? null : i.type === TYPE ? i : i.type === LINK ? said(i, items.get(String(i.fields.from))) : null));
+      // A node item moved to an ordinary type (record, …) is said by its umwelt link now: what a run heard from it
+      // is what that link says, so the move isn't told as a retirement.
+      for (const [k, i] of got.entries()) {
+        if (!moved || !i || out[k] || i.type === TYPE || i.type === LINK) continue;
+        const page = await graph.links(i.id, { type: LINK, dir: "out" }, { limit: LIMIT_MAX });
+        for (const l of page.items) {
+          const s = said(l, i);
+          if (s && s.fields.status !== "retired") {
+            out[k] = s;
+            break;
+          }
+        }
+      }
+      return out;
     };
 
     ctx.provide<WordsHeard>(HEARD, () => ({
       async heard(run, node) {
-        const [item] = await view([node]);
+        const [item] = await view([node], true);
         if (!item) return;
         const text = wholeWords(item, TRIAL_MARK);
         if (text) hearing.note(run, node, { text, title: String(item.fields.title ?? node), listed: false });
@@ -423,7 +437,7 @@ const words: Pack<WordsConfig> = {
         const now = new Map<Id, Item | null>();
         for (let i = 0; i < ids.length; i += LIMIT_MAX) {
           const part = ids.slice(i, i + LIMIT_MAX);
-          (await view(part)).forEach((it, j) => now.set(part[j]!, it ?? null));
+          (await view(part, true)).forEach((it, j) => now.set(part[j]!, it ?? null));
         }
         const lines = changes(heard, now, TRIAL_MARK);
         return lines.length ? { say: [CHANGED_HEAD, ...lines.map((l) => `- ${l}`)].join("\n") } : null;

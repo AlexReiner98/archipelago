@@ -112,7 +112,9 @@ const seeding = (facts: Fact[]): Pack => ({
   id: "seed",
   inject: ["action.register", "action.invoke"],
   async apply(ctx) {
-    ctx.get<ActionRegister>("action.register").register({ name: "seed.raw", title: "Seed", input: { type: "object" }, async run(_i: Json, call: ActionContext) { call.write(facts); return {}; } });
+    // Writes the given facts as they are, or, with none given, the seed's.
+    ctx.get<ActionRegister>("action.register").register({ name: "seed.raw", title: "Seed", input: { type: "object" }, async run(i: { facts?: Fact[] }, call: ActionContext) { call.write(i.facts ?? facts); return {}; } });
+    if (!facts.length) return;
     const out = await ctx.get<ActionInvoke>("action.invoke").invoke({ action: "seed.raw", input: {}, authority: { of: "human", basis: "test" }, reason: "test" });
     assert.ok(out.ok, JSON.stringify(out));
   },
@@ -273,5 +275,27 @@ test("profiles and their links from before umwelt are renamed on load, as one ch
   const got = await graph.get(["p1", "l1", "l2"]);
   assert.deepEqual(got.map((i) => i?.type), ["umwelt", "in_umwelt", "out_of_umwelt"]);
   assert.deepEqual((await read.nodes("p1")).out, ["words/n1"]);
+  assert.deepEqual(errors, []);
+});
+
+test("a node a run heard, moved to a record said by its umwelt link, isn't told as retired", async () => {
+  const { errors, ctx, act } = await setup([]);
+  const node = (await act("words.add", { title: "Rule", kind: "instruction", at: ["tool:Bash"], words: "Keep it small." })).node;
+  const umwelt = (await act("items.create", { type: "umwelt", title: "Here" })).id;
+  const run = ctx("m1").get<AgentRun>("agent.run");
+  await run.begin(start("m1", {}));
+  assert.deepEqual((await run.reach({ run: "m1", places: ["tool:Bash"], time: T })).said.map((s) => s.text), ["Keep it small."]);
+  await act("seed.raw", {
+    facts: [
+      ["-", node, "type", "node"], ["+", node, "type", "record"], ["-", node, "words", "Keep it small."], ["-", node, "at", ["tool:Bash"]],
+      ["-", node, "kind", "instruction"], ["+", node, "kind", "rule"], ["+", node, "note", "Keep it small."], ["+", node, "status", "current"],
+      ["+", "l1", "type", "in_umwelt"], ["+", "l1", "from", node], ["+", "l1", "to", umwelt], ["+", "l1", "at", ["tool:Bash"]], ["+", "l1", "kind", "instruction"],
+    ],
+  });
+  const told = (await run.reach({ run: "m1", places: ["prompt"], time: T })).said.map((s) => s.text);
+  assert.deepEqual(told, [], "the same words, said by its link: nothing changed");
+  await act("items.set", { id: node, fields: { note: "Keep it smaller." } });
+  const reworded = (await run.reach({ run: "m1", places: ["prompt"], time: T })).said.map((s) => s.text).join("\n");
+  assert.match(reworded, /"Rule" now says: Keep it smaller\./, "a rewording after the move is told as one");
   assert.deepEqual(errors, []);
 });
