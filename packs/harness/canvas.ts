@@ -257,8 +257,8 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   };
   useEffect(() => () => clearTimeout(settle.current), []);
 
-  // A preview fits its dots; the big tree fits its names too (the layout's measured box), so every name is in sight.
-  const bounds = small ? dotsBox(placed, 40) : pad(placed.box, 16);
+  // A preview fits its dots; the big tree fits its names too (the layout's measured box, less most of its margin), so every name is in sight and as big as it can be.
+  const bounds = small ? dotsBox(placed, 40) : pad(placed.box, -38);
   // The camera fits once, when the canvas is first laid out, and then only when asked (a double-click):
   // the map changing under it never moves it.
   const manual = useRef(false);
