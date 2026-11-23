@@ -48,7 +48,7 @@ const legend: Pack = {
       const [, tick] = useState(0);
       useEffect(() => index.watch(() => tick((x) => x + 1)) as () => void, []);
       const bases = index.types().filter((t) => t.base === t.name);
-      const names = bases.map((t) => t.name);
+      const marks = index.marks();
       const wire = (cls: string) => html`<svg viewBox="0 0 22 8"><path class=${`lg-wire ${cls}`} d="M0 4H22" /></svg>`;
       return html`
         <div class="lg">
@@ -56,7 +56,7 @@ const legend: Pack = {
             (t) => html`
               <span class="b">${t.name}</span>
               <span class="row">
-                ${[...t.statuses.open, ...t.statuses.closed].map((st) => html`<span><span class=${`m s-${side(t, st)}`}>${mark(names, t, st)}</span>${st}</span>`)}
+                ${[...t.statuses.open, ...t.statuses.closed].map((st) => html`<span><span class=${`m s-${side(t, st)}`}>${mark(marks, t, st)}</span>${st}</span>`)}
               </span>
             `,
           )}

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ActionInvoke } from "../spec/action.ts";
 import type { GraphRead } from "../spec/graph.ts";
-import type { LinkInfo, TypeInfo, TypesDefine, TypesRead } from "../spec/types.ts";
+import type { LinkInfo, TypeInfo, TypesDefine, TypesMark, TypesRead } from "../spec/types.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
 import action from "../packs/action/index.ts";
@@ -16,7 +16,7 @@ import types from "../packs/types/index.ts";
 import work from "../packs/work/index.ts";
 
 const BASE = "mem:/packs/";
-const probe: Pack = { id: "probe", inject: ["types.define", "types.read", "action.invoke", "graph.read"], apply() {} };
+const probe: Pack = { id: "probe", inject: ["types.define", "types.read", "types.mark", "action.invoke", "graph.read"], apply() {} };
 const modules: Record<string, Pack> = { graph, action, types, work, question, record, actor, links, items, probe };
 
 const TREE: Entry[] = ["graph", "action", "types", "work", "question", "record", "actor", "links", "items", "probe"].map((id) => ({ id, pack: `${id}.ts` }));
@@ -32,6 +32,7 @@ async function setup(tree = TREE) {
   const p = {
     define: () => ctx().get<TypesDefine>("types.define"),
     read: () => ctx().get<TypesRead>("types.read"),
+    mark: () => ctx().get<TypesMark>("types.mark"),
     invoke: (a: string, input: unknown) =>
       ctx().get<ActionInvoke>("action.invoke").invoke({ action: a, input: input as never, authority: { of: "human", basis: "test" }, reason: "test" }),
     get: async (id: string) => (await ctx().get<GraphRead>("graph.read").get([id]))[0],
@@ -50,6 +51,31 @@ test("the four bases and five links are defined, each with its statuses and the 
   assert.ok(w.fields.title && w.fields.note && w.fields.status && w.fields.priority);
   assert.equal(w.pack, "work");
   assert.deepEqual((p.read().get("waits_on") as LinkInfo).to, ["actor"]);
+});
+
+test("each base is drawn in the shape its pack names; one none names takes the first shape left", async () => {
+  const { loader, rt, p } = await setup();
+  assert.deepEqual(p.mark().marks(), { work: "square", question: "diamond", record: "circle", actor: "triangle" });
+  let heard = 0;
+  p.mark().watch(() => heard++);
+  // A base none names: the first shape no base holds.
+  const d = p.define();
+  d.base({ name: "place", statuses: { open: ["here"], closed: [] }, fields: {} });
+  assert.equal(p.mark().marks().place, "pentagon");
+  // Named, it takes its own; a shape another base holds, or a second name, is refused.
+  const drop = p.mark().mark("place", "hexagon");
+  assert.equal(p.mark().marks().place, "hexagon");
+  assert.ok(heard >= 2);
+  assert.throws(() => p.mark().mark("note", "square"), /work is drawn as a square/);
+  assert.throws(() => p.mark().mark("place", "pentagon"), /place is drawn as a hexagon/);
+  assert.throws(() => p.mark().mark("other", "star" as never), /not a mark shape/);
+  await drop();
+  assert.equal(p.mark().marks().place, "pentagon");
+  // A base's pack unloading takes its shape back: the shape is free for the next base none names.
+  await loader.edit((t) => (t.find((e) => e.id === "work")!.disabled = true, t));
+  await rt.settle();
+  assert.equal(p.mark().marks().work, undefined);
+  assert.equal(p.mark().marks().place, "square");
 });
 
 test("a flavour adds fields to its base and starts as a trial; it can't redefine a field or bring statuses", async () => {

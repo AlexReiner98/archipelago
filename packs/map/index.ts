@@ -29,7 +29,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import type { LinkInfo, TypeInfo } from "../../spec/types.ts";
 import { layout, SIZE, type Out } from "./layout.ts";
 import { mark, side } from "./marks.ts";
-import { onStyle, sheet } from "../../spec/style.ts";
+import { onStyle, sheet, type MarkShape } from "../../spec/style.ts";
 
 export { mark, side } from "./marks.ts";
 
@@ -52,6 +52,8 @@ interface FindIndex {
   types(): TypeInfo[];
   links(): LinkInfo[];
   type(name: string): TypeInfo | undefined;
+  /** Every base's mark shape (types.mark, edition 10). */
+  marks(): Record<string, MarkShape>;
   run(query: string, limit?: number): Result;
   watch(on: () => void): () => void;
 }
@@ -113,7 +115,7 @@ const map: Pack = {
       const [panning, setPanning] = useState(false);
       const [fits, refit] = useState(0);
       const [hover, setHover] = useState<Id | undefined>();
-      const bases = useMemo(() => index.types().filter((t) => t.base === t.name).map((t) => t.name), [result]);
+      const marks = useMemo(() => index.marks(), [result]);
 
       // Fit the drawing when what is drawn changes shape, not when the pane beside it opens.
       const shape = `${drawn.width}x${drawn.height}:${result.items.length}`;
@@ -203,7 +205,7 @@ const map: Pack = {
                 <g key=${r.id} class=${cls} transform=${`translate(${b.x} ${b.y})`} onPointerEnter=${() => setHover(r.id)} onPointerLeave=${() => setHover((h) => (h === r.id ? undefined : h))}>
                   <title>${title} · ${r.type} · ${String(r.fields.status ?? "")}</title>
                   <rect width=${SIZE.w} height=${SIZE.h} rx="3" />
-                  <text class="mk" x="9" y=${SIZE.h / 2}>${mark(bases, t, r.fields.status)}</text>
+                  <text class="mk" x="9" y=${SIZE.h / 2}>${mark(marks, t, r.fields.status)}</text>
                   <text class="t" x="24" y=${SIZE.h / 2}>${clip(title, titleLen)}</text>
                 </g>
               `;

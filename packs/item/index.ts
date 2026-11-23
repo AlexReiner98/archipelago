@@ -21,7 +21,7 @@ import { KEYS } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
 import type { TypeInfo } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { glyph, onStyle, read, shape, side } from "../../spec/style.ts";
+import { markGlyph, markShape, onStyle, read, side, type MarkShape } from "../../spec/style.ts";
 import { parts } from "./parts.ts";
 import { lines, marks, neighbours, type Wire } from "./read.ts";
 import { STYLE } from "./sheet.ts";
@@ -41,6 +41,8 @@ interface FindIndex {
   linksOf(id: Id): Wire[];
   types(): TypeInfo[];
   type(name: string): TypeInfo | undefined;
+  /** Every base's mark shape (types.mark, edition 10). */
+  marks(): Record<string, MarkShape>;
   watch(on: () => void): () => void;
 }
 
@@ -68,9 +70,8 @@ const item: Pack = {
     };
     const markOf = (r: Row | undefined) => {
       const t = r && index.type(r.type);
-      const bases = index.types().filter((x) => x.base === x.name).map((x) => x.name);
       const at = side(t, r?.fields.status);
-      return { glyph: read(glyph(shape(bases, t), at)), side: at };
+      return { glyph: read(markGlyph(markShape(index.marks(), t), at)), side: at };
     };
     const open = (id: Id) => set.set(KEYS.item, id);
     const P = parts({

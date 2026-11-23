@@ -3,7 +3,7 @@
  * open; done and dropped are closed. Waiting is a `waits_on` link, not a
  * status. Its fields are the ones Focus uses today.
  */
-import type { BaseDef, TypesDefine } from "../../spec/types.ts";
+import type { BaseDef, TypesDefine, TypesMark } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 
 export const WORK: BaseDef = {
@@ -24,9 +24,11 @@ export const WORK: BaseDef = {
 const work: Pack = {
   id: "work",
   about: "Work items: tasks and steps, with their status.",
-  inject: ["types.define"],
+  inject: ["types.define", "types.mark"],
   apply(ctx: Context) {
     ctx.get<TypesDefine>("types.define").base(WORK);
+    // Edition 10: drawn as a square wherever its marks are.
+    ctx.get<TypesMark>("types.mark").mark(WORK.name, "square");
   },
 };
 

@@ -21,7 +21,8 @@ import type { Dispose, Id, Json } from "../../spec/common.ts";
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
-import type { LinkInfo, TypeInfo, TypesRead } from "../../spec/types.ts";
+import type { LinkInfo, TypeInfo, TypesMark, TypesRead } from "../../spec/types.ts";
+import type { MarkShape } from "../../spec/style.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { KEYS } from "../../spec/here.ts";
 import { closed, run, type Index, type Result, type Row, type Wire } from "./query.ts";
@@ -47,6 +48,8 @@ export interface FindIndex {
   types(): TypeInfo[];
   links(): LinkInfo[];
   type(name: string): TypeInfo | undefined;
+  /** Every base's mark shape (types.mark, edition 10): draw a type with `markShape(marks(), t)`. */
+  marks(): Record<string, MarkShape>;
   /** Whether an item's status is on its base's closed side. */
   closed(row: Row): boolean;
   run(query: string, limit?: number): Result;
@@ -70,11 +73,12 @@ export interface FindOffer {
 const find: Pack = {
   id: "find",
   about: "The search line: finds items by words, kind, status and links.",
-  inject: ["graph.read", "graph.watch", "types.read", "here.declare", "here.read", "here.set", "slot.fill"],
+  inject: ["graph.read", "graph.watch", "types.read", "types.mark", "here.declare", "here.read", "here.set", "slot.fill"],
   async apply(ctx: Context) {
     const graph = ctx.get<GraphRead>("graph.read");
     const live = ctx.get<GraphWatch>("graph.watch");
     const typesRead = ctx.get<TypesRead>("types.read");
+    const typesMark = ctx.get<TypesMark>("types.mark");
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
     ctx.get<HereDeclare>("here.declare").declare({ key: QUERY, scope: "page", doc: "The query the map draws." });
@@ -168,6 +172,7 @@ const find: Pack = {
       types: () => [...byType.values()],
       links: () => linkTypes,
       type: (n) => byType.get(n),
+      marks: () => typesMark.marks(),
       closed: (r) => closed(byType.get(r.type), r.fields.status),
       run: (q, limit) => run(index, q, limit),
       watch: (on) =>
@@ -186,7 +191,7 @@ const find: Pack = {
       if (!DRAWS.includes(here.get<string>(KEYS.view) ?? "")) set.set(KEYS.view, DRAWS[0]);
     };
     const offers = new Set<Offer>();
-    const Line = makeLine({ index, types: () => [...byType.values()], watchers, here, set, query: QUERY, jump, offers });
+    const Line = makeLine({ index, types: () => [...byType.values()], marks: () => typesMark.marks(), watchers, here, set, query: QUERY, jump, offers });
     ctx.provide<FindLine>("find.line", () => ({ Line, jump }));
     // Rows another pack offers the command line; each is gone when its pack is.
     ctx.provide<FindOffer>("find.offer", (_caller, from) => ({

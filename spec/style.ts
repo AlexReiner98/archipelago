@@ -13,9 +13,22 @@ import type { TypeInfo } from "./types.ts";
 export type Side = "fresh" | "moving" | "done" | "gone";
 export const SIDES: readonly Side[] = ["fresh", "moving", "done", "gone"];
 
-/** A base's mark shape, by the base's place among the bases defined. */
+/** A base's mark shape, by the base's place among the bases defined. Retired in edition 10 by `MarkShape`. */
 export type Shape = "square" | "diamond" | "circle" | "triangle";
 export const SHAPES: readonly Shape[] = ["square", "diamond", "circle", "triangle"];
+
+/**
+ * Edition 10: the shapes a base may be drawn in. A pack names its base's
+ * (`types.mark`, spec/types.ts); a base none names takes the first shape no
+ * base holds. Edition 1's four, then two more, so six bases each have their own.
+ */
+export type MarkShape = "square" | "diamond" | "circle" | "triangle" | "pentagon" | "hexagon";
+export const MARK_SHAPES: readonly MarkShape[] = ["square", "diamond", "circle", "triangle", "pentagon", "hexagon"];
+
+/** Edition 10: a type's mark shape, from every base's (`types.mark` `marks()`); a type whose base has none is a circle. */
+export function markShape(marks: Readonly<Record<string, MarkShape>>, t: TypeInfo | undefined): MarkShape {
+  return marks[t?.base ?? ""] ?? "circle";
+}
 
 /** A verdict on a node in a run, and `none` for not said. */
 export type Verdict = "held" | "failed" | "quiet" | "none";
@@ -30,7 +43,7 @@ export function side(t: TypeInfo | undefined, status: Json | undefined): Side {
   return t.statuses.closed.indexOf(status) <= 0 ? "done" : "gone";
 }
 
-/** A base's shape: its place among the bases (`bases`, their names in order), round again past the last. */
+/** A base's shape: its place among the bases (`bases`, their names in order), round again past the last. Retired in edition 10 by `markShape`. */
 export function shape(bases: readonly string[], t: TypeInfo | undefined): Shape {
   return SHAPES[Math.max(0, bases.indexOf(t?.base ?? "")) % SHAPES.length]!;
 }
@@ -40,8 +53,12 @@ export type GlyphToken = `glyph-${Shape}-${Side}` | `glyph-${Verdict}`;
 export const glyph = (shape: Shape, side: Side): GlyphToken => `glyph-${shape}-${side}`;
 export const verdictGlyph = (v: Verdict): GlyphToken => `glyph-${v}`;
 
-const plainGlyphs = {} as Record<GlyphToken, string>;
-for (const s of SHAPES) for (const [i, side] of SIDES.entries()) plainGlyphs[glyph(s, side)] = `"${["-", "~", "+", "x"][i]}"`;
+/** Edition 10: the glyph token for any mark shape at a side. */
+export type MarkGlyphToken = `glyph-${MarkShape}-${Side}`;
+export const markGlyph = (shape: MarkShape, side: Side): MarkGlyphToken => `glyph-${shape}-${side}`;
+
+const plainGlyphs = {} as Record<GlyphToken | MarkGlyphToken, string>;
+for (const s of MARK_SHAPES) for (const [i, side] of SIDES.entries()) plainGlyphs[markGlyph(s, side)] = `"${["-", "~", "+", "x"][i]}"`;
 Object.assign(plainGlyphs, { "glyph-held": '"+"', "glyph-failed": '"x"', "glyph-quiet": '"o"', "glyph-none": '"."' });
 
 /**

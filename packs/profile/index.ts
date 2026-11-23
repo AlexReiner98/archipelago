@@ -30,7 +30,7 @@ import type { ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch, Link } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { ProfileRead } from "../../spec/profile.ts";
-import type { BaseDef, LinkDef, TypesDefine } from "../../spec/types.ts";
+import type { BaseDef, LinkDef, TypesDefine, TypesMark } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { placeMatches } from "../agent/index.ts";
 import { type Model, type Profile, hearing, matchNode, nodeProfiles, placing, runProfiles } from "./model.ts";
@@ -73,13 +73,15 @@ async function allPages<T>(read: (after?: string) => Promise<{ items: T[]; next?
 const profile: Pack = {
   id: "profile",
   about: "Profiles: which agent sessions each node is meant for.",
-  inject: ["graph.read", "graph.watch", "types.define", "agent.tree", "agent.gate", "agent.run", "exchange.read", "exchange.watch", "action.register", "action.invoke"],
+  inject: ["graph.read", "graph.watch", "types.define", "types.mark", "agent.tree", "agent.gate", "agent.run", "exchange.read", "exchange.watch", "action.register", "action.invoke"],
   async apply(ctx: Context) {
     const graph = ctx.get<GraphRead>("graph.read");
     const tree = ctx.get<AgentTree>("agent.tree");
     const invoke = ctx.get<ActionInvoke>("action.invoke");
     const define = ctx.get<TypesDefine>("types.define");
     define.base(PROFILE);
+    // Edition 10: a hexagon, apart from the four core bases.
+    ctx.get<TypesMark>("types.mark").mark(PROFILE.name, "hexagon");
     for (const l of LINKS) define.link(l);
 
     // The model, read again whenever a profile or one of its links changes.

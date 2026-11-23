@@ -3,7 +3,9 @@
  * `spec/*.ts`, printed without comments, keyed `file:name`. What the spec
  * says may only grow (capabilities, vocabulary terms, regions, keys) is
  * split into one entry per member (`file:name[member]`), so an edition
- * can add to it without touching what is already there.
+ * can add to it without touching what is already there. A contract's
+ * `Capabilities` map is one too (`file:Capabilities[key]`, since edition
+ * 10): an edition adds a capability to it, never changes one.
  *
  * `test/spec-frozen.test.ts` holds every accepted entry to its text in
  * `test/spec-frozen.json`. `node scripts/spec-surface.ts --accept` adds the
@@ -17,8 +19,8 @@ import ts from "typescript";
 const SPEC = fileURLToPath(new URL("../spec/", import.meta.url));
 const FROZEN = fileURLToPath(new URL("../test/spec-frozen.json", import.meta.url));
 
-/** Exports that name the edition the files are, or gather other modules: they move with every edition. */
-const MOVING = new Set(["common.ts:EDITION", "index.ts:capabilities"]);
+/** Exports that name the edition the files are or the one accepted, or gather other modules: they move with every edition. */
+const MOVING = new Set(["common.ts:EDITION", "common.ts:ACCEPTED", "index.ts:capabilities"]);
 
 const printer = ts.createPrinter({ removeComments: true, newLine: ts.NewLineKind.LineFeed });
 
@@ -79,6 +81,11 @@ export function surface(dir: string = SPEC): Record<string, string> {
           }
           out[name] = printer.printNode(ts.EmitHint.Unspecified, d, sf);
         }
+        continue;
+      }
+      // A contract's map of capabilities, key to interface: one entry each, as its list is.
+      if (ts.isInterfaceDeclaration(st) && st.name.text === "Capabilities" && !st.heritageClauses?.length) {
+        for (const m of st.members) if (m.name) out[`${file}:Capabilities[${m.name.getText(sf).replace(/^["']|["']$/g, "")}]`] = printer.printNode(ts.EmitHint.Unspecified, m, sf);
         continue;
       }
       const named = st as ts.Statement & { name?: ts.Identifier };

@@ -24,6 +24,9 @@ export const DRAW: Dial[] = [
   { key: "link_width", label: "link width", min: 0.1, max: 4, step: 0.1, value: 0.6, then: "paint", doc: "A link's width, in screen px." },
   { key: "arrows", label: "arrows", min: 0, max: 1, step: 1, value: 1, choices: ["no", "yes"], then: "paint", doc: "Each link has an arrowhead at the end it points to (A depends_on B points at B)." },
   { key: "arrow_px", label: "arrow size", min: 2, max: 20, step: 0.5, value: 6, then: "paint", doc: "An arrowhead's length, in screen px (its width is two thirds of that)." },
+  { key: "arrow_strength", label: "arrow strength", min: 1, max: 10, step: 0.1, value: 4, then: "paint", doc: "How much stronger an arrowhead is than its line, so a faint link still says which way it goes." },
+  { key: "arrow_keep", label: "arrows keep", min: 0, max: 1, step: 0.01, value: 0.5, then: "paint", doc: "While a pointer dims the rest or find fades its outer ring, an arrowhead keeps at least this share of its strength, though its line fades further." },
+  { key: "arrow_lit", label: "lit arrow size", min: 1, max: 3, step: 0.05, value: 1.4, then: "paint", doc: "How much bigger an arrowhead is on a lit link, to go with its wider line." },
   { key: "arrow_from_px", label: "arrows from", min: 0, max: 200, step: 2, value: 24, then: "paint", doc: "A link shorter than this on screen, in px, has no arrowhead." },
   { key: "link_names", label: "link names", min: 0, max: 1, step: 1, value: 1, choices: ["no", "yes"], then: "paint", doc: "A link long enough on screen has its type's name along its middle: a lit one, or one whose ends are both big enough to be titled ('titles from')." },
   { key: "link_name_from_px", label: "link names from", min: 20, max: 400, step: 5, value: 90, then: "paint", doc: "A link shorter than this on screen, in px, is not named." },
@@ -248,12 +251,12 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   const ringOf = (i: number, rr: number) => (i === focus && S.hover_ring! > 0 ? Math.min(S.hover_ring! / cam.k, rr / 2) : 0);
   // An arrowhead at a link's `to`, its tip on that particle's edge as drawn: added to a path, filled after the lines.
   const alen = S.arrow_px! / cam.k, awide = (S.arrow_px! * 2) / 3 / cam.k, afrom = S.arrow_from_px! / cam.k;
-  const head = (path: Path2D, e: number) => {
+  const head = (path: Path2D, e: number, grow = 1) => {
     const a = g.a[e]!, b = g.b[e]!, dx = g.x[a]! - g.x[b]!, dy = g.y[a]! - g.y[b]!;
     if (Math.hypot(dx, dy) < afrom) return;
     const rb = grown.get(b) ?? g.r[b]!;
     const back = (rb + ringOf(b, rb)) * (S.shapes ? edge(g.shape[b]!, Math.atan2(dy, dx)) : 1);
-    const p = arrow(g.x[a]!, g.y[a]!, g.x[b]!, g.y[b]!, back, alen, awide);
+    const p = arrow(g.x[a]!, g.y[a]!, g.x[b]!, g.y[b]!, back, alen * grow, awide * grow);
     path.moveTo(p[0], p[1]);
     path.lineTo(p[2], p[3]);
     path.lineTo(p[4], p[5]);
@@ -271,11 +274,12 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
       c.lineTo(g.x[b]!, g.y[b]!);
       if (S.arrows) head(heads, e);
     }
-    c.globalAlpha = S.link_alpha! * faint * (kind === partOf ? 1.4 : 1) * (lit ? 1 : S.query_fade!);
+    const strength = S.link_alpha! * (kind === partOf ? 1.4 : 1), dimmed = faint * (lit ? 1 : S.query_fade!);
+    c.globalAlpha = strength * dimmed;
     c.strokeStyle = kind === partOf ? ink.muted : ink.line;
     c.stroke();
-    // Heads a little stronger than their line, so a faint link still says which way it goes.
-    c.globalAlpha = Math.min(1, c.globalAlpha * 2);
+    // Heads stronger than their line, and fading less with it, so a faint link still says which way it goes.
+    c.globalAlpha = Math.min(1, strength * S.arrow_strength!) * Math.max(dimmed, S.arrow_keep!);
     c.fillStyle = c.strokeStyle;
     c.fill(heads);
   }
@@ -294,7 +298,8 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     c.stroke();
     if (S.arrows) {
       const one = new Path2D();
-      head(one, e);
+      head(one, e, S.arrow_lit!);
+      c.globalAlpha = s;
       c.fillStyle = ink.accent;
       c.fill(one);
     }

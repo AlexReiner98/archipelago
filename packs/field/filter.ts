@@ -7,6 +7,7 @@
  * again with what is shown.
  */
 import type { Id } from "../../spec/common.ts";
+import { SIDES } from "../../spec/style.ts";
 import type { Dial } from "./behaviour.ts";
 import { typeColours, type FieldIn } from "./graph.ts";
 
@@ -18,6 +19,8 @@ export interface Hide {
   kinds?: string[];
   open?: boolean;
   closed?: boolean;
+  /** Open items by how full they are drawn: `fresh` (a type's first status, hollow), `moving` (a later one, half). */
+  sides?: string[];
   links?: string[];
   /** Items with no link among the drawn ones. */
   lone?: boolean;
@@ -32,8 +35,17 @@ export interface Count {
 }
 export interface TypeFacet extends Count {
   colour: string;
-  statuses: (Count & { closed: boolean })[];
+  /** Its base, and the base's mark shape (an index in MARK_SHAPES; absent: circle). */
+  base: string;
+  shape?: number;
+  /** Each status, with how full it is drawn (`side`, an index in SIDES; absent: done). */
+  statuses: (Count & { closed: boolean; side?: number })[];
   kinds: Count[];
+}
+/** A base: its shape and the types drawn in it. */
+export interface BaseFacet extends Count {
+  shape?: number;
+  types: string[];
 }
 export interface Facets {
   types: TypeFacet[];
@@ -42,6 +54,11 @@ export interface Facets {
   links: Count[];
   lone: Count;
   items: Count;
+  /** Each base, by its shape. */
+  bases: BaseFacet[];
+  /** Open items at their type's first status (drawn hollow) and at a later one (half). */
+  fresh: Count;
+  moving: Count;
 }
 
 const NO_KIND = "no kind";
@@ -57,6 +74,7 @@ export function shown(input: FieldIn, hide: Hide): { items: Set<Id>; links: Set<
     if (has(hide.statuses, `${it.type}:${it.status}`)) continue;
     if (has(hide.kinds, `${it.type}:${it.kind || NO_KIND}`)) continue;
     if (it.closed ? hide.closed : hide.open) continue;
+    if (!it.closed && hide.sides?.length && has(hide.sides, SIDES[it.side ?? 2] ?? "")) continue;
     if (hide.lone && !degree.get(it.id)) continue;
     items.add(it.id);
   }
@@ -75,17 +93,25 @@ export function facets(input: FieldIn, hide: Hide, pal: string[] = []): Facets {
     if (on) c.shown++;
     return c;
   };
-  const types = new Map<string, Count>(), statuses = new Map<string, Map<string, Count & { closed: boolean }>>(), kinds = new Map<string, Map<string, Count>>();
+  const types = new Map<string, Count>(), statuses = new Map<string, Map<string, Count & { closed: boolean; side?: number }>>(), kinds = new Map<string, Map<string, Count>>();
   const open: Count = { name: "open", n: 0, shown: 0 }, closed: Count = { name: "closed", n: 0, shown: 0 };
   const degree = new Map<Id, number>();
   for (const l of input.links) degree.set(l.from, (degree.get(l.from) ?? 0) + 1), degree.set(l.to, (degree.get(l.to) ?? 0) + 1);
   const lone: Count = { name: "no links", n: 0, shown: 0 };
+  const fresh: Count = { name: "first status", n: 0, shown: 0 }, moving: Count = { name: "later status", n: 0, shown: 0 };
+  const look = new Map<string, { base: string; shape?: number }>();
   for (const it of input.items) {
     const on = items.has(it.id);
     count(types, it.type, it.type, on);
     if (!statuses.has(it.type)) statuses.set(it.type, new Map());
-    const st = count(statuses.get(it.type)! as Map<string, Count>, it.status, it.status || "no status", on) as Count & { closed: boolean };
+    const st = count(statuses.get(it.type)! as Map<string, Count>, it.status, it.status || "no status", on) as Count & { closed: boolean; side?: number };
     st.closed = it.closed;
+    if (it.side !== undefined) st.side = it.side;
+    if (!look.has(it.type)) look.set(it.type, { base: it.base || it.type, shape: it.shape });
+    if (!it.closed) {
+      const c = it.side === 0 ? fresh : it.side === 1 ? moving : null;
+      if (c) (c.n++, on && c.shown++);
+    }
     if (!kinds.has(it.type)) kinds.set(it.type, new Map());
     count(kinds.get(it.type)!, it.kind || NO_KIND, it.kind || NO_KIND, on);
     const side = it.closed ? closed : open;
@@ -99,11 +125,21 @@ export function facets(input: FieldIn, hide: Hide, pal: string[] = []): Facets {
   const colour = new Map(typeColours(input.types ?? input.items.map((it) => it.type), pal).map((t) => [t.name, t.colour]));
   const colours = [...types.keys()].sort().map((name) => ({ name, colour: colour.get(name) ?? "" }));
   const byN = (a: Count, b: Count) => b.n - a.n || (a.name < b.name ? -1 : 1);
+  const bases = new Map<string, BaseFacet>();
+  for (const [name, c] of [...types].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    const { base, shape } = look.get(name)!;
+    let b = bases.get(base);
+    if (!b) bases.set(base, (b = { name: base, n: 0, shown: 0, shape, types: [] }));
+    b.n += c.n;
+    b.shown += c.shown;
+    b.types.push(name);
+  }
   return {
     types: colours.map(({ name, colour }) => ({
       ...types.get(name)!,
       colour,
-      statuses: [...statuses.get(name)!.entries()].map(([status, c]) => ({ ...c, name: status })).sort(byN) as TypeFacet["statuses"],
+      ...look.get(name)!,
+      statuses: [...statuses.get(name)!.entries()].map(([status, c]) => ({ ...c, name: status })).sort((a, b) => (a.side ?? 9) - (b.side ?? 9) || byN(a, b)) as TypeFacet["statuses"],
       kinds: [...kinds.get(name)!.values()].sort(byN),
     })),
     open,
@@ -111,11 +147,14 @@ export function facets(input: FieldIn, hide: Hide, pal: string[] = []): Facets {
     links: [...linkCounts.values()].sort(byN),
     lone,
     items: { name: "items", n: input.items.length, shown: items.size },
+    bases: [...bases.values()].sort((a, b) => (a.shape ?? 99) - (b.shape ?? 99) || byN(a, b)),
+    fresh,
+    moving,
   };
 }
 
 /** `hide` with one value switched: a list entry added or taken out, or a flag flipped. */
-export function toggle(hide: Hide, key: "types" | "statuses" | "kinds" | "links", value: string): Hide;
+export function toggle(hide: Hide, key: "types" | "statuses" | "kinds" | "links" | "sides", value: string): Hide;
 export function toggle(hide: Hide, key: "open" | "closed" | "lone"): Hide;
 export function toggle(hide: Hide, key: keyof Hide, value?: string): Hide {
   const next: Hide = { ...hide };
@@ -125,7 +164,7 @@ export function toggle(hide: Hide, key: keyof Hide, value?: string): Hide {
     else next[flag] = true;
     return next;
   }
-  const list = key as "types" | "statuses" | "kinds" | "links";
+  const list = key as "types" | "statuses" | "kinds" | "links" | "sides";
   const had = hide[list] ?? [];
   const now = had.includes(value) ? had.filter((v) => v !== value) : [...had, value];
   if (now.length) next[list] = now;

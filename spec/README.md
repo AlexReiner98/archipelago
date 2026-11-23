@@ -5,7 +5,7 @@ be changed silently. Each contract is a TypeScript module (the types) and a
 short doc.
 
 <!-- contracts: written by scripts/contracts.ts from the spec -->
-This is **edition 9**. A capability that came after edition 1 shows the edition it came in.
+This is **edition 10**. A capability that came after edition 1 shows the edition it came in.
 
 | Contract | Capabilities | What it is |
 |---|---|---|
@@ -16,7 +16,7 @@ This is **edition 9**. A capability that came after edition 1 shows the edition 
 | [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` `slot.arrange` (8) | How the UI is put together out of packs. |
 | [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | How large graphs are drawn. |
 | [here](here.md) | `here.declare` `here.read` `here.set` | What is being looked at, now. |
-| [types](types.md) | `types.define` `types.read` | What kinds of item and link the map holds. |
+| [types](types.md) | `types.define` `types.read` `types.mark` (10) | What kinds of item and link the map holds. |
 | [profile](profile.md) | `profile.read` (5) | Not every node fits every run. |
 | [loader](loader.md) | `loader.tree` (7) | The config tree as a capability. |
 | [changeset](changeset.md) | (a format) | A change, written in full. |
@@ -34,7 +34,11 @@ surface, and the spec owns the six places of edition 1 and edition 2's
 Edition 3 adds the place `compact` and the person's acts, `decision` and
 `notice` ([agent](agent.md)). Edition 4 says a node's same words once per
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
-([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 9 adds the style token `harness`, the colour of what the
+([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 10 adds
+`types.mark`, the shape each base is drawn in, named by its pack, and two
+mark shapes, pentagon and hexagon ([types](types.md), [style](style.md));
+from it a contract's `Capabilities` map is frozen one key at a time, as its
+list is. Edition 9 adds the style token `harness`, the colour of what the
 harness gave an agent rather than the map ([style](style.md)). Edition 8 adds `slot.arrange`, an arrange laid over the
 page's while a pack holds it, so a view moves fills without a reload
 ([slot](slot.md)).
@@ -107,8 +111,8 @@ The spec has editions: 1, 2, 3… Packs don't declare versions of anything.
 - Each capability says the edition it arrived in (`since`) and, if
   retired, the edition and what replaces it. The list is the spec's
   history.
-- Editions 1 to 9 are accepted (edition 1 on 20 Nov 2026, up to 9 on
-  23 Nov 2026, the first public release): their capabilities' meanings are
+- Editions 1 to 10 are accepted (edition 1 on 20 Nov 2026, up to 9 on
+  23 Nov 2026, the first public release, and 10 the same day): their capabilities' meanings are
   fixed. `ACCEPTED` in common.ts says up to which edition.
 - A test holds it: `test/spec-frozen.test.ts` compares every accepted
   type, capability and term with `test/spec-frozen.json` and fails on any

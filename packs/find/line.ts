@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import type { Id } from "../../spec/common.ts";
 import type { HereRead, HereSet } from "../../spec/here.ts";
-import { glyph, read, shape, side, sheet } from "../../spec/style.ts";
+import { markGlyph, markShape, read, side, sheet, type MarkShape } from "../../spec/style.ts";
 import type { TypeInfo } from "../../spec/types.ts";
 import { run, type Index, type Result } from "./query.ts";
 import { offered, suggest, type Offer, type Suggestion } from "./suggest.ts";
@@ -46,6 +46,8 @@ export const STYLE = sheet(`
 export interface LineDeps {
   index: Index;
   types: () => TypeInfo[];
+  /** Every base's mark shape (types.mark). */
+  marks: () => Record<string, MarkShape>;
   watchers: Set<() => void>;
   here: HereRead;
   set: HereSet;
@@ -136,7 +138,7 @@ export function makeLine(d: LineDeps) {
       }
     };
 
-    const bases = d.types().filter((t) => t.base === t.name).map((t) => t.name);
+    const marks = d.marks();
     const row = (s: Suggestion, i: number) => {
       const on = i === sel ? " on" : "";
       const hold = (e: Event) => e.preventDefault();
@@ -155,7 +157,7 @@ export function makeLine(d: LineDeps) {
         </div>`;
       const t = d.index.type(s.type);
       return html`<div class=${`fd-row${on}`} key=${s.id} onMouseDown=${hold} onClick=${() => pick(s)} onMouseEnter=${() => setSel(i)} title=${s.id}>
-        <span class=${`mk s-${side(t, s.status)}`}>${read(glyph(shape(bases, t), side(t, s.status)))}</span><span class="t">${s.title}</span><span class="hn">${s.type} · ${s.status}</span>
+        <span class=${`mk s-${side(t, s.status)}`}>${read(markGlyph(markShape(marks, t), side(t, s.status)))}</span><span class="t">${s.title}</span><span class="hn">${s.type} · ${s.status}</span>
       </div>`;
     };
     const firstItem = list.findIndex((s) => s.kind !== "term");

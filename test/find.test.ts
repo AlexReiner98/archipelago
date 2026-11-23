@@ -95,6 +95,7 @@ async function boot() {
       ctx.provide("graph.read", () => ({ of, now: async () => "0" }) as any);
       ctx.provide("graph.watch", () => ({ watch: () => () => {} }));
       ctx.provide("types.read", () => ({ all: () => all, get: () => undefined, watch: () => () => {} }));
+      ctx.provide("types.mark", () => ({ marks: () => ({ work: "square" }), mark: () => () => {}, watch: () => () => {} }));
       ctx.provide<SlotFill>("slot.fill", () => ({ fill: (def) => (fills.push(def as FillDef<unknown>), () => {}) }));
     },
   };

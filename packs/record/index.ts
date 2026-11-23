@@ -2,7 +2,7 @@
  * The record base (spec/types.md): something that is so. Current until
  * superseded. A finding is a record with a value.
  */
-import type { BaseDef, TypesDefine } from "../../spec/types.ts";
+import type { BaseDef, TypesDefine, TypesMark } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 
 export const RECORD: BaseDef = {
@@ -21,9 +21,11 @@ export const RECORD: BaseDef = {
 const record: Pack = {
   id: "record",
   about: "Records: what was found, said or decided.",
-  inject: ["types.define"],
+  inject: ["types.define", "types.mark"],
   apply(ctx: Context) {
     ctx.get<TypesDefine>("types.define").base(RECORD);
+    // Edition 10: drawn as a circle wherever its marks are.
+    ctx.get<TypesMark>("types.mark").mark(RECORD.name, "circle");
   },
 };
 

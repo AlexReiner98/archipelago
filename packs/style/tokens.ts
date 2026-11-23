@@ -3,7 +3,7 @@
  * marks (spec/style.md). `css()` writes them as custom properties on the
  * page's root; nothing else here touches the page, so Node can read them.
  */
-import { glyph, SHAPES, SIDES, verdictGlyph, type Token } from "../../spec/style.ts";
+import { MARK_SHAPES, markGlyph, SIDES, verdictGlyph, type Token } from "../../spec/style.ts";
 
 export type Tokens = Partial<Record<Token, string>>;
 
@@ -93,15 +93,18 @@ export const SPACE: Tokens = {
 };
 
 /** Each shape at each side: hollow, half, full, and full again (a later closed status is told by its colour). */
-const DRAWN: Record<(typeof SHAPES)[number], string[]> = {
+const DRAWN: Record<(typeof MARK_SHAPES)[number], string[]> = {
   square: ["□", "◧", "■", "■"],
   diamond: ["◇", "◈", "◆", "◆"],
   circle: ["○", "◐", "●", "●"],
   triangle: ["△", "◭", "▲", "▲"],
+  // Edition 10. No half pentagon or hexagon is a letter: half is drawn full, its colour (mark-moving) tells it.
+  pentagon: ["⬠", "⬟", "⬟", "⬟"],
+  hexagon: ["⬡", "⬢", "⬢", "⬢"],
 };
 
 export const MARKS: Tokens = {
-  ...Object.fromEntries(SHAPES.flatMap((s) => SIDES.map((side, i) => [glyph(s, side), `"${DRAWN[s][i]}"`]))),
+  ...Object.fromEntries(MARK_SHAPES.flatMap((s) => SIDES.map((side, i) => [markGlyph(s, side), `"${DRAWN[s][i]}"`]))),
   [verdictGlyph("held")]: '"✓"',
   [verdictGlyph("failed")]: '"✕"',
   [verdictGlyph("quiet")]: '"○"',
