@@ -7,7 +7,7 @@
 import type { Dial } from "./behaviour.ts";
 import { HUES, read } from "../../spec/style.ts";
 import { neighbours, type G, type Grid, type Settings } from "./graph.ts";
-import { place, type Want } from "./labels.ts";
+import { hubSet, place, type Want } from "./labels.ts";
 import { FAINT, FOUND } from "./filter.ts";
 import { CIRCLE, edge, fill, outline, reach } from "./shapes.ts";
 import { arrow, easeWires, placeWires, wireName, wireSize, type WireFade, type WireWant } from "./wires.ts";
@@ -33,7 +33,9 @@ export const DRAW: Dial[] = [
   { key: "link_name_fade_ms", label: "link names fade", min: 0, max: 1000, step: 10, value: 220, then: "paint", doc: "How long a link name takes to fade in or out when it gains or loses its room, in ms." },
   { key: "link_name_most", label: "link names at most", min: 0, max: 200, step: 5, value: 40, then: "paint", doc: "At most this many link names at once: the lit first, then the longest." },
   { key: "label_px", label: "titles from", min: 2, max: 40, step: 0.5, value: 9, then: "paint", doc: "A particle's title shows once its radius reaches this on screen, in px." },
-  { key: "label_hubs", label: "always name hubs", min: 0, max: 100, step: 1, value: 15, then: "paint", doc: "The this-many most linked items are named at any zoom, so the picture reads before you zoom in." },
+  { key: "label_hubs", label: "always name hubs", min: 0, max: 100, step: 1, value: 12, then: "paint", doc: "The this-many most linked items, the map's central topics, are named at any zoom and stay named, over other particles if need be, so the picture reads before you zoom in." },
+  { key: "label_hub_links", label: "hubs from", min: 1, max: 100, step: 1, value: 8, then: "paint", doc: "An item needs at least this many links to be named as a hub." },
+  { key: "label_hub_keep", label: "hubs hold", min: 0, max: 50, step: 1, value: 4, then: "paint", doc: "A hub stays named until this many more items outrank it, so the named set holds still while links come and go." },
   { key: "label_most", label: "titles at most", min: 0, max: 600, step: 10, value: 120, then: "paint", doc: "At most this many titles at once." },
   { key: "label_room", label: "room per title", min: 1000, max: 40000, step: 500, value: 9000, then: "paint", doc: "At most one title per this many square pixels of the view, so a small view is not buried in words." },
   { key: "label_gap", label: "title gap", min: 0, max: 20, step: 1, value: 4, then: "paint", doc: "Space between a particle and its title, in screen px." },
@@ -98,6 +100,21 @@ export class Light {
   }
   /** The ids named last frame: they are placed first, so names hold still while the map settles. */
   named = new Set<string>();
+  /** The spot each title took last frame (labels.ts), tried first so it keeps its side. */
+  spots = new Map<string, number>();
+  /** The hubs named at any zoom, by id: kept from graph to graph (labels.ts hubSet). */
+  hubIds = new Set<string>();
+  private hubOf: { g: G; key: string; mask: Uint8Array } | null = null;
+  /** Which particles are hubs now: worked out again only when the graph or the dials change. */
+  hubs(g: G, S: Settings): Uint8Array {
+    const key = `${S.label_hubs}|${S.label_hub_links}|${S.label_hub_keep}`;
+    if (this.hubOf && this.hubOf.g === g && this.hubOf.key === key) return this.hubOf.mask;
+    this.hubIds = hubSet(g.id, g.degree, this.hubIds, S.label_hubs!, S.label_hub_links!, S.label_hub_keep!);
+    const mask = new Uint8Array(g.n);
+    for (let i = 0; i < g.n; i++) if (this.hubIds.has(g.id[i]!)) mask[i] = 1;
+    this.hubOf = { g, key, mask };
+    return mask;
+  }
   private leftAt = 0;
   private last = 0;
   /** Eases toward the particle pointed at (hover) and its neighbours; true while it still moves. */
@@ -154,18 +171,6 @@ function particle(c: CanvasRenderingContext2D, g: G, i: number, r: number, S: Se
   c.fill();
   if (how === 1) c.restore();
   c.fillStyle = colour;
-}
-
-/** Which particles are among the `most` most linked, worked out once per graph and count. */
-const hubCache = new WeakMap<G, { most: number; hub: Uint8Array }>();
-function hubs(g: G, most: number): Uint8Array {
-  const had = hubCache.get(g);
-  if (had && had.most === most) return had.hub;
-  const hub = new Uint8Array(g.n);
-  const order = Array.from({ length: g.n }, (_, i) => i).sort((p, q) => g.degree[q]! - g.degree[p]! || p - q);
-  for (const i of order.slice(0, most)) hub[i] = 1;
-  hubCache.set(g, { most, hub });
-  return hub;
 }
 
 /** Words onto at most `rows` lines, each at most `px` wide in the canvas's font now; the last cut with … if more is left. */
@@ -331,10 +336,10 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   c.textBaseline = "middle";
   c.lineJoin = "round";
   c.font = "11px ui-sans-serif, system-ui, sans-serif";
-  const hub = hubs(g, S.label_hubs!);
+  const hub = light.hubs(g, S);
   const lit = light.dim > 0.5;
   const rank = (i: number) =>
-    (i === focus ? 64 : 0) + (shine[i]! > 0 ? 32 : 0) + (match?.[i] === FOUND ? 16 : 0) + (light.named.has(g.id[i]!) ? 8 : 0) + (hub[i] ? 4 : 0) + (g.closed[i] ? 0 : 2);
+    (i === focus ? 64 : 0) + (shine[i]! > 0 ? 32 : 0) + (match?.[i] === FOUND ? 16 : 0) + (hub[i] ? 8 : 0) + (light.named.has(g.id[i]!) ? 4 : 0) + (g.closed[i] ? 0 : 2);
   const wants: number[] = [];
   for (let i = 0; i < g.n; i++) {
     if (!inView(i, 0)) continue;
@@ -343,13 +348,13 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     if (lit ? !(shine[i]! > 0.5) : match ? !(match[i] === FOUND || (full(i) && (g.r[i]! * cam.k >= S.label_px! || hub[i]))) : !(g.r[i]! * cam.k >= S.label_px! || hub[i])) continue;
     wants.push(i);
   }
-  wants.sort((p, q) => rank(q) - rank(p) || g.r[q]! - g.r[p]! || p - q);
+  // Among equals, the more linked first: hubs by their links, the rest by their size.
+  wants.sort((p, q) => rank(q) - rank(p) || (hub[p] && hub[q] ? g.degree[q]! - g.degree[p]! : 0) || g.r[q]! - g.r[p]! || p - q);
   const budget = Math.min(S.label_most!, Math.floor((width * height) / Math.max(1, S.label_room!)));
   const texts = new Map<number, string[]>();
   const LINE = 13;
   const want: Want[] = wants.slice(0, Math.max(budget * 4, 40)).map((i) => {
     const r = g.r[i]! * cam.k;
-    // Wide enough: the title inside the particle, cut to what fits across most of it.
     // Wide enough: the title inside the particle, on as many lines as fit across it (at most three), the last cut with ….
     const rows = Math.min(3, Math.floor((2 * r * 0.75) / LINE));
     const lines = S.label_inside! > 0 && 2 * r >= S.label_inside! && rows >= 1 ? wrap(c, clip(g.title[i]!, S.label_chars!), 2 * r * 0.8, rows) : [];
@@ -358,7 +363,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     const text = inside ? lines : [clip(g.title[i]!, S.label_chars!)];
     texts.set(i, text);
     const w = Math.max(...text.map((t) => c.measureText(t).width)) + 4;
-    return { i, x: g.x[i]! * cam.k + cam.tx, y: g.y[i]! * cam.k + cam.ty, r, w, h: text.length * LINE + 1, must: shine[i]! > 0.5, inside };
+    return { i, x: g.x[i]! * cam.k + cam.tx, y: g.y[i]! * cam.k + cam.ty, r, w, h: text.length * LINE + 1, must: shine[i]! > 0.5 || (!lit && !!hub[i]), inside, spot: light.spots.get(g.id[i]!) };
   });
   // Whether a box covers a particle other than i that is label_cover_px or more across on screen.
   const covers = (b: [number, number, number, number], i: number) => {
@@ -375,6 +380,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   };
   const placed = place(want, { width, height, room: S.label_room!, most: S.label_most!, gap: S.label_gap!, covers, clear });
   light.named = new Set(placed.map((p) => g.id[p.i]!));
+  light.spots = new Map(placed.map((p) => [g.id[p.i]!, p.spot]));
   c.strokeStyle = ink.sea;
   for (const { i, box, within } of placed) {
     const rs = g.r[i]! * cam.k;

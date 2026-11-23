@@ -163,6 +163,23 @@ test("titles: no two overlap, none leaves the view, none covers a particle, the 
   // A particle wider than its title holds it inside.
   const big = place([{ i: 0, x: 200, y: 150, r: 50, w: 80, h: 14, inside: true }], { ...at, covers: () => true });
   assert.equal(big[0]?.within, true);
+  // A title tries last frame's spot first: told it sat left, it stays left though right is free.
+  const left = place([{ i: 0, x: 200, y: 150, r: 3, w: 80, h: 14, spot: 1 }], { ...at, covers: () => false });
+  assert.equal(left[0]!.spot, 1);
+  assert.ok(left[0]!.box[2] < 200);
+});
+
+test("hubs: the most linked, from a least, and the set holds still", async () => {
+  const { hubSet } = await import("../packs/field/labels.ts");
+  const ids = ["a", "b", "c", "d", "e"];
+  // Two hubs from three links up: d and b; e has too few.
+  assert.deepEqual([...hubSet(ids, [5, 9, 4, 12, 2], new Set(), 2, 3, 0)].sort(), ["b", "d"]);
+  // a passes b by one: with no hold, b drops; held for one more rank, b stays beside the newcomer.
+  const had = new Set(["b", "d"]);
+  assert.deepEqual([...hubSet(ids, [10, 9, 4, 12, 2], had, 2, 3, 0)].sort(), ["a", "d"]);
+  assert.deepEqual([...hubSet(ids, [10, 9, 4, 12, 2], had, 2, 3, 1)].sort(), ["a", "b", "d"]);
+  // Ties go by id, so the same counts give the same set whatever the order.
+  assert.deepEqual([...hubSet(["y", "x"], [4, 4], new Set(), 1, 1, 0)], ["x"]);
 });
 
 test("a type keeps its colour whatever the filter hides", async () => {

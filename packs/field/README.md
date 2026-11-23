@@ -78,13 +78,18 @@ find line has words, only what it finds and what lies near it.
   in the same box, the same size, with how the run is going last, closed
   (`state`).
 - **Titles** ([labels.ts](labels.ts)). Placed in order: the particle
-  pointed at and its neighbours, what the find line finds, what was named
-  last frame (so names hold still while it settles), the most linked
-  (`label_hubs`), then the largest on screen. A particle wide enough
-  (`label_inside`) holds its title inside, wrapped onto up to three lines;
-  otherwise a title tries eight spots round its particle and takes the
-  first inside the view that overlaps no title, no particle and not the
-  legend. At most one per `label_room` square pixels.
+  pointed at and its neighbours, what the find line finds, the hubs, what
+  was named last frame (so names hold still while it settles), then the
+  largest on screen. The hubs are the map's central topics: the
+  `label_hubs` most linked with at least `label_hub_links` links, named at
+  any zoom, over other particles if need be. The set is worked out only
+  when the graph or a dial changes, and a hub stays until `label_hub_keep`
+  more items outrank it, so zoomed out the same few names hold through the
+  solve. A particle wide enough (`label_inside`) holds its title inside,
+  wrapped onto up to three lines; otherwise a title tries eight spots round
+  its particle, the one it had last frame first, and takes the first inside
+  the view that overlaps no title, no particle and not the legend. At most
+  one per `label_room` square pixels.
 - **Hover** lights a particle, its links and its neighbours, dims the rest,
   and names them ([paint.ts](paint.ts)); the pointer picks the nearest
   particle within `hover_px` of its edge. A click sets `here.item`; the item
