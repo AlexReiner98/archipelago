@@ -3,9 +3,10 @@
  * it is given, and draws nothing.
  *
  * - Titles are placed in order of what matters: the particle pointed at,
- *   its neighbours, what the find line finds, what was named last frame (so
- *   names hold still while the map settles), the most linked, then the
- *   largest on screen.
+ *   its neighbours, what the find line finds, the hubs (the most linked, a
+ *   set that holds still: `hubSet`), what was named last frame (so names
+ *   hold still while the map settles), then the largest on screen. A title
+ *   tries the spot it had last frame first.
  * - A particle wide enough on screen holds its title inside itself (the
  *   caller cuts the title to fit, and says so with `inside`).
  *   Otherwise a title tries eight spots round its particle (right, left,
@@ -30,6 +31,8 @@ export interface Want {
   must?: boolean;
   /** Written inside its own particle, if that spot is free. */
   inside?: boolean;
+  /** The spot it took last frame (index into the eight), tried first so a title does not hop round its particle. */
+  spot?: number;
 }
 export interface Placed {
   i: number;
@@ -52,6 +55,24 @@ export interface Room {
 export interface PlacedIn extends Placed {
   /** Written inside its own particle. */
   within?: boolean;
+  /** Which of the eight spots it took (-1: inside). */
+  spot: number;
+}
+
+/**
+ * The hubs to name at any zoom: the `most` most linked with at least `least`
+ * links, ranked by links (ties by id, so a rebuilt graph ranks alike). One
+ * named before (`had`) stays while it ranks within `most + keep`: the set
+ * holds still while links come and go, and never changes frame to frame.
+ */
+export function hubSet(ids: readonly string[], links: ArrayLike<number>, had: ReadonlySet<string>, most: number, least: number, keep: number): Set<string> {
+  const order = ids.map((_, i) => i).filter((i) => links[i]! >= Math.max(1, least));
+  order.sort((p, q) => links[q]! - links[p]! || (ids[p]! < ids[q]! ? -1 : ids[p]! > ids[q]! ? 1 : 0));
+  const out = new Set<string>();
+  order.forEach((i, rank) => {
+    if (rank < most || (had.has(ids[i]!) && rank < most + keep)) out.add(ids[i]!);
+  });
+  return out;
 }
 
 type Box = [number, number, number, number];
@@ -88,7 +109,7 @@ export function place(wants: Want[], at: Room): PlacedIn[] {
       const b: Box = [t.x - hw, t.y - hh, t.x + hw, t.y + hh];
       if (inView(b) && free(b)) {
         each(b, (list) => list.push(b));
-        out.push({ i: t.i, box: b, within: true });
+        out.push({ i: t.i, box: b, within: true, spot: -1 });
         continue;
       }
     }
@@ -103,11 +124,15 @@ export function place(wants: Want[], at: Room): PlacedIn[] {
       [t.x + g * 0.7, t.y + g * 0.7],
       [t.x - g * 0.7 - t.w, t.y + g * 0.7],
     ];
-    for (const [lx, ty] of spots) {
+    // Last frame's spot first, so a title keeps its side while the map moves under it.
+    const tries = spots.map((_, k) => k);
+    if (t.spot !== undefined && t.spot >= 0 && t.spot < spots.length) tries.splice(t.spot, 1), tries.unshift(t.spot);
+    for (const k of tries) {
+      const [lx, ty] = spots[k]!;
       const b: Box = [lx, ty, lx + t.w, ty + t.h];
       if (!inView(b) || !free(b) || (!t.must && at.covers(b, t.i))) continue;
       each(b, (list) => list.push(b));
-      out.push({ i: t.i, box: b });
+      out.push({ i: t.i, box: b, spot: k });
       break;
     }
   }
