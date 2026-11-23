@@ -11,6 +11,7 @@ import { hubSet, place, type Want } from "./labels.ts";
 import { FAINT, FOUND } from "./filter.ts";
 import { CIRCLE, edge, fill, outline, reach } from "./shapes.ts";
 import { arrow, easeWires, placeWires, wireName, wireSize, type WireFade, type WireWant } from "./wires.ts";
+import { comeFade } from "./gone.ts";
 
 /** The drawing's own dials. */
 export const DRAW: Dial[] = [
@@ -21,6 +22,7 @@ export const DRAW: Dial[] = [
   { key: "hollow_px", label: "hollow from", min: 0, max: 20, step: 0.5, value: 3, then: "paint", doc: "A particle smaller than this on screen (radius, px) is drawn full whatever its status: a hollow speck would vanish." },
   { key: "closed_fade", label: "closed fade", min: 0, max: 1, step: 0.01, value: 0.28, then: "paint", doc: "How faint a closed item (done, dropped, decided) is drawn." },
   { key: "gone_ms", label: "gone fades", min: 0, max: 2000, step: 50, value: 600, then: "paint", doc: "How long an item that leaves the map (a filter turned off, a find that keeps fewer) takes to fade out where it stood, in ms (0: it vanishes at once)." },
+  { key: "come_ms", label: "new fades in", min: 0, max: 2000, step: 50, value: 600, then: "paint", doc: "How long an item that comes onto the map (a filter turned on, a find that keeps more) takes to fade in where it lands, in ms (0: it shows at once)." },
   { key: "link_alpha", label: "link strength", min: 0, max: 1, step: 0.01, value: 0.18, then: "paint", doc: "How strong a link's line is." },
   { key: "link_width", label: "link width", min: 0.1, max: 4, step: 0.1, value: 0.6, then: "paint", doc: "A link's width, in screen px." },
   { key: "arrows", label: "arrows", min: 0, max: 1, step: 1, value: 1, choices: ["no", "yes"], then: "paint", doc: "Each link has an arrowhead at the end it points to (A depends_on B points at B)." },
@@ -230,7 +232,10 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   // Links, faint, one path per kind (and per found or not); part_of in the muted ink.
   c.lineWidth = S.link_width! / cam.k;
   const partOf = g.linkKinds.indexOf("part_of");
-  const fade = (i: number) => (match && match[i] === FAINT ? S.query_fade! : 1);
+  const at = performance.now();
+  // A particle new to the map fades in (gone.ts); one already there is whole.
+  const come = (i: number) => (g.born && S.come_ms ? comeFade(at - g.born[i]!, S.come_ms) : 1);
+  const fade = (i: number) => (match && match[i] === FAINT ? S.query_fade! : 1) * come(i);
   const full = (i: number) => (match ? (match[i] !== FAINT ? 1 : 0) : 1);
   // Lit particles grow, only into the room round them (drawn after the links); the one pointed at also has a
   // ring. Their drawn edge is known first, so an arrowhead at one ends there rather than under it.
@@ -314,7 +319,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
         if (g.typeIx[i] !== ty || g.closed[i] !== shut || !inView(i, g.r[i]!)) continue;
         if (match && full(i) !== hit) continue;
         // What the find line finds is drawn whole, closed or not: a plan's done steps still read.
-        c.globalAlpha = (shut && match?.[i] !== FOUND ? S.closed_fade! : 1) * faint * (match && !hit ? S.query_fade! : 1);
+        c.globalAlpha = (shut && match?.[i] !== FOUND ? S.closed_fade! : 1) * faint * (match && !hit ? S.query_fade! : 1) * come(i);
         particle(c, g, i, g.r[i]!, S, cam.k, ink.sea);
       }
     }
@@ -393,7 +398,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     const grow = shine[i]! > 0 || match?.[i] === FOUND || hub[i] ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
     // A closed item's title is muted, like its particle.
     const shut = g.closed[i] && !(shine[i]! > 0) && !within && match?.[i] !== FOUND;
-    c.globalAlpha = grow * Math.max(faint * fade(i), shine[i]!) * (shut ? 0.75 : 1);
+    c.globalAlpha = grow * Math.max(faint * fade(i), shine[i]!) * (shut ? 0.75 : 1) * come(i);
     c.fillStyle = shut ? ink.muted : ink.text;
     const lines = texts.get(i)!, mid = (box[0] + box[2]) / 2;
     c.textAlign = within ? "center" : "left";

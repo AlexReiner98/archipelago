@@ -376,3 +376,17 @@ test("the map follows the find line once typing pauses: a value is taken only af
   t.mock.timers.tick(400);
   assert.deepEqual(took, ["can", "x"], "the same words again: nothing new");
 });
+
+test("an item that comes onto the map fades in where it lands over come_ms; what was there stays whole", async () => {
+  const { bornOf, comeFade } = await import("../packs/field/gone.ts");
+  const item = (id: string) => ({ id, title: id, type: "work", status: "", closed: false });
+  const one = build({ items: [item("a")], links: [], types: ["work"] }, null);
+  one.born = bornOf(null, one, 0);
+  assert.equal(one.born[0], -Infinity, "a first map was all there");
+  const two = build({ items: [item("a"), item("b")], links: [], types: ["work"] }, one);
+  two.born = bornOf(one, two, 500);
+  assert.deepEqual([two.born[two.idIx.get("a")!], two.born[two.idIx.get("b")!]], [-Infinity, 500]);
+  assert.equal(comeFade(Infinity, 600), 1);
+  assert.equal(comeFade(0, 600), 0);
+  assert.equal(comeFade(100, 0), 1, "0: it shows at once");
+});

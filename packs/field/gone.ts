@@ -43,6 +43,22 @@ export function goneOf(last: G | null, next: G, now: number, S: Settings, match:
   return out;
 }
 
+/** When each particle of `next` came: what `last` held keeps its time, what is new came `now`; a first map, long ago. */
+export function bornOf(last: G | null, next: G, now: number): Float64Array {
+  const out = new Float64Array(next.n).fill(-Infinity);
+  if (!last) return out;
+  for (let i = 0; i < next.n; i++) {
+    const j = last.idIx.get(next.id[i]!);
+    out[i] = j === undefined ? now : (last.born?.[j] ?? -Infinity);
+  }
+  return out;
+}
+
+/** How strong a particle is `ms` after it came, over `life` ms: eased from 0 to 1. */
+export function comeFade(ms: number, life: number): number {
+  return 1 - ghostFade(ms, life);
+}
+
 /** How strong a ghost is `ms` after it left, over `life` ms: eased from 1 to 0. */
 export function ghostFade(ms: number, life: number): number {
   if (life <= 0 || ms >= life) return 0;

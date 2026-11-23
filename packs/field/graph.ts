@@ -78,6 +78,8 @@ export interface G {
    * one that has a place, at (`x[i]`, `y[i]`). Absent: none has.
    */
   target?: { on: Uint8Array; x: Float32Array; y: Float32Array };
+  /** When each particle came onto the map, in ms (performance.now); it fades in over `come_ms` (gone.ts). Absent: all were there. */
+  born?: Float64Array;
   sim: Sim;
   /** Scratch, kept so each step does not allocate. */
   force: { x: Float32Array; y: Float32Array; z: Float32Array };
