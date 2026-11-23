@@ -1,7 +1,7 @@
 # The runtime
 
 The kernel: a small Cordis runtime ([arXiv 2608.25512](https://arxiv.org/abs/2608.25512))
-and its loader. No dependencies. The same TypeScript runs on Node 24 (type
+and its loader. No dependencies. The same TypeScript runs on Node 22.18+ (type
 stripping) and in the browser (the dev server strips types).
 
 | File | What it is | Paper |

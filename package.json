@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "license": "MIT",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
     "check": "tsc -p .",
     "test": "node --test --test-timeout=20000 test/*.test.ts",

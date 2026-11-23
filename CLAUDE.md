@@ -51,4 +51,4 @@ human or agent) when working in this repository. The
 - Run the tests you touched, `node --test test/<pack>.test.ts`, and the
   whole set (`npm test`) before a pull request.
 - To see a change in the browser, `npm run serve` and open
-  http://127.0.0.1:5280/app/. It runs `.ts` directly: there is no build.
+  http://127.0.0.1:5280/app/. Node runs the TypeScript directly: there is no build.

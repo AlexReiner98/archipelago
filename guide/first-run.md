@@ -1,7 +1,7 @@
 # First run
 
 Everything runs on your own machine, in one process, with no build step.
-You need Node 24 and Claude Code.
+You need Node 22.18 or later and Claude Code.
 
 ## Start it
 
