@@ -778,3 +778,13 @@ test("a drawn node draws again only when one of its values changed", async () =>
   assert.equal(c.shouldComponentUpdate!({ a: 1 }, {}, {}), true, "a value gone");
   assert.equal(c.shouldComponentUpdate!({ a: 1, b: "x", c: 3 } as never, {}, {}), true, "a value added");
 });
+
+test("a time is written once per input, and nothing for none", async () => {
+  const { day, time } = await import("../packs/harness/clock.ts");
+  const t = "2026-11-21T09:05:07Z";
+  assert.equal(day(t), new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }));
+  assert.equal(time(t), new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+  assert.equal(day(t), day(t));
+  assert.equal(day(undefined), "");
+  assert.equal(time("not a time"), "");
+});

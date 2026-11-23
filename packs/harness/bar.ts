@@ -5,10 +5,11 @@
  * view's dials) in one ⋯ menu.
  */
 import { h } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import { runName, type RunInfo } from "../../spec/agent.ts";
 import { read as token, sheet, verdictGlyph } from "../../spec/style.ts";
+import { day } from "./clock.ts";
 import { short } from "./events.ts";
 import type { Grouping } from "./layout.ts";
 
@@ -27,7 +28,6 @@ export const BAR_STYLE = sheet(`
 .hv-more button.on { color:var(--fg); text-decoration:underline; text-underline-offset:4px; }
 `);
 
-const clock = (t?: string) => (t ? new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
 export interface BarProps {
   runs: RunInfo[];
@@ -65,6 +65,10 @@ export const Bar = (p: BarProps) => {
     window.addEventListener("pointerdown", away, true);
     return () => window.removeEventListener("pointerdown", away, true);
   }, [open]);
+  // The runs' rows, made again only when a run, its name or whether it is live changed: not on every event.
+  const liveNow = new Set(p.current.map((x) => x.run));
+  const shape = p.runs.map((r) => `${r.run}|${runName(r)}|${r.started}|${liveNow.has(r.run) ? 1 : 0}`).join("\n");
+  const options = useMemo(() => p.runs.map((r) => html`<option value=${r.run}>${liveNow.has(r.run) ? "●" : "○"} ${short(runName(r), 40)} · ${day(r.started)}</option>`), [shape]);
   const value = p.live ? "live" : p.all ? "*" : (p.pinned ?? "");
   const groupings: Grouping[] = ["place", "channel", "pack", ...(p.profiles.length ? (["profile"] as Grouping[]) : [])];
   return html`
@@ -73,7 +77,7 @@ export const Bar = (p: BarProps) => {
         <option value="live">live · ${p.current.length} at once</option>
         <option value="*">all runs</option>
         <option value="">last active${p.runs[0] ? ` · ${short(runName(p.runs[0]), 40)}` : ""}</option>
-        ${p.runs.map((r) => html`<option value=${r.run}>${p.current.some((x) => x.run === r.run) ? "●" : "○"} ${short(runName(r), 40)} · ${clock(r.started)}</option>`)}
+        ${options}
       </select>
       ${p.info && p.current.some((x) => x.run === p.info!.run) && html`<span class="live" title="The run is live">●</span>`}
       ${!p.live && html`<span class="hv-n" title=${p.all ? "Every run's verdicts, node by run: held, failed, quiet" : "This run's verdicts: held, failed, quiet"}><span class="m-held">${token(verdictGlyph("held"))} ${p.sum.held}</span> <span class="m-failed">${token(verdictGlyph("failed"))} ${p.sum.failed}</span> <span class="m-quiet">${token(verdictGlyph("quiet"))} ${p.sum.quiet}</span></span>`}

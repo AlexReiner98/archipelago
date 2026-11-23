@@ -50,6 +50,7 @@ import { nodePane } from "./node.ts";
 import { shows } from "./channels.ts";
 import { GIVEN, GivenPane, parseGiven, useGiven, type GivenInfo } from "./given.ts";
 import { holdsOf, nodeOf, playhead, stateAt } from "./replay.ts";
+import { day } from "./clock.ts";
 import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
 import { useWindow, WINDOW, WindowBar, WINDOWBAR_STYLE, windowMarks } from "./windowbar.ts";
 import { NODE as NODE_WINDOW, TREND_STYLE } from "./trend.ts";
@@ -132,7 +133,6 @@ ${TREND_STYLE}
 
 const values = (v: string | string[] | undefined) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
-const clock = (t?: string) => (t ? new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
 const harness: Pack = {
   id: "harness",
@@ -493,7 +493,7 @@ const harness: Pack = {
         <div class="hv-body">
           ${runs && !runs.length && html`<div class="hv-empty" title="Of the last 50 runs, by profile.read.of">${of ? `No run in ${of}` : "No run yet"}</div>`}
           ${(runs ?? []).map((r) => html`<div class="hv-row" title=${r.title ?? r.run} onClick=${() => set.set(KEYS.run, r.run)}>
-            <span class="hv-m">${r.ended ? "○" : "●"}</span><span class="x" title=${runName(r)}>${runName(r)}</span><span class="n">${clock(r.started)}</span>
+            <span class="hv-m">${r.ended ? "○" : "●"}</span><span class="x" title=${runName(r)}>${runName(r)}</span><span class="n">${day(r.started)}</span>
           </div>`)}
         </div>
       </div>`;

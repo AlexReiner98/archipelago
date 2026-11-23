@@ -18,6 +18,7 @@ import { NODE, NodeWindowPart, useNodeWindow } from "./trend.ts";
 import { read as token, verdictGlyph } from "../../spec/style.ts";
 import { channelDoc, channelOf } from "./channels.ts";
 import { Mark } from "./events.ts";
+import { time } from "./clock.ts";
 import type { Hooks, VerdictRead } from "./hooks.ts";
 import type { keepParts, Review } from "./keep.ts";
 
@@ -32,7 +33,6 @@ const SAY = "words.say";
 /** The action that opens a written node to refinement or holds it (packs/written). */
 const RULE = "written.rule";
 
-const clock = (t?: string) => (t ? new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "");
 const mark = (x: "held" | "failed" | "quiet") => token(verdictGlyph(x));
 
 interface Deps {
@@ -228,7 +228,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
           ${(list ?? []).map(
             (x) => html`
               <div class=${`hv-row ${run === x.run ? "hv-lit" : ""}`} onClick=${() => set.set(KEYS.run, x.run)} title=${`failed by #${x.failed_by.join(", #") || "nothing"}`}>
-                <${Mark} v=${x.verdict} /><span class="x">${x.run.slice(0, 8)} · ${x.said}</span><span class="n">${clock(x.said_at)}</span>
+                <${Mark} v=${x.verdict} /><span class="x">${x.run.slice(0, 8)} · ${x.said}</span><span class="n">${time(x.said_at)}</span>
               </div>
             `,
           )}
