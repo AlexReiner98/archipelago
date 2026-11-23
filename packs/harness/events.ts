@@ -1,5 +1,5 @@
 /**
- * The Sensory interface's run pane (the right region): the run looked at, one line per event, in
+ * The Context interface's run pane (the right region): the run looked at, one line per event, in
  * one column. → the map to the agent, ← the agent to the map. The event at
  * the playhead is picked; those after it are faint until the run plays to
  * them. A click opens a line in place (expand.ts) and moves the playhead
@@ -143,7 +143,7 @@ export const Events = ({ info, events, index, end, verdicts, titles, speakers, n
         ${facts.remote && html`<span class="hv-dim hv-cut">${String(facts.remote).split("/").slice(-1)[0]}${facts.branch ? ` · ${facts.branch}` : ""}</span>`}
       </div>
       ${info && html`<div class="hv-prof">
-        ${profiles && !profiles.length && html`<span class="part" title="In no profile: it hears every node">no profile</span>`}
+        ${profiles && !profiles.length && html`<span class="part" title="In no umwelt: it hears every node">no umwelt</span>`}
         ${(profiles ?? []).map((p) => html`<span class=${p.by === "part" ? "part" : ""} title=${`${p.holding ? "holds" : "shadow: only records"}${p.by === "part" ? ", as a part" : ""}`}>${p.holding ? "●" : "◌"} ${p.title}</span>`)}
       </div>`}
       <div class="hv-body" ref=${body} onScroll=${(ev: Event) => {

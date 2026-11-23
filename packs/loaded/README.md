@@ -3,7 +3,7 @@
 What a harness loads into a run, as nodes: a skill's text and memory files
 (CLAUDE.md, CLAUDE.local.md, MEMORY.md). They shape a run as much as
 anything the map says, so each is a node said at its place, judged per run
-like any node, and shown in the sensory interface's tree. Injects `graph.read`,
+like any node, and shown in the context interface's tree. Injects `graph.read`,
 `graph.watch`, `agent.node` and `action.register`.
 
 | Place | Reached when |

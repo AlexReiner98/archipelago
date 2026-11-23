@@ -1,22 +1,23 @@
 # harness
 
-The Sensory interface: how each agent senses the landscape around it, and how it
+The Context interface: how each agent senses the landscape around it, and how it
 reaches back into it. (The pack's id, its page keys and its fills keep the
-name `harness`; the view was called Harness until 21 Nov 2026.) It is the
+name `harness`; the view was called Harness until 21 Nov 2026, and Sensory interface until 23 Nov 2026.) It is the
 hub to watch every agent at once, and every run, live or replayed, and
 every profile. What the map says to an agent is a
 tree of places and nodes. It lands on every live run: each agent has a tree
 of its own, holding the nodes its profile lets it hear, under its name in
 its colour and its profile, and what it is told colours that tree. Nothing
 moves. Two fills, linked through `here`; the run pane shows beside the
-view while it does (`when: { "here.view": "harness/view" }`), open from
-the start. Inside the view, one bar on the left holds the previews, or,
+view while it does (`when: { "here.view": "harness/view" }`), folded to
+its rail at the start (the frame's `folded` in app/boot.ts), so the tree
+has the room; a click on the rail opens it. Inside the view, one bar on the left holds the previews, or,
 while a node is picked, the node in their place; a click on the
 background, picking none, brings the previews back.
 
 | Fill | Region | Shows |
 |---|---|---|
-| Sensory interface (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline. Its left bar: the previews, or the node picked (its words, standing, places, pack, kind, record, and its verdict per run) |
+| Context interface (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline. Its left bar: the previews, or the node picked (its words, standing, places, pack, kind, record, and its verdict per run) |
 | Run (`harness/run`, "Run") | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: the events of the agent in focus, opening in place as one run's do. All runs: the runs, or a profile's |
 
 ## The bar ([bar.ts](bar.ts))
@@ -46,7 +47,7 @@ come.
   ended and heard from within `quiet_min` minutes (15, as Activity counts
   live), of the last 50 active, each in its own colour: a session archived
   or killed without ending its run drops to the past runs
-  ([live.ts](live.ts)): the style's six hues, then round again mixed toward
+  ([live.ts](live.ts)): the style's hues but the warm `hue-2` and `hue-4`, too near Claude Code's orange (an agent's lights would read as Claude Code's; a spark also has a white-hot core), then round again mixed toward
   the text colour, then toward the page, so there is no limit and every
   colour is made of tokens. A run keeps its colour while it stays live. Each is an agent with a tree of its own (below). The right pane shows the
   events of the agent in focus (`harness.focus`, this pack's own page
@@ -94,7 +95,12 @@ The dials, in the bar's ⋯ menu: how long a switch of focus takes
 (`switch_s`), how long the pointer rests on a node or a bough before its
 words show beside it (`tip_ms`, 0 for never), how many sizes names
 take per doubling while the tree zooms (`name_steps`, 0 for every size),
-and how long a run may be
+the size on screen below which a node's name shows only if the run said
+it, refused with it, or it is picked (`quiet_px`, 0 for every name, as it starts),
+the most characters a name shows (`name_most`, 28; 0 for whole),
+whether wire names give way where they overlap (`give_way`, 0: they always show),
+how long and how big an act's spark is (`spark_s`, 1.6; `spark_x`, 2.2 times the style's), how tall each agent preview is (`peek_px`, 200, its column a third wider), so
+a tree seen whole reads by its shape and what it was told, and how long a run may be
 quiet and still be live (`quiet_min`). Its value is `harness.dials` (page scope), so an agent can
 set it; the browser remembers it. Colours are style tokens only.
 
@@ -138,9 +144,9 @@ refusal), or sparks on the bough of an act's place (amber, red when it
 failed). Under reduced motion only the names light. Drag to move, wheel to
 zoom, double-click to fit; a press picks a node by its name, or anywhere
 within 22 px of its dot (`HIT_PX`). The key ([key.ts](key.ts)) is always
-there, bottom left of one run's tree or the agent in focus: open, every
-mark with its words, or collapsed by its head ("key ▾") to one line of the
-marks that filter; the browser remembers which. It lists only the marks
+there, bottom left of one run's tree or the agent in focus: collapsed by
+its head ("key ▸") to one line of the marks that filter until it is
+opened, or open, every mark with its words; the browser remembers which. It lists only the marks
 the tree in sight shows (`marksIn`): a new user's key is who and how, and
 held-back, shadow, verdict and trial marks join it as they appear. Its
 rows stand in titled sections, each a line apart, with what it means in
@@ -159,17 +165,23 @@ from the trees (struck while hidden), and a second click shows them again
 as "given" in the ⋯ menu. A node's text that the server doesn't answer for
 says so after 15 seconds, with "try again".
 
-Names are whole, never cut, and never show a path: a path is said as
+Names on the tree are cut to `name_most` characters with an ellipsis (28,
+a dial; 0 for whole: a long name otherwise shrinks the whole tree out of
+reading, 23 Nov 2026), the whole title in its words, and never show a path: a path is said as
 whose it is, after a dot (`nameOf`, `placeName`): its project's folder,
 and the file when it isn't the usual CLAUDE.md or MEMORY.md, so
 "project memory · archipelago-next", "auto memory · Aperture". The whole
-title is in its words, shown beside it when the pointer rests on it. The camera fits the dots, not the names, so a long name never shrinks the
-picture. Every tree, big or a preview, fits once, when first laid out,
-and then only on a double-click: the map changing under it never moves
-it (`shouldFit`).
+title is in its words, shown beside it when the pointer rests on it. The big tree's camera fits its names too (the layout's measured box), so
+every name is in sight; a preview fits its dots. Every tree fits when
+first laid out, again when it outgrows the view (a profile that hears
+more, Claude Code's nodes shown again, a smaller window), and on a
+double-click; once moved by hand it stays where it is put, and the map
+changing under it never moves it otherwise (`shouldFit`, `outgrown`).
 
 The names on the wires (a bough's, along its branch) grow and shrink with
-the zoom, and give way ([labels.ts](labels.ts)): one that overlaps a
+the zoom, and always show, in the text's colour over a halo of the page,
+so they read over the wires (23 Nov 2026: they must be clear and visible).
+With the `give_way` dial at 1 they give way instead ([labels.ts](labels.ts)): one that overlaps a
 node's name or dot, a bough's dot, the root or a wire name nearer the
 root fades out over a quarter second, and comes back when zoom clears it.
 Each is tested by its turned outline, worked out from its measured text,
@@ -199,7 +211,9 @@ With the context pack ([context](../context/README.md)), a bar over the
 agent in focus, and over one run's tree, says how full its context window
 is at the playhead, or live (`context.window`): the tokens in it of the
 window's size and the share that is, "≈" when it is an estimate (no usage
-in the transcript yet), and how many compactions. Under it two thin rows
+in the transcript yet), and how many compactions. It starts folded to that
+one line; its head ("window ▸") opens the rows below, and the browser
+remembers which (`harness.window-open`). Under it two thin rows
 on the window's one scale: its share by source (the map's, Claude Code's,
 the conversation, and what the model counts beyond those), and by channel
 (hook, rule, file, context, talk). A share's tooltip says its tokens, its

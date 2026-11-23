@@ -23,6 +23,12 @@ export const DIALS: readonly Dial[] = [
   { key: "switch_s", label: "switch s", min: 0, max: 1.5, step: 0.05, value: 0.4, doc: "Seconds a tree takes to grow into focus while the old one shrinks into the column; 0 switches at once." },
   { key: "tip_ms", label: "words after ms", min: 0, max: 3000, step: 50, value: 600, doc: "How long the pointer rests on a node or a bough before its words show beside it; 0 shows none." },
   { key: "name_steps", label: "name sizes", min: 0, max: 16, step: 1, value: 4, doc: "While the tree zooms, its names are drawn at this many sizes for each doubling, not at every size the zoom passes, so the letters drawn for one frame serve the next; they settle to their true size when it stops. 0 draws every size." },
+  { key: "name_most", label: "name chars", min: 0, max: 120, step: 1, value: 28, doc: "The most characters a name on the tree shows, cut with an ellipsis (its whole title is in its words, on the pointer resting on it), so a long name doesn't shrink the whole tree out of reading. 0 shows every name whole." },
+  { key: "spark_s", label: "spark s", min: 0.3, max: 4, step: 0.1, value: 1.6, doc: "Seconds an act's spark glows on the bough of its place, in the agent's colour, and the bough stays lit: long enough to see what an agent is doing as it does it." },
+  { key: "spark_x", label: "spark size", min: 0.5, max: 4, step: 0.1, value: 2.2, doc: "How big an act's spark is, as a multiple of the style's: big enough to see from across the tree." },
+  { key: "peek_px", label: "preview px", min: 100, max: 320, step: 10, value: 200, doc: "Each agent preview's height, in px; the previews' column is a third wider, so a preview's name and profile read." },
+  { key: "give_way", label: "wire names give way", min: 0, max: 1, step: 1, value: 0, doc: "1: a name along a branch fades out where it overlaps another name or a dot, and comes back as the zoom clears it. 0: every wire name always shows, over a halo of the page." },
+  { key: "quiet_px", label: "all names from px", min: 0, max: 16, step: 0.5, value: 0, doc: "Below this size on screen, a node's name shows only if the run said it, refused with it, or it is picked: a tree seen whole reads by its shape and what it was told, and every name comes back as it zooms in. 0 shows every name." },
   { key: "quiet_min", label: "live for min", min: 1, max: 240, step: 1, value: 15, doc: "Minutes a run may go unheard and still be live; past it, it is a past run in the list, not an agent in the previews." },
 ];
 

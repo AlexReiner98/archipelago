@@ -1,5 +1,5 @@
 /**
- * The Sensory interface's part for the keep pack (packs/keep): each trial node's
+ * The Context interface's part for the keep pack (packs/keep): each trial node's
  * record, standing and checks, read through the action `keep.review`, and
  * the buttons that keep or retire one (`keep.apply`, as the person at the
  * page). Without the keep pack there is nothing to show, and nothing is.
@@ -77,7 +77,7 @@ export function keepParts({ actions, invoke, graphLive, onVerdicts, pick }: Deps
       let timer: ReturnType<typeof setTimeout> | undefined;
       const load = () =>
         void invoke
-          .invoke({ action: REVIEW, input: {}, authority: { of: "human", basis: "read in the sensory interface" }, reason: "Show each trial node's standing" })
+          .invoke({ action: REVIEW, input: {}, authority: { of: "human", basis: "read in the context interface" }, reason: "Show each trial node's standing" })
           .then((out) => !gone && out.ok && setR(out.output as unknown as Review));
       const later = () => {
         clearTimeout(timer);
@@ -138,9 +138,9 @@ export function keepParts({ actions, invoke, graphLive, onVerdicts, pick }: Deps
       setStatus("…");
       const out = await invoke.invoke({
         action: APPLY,
-        input: { node: r.item, state, why: state === "promote" ? "Kept in the sensory interface" : "Retired in the sensory interface" },
-        authority: { of: "human", basis: state === "promote" ? "kept in the sensory interface" : "retired in the sensory interface" },
-        reason: `${state === "promote" ? "Kept" : "Retired"} ${r.title} in the sensory interface`,
+        input: { node: r.item, state, why: state === "promote" ? "Kept in the context interface" : "Retired in the context interface" },
+        authority: { of: "human", basis: state === "promote" ? "kept in the context interface" : "retired in the context interface" },
+        reason: `${state === "promote" ? "Kept" : "Retired"} ${r.title} in the context interface`,
       });
       setStatus(out.ok ? "" : `refused: ${out.refused.message}`);
     };

@@ -1,5 +1,5 @@
 /**
- * The Sensory interface's tree, drawn: every node as one circular tree grown
+ * The Context interface's tree, drawn: every node as one circular tree grown
  * from its root (layout.ts), lit by the run up to the event looked at. It is
  * painted on a 2D canvas, as the Landscape is (paint.ts, scene.ts): no
  * element per node, so a zoom, a move or an event is one repaint.
@@ -23,8 +23,8 @@
  * Drag to move, wheel to zoom, double-click to fit. A press picks a node by
  * its name, or within HIT_PX of its dot; resting the pointer on a node or a
  * bough shows its words after `tipMs`. The camera fits once, when first
- * laid out, and then only on a double-click (`shouldFit`): the map changing
- * under it never moves it.
+ * laid out, again when the tree outgrows the view, and on a double-click (`shouldFit`): the map changing
+ * under it otherwise never moves it.
  */
 import { Key, marksIn, type KeyFilter } from "./key.ts";
 export type { KeyFilter } from "./key.ts";
@@ -35,7 +35,7 @@ import htm from "htm";
 import type { NodeInfo } from "../../spec/agent.ts";
 import { onStyle, sheet } from "../../spec/style.ts";
 import { crowdedNames, boxQuad, nameQuad, type Quad } from "./labels.ts";
-import { HIT_PX, nearest, SETTLE_MS, shouldFit, fitKey } from "./camera.ts";
+import { HIT_PX, nearest, outgrown, SETTLE_MS, shouldFit, fitKey } from "./camera.ts";
 export { fitKey, HIT_PX, nearest, shouldFit } from "./camera.ts";
 import { dotsBox, STYLE, type Placed, type Tree } from "./layout.ts";
 import type { Verdict } from "./hooks.ts";
@@ -54,6 +54,8 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 const NAME_FADE_MS = 250;
 /** A name's height for picking and crowding, as a share of its size. */
 const NAME_TALL = 1.2;
+/** A box grown by m on every side. */
+const pad = (b: { x: number; y: number; width: number; height: number }, m: number) => ({ x: b.x - m, y: b.y - m, width: b.width + 2 * m, height: b.height + 2 * m });
 
 export const CANVAS_STYLE = sheet(`
 .rx-canvas { position:relative; overflow:hidden; cursor:grab; user-select:none; min-height:0; }
@@ -110,6 +112,14 @@ export interface CanvasProps {
   tipMs?: number;
   /** While moving, names are drawn at this many sizes per doubling of the zoom (the `name_steps` dial); 0, every size. */
   nameSteps?: number;
+  /** Below this size on screen a node's name shows only if it matters (paint.ts `quiet`). */
+  quietPx?: number;
+  /** Wire names fade where they overlap (labels.ts); else they always show. */
+  giveWay?: boolean;
+  /** How long an act's spark lasts, in seconds (the spark_s dial); 0, the style's. */
+  sparkS?: number;
+  /** How big an act's spark is, a multiple of the style's (the spark_x dial). */
+  sparkX?: number;
 }
 
 /** A name's outline in the picture's units, along its own line: where it starts, how long, how tall. */
@@ -145,7 +155,7 @@ function crowdedAt(scene: Scene, k: number, ink: Ink, widths: Widths, waiting: R
   return crowdedNames(names, others);
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, tipMs = 600, nameSteps = 4 }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, tipMs = 600, nameSteps = 4, quietPx = 0, giveWay = false, sparkS = 0, sparkX = 1 }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   const tipEl = useRef<HTMLDivElement>(null);
@@ -158,8 +168,8 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     () => sceneOf({ tree, placed, hues, statuses, ...(rings ? { rings } : {}), heard, held, counts, standing, ...(picked ? { picked } : {}), ...(win ? { window: win } : {}), theirs }),
     [tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, win, theirs],
   );
-  const now = useRef({ tree, placed, scene, small: !!small, tipMs, nameSteps });
-  now.current = { tree, placed, scene, small: !!small, tipMs, nameSteps };
+  const now = useRef({ tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx, giveWay, sparkS, sparkX });
+  now.current = { tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx, giveWay, sparkS, sparkX };
 
   // The painter: made once, outside Preact, as the Landscape's engine is.
   type Painter = { schedule(): void; recrowd(): void; lights: Lights; ink: Ink; widths: Widths; moving: boolean; zooming: boolean };
@@ -183,7 +193,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
       schedule: () => void (raf ||= requestAnimationFrame(frame)),
       recrowd: () => {
         if (now.current.small) return;
-        want = crowdedAt(now.current.scene, viewRef.current.k, ink, widths, P.lights.waiting);
+        want = now.current.giveWay ? crowdedAt(now.current.scene, viewRef.current.k, ink, widths, P.lights.waiting) : new Set();
         P.schedule();
       },
     };
@@ -206,7 +216,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
         if (next !== goal) fading = true;
       }
       const v = viewRef.current;
-      paint(c, now.current.scene, v, { width, height, dpr }, ink, widths, { waiting: P.lights.waiting, lit: P.lights.lit, shown, small: now.current.small, steps: now.current.nameSteps, zooming: P.zooming }, paths, (cx) => P.lights.draw(cx, v.k, ink, t), atlas);
+      paint(c, now.current.scene, v, { width, height, dpr }, ink, widths, { waiting: P.lights.waiting, lit: P.lights.lit, shown, small: now.current.small, steps: now.current.nameSteps, zooming: P.zooming, quiet: now.current.quietPx }, paths, (cx) => P.lights.draw(cx, v.k, ink, t), atlas);
       if (fading || P.lights.running) P.schedule();
       else last = 0;
     };
@@ -219,7 +229,9 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     return () => {
       cancelAnimationFrame(raf);
       P.lights.stop();
-      fires.current = undefined;
+      // Only its own: when an agent comes into focus its new canvas has taken `fires` already, and the
+      // preview's going after it must not leave the agent with no lights.
+      if (fires.current === P.lights.fire) fires.current = undefined;
       off();
       scheme.removeEventListener("change", restyle);
       ink.dispose();
@@ -251,8 +263,8 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   };
   useEffect(() => () => clearTimeout(settle.current), []);
 
-  // Fit the dots, not the names: a long name never shrinks or shifts the picture.
-  const bounds = dotsBox(placed, small ? 40 : 60);
+  // A preview fits its dots; the big tree fits its names too (the layout's measured box, less most of its margin), so every name is in sight and as big as it can be.
+  const bounds = small ? dotsBox(placed, 40) : pad(placed.box, -38);
   // The camera fits once, when the canvas is first laid out, and then only when asked (a double-click):
   // the map changing under it never moves it.
   const manual = useRef(false);
@@ -263,7 +275,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     const W = box.current?.clientWidth ?? 0;
     const H = box.current?.clientHeight ?? 0;
     if (!W || !H) return;
-    if (!shouldFit({ fitted: fitted.current, manual: manual.current, asked: ask.current })) return;
+    if (!shouldFit({ fitted: fitted.current, manual: manual.current, asked: ask.current, outgrown: outgrown(bounds, viewRef.current, W, H) })) return;
     ask.current = false;
     fitted.current = true;
     const k = Math.min(3, Math.max(0.1, Math.min(W / bounds.width, H / bounds.height)));

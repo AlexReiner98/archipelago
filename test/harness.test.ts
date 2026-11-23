@@ -427,11 +427,14 @@ test("a live run keeps its colour slot while it stays; a new one takes the lowes
   assert.deepEqual([...many.values()], [0, 1, 2, 3, 4, 5, 6, 7, 8]);
 });
 
-test("colourOf: the six hues, then round again mixed toward the text, then the page; tokens only", () => {
+test("colourOf: the hues but the warm ones near Claude Code's orange, then round again mixed toward the text, then the page; tokens only", () => {
   assert.equal(colourOf(0), "var(--hue-1, CanvasText)");
-  assert.equal(colourOf(5), "var(--hue-6, CanvasText)");
-  assert.match(colourOf(6), /^color-mix\(in srgb, var\(--hue-1, [^)]*\) \d+%, var\(--fg, [^)]*\)\)$/);
-  assert.match(colourOf(13), /var\(--hue-2, .*var\(--bg, /);
+  assert.equal(colourOf(1), "var(--hue-3, CanvasText)", "hue-2 is too near Claude Code's orange");
+  assert.equal(colourOf(2), "var(--hue-5, CanvasText)", "and hue-4");
+  assert.equal(colourOf(3), "var(--hue-6, CanvasText)");
+  assert.match(colourOf(4), /^color-mix\(in srgb, var\(--hue-1, [^)]*\) \d+%, var\(--fg, [^)]*\)\)$/);
+  assert.match(colourOf(9), /var\(--hue-3, .*var\(--bg, /);
+  for (let i = 0; i < 40; i++) assert.ok(!/hue-[24]/.test(colourOf(i)), "never hue-2 or hue-4");
   const twenty = Array.from({ length: 24 }, (_, i) => colourOf(i));
   assert.equal(new Set(twenty).size, 24, "no two of the first 24 alike");
   for (const c of twenty) assert.ok(!/#|rgb\(/.test(c), "never a value of its own");
@@ -478,7 +481,7 @@ test("placementOf: matched, the fallback, or none; a run that named the fallback
   assert.equal(placementOf([p("arch")], fallbacks, ["arch"]).kind, "matched");
   assert.deepEqual(placementOf([], fallbacks), { kind: "none", title: "", ids: [] });
   assert.equal(placementText(placementOf([p("arch")], fallbacks)), "○ Arch");
-  assert.equal(placementText(placementOf([], fallbacks)), "– no profile");
+  assert.equal(placementText(placementOf([], fallbacks)), "– no umwelt");
 });
 
 test("landsLive: nothing picked watches every live run; a run, every run or live turned off doesn't", () => {
@@ -548,11 +551,21 @@ test("quadsOverlap: turned outlines, not boxes; crowded: a wire name that hits a
 });
 
 test("shouldFit: every tree fits once and then only when asked", () => {
-  const at = (o: Partial<{ fitted: boolean; manual: boolean; asked: boolean }>) => shouldFit({ fitted: false, manual: false, asked: false, ...o });
+  const at = (o: Partial<{ fitted: boolean; manual: boolean; asked: boolean; outgrown: boolean }>) => shouldFit({ fitted: false, manual: false, asked: false, ...o });
   assert.equal(at({}), true, "the first time");
   assert.equal(at({ fitted: true }), false, "the map changed: the camera stays");
   assert.equal(at({ manual: true }), false);
   assert.equal(at({ fitted: true, manual: true, asked: true }), true, "a double-click");
+  assert.equal(at({ fitted: true, outgrown: true }), true, "the tree outgrew the view: fit again");
+  assert.equal(at({ fitted: true, manual: true, outgrown: true }), false, "moved by hand: it stays");
+});
+
+test("outgrown: a box past any edge of the camera's view", async () => {
+  const { outgrown } = await import("../packs/harness/camera.ts");
+  const v = { x: 0, y: 0, k: 2 };
+  assert.equal(outgrown({ x: 10, y: 10, width: 100, height: 100 }, v, 400, 400), false, "inside the 200 by 200 seen");
+  assert.equal(outgrown({ x: 10, y: 10, width: 300, height: 100 }, v, 400, 400), true, "past the right");
+  assert.equal(outgrown({ x: -20, y: 10, width: 50, height: 50 }, v, 400, 400), true, "past the left");
 });
 
 test("atFoot: new lines keep the list at its foot only when it is already there", async () => {
@@ -839,6 +852,17 @@ test("a time is written once per input, and nothing for none", async () => {
   assert.equal(day(t), day(t));
   assert.equal(day(undefined), "");
   assert.equal(time("not a time"), "");
+});
+
+test("seen whole, a node's name shows only if it matters: below quiet_px on screen it fades out over two px", async () => {
+  const { quietShown } = await import("../packs/harness/paint.ts");
+  assert.equal(quietShown(5, 0), 1, "0: every name");
+  assert.equal(quietShown(9, 9), 1, "whole from the dial's size");
+  assert.equal(quietShown(8, 9), 0.5, "half a step below");
+  assert.equal(quietShown(7, 9), 0, "gone two px below");
+  assert.equal(dialsOf({}).quiet_px, 0, "the dial starts at 0: every name");
+  assert.equal(dialsOf({}).name_most, 28, "names cut at 28 characters");
+  assert.equal(radial(treeOf([{ id: "words/a", title: "A name far longer than twenty-eight characters", at: ["prompt"], pack: "words", kind: "reflex" } as never]), { nameMost: 28 }).labels.get("words/a")?.text.length, 28, "cut with an ellipsis");
 });
 
 test("while zooming, names come from an atlas: a zoom stepped to a few sizes per doubling, pictures placed shelf by shelf", async () => {

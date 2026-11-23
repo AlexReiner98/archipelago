@@ -182,7 +182,7 @@ export function useWindow(invoke: ActionInvoke, has: boolean, run: string | unde
       let w: WindowRead | undefined;
       let after = 0;
       for (let i = 0; i < PAGES; i++) {
-        const out = await invoke.invoke({ action: WINDOW, input: { run, limit: LIMIT_MAX, ...(at ? { at } : {}), ...(after ? { after } : {}) }, authority: { of: "human", basis: "read in the sensory interface" }, reason: "Show what is in the agent's window" });
+        const out = await invoke.invoke({ action: WINDOW, input: { run, limit: LIMIT_MAX, ...(at ? { at } : {}), ...(after ? { after } : {}) }, authority: { of: "human", basis: "read in the context interface" }, reason: "Show what is in the agent's window" });
         if (!out.ok) {
           last.current.t = 0;
           return;
@@ -205,6 +205,8 @@ export function useWindow(invoke: ActionInvoke, has: boolean, run: string | unde
 export const WINDOWBAR_STYLE = sheet(`
 .hv-win { padding:var(--space-1) var(--space-4) var(--space-2); display:grid; gap:3px; min-width:0; }
 .hv-win .t { display:flex; gap:var(--space-3); align-items:baseline; white-space:nowrap; color:var(--dim); font-size:var(--text-s); min-width:0; overflow:hidden; }
+.hv-win .hv-whead { font:inherit; background:none; border:0; color:inherit; padding:0; cursor:pointer; }
+.hv-win .hv-whead:hover { color:var(--fg); }
 .hv-win .t b { color:var(--fg); font-weight:var(--bold); font-variant-numeric:tabular-nums; }
 .hv-win .row { display:flex; height:6px; border-radius:2px; overflow:hidden; background:color-mix(in srgb, var(--line) 30%, transparent); }
 .hv-win .row > button { height:100%; padding:0; border:0; margin:0; min-width:0; flex:none; cursor:pointer; font:inherit; }
@@ -297,20 +299,38 @@ const MapRow = ({ w, hues, picked, onPick }: { w: WindowRead; hues?: Map<string,
     </div>`;
 };
 
+/** The browser's memory of whether the window bar is open: folded to its one line until opened. */
+const WINDOW_OPEN = "harness.window-open";
+function windowOpen(): boolean {
+  try {
+    return localStorage.getItem(WINDOW_OPEN) === "1";
+  } catch {
+    return false;
+  }
+}
+
 export const WindowBar = ({ w, filter, hues, picked, onPick }: { w?: WindowRead; filter?: KeyFilter; hues?: Map<string, string>; picked?: string; onPick?(id: string): void }) => {
+  const [open, setOpen] = useState(windowOpen);
   if (!w) return "";
   const { sources, channels } = sharesOf(w);
   const full = pct(w.total.tokens, w.limit.tokens);
   const limitTip = w.limit.from === "model" ? `the window of ${w.model ?? "the model"}` : w.limit.from === "seen" ? "the long window: more than 200k was seen in it" : "the usual window; the model doesn't say";
   const totalTip = w.total.from === "usage" ? "The model's own count: the latest message's input, cache and output tokens" : "An estimate: what the parts hold, at four characters a token. The transcript has no usage yet";
+  const toggle = (e: Event) => {
+    e.stopPropagation();
+    setOpen(!open);
+    try {
+      localStorage.setItem(WINDOW_OPEN, open ? "0" : "1");
+    } catch {}
+  };
   return html`<div class="hv-win" onPointerDown=${(e: Event) => e.stopPropagation()}>
     <div class="t">
-      <span>window</span>
+      <button class="hv-whead" title=${open ? "Fold the window to one line" : "Open the window: its share by source, by channel, and the map's own"} onClick=${toggle}>window ${open ? "▾" : "▸"}</button>
       <span title=${totalTip}>${w.total.from === "estimate" ? "≈ " : ""}<b>${tok(w.total.tokens)}</b> of <span title=${limitTip}>${tok(w.limit.tokens)}</span> · ${full.toFixed(full < 10 ? 1 : 0)}%</span>
       ${w.compactions > 0 && html`<span title=${w.compacted?.pre !== undefined ? `The last: ${tok(w.compacted.pre)} → ${tok(w.compacted.post ?? 0)} tokens${w.compacted.trigger ? `, ${w.compacted.trigger}` : ""}` : "Compacted"}>${w.compactions} compaction${w.compactions === 1 ? "" : "s"}</span>`}
     </div>
-    <${Row} shares=${sources} limit=${w.limit.tokens} filter=${filter} label="by source" />
+    ${open && html`<${Row} shares=${sources} limit=${w.limit.tokens} filter=${filter} label="by source" />
     <${Row} shares=${channels} limit=${w.limit.tokens} filter=${filter} label="by channel" />
-    <${MapRow} w=${w} hues=${hues} picked=${picked} onPick=${onPick} />
+    <${MapRow} w=${w} hues=${hues} picked=${picked} onPick=${onPick} />`}
   </div>`;
 };

@@ -92,7 +92,7 @@ const FilterRow = (f: Filter, mark: unknown, text: string, filter?: KeyFilter) =
 /** The marks a filter can hide: who it is from, then each channel. Shared by the open key and the collapsed one. */
 const FILTERS = (): { f: Filter; mark: unknown; text: string }[] => [
   { f: "map", mark: html`<svg viewBox="0 0 14 10"><path d="M1 5H8" style=${`stroke:${v("say")};stroke-width:2`} /><circle cx="10" cy="5" r="3" style=${`fill:${v("owner")}`} /></svg>`, text: "the map's: what we supply" },
-  { f: "harness", mark: html`<svg viewBox="0 0 14 10"><path d="M1 5H8" style=${`stroke:${v("harness")};stroke-width:2`} /><circle cx="10" cy="5" r="3" style=${`fill:${v("harness")}`} /></svg>`, text: "orange: Claude Code gave it" },
+  { f: "harness", mark: html`<svg viewBox="0 0 14 10"><path d="M1 5H8" style=${`stroke:${v("harness")};stroke-width:2`} /><circle cx="10" cy="5" r="3" style=${`fill:${v("harness")}`} /></svg>`, text: "orange: Claude Code's own, read only" },
   ...CHANNELS.map((c) => ({ f: c.channel as Filter, mark: html`<svg viewBox="0 0 14 10"><path transform="translate(7 5)" d=${shapePath(c.shape, 3.6)} style=${`fill:${v("dim")}`} /></svg>`, text: `${c.title}: ${c.key}` })),
 ];
 

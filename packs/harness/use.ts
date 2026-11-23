@@ -107,7 +107,7 @@ export function outOf(extras: Extras | undefined, name: string): Out | undefined
 }
 
 const ask = (invoke: ActionInvoke, action: string, input: object, reason: string) =>
-  invoke.invoke({ action, input: input as never, authority: { of: "human", basis: "read in the sensory interface" }, reason });
+  invoke.invoke({ action, input: input as never, authority: { of: "human", basis: "read in the context interface" }, reason });
 
 /** Reads a run's extras: the use of its tools and servers, the plans of its profiles, and whether the server writes. */
 export async function readExtras(invoke: ActionInvoke, run: string, names: string[]): Promise<Extras> {

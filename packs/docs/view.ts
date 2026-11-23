@@ -17,7 +17,7 @@
  * goes in the head.
  *
  * It invokes no action. What it opens it opens through `here` keys
- * (`find.query` for the Map, `here.run` for the sensory interface, `docs.pack` for a
+ * (`find.query` for the Map, `here.run` for the context interface, `docs.pack` for a
  * pack's page), which are not actions. Its styles go when it unloads.
  */
 import { h } from "preact";

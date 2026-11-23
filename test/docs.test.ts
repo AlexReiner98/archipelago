@@ -215,7 +215,7 @@ test("cards: what a pack adds, as counts, live where they can be, each opening w
     { key: "kinds", label: "140+ items", items: [{ title: "work: 40", query: "type:work" }, { title: "branch (a kind of work): 100+", query: "type:branch" }] },
     { key: "links", label: "1 kind of link", items: [{ title: "part_of" }] },
     { key: "actions", label: "1 action", items: [{ title: "Make an item" }] },
-    { key: "says", label: "3 nodes for agents", to: { title: "Sensory interface", view: "harness" } },
+    { key: "says", label: "3 nodes for agents", to: { title: "Context interface", view: "harness" } },
     { key: "run", label: "last run: said 3 times, 1 act", to: { title: "the run", view: "harness", run: "r1" } },
     { key: "used", label: "used by 1 pack", items: [{ title: "user", pack: "user" }] },
   ]);

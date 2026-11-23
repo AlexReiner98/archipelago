@@ -1,5 +1,5 @@
 /**
- * The Sensory interface's live mode (`harness.live`): every live run at once,
+ * The Context interface's live mode (`harness.live`): every live run at once,
  * each in a colour of its own. Its colours are the style's hues (`hue-1`…),
  * as tokens. A run keeps its colour while it stays live; a new one takes
  * the first colour free.
@@ -50,11 +50,18 @@ export function colours(runs: string[], had: Map<string, number> = new Map()): M
 }
 
 /**
- * A slot's colour, from the style's tokens only: the six hues, then round
+ * The hues an agent takes: the style's, less the warm `hue-2` and `hue-4`, too near the orange
+ * that marks what Claude Code gave (as the packs' hues leave it out, layout.ts),
+ * so an agent's lights and sparks never read as Claude Code's.
+ */
+export const AGENT_HUES: readonly Token[] = HUES.filter((t) => t !== "hue-2" && t !== "hue-4");
+
+/**
+ * A slot's colour, from the style's tokens only: the agent hues, then round
  * again mixed toward the text colour (lighter by night), then toward the
  * page (darker), and so on.
  */
-export function colourOf(slot: number, tokens: readonly Token[] = HUES): string {
+export function colourOf(slot: number, tokens: readonly Token[] = AGENT_HUES): string {
   const hue = v(tokens[slot % tokens.length]!);
   const round = Math.floor(slot / tokens.length);
   if (!round) return hue;

@@ -1,5 +1,5 @@
 /**
- * Times as the Sensory interface writes them, each formatted once: a
+ * Times as the Context interface writes them, each formatted once: a
  * run's start (`day`) and an event's time (`time`). Formatting a date is
  * slow (toLocaleString builds its formatter on every call), and the bar
  * writes every run's start each time an event comes, so the formatters

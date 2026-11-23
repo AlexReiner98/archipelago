@@ -35,7 +35,7 @@ applies it through `keep.apply`. That calls `words.promote` or
 the record) in the same change set, so `history.undo` takes both back. After
 an undo, the pack doesn't decide that node again until its record has a new
 run. It decides only trial nodes. To keep one or retire it by hand, a person
-uses the same action, from the sensory interface.
+uses the same action, from the context interface.
 
 ## Checks
 
@@ -59,7 +59,7 @@ uses the same action, from the sensory interface.
 | `keep.review` `{ node? }` | Each trial node's record, standing and checks, with the nodes decided. Writes nothing |
 | `keep.apply` `{ node, state, rule?, why? }` | `promote` or `retire`, with `decided` |
 
-The Sensory interface ([keep.ts](../harness/keep.ts)) shows the standing in the
+The Context interface ([keep.ts](../harness/keep.ts)) shows the standing in the
 tree (trial, promote, retire, held back) and the kept and retired nodes in
 the tree's last group. In the node pane it shows the record against the
 thresholds, why, the gate's checks, and Keep and Retire.

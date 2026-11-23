@@ -12,9 +12,18 @@ export function fitKey(count: number, b: Placed["box"]): string {
   return `${count}|${[b.x, b.y, b.width, b.height].map((n) => Math.round(n)).join(",")}`;
 }
 
-/** Whether the camera fits now: when asked (a double-click), always; else only its first time, if not moved by hand. */
-export function shouldFit(s: { fitted: boolean; manual: boolean; asked: boolean }): boolean {
-  return s.asked || (!s.manual && !s.fitted);
+/**
+ * Whether the camera fits now: when asked (a double-click), always; never once moved by hand; else its first
+ * time, and again only when the tree has outgrown the view (a profile that hears more), so all of it stays in sight.
+ */
+export function shouldFit(s: { fitted: boolean; manual: boolean; asked: boolean; outgrown?: boolean }): boolean {
+  return s.asked || (!s.manual && (!s.fitted || !!s.outgrown));
+}
+
+/** Whether a box reaches past the camera's view of a W×H canvas. */
+export function outgrown(b: Placed["box"], v: { x: number; y: number; k: number }, W: number, H: number): boolean {
+  const e = 0.5;
+  return b.x < v.x - e || b.y < v.y - e || b.x + b.width > v.x + W / v.k + e || b.y + b.height > v.y + H / v.k + e;
 }
 
 /** How far round a dot, in screen px, a press still picks its node. */

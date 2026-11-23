@@ -106,7 +106,7 @@ function boughsFor(n: NodeInfo, o: Required<TreeOptions>): Bough[] | undefined {
   }
   if (o.by === "pack") return [{ key: `pack:${n.pack}`, title: n.pack }, { key: `pack:${n.pack}:${n.kind}`, title: words(n.kind) }];
   if (o.by === "profile") {
-    const from = o.profiles.get(n.id)?.[0] ?? "no profile";
+    const from = o.profiles.get(n.id)?.[0] ?? "no umwelt";
     return [{ key: `profile:${from}`, title: from }, { key: `profile:${from}:${n.kind}`, title: words(n.kind) }];
   }
   if (!n.at.length) return o.unsaid ? [NEVER] : undefined;

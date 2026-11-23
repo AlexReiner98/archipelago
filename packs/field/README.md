@@ -1,6 +1,6 @@
 # field
 
-Page side: the map as particles, the view "Landscape" (the world every agent's sensory interface
+Page side: the map as particles, the view "Landscape" (the world every agent's context interface
 touches) in the frame's `center` (home). Each item is a particle in its type's colour and its base's shape,
 and links are faint lines with arrows. It lays out the whole map, open and
 closed, up to `field_limit` items, less what the legend hides (closed
@@ -37,7 +37,11 @@ find line has words, only what it finds and what lies near it.
   stiffness per link type), `flow` (order links put a plan in columns:
   each item's rank is its longest chain of what it waits on, and what it
   waits on is to the left) and `collide` (by each shape's edge along the
-  line between two particles).
+  line between two particles), and `tree` (while the Landscape is
+  arranged into a context profile, packs/arrange's page key
+  `arrange.tree`, each of its items pulled to its place in that profile's
+  tree; only those items are laid out, and the tree's branches and names
+  ([treeover.ts](treeover.ts)) come in under them as they arrive).
 - **Every number is a dial**, in the legend's dials tab: each behaviour's,
   then the start, find, the run and the drawing, in sections that start
   closed and say how many of their dials are changed; springs and flow are

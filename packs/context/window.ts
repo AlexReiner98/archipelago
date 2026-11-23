@@ -4,7 +4,7 @@
  * (the transcript pack's nodes), and its token use and compactions.
  *
  * Each part has a source (the map, Claude Code, the agent), a channel (how
- * it reaches the agent, as the sensory interface shapes its dots, or `act`
+ * it reaches the agent, as the context interface shapes its dots, or `act`
  * for what the agent did), a size in tokens and a state:
  *
  * | State | Means |
