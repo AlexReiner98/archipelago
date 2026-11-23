@@ -1,5 +1,5 @@
 {
-  "accepted": 9,
+  "accepted": 10,
   "entries": {
     "action.ts:ActionContext": "export interface ActionContext {\n    caller: Caller;\n    authority: Authority;\n    reason: string;\n    write(facts: Fact[]): void;\n    written(): readonly Fact[];\n    call<O extends Json = Json>(name: string, input: Json): Promise<O>;\n}",
     "action.ts:ActionDef": "export interface ActionDef<I extends Json = Json, O extends Json = Json> {\n    name: string;\n    title: string;\n    doc?: string;\n    input: JsonSchema;\n    output?: JsonSchema;\n    run(input: I, ctx: ActionContext): Promise<O>;\n}",
@@ -93,7 +93,6 @@
     "changeset.ts:inverse": "export function inverse(facts: readonly Fact[]): Fact[] {\n    const out: Fact[] = [];\n    for (let i = facts.length - 1; i >= 0; i--) {\n        const [op, id, field, value] = facts[i]!;\n        out.push([op === \"+\" ? \"-\" : \"+\", id, field, value]);\n    }\n    return out;\n}",
     "changeset.ts:Op": "export type Op = \"+\" | \"-\";",
     "changeset.ts:Proposed": "export interface Proposed {\n    header: Header;\n    facts: Fact[];\n}",
-    "common.ts:ACCEPTED": "ACCEPTED: Edition = 9",
     "common.ts:Actor": "export interface Actor {\n    id: Id;\n    kind: \"person\" | \"agent\";\n}",
     "common.ts:Authority": "export interface Authority {\n    of: \"human\" | \"agent\";\n    basis?: string;\n}",
     "common.ts:byPosition": "export function byPosition(a: Caller, b: Caller): number {\n    const n = Math.min(a.position.length, b.position.length);\n    for (let i = 0; i < n; i++) {\n        const d = a.position[i]! - b.position[i]!;\n        if (d !== 0)\n            return d;\n    }\n    return a.position.length - b.position.length;\n}",
@@ -242,6 +241,17 @@
     "style.ts:HUES[hue-4]": "\"hue-4\"",
     "style.ts:HUES[hue-5]": "\"hue-5\"",
     "style.ts:HUES[hue-6]": "\"hue-6\"",
+    "style.ts:MARK_SHAPES:type": "readonly MarkShape[]",
+    "style.ts:MARK_SHAPES[circle]": "\"circle\"",
+    "style.ts:MARK_SHAPES[diamond]": "\"diamond\"",
+    "style.ts:MARK_SHAPES[hexagon]": "\"hexagon\"",
+    "style.ts:MARK_SHAPES[pentagon]": "\"pentagon\"",
+    "style.ts:MARK_SHAPES[square]": "\"square\"",
+    "style.ts:MARK_SHAPES[triangle]": "\"triangle\"",
+    "style.ts:markGlyph": "markGlyph = (shape: MarkShape, side: Side): MarkGlyphToken => `glyph-${shape}-${side}`",
+    "style.ts:MarkGlyphToken": "export type MarkGlyphToken = `glyph-${MarkShape}-${Side}`;",
+    "style.ts:markShape": "export function markShape(marks: Readonly<Record<string, MarkShape>>, t: TypeInfo | undefined): MarkShape {\n    return marks[t?.base ?? \"\"] ?? \"circle\";\n}",
+    "style.ts:MarkShape": "export type MarkShape = \"square\" | \"diamond\" | \"circle\" | \"triangle\" | \"pentagon\" | \"hexagon\";",
     "style.ts:onStyle": "export function onStyle(on: () => void): () => void {\n    if (typeof document === \"undefined\")\n        return () => { };\n    document.addEventListener(CHANGED, on);\n    return () => document.removeEventListener(CHANGED, on);\n}",
     "style.ts:read": "export function read(name: Token, el?: Element): string {\n    let got = \"\";\n    if (typeof document !== \"undefined\")\n        got = getComputedStyle(el ?? document.documentElement).getPropertyValue(`--${name}`).trim();\n    const value = got || TOKENS[name];\n    return /^\".*\"$/.test(value) ? value.slice(1, -1) : value;\n}",
     "style.ts:shape": "export function shape(bases: readonly string[], t: TypeInfo | undefined): Shape {\n    return SHAPES[Math.max(0, bases.indexOf(t?.base ?? \"\")) % SHAPES.length]!;\n}",
@@ -321,6 +331,8 @@
     "types.ts:capabilities:type": "Capability[]",
     "types.ts:capabilities[types.define]": "{ key: \"types.define\", since: 1, doc: \"Defines a base, a flavour of one, or a kind of link.\" }",
     "types.ts:Capabilities[types.define]": "\"types.define\": TypesDefine;",
+    "types.ts:capabilities[types.mark]": "{ key: \"types.mark\", since: 10, doc: \"The shape each base is drawn in: named by its pack, else the first shape no base holds.\" }",
+    "types.ts:Capabilities[types.mark]": "\"types.mark\": TypesMark;",
     "types.ts:capabilities[types.read]": "{ key: \"types.read\", since: 1, doc: \"The bases, flavours and links defined now, resolved, and when they change.\" }",
     "types.ts:Capabilities[types.read]": "\"types.read\": TypesRead;",
     "types.ts:COMMON.note": "note: { kind: \"text\", doc: \"What else there is to say, short.\" }",
@@ -334,6 +346,7 @@
     "types.ts:Statuses": "export interface Statuses {\n    open: string[];\n    closed: string[];\n}",
     "types.ts:TypeInfo": "export interface TypeInfo {\n    name: string;\n    base: string;\n    doc?: string;\n    statuses: Statuses;\n    fields: Record<string, FieldDef>;\n    trial: boolean;\n    pack: PackId;\n}",
     "types.ts:TypesDefine": "export interface TypesDefine {\n    base(def: BaseDef): Dispose;\n    flavour(def: FlavourDef): Dispose;\n    link(def: LinkDef): Dispose;\n}",
+    "types.ts:TypesMark": "export interface TypesMark {\n    mark(base: string, shape: MarkShape): Dispose;\n    marks(): Record<string, MarkShape>;\n    watch(on: () => void): Dispose;\n}",
     "types.ts:TypesRead": "export interface TypesRead {\n    all(): {\n        types: TypeInfo[];\n        links: LinkInfo[];\n    };\n    get(name: string): TypeInfo | LinkInfo | undefined;\n    watch(on: () => void): Dispose;\n}"
   }
 }

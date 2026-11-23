@@ -146,7 +146,7 @@ export type Edition = number;
 export const EDITION: Edition = 10;
 
 /** Every edition up to this one is accepted: what it says is frozen (test/spec-frozen.json). */
-export const ACCEPTED: Edition = 9;
+export const ACCEPTED: Edition = 10;
 
 /**
  * A capability: one key in the Cordis context, and what it means. A pack

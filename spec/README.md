@@ -111,8 +111,8 @@ The spec has editions: 1, 2, 3… Packs don't declare versions of anything.
 - Each capability says the edition it arrived in (`since`) and, if
   retired, the edition and what replaces it. The list is the spec's
   history.
-- Editions 1 to 9 are accepted (edition 1 on 20 Nov 2026, up to 9 on
-  23 Nov 2026, the first public release): their capabilities' meanings are
+- Editions 1 to 10 are accepted (edition 1 on 20 Nov 2026, up to 9 on
+  23 Nov 2026, the first public release, and 10 the same day): their capabilities' meanings are
   fixed. `ACCEPTED` in common.ts says up to which edition.
 - A test holds it: `test/spec-frozen.test.ts` compares every accepted
   type, capability and term with `test/spec-frozen.json` and fails on any

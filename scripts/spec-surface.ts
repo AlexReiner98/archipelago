@@ -19,8 +19,8 @@ import ts from "typescript";
 const SPEC = fileURLToPath(new URL("../spec/", import.meta.url));
 const FROZEN = fileURLToPath(new URL("../test/spec-frozen.json", import.meta.url));
 
-/** Exports that name the edition the files are, or gather other modules: they move with every edition. */
-const MOVING = new Set(["common.ts:EDITION", "index.ts:capabilities"]);
+/** Exports that name the edition the files are or the one accepted, or gather other modules: they move with every edition. */
+const MOVING = new Set(["common.ts:EDITION", "common.ts:ACCEPTED", "index.ts:capabilities"]);
 
 const printer = ts.createPrinter({ removeComments: true, newLine: ts.NewLineKind.LineFeed });
 
