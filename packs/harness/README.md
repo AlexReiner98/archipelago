@@ -61,6 +61,14 @@ come.
 - **Playhead:** `here.event`, in one run. Unset, the view follows the run's
   end live.
 
+## From a context filter ([open.ts](open.ts))
+
+A context filter's item page (the Landscape or the Map, a click on the
+item) has a button into its view here, in the item pack's `item.actions`
+slot: with a session live in the filter, "Watch its live session", which
+opens the live view focused on it; with none, "Its context", which opens
+the filter's own tree (`openFilter`).
+
 ## The agents ([trees.ts](trees.ts), [agents.ts](agents.ts))
 
 Live mode and the agents are one idea: each live run is an agent, in the

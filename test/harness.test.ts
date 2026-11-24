@@ -934,3 +934,16 @@ test("placeLabel: an MCP tool's place reads as its server and name; any other pl
   assert.equal(placeLabel("tool:Edit"), "tool:Edit");
   assert.equal(placeLabel("file:index.html"), "file:index.html");
 });
+
+test("openFilter: a context filter's view, live on its session when one is live, else its own tree", async () => {
+  const { openFilter, VIEW } = await import("../packs/harness/open.ts");
+  const live = new Map(openFilter("f1", ["r1", "r2"]));
+  assert.equal(live.get("harness.live"), true);
+  assert.equal(live.get("harness.focus"), "r1");
+  assert.equal(live.get("harness.profile"), undefined);
+  assert.equal(live.get("here.view"), VIEW);
+  const none = new Map(openFilter("f1", []));
+  assert.equal(none.get("harness.profile"), "f1");
+  assert.equal(none.get("harness.live"), undefined);
+  assert.equal(none.get("here.view"), VIEW);
+});

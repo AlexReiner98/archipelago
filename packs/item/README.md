@@ -8,6 +8,10 @@ actions, and the page follows live.
 From the top:
 
 - **Head:** the item's mark and title; its type and status under it.
+- **Actions:** under the head, the slot `item.actions` (merge many), where
+  another pack offers what to do with the item shown; each fill reads
+  `here.item` and shows nothing for an item it has nothing for (the
+  harness: a context filter's view).
 - **Fields as marks:** one chip per field it has, by kind (`kind bug`,
   `due 2026-11-21`); a yes is the field's name, a no is left out, a long
   value is cut short with the whole in its tooltip. An `id` field opens

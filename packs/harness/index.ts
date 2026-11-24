@@ -38,6 +38,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
 import type { RootMark } from "./paint.ts";
+import { CONTEXT_FILTER, OpenFilterButton } from "./open.ts";
 import type { Json } from "../../spec/common.ts";
 /** Each type's mark as the Landscape draws it (packs/field), read by name: a key, not an import. */
 const FIELD_MARKS = "field.marks";
@@ -548,6 +549,8 @@ const harness: Pack = {
     const whileShown = { "here.view": "harness/view" };
     fill.fill({ slot: "center", name: "view", title: "Context interface", view: Center });
     fill.fill({ slot: "right", name: "run", title: "Run", when: whileShown, view: RunFill });
+    // On a context filter's item page: the way into its view here (open.ts).
+    fill.fill({ slot: "item.actions", name: "open", view: OpenFilterButton({ set, type: CONTEXT_FILTER, useHere: hk.useHere, useItem: hk.useItem, useLive: () => hk.useRun().current, useRunsIn: hk.useRunsIn }) });
   },
 };
 

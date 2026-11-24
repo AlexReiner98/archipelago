@@ -18,7 +18,10 @@ import type { ActionInvoke } from "../../spec/action.ts";
 import type { Id, Json } from "../../spec/common.ts";
 import type { HereRead, HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
-import type { SlotFill } from "../../spec/slot.ts";
+import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
+
+/** The item page's slot for what other packs offer to do with the item shown. */
+export const ACTIONS = "item.actions";
 import type { TypeInfo } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { markGlyph, markShape, onStyle, read, side, type MarkShape } from "../../spec/style.ts";
@@ -51,12 +54,15 @@ const QUERY = "find.query";
 const item: Pack = {
   id: "item",
   about: "The page for one item: its note, its fields, what it is tied to, and its history with undo.",
-  inject: ["find.index", "here.read", "here.set", "slot.fill", "action.invoke"],
+  inject: ["find.index", "here.read", "here.set", "slot.fill", "slot.read", "slot.declare", "action.invoke"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
     const invoke = ctx.get<ActionInvoke>("action.invoke");
+    // What other packs offer to do with the item shown, under its head: each fill reads here.item itself.
+    ctx.get<SlotDeclare>("slot.declare").declare({ name: ACTIONS, merge: "many", doc: "On the item page, under its head: what another pack offers to do with the item shown (here.item), such as opening a context filter's view." });
+    const Slot = ctx.get<SlotRead>("slot.read").Slot;
 
     const useHere = <T extends Json>(key: string): T | undefined => {
       const [v, setV] = useState<T | undefined>(here.get<T>(key));
@@ -107,6 +113,7 @@ const item: Pack = {
             ${close}
           </div>
           <div class="ip-sub">${row.type}${t && t.base !== t.name ? ` (${t.base})` : ""} · ${String(row.fields.status ?? "")}</div>
+          <div class="ip-acts"><${Slot} name=${ACTIONS} /></div>
           <${P.Marks} marks=${marks(row.fields, t?.fields ?? {})} />
           ${note && html`<${P.Note} key=${id} text=${note} />`}
           ${groups.length > 0 && html`<div class="ip-label">Tied to</div>`}

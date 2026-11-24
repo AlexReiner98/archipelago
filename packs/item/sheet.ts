@@ -10,6 +10,9 @@ export const STYLE = sheet(`
 .ip-mk { width:1.1em; text-align:center; flex:none; display:inline-block; }
 .ip-mk.s-fresh { color:var(--mark-fresh); } .ip-mk.s-moving { color:var(--mark-moving); } .ip-mk.s-done { color:var(--mark-done); } .ip-mk.s-gone { color:var(--mark-gone); }
 .ip-sub { padding:0 var(--space-4) var(--space-2); color:var(--dim); font-size:var(--text-s); }
+.ip-acts { padding:0 var(--space-4) var(--space-3); display:flex; flex-wrap:wrap; gap:var(--space-3); }
+.ip-acts:empty { display:none; }
+.ip-acts .ip-btn { padding:var(--space-2) var(--space-4); }
 .ip-marks { display:flex; flex-wrap:wrap; gap:var(--space-1); padding:0 var(--space-4) var(--space-2); }
 .ip-chip { font-size:var(--text-s); border:1px solid var(--line); border-radius:var(--radius); padding:0 var(--space-2); white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
 .ip-label { padding:var(--space-3) var(--space-4) var(--space-1); color:var(--dim); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:.06em; }
