@@ -130,6 +130,30 @@ export interface PaintState {
    * picked (the `quiet_px` dial), so a tree seen whole reads by its shape and what the run was told. 0: every name.
    */
   quiet?: number;
+  /** The context filter the tree is of, named at its root, so the tree reads as that item on the map. */
+  root?: string;
+}
+
+/**
+ * The context filter's name at the tree's root, at one screen size whatever the zoom: bold, on a plate of the page's
+ * own colour so it reads over the wires, just under the root's dot.
+ */
+function rootName(c: CanvasRenderingContext2D, name: string, k: number, ink: Ink): void {
+  c.save();
+  c.scale(1 / k, 1 / k);
+  c.font = `${ink.bold} ${S.rootName}px ${ink.font}`;
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  const w = c.measureText(name).width, h = S.rootName * 1.5, y = S.root * k + 4 + h / 2;
+  c.globalAlpha = 0.85;
+  c.fillStyle = ink.color(INK.bg);
+  c.beginPath();
+  c.roundRect(-w / 2 - 6, y - h / 2, w + 12, h, h / 2);
+  c.fill();
+  c.globalAlpha = 1;
+  c.fillStyle = ink.color(INK.fg);
+  c.fillText(name, 0, y);
+  c.restore();
 }
 
 /** How far a node's name shows at an on-screen size of `px`: whole from `quiet`, gone two px below it. */
@@ -336,6 +360,7 @@ export function paint(c: CanvasRenderingContext2D, scene: Scene, cam: Camera, vi
   c.arc(0, 0, S.root, 0, Math.PI * 2);
   c.fillStyle = ink.color(INK.fg);
   c.fill();
+  if (state.root && !state.small) rootName(c, state.root, cam.k, ink);
   after?.(c);
   c.globalAlpha = 1;
 }

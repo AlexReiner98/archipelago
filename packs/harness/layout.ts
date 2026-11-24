@@ -248,6 +248,8 @@ export const STYLE = {
   node: 3,
   leaf: 2.5,
   root: 7,
+  /** The size of the context filter's name at the root, in screen px. */
+  rootName: 14,
   hit: 8,
   branch: 3.2,
   branchStep: 0.45,
