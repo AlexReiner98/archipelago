@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { AgentNode, AgentRun, NodeDef } from "../spec/agent.ts";
+import type { AgentNode, NodeDef } from "../spec/agent.ts";
 import type { ExchangeEvent } from "../spec/exchange.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
@@ -8,6 +8,7 @@ import agent from "../packs/agent/index.ts";
 import exchange from "../packs/exchange/index.ts";
 import graph from "../packs/graph/index.ts";
 import verdict, { type VerdictRead } from "../packs/verdict/index.ts";
+import { playAs, type Script } from "../packs/scripted/index.ts";
 import { covers, judgeRun, listeningOf, namesMiss, placeMatches, records } from "../packs/verdict/judge.ts";
 
 const BASE = "mem:/packs/";
@@ -234,7 +235,7 @@ const nodes: Pack<{ nodes: NodeSpec[] }> = {
   },
 };
 
-/** The adapter's side, and apart from it the harness view's read, so runs go on while verdict is out. */
+/** The adapter's side (the scripted agent plays runs from it), and apart from it the harness view's read, so runs go on while verdict is out. */
 const probe: Pack = { id: "probe", inject: ["agent.run"], apply() {} };
 const view: Pack = { id: "view", inject: ["verdict.read"], apply() {} };
 
@@ -251,10 +252,7 @@ function setup() {
       return { default: m };
     },
   });
-  const as = (run: string) => {
-    const ctx = loader.fiber("probe")!.ctx.intercept({ actor: { id: "e_agent", kind: "agent" }, run });
-    return { run: ctx.get<AgentRun>("agent.run") };
-  };
+  const as = (run: string) => ({ play: (script: Script) => playAs(loader.fiber("probe")!.ctx, script, { run, actor: { id: "e_agent", kind: "agent" } }) });
   const read = () => loader.fiber("view")!.ctx.get<VerdictRead>("verdict.read");
   return { rt, loader, errors, as, read };
 }
@@ -278,17 +276,16 @@ const entries = (withVerdict = true): Entry[] => [
   { id: "view", pack: "view.ts" },
 ];
 
-const start = (run: string) => ({ run, agent: { id: "e_agent", kind: "agent" as const }, harness: "test", reaches: ["session_start", "tool:*", "file:*"] });
-
-/** A run through the agent service: the trap is said at an edit, then the edit fails or not. */
+/** A run played by the scripted agent: the trap is said at an edit, then the edit fails or not. */
 async function aRun(as: ReturnType<typeof setup>["as"], run: string, editFails: boolean, failBefore = false) {
-  const { run: agentRun } = as(run);
-  await agentRun.begin(start(run));
-  await agentRun.reach({ run, places: ["session_start"], time: T(1) });
-  if (failBefore) await agentRun.act({ run, place: "tool:Edit", time: T(2), kind: "tool", by: "agent", input: { file_path: "packs/x/page/a.js" }, ok: false });
-  await agentRun.reach({ run, places: ["tool:Edit", "file:packs/x/page/a.js"], time: T(3), input: { file_path: "packs/x/page/a.js" } });
-  await agentRun.act({ run, place: "tool:Edit", time: T(4), kind: "tool", by: "agent", input: { file_path: "packs/x/page/a.js" }, ok: !editFails });
-  await agentRun.end(run, T(5));
+  const input = { file_path: "packs/x/page/a.js" };
+  await as(run).play({
+    start: { harness: "test", reaches: ["session_start", "tool:*", "file:*"] },
+    steps: [
+      ...(failBefore ? [{ act: { place: "tool:Edit", kind: "tool" as const, by: "agent" as const, input, ok: false }, time: T(2) }] : []),
+      { tool: "Edit", input, ok: !editFails, time: T(3) },
+    ],
+  });
 }
 
 test("live: runs through the agent service come out as verdicts and records", async () => {
