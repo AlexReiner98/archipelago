@@ -45,4 +45,4 @@ the query, it opens Map.
 An empty line is `is:open`. At most 150 items come back, and the links
 among them. Writes nothing.
 
-The suggestions list fades in over 140 ms as it opens.
+The suggestions list and the count follow the query once it holds still for `LIST_WAIT_MS` (220), so typing does not flicker them; the list fades in over 140 ms as it opens and out over `LIST_OUT_MS` (140) as it closes.
