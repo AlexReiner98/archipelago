@@ -2,7 +2,7 @@
  * Page side: the checks pack's results, a view in `center` ("Checks",
  * `checks/results`). Tests grouped by rule or by subject, each with its
  * result, findings and a person's accept or reject; under each rule, a
- * preview of other params. It knows no domain: lint, geometry or any other
+ * preview of other params. It knows no domain: lint, documents or any other
  * shows the same way.
  *
  * What it shows is set by page keys, so a view item composes it as data

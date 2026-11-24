@@ -34,7 +34,7 @@ async function setup() {
 test("a change on a test's word is the test's, at its version, and reads back as such", async () => {
   const s = await setup();
   try {
-    const made = await s.invoke.invoke({ action: "items.create", input: { type: "work", title: "Wall at least 2 mm" }, authority: { of: "agent", basis: "a test" }, reason: "make a test item" });
+    const made = await s.invoke.invoke({ action: "items.create", input: { type: "work", title: "Lines at most 80 characters" }, authority: { of: "agent", basis: "a test" }, reason: "make a test item" });
     assert.ok(made.ok && made.committed);
     assert.equal(attested(made.committed!.header), undefined);
     const id = (made.output as { id: string }).id;

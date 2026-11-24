@@ -2,7 +2,7 @@
  * The checks pack: its checker and rejections reading apart from the
  * runtime (a graph as plain data in, the writes it makes out), then the pack
  * in a runtime with the map's packs in memory and a stand-in domain whose
- * judge compares a subject's `thickness` (by its `rev`) with a rule's limit.
+ * judge compares a subject's `length` (by its `rev`) with a rule's limit.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -29,14 +29,14 @@ function graph(items: Item[], links: [string, string, string][]): Read & { items
 
 const item = (id: string, type: string, fields: Record<string, Json> = {}): Item => ({ id, type, fields });
 
-/** A judge over `rev`s: passes when the subject's thickness is at least the rule's min. */
-function judging(thickness: Record<string, number>, calls: string[] = []): Judging {
+/** A judge over `rev`s: passes when the subject's length is at least the rule's min. */
+function judging(length: Record<string, number>, calls: string[] = []): Judging {
   return {
     stamp: "rev",
     async judge({ subject, other, fn, params }) {
       const rev = subject.fields.rev as string;
       calls.push(`${rev}${other ? `|${other.fields.rev}` : ""}:${fn}`);
-      const t = thickness[rev];
+      const t = length[rev];
       if (t === undefined) throw new Error(`no subject ${rev}`);
       const min = (params as { min: number }).min;
       return { passed: t >= min, findings: t >= min ? [] : [{ measured: t, limit: min }] };
@@ -45,10 +45,10 @@ function judging(thickness: Record<string, number>, calls: string[] = []): Judgi
 }
 
 test("a stamp is the same for the same inputs, whatever their order, and keeps its bytes", () => {
-  // Pinned: these are the stamps a one-part and a two-part test had before the pack was general.
-  assert.equal(stamp({ fn: "thin_wall", params: { min_thickness: 2 }, field: "hash", value: "h1", needs: [] }), "bcb1287e5079a677");
-  assert.equal(stamp({ fn: "thin_wall", params: { min_thickness: 2 }, field: "hash", value: "h1", needs: [["t_b", "v1", "pass"], ["t_a", "v0", "fail"]] }), "9b838258c6385a0e");
-  assert.equal(stamp({ fn: "clearance", params: { min_gap: 0.05 }, field: "hash", value: "block", other: "pin1", needs: [] }), "969566fd97ee8025");
+  // Pinned: a stamp keeps its bytes, or every test on a map already solved would be solved again.
+  assert.equal(stamp({ fn: "few_words", params: { min_words: 2 }, field: "hash", value: "h1", needs: [] }), "740ede90364e12e3");
+  assert.equal(stamp({ fn: "few_words", params: { min_words: 2 }, field: "hash", value: "h1", needs: [["t_b", "v1", "pass"], ["t_a", "v0", "fail"]] }), "fae55f5b85bf676d");
+  assert.equal(stamp({ fn: "overlap", params: { min_distance: 0.05 }, field: "hash", value: "a.md", other: "b.md", needs: [] }), "9495b8c1dbd584f8");
   assert.equal(stamp({ fn: "f", params: { a: 1, b: 2 }, field: "rev", value: "r", needs: [] }), stamp({ fn: "f", params: { b: 2, a: 1 }, field: "rev", value: "r", needs: [] }));
   assert.notEqual(stamp({ fn: "f", params: { a: 1 }, field: "rev", value: "r", needs: [] }), stamp({ fn: "f", params: { a: 2 }, field: "rev", value: "r", needs: [] }));
 });
@@ -63,12 +63,12 @@ test("order puts each test after the tests it needs, and only what is downstream
 test("solve: pending at the new version, then the result; blocked behind a failure; a held stamp is left", async () => {
   const g = graph(
     [
-      item("s", "part", { rev: "r1" }),
-      item("walls", "rule", { fn: "min", params: { min: 2 } }),
+      item("s", "doc", { rev: "r1" }),
+      item("words", "rule", { fn: "min", params: { min: 2 } }),
       item("t1", "test"),
       item("t2", "test"),
     ],
-    [["checks", "t1", "s"], ["applies", "t1", "walls"], ["checks", "t2", "s"], ["applies", "t2", "walls"], ["needs", "t2", "t1"]],
+    [["checks", "t1", "s"], ["applies", "t1", "words"], ["checks", "t2", "s"], ["applies", "t2", "words"], ["needs", "t2", "t1"]],
   );
   const writes: Write[] = [];
   const apply = async (w: Write) => {
@@ -76,7 +76,7 @@ test("solve: pending at the new version, then the result; blocked behind a failu
     const t = g.items.get(w.test)!;
     g.items.set(w.test, { ...t, fields: { ...t.fields, ...w.fields } });
   };
-  const domains = (type: string) => (type === "part" ? judging({ r1: 1, r2: 3 }) : undefined);
+  const domains = (type: string) => (type === "doc" ? judging({ r1: 1, r2: 3 }) : undefined);
   await solve(["t1"], g, domains, apply);
   assert.deepEqual(writes.map((w) => [w.test, w.fields.result]), [["t1", "pending"], ["t1", "fail"], ["t2", "pending"], ["t2", "blocked"]]);
   assert.deepEqual(g.items.get("t1")!.fields.findings, [{ measured: 1, limit: 2 }]);
@@ -88,7 +88,7 @@ test("solve: pending at the new version, then the result; blocked behind a failu
 
   // A decision is cleared when the version moves.
   g.items.set("t1", { ...g.items.get("t1")!, fields: { ...g.items.get("t1")!.fields, decision: "rejected", decided_version: g.items.get("t1")!.fields.version! } });
-  g.items.set("s", item("s", "part", { rev: "r2" }));
+  g.items.set("s", item("s", "doc", { rev: "r2" }));
   await solve(["t1"], g, domains, apply);
   assert.deepEqual(writes[0]!.fields.decision, null);
   assert.equal(g.items.get("t1")!.fields.result, "pass");
@@ -96,7 +96,7 @@ test("solve: pending at the new version, then the result; blocked behind a failu
 });
 
 test("solve: a subject no domain judges is left as it is; a judge that throws is an error", async () => {
-  const g = graph([item("s", "part", { rev: "r1" }), item("r", "rule", { fn: "min", params: { min: 1 } }), item("t", "test")], [["checks", "t", "s"], ["applies", "t", "r"]]);
+  const g = graph([item("s", "doc", { rev: "r1" }), item("r", "rule", { fn: "min", params: { min: 1 } }), item("t", "test")], [["checks", "t", "s"], ["applies", "t", "r"]]);
   const writes: Write[] = [];
   await solve(["t"], g, () => undefined, async (w) => void writes.push(w));
   assert.equal(writes.length, 0);
@@ -107,7 +107,7 @@ test("solve: a subject no domain judges is left as it is; a judge that throws is
 
 test("solve: a two-subject test judges its subject against the other, and stamps both", async () => {
   const g = graph(
-    [item("a", "part", { rev: "a1" }), item("b", "part", { rev: "b1" }), item("r", "rule", { fn: "fit", params: { min: 0 } }), item("t", "test")],
+    [item("a", "doc", { rev: "a1" }), item("b", "doc", { rev: "b1" }), item("r", "rule", { fn: "fit", params: { min: 0 } }), item("t", "test")],
     [["checks", "t", "a"], ["against", "t", "b"], ["applies", "t", "r"]],
   );
   const calls: string[] = [];
@@ -119,11 +119,11 @@ test("solve: a two-subject test judges its subject against the other, and stamps
 
 test("seeds: a change reaches the tests whose inputs it may have moved", async () => {
   const g = graph(
-    [item("s", "part"), item("r", "rule"), item("t", "test"), item("l", "needs", { from: "t", to: "u" })],
+    [item("s", "doc"), item("r", "rule"), item("t", "test"), item("l", "needs", { from: "t", to: "u" })],
     [["checks", "t", "s"], ["against", "u", "s"], ["applies", "t", "r"]],
   );
   const typeOf = async (id: string) => g.items.get(id)?.type;
-  const stampOf = (type: string) => (type === "part" ? "rev" : undefined);
+  const stampOf = (type: string) => (type === "doc" ? "rev" : undefined);
   assert.deepEqual(await seeds([["+", "s", "rev", "r2"]], g, typeOf, stampOf), ["t", "u"]);
   assert.deepEqual(await seeds([["+", "s", "title", "x"]], g, typeOf, stampOf), []);
   assert.deepEqual(await seeds([["+", "r", "params", { min: 3 }]], g, typeOf, stampOf), ["t"]);
@@ -132,30 +132,30 @@ test("seeds: a change reaches the tests whose inputs it may have moved", async (
 });
 
 const LIMITS: RuleLimit[] = [
-  { fn: "thin_wall", limit: "min_thickness", fails: "below" },
-  { fn: "deep_hole", limit: "max_depth_ratio", fails: "above" },
+  { fn: "few_words", limit: "min_words", fails: "below" },
+  { fn: "long_lines", limit: "max_line_ratio", fails: "above" },
 ];
-const walls = { id: "walls", title: "Walls at least 2 mm", fn: "thin_wall", params: { min_thickness: 2 } };
-const holes = { id: "holes", title: "Holes at most 5 x", fn: "deep_hole", params: { max_depth_ratio: 5 } };
+const words = { id: "words", title: "Sections at least 2 words", fn: "few_words", params: { min_words: 2 } };
+const lines = { id: "lines", title: "Lines at most 5 x", fn: "long_lines", params: { max_line_ratio: 5 } };
 const d = (test: string, rule: string, decision: Decided["decision"], measured: number): Decided => ({ test, title: test, rule, decision, measured: [measured] });
 
 test("rejections: the limit that spares the rejected and still catches the accepted, either side", () => {
-  const [r] = reading([walls], LIMITS, [d("a", "walls", "accepted", 0.8), d("b", "walls", "accepted", 1.2), d("c", "walls", "rejected", 1.5), d("e", "walls", "rejected", 1.8)]);
+  const [r] = reading([words], LIMITS, [d("a", "words", "accepted", 0.8), d("b", "words", "accepted", 1.2), d("c", "words", "rejected", 1.5), d("e", "words", "rejected", 1.8)]);
   assert.equal(r!.current, 2);
   assert.equal(r!.proposal, 1.5);
-  assert.match(r!.note, /Lowering min_thickness to 1.5 spares every rejection and still catches 2 accepted/);
-  const [h] = reading([holes], LIMITS, [d("a", "holes", "rejected", 7), d("b", "holes", "accepted", 10)]);
+  assert.match(r!.note, /Lowering min_words to 1.5 spares every rejection and still catches 2 accepted/);
+  const [h] = reading([lines], LIMITS, [d("a", "lines", "rejected", 7), d("b", "lines", "accepted", 10)]);
   assert.equal(h!.proposal, 7);
-  assert.match(h!.note, /Raising max_depth_ratio to 7/);
+  assert.match(h!.note, /Raising max_line_ratio to 7/);
 });
 
 test("rejections: no proposal when no threshold can say it; nothing decided or an unknown fn is left out", () => {
-  const [r] = reading([walls], LIMITS, [d("a", "walls", "rejected", 1.0), d("b", "walls", "accepted", 1.4)]);
+  const [r] = reading([words], LIMITS, [d("a", "words", "rejected", 1.0), d("b", "words", "accepted", 1.4)]);
   assert.equal(r!.proposal, null);
   assert.match(r!.note, /a threshold can't say/);
-  assert.deepEqual(reading([walls, holes], LIMITS, []), []);
-  assert.deepEqual(reading([{ ...walls, fn: "unknown" }], LIMITS, [d("a", "walls", "rejected", 1)]), []);
-  const [s] = reading([walls], LIMITS, [d("a", "walls", "accepted", 1)]);
+  assert.deepEqual(reading([words, lines], LIMITS, []), []);
+  assert.deepEqual(reading([{ ...words, fn: "unknown" }], LIMITS, [d("a", "words", "rejected", 1)]), []);
+  const [s] = reading([words], LIMITS, [d("a", "words", "accepted", 1)]);
   assert.match(s!.note, /Nothing rejected/);
 });
 
@@ -171,18 +171,18 @@ test("decidedOf: a decision counts at its version, with a rule and a measured fi
 
 const BASES = ["graph", "action", "types", "work", "question", "record", "actor", "links", "items", "schema"];
 
-/** A stand-in domain pack: subjects of type `part`, stamped by `rev`. */
-function partDomain(thickness: Map<string, number>, calls: string[]): Pack {
+/** A stand-in domain pack: subjects of type `doc`, stamped by `rev`. */
+function docDomain(length: Map<string, number>, calls: string[]): Pack {
   return {
-    id: "parts",
+    id: "docs",
     about: "A stand-in domain for the checks pack's tests.",
     inject: ["types.define", "checks.domain"],
     apply(ctx) {
-      ctx.get<any>("types.define").flavour({ name: "part", base: "record", fields: { rev: { kind: "text" } }, trial: false });
+      ctx.get<any>("types.define").flavour({ name: "doc", base: "record", fields: { rev: { kind: "text" } }, trial: false });
       const domain: CheckDomain = {
-        subject: "part",
+        subject: "doc",
         stamp: "rev",
-        judge: (call) => judging(Object.fromEntries(thickness), calls).judge(call),
+        judge: (call) => judging(Object.fromEntries(length), calls).judge(call),
         limits: async () => [{ fn: "min", limit: "min", fails: "below" }],
       };
       ctx.get<ChecksDomain>("checks.domain").register(domain);
@@ -190,18 +190,18 @@ function partDomain(thickness: Map<string, number>, calls: string[]): Pack {
   };
 }
 
-async function setup(thickness: Map<string, number>) {
+async function setup(length: Map<string, number>) {
   const calls: string[] = [];
   const packs: Record<string, Pack> = {};
   for (const id of BASES) packs[id] = (await import(`../packs/${id}/index.ts`)).default;
   packs.checks = checks;
-  packs.parts = partDomain(thickness, calls);
+  packs.docs = docDomain(length, calls);
   packs.probe = { id: "probe", inject: ["action.invoke", "graph.read", "checks.domain"], apply() {} };
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => void errors.push(e);
   const loader = new Loader(rt, { base: "mem:/", import: async (u) => ({ default: packs[u.slice(5)]! }) });
-  await loader.apply([...BASES, "checks", "parts", "probe"].map((id) => ({ id, pack: id })));
+  await loader.apply([...BASES, "checks", "docs", "probe"].map((id) => ({ id, pack: id })));
   await rt.settle();
   const ctx = loader.fiber("probe")!.ctx.intercept({ actor: { id: "person:owner", kind: "person" } });
   const invoke = ctx.get<any>("action.invoke");
@@ -228,12 +228,12 @@ async function setup(thickness: Map<string, number>) {
 }
 
 test("the pack solves a test through its domain's judge, on the test's word, and again when its inputs move", async () => {
-  const thickness = new Map([["r1", 1], ["r2", 3]]);
-  const s = await setup(thickness);
+  const length = new Map([["r1", 1], ["r2", 3]]);
+  const s = await setup(length);
   try {
-    const p = await s.make("part", "Bracket", { rev: "r1" });
+    const p = await s.make("doc", "Guide", { rev: "r1" });
     const r = await s.make("rule", "At least 2", { fn: "min", params: { min: 2 } });
-    const t = await s.make("test", "Bracket walls");
+    const t = await s.make("test", "Guide words");
     await s.link("checks", t, p);
     await s.link("applies", t, r);
     let [x] = await s.settled([t]);
@@ -248,7 +248,7 @@ test("the pack solves a test through its domain's judge, on the test's word, and
     assert.deepEqual([reading.rule, reading.proposal], [r, 1]);
 
     // A field the stamp doesn't read changes nothing; the stamped one solves it again and clears the decision.
-    await s.act("items.set", { id: p, fields: { title: "Bracket, left" } });
+    await s.act("items.set", { id: p, fields: { title: "Guide, left" } });
     await s.quiet();
     assert.equal((await s.get(t)).fields.decision, "rejected");
     await s.act("items.set", { id: p, fields: { rev: "r2" } });
@@ -288,7 +288,7 @@ test("needs is held acyclic, and a domain can't take a subject or stamp field th
     apply(ctx) {
       const reg = ctx.get<ChecksDomain>("checks.domain");
       const j = judging({});
-      for (const dom of [{ subject: "part", stamp: "fn" }, { subject: "test", stamp: "rev" }, { subject: "part", stamp: "rev" }, { subject: "part", stamp: "rev" }]) {
+      for (const dom of [{ subject: "doc", stamp: "fn" }, { subject: "test", stamp: "rev" }, { subject: "doc", stamp: "rev" }, { subject: "doc", stamp: "rev" }]) {
         try {
           reg.register({ ...j, ...dom });
           tries.push("ok");
@@ -468,19 +468,19 @@ test("the pack: a domain that judges by function reads the graph, and a change t
 test("preview: which tests a rule change would flip, judged only where the stamp moves, nothing written", async () => {
   const { g, writes, apply } = live(
     [
-      item("a", "part", { rev: "ra" }),
-      item("b", "part", { rev: "rb" }),
-      item("c", "part", { rev: "rc" }),
-      item("walls", "rule", { fn: "min", params: { min: 2 } }),
+      item("a", "doc", { rev: "ra" }),
+      item("b", "doc", { rev: "rb" }),
+      item("c", "doc", { rev: "rc" }),
+      item("words", "rule", { fn: "min", params: { min: 2 } }),
       item("other", "rule", { fn: "min", params: { min: 0 } }),
-      item("ta", "test", { title: "A walls" }),
-      item("tb", "test", { title: "B walls" }),
+      item("ta", "test", { title: "A words" }),
+      item("tb", "test", { title: "B words" }),
       item("tc", "test", { title: "C other" }),
       item("ready", "test", { title: "A ready" }),
     ],
     [
-      ["checks", "ta", "a"], ["applies", "ta", "walls"],
-      ["checks", "tb", "b"], ["applies", "tb", "walls"],
+      ["checks", "ta", "a"], ["applies", "ta", "words"],
+      ["checks", "tb", "b"], ["applies", "tb", "words"],
       ["checks", "tc", "c"], ["applies", "tc", "other"],
       ["checks", "ready", "a"], ["applies", "ready", "other"], ["needs", "ready", "ta"],
     ],
@@ -493,10 +493,10 @@ test("preview: which tests a rule change would flip, judged only where the stamp
   writes.length = 0;
   calls.length = 0;
 
-  const p = await preview("walls", { min: 1 }, g, dom);
+  const p = await preview("words", { min: 1 }, g, dom);
   assert.equal(writes.length, 0);
   assert.equal(JSON.stringify([...g.items]), snapshot);
-  // Both walls tests move (their params did), and `ready` with them; `tc` doesn't.
+  // Both words tests move (their params did), and `ready` with them; `tc` doesn't.
   assert.deepEqual(p.tests.map((t) => [t.test, t.before.result, t.after.result, t.flips]), [
     ["ta", "fail", "pass", true],
     ["tb", "pass", "pass", false],
@@ -507,7 +507,7 @@ test("preview: which tests a rule change would flip, judged only where the stamp
 
   // judge: 0 judges nothing, and says what would be judged.
   calls.length = 0;
-  const q = await preview("walls", { min: 1 }, g, dom, { judge: 0 });
+  const q = await preview("words", { min: 1 }, g, dom, { judge: 0 });
   assert.deepEqual(calls, []);
   assert.deepEqual(q.tests.map((t) => [t.test, t.after.result, t.judged]), [["ta", "pending", false], ["tb", "pending", false], ["ready", "pending", false]]);
   assert.equal(q.held_back, 3);
@@ -517,9 +517,9 @@ test("preview: which tests a rule change would flip, judged only where the stamp
 test("the pack: checks.preview writes nothing to the map", async () => {
   const s = await setup(new Map([["r1", 1]]));
   try {
-    const p = await s.make("part", "Bracket", { rev: "r1" });
+    const p = await s.make("doc", "Guide", { rev: "r1" });
     const r = await s.make("rule", "At least 2", { fn: "min", params: { min: 2 } });
-    const t = await s.make("test", "Bracket walls");
+    const t = await s.make("test", "Guide words");
     await s.link("checks", t, p);
     await s.link("applies", t, r);
     await s.settled([t]);
@@ -538,32 +538,32 @@ test("the pack: checks.preview writes nothing to the map", async () => {
 
 // ---- Decisions per finding ----
 
-/** A judge whose findings are the faces of its subject thinner than the limit, named by face. */
-function faces(finding = true): Judging {
+/** A judge whose findings are the sections of its subject shorter than the limit, named by section. */
+function sections(finding = true): Judging {
   return {
     stamp: "rev",
     async judge({ subject, params }) {
-      const walls = JSON.parse(subject.fields.rev as string) as Record<string, number>;
+      const words = JSON.parse(subject.fields.rev as string) as Record<string, number>;
       const min = (params as { min: number }).min;
-      const findings = Object.entries(walls).filter(([, t]) => t < min).map(([face, t]) => ({ face, measured: t }));
+      const findings = Object.entries(words).filter(([, n]) => n < min).map(([section, n]) => ({ section, measured: n }));
       return { passed: !findings.length, findings };
     },
-    ...(finding ? { finding: (f: Json) => ((f as { face?: string }).face ?? undefined) } : {}),
+    ...(finding ? { finding: (f: Json) => ((f as { section?: string }).section ?? undefined) } : {}),
   };
 }
 
 test("decisions per finding: kept while every finding decided on is still found, cleared when one goes or the result turns", async () => {
-  const { g, apply, set } = live([item("s", "part", { rev: JSON.stringify({ f1: 1, f2: 1.5, f3: 3 }) }), item("r", "rule", { fn: "min", params: { min: 2 } }), item("t", "test")], [["checks", "t", "s"], ["applies", "t", "r"]]);
-  const dom = () => faces();
+  const { g, apply, set } = live([item("s", "doc", { rev: JSON.stringify({ f1: 1, f2: 1.5, f3: 3 }) }), item("r", "rule", { fn: "min", params: { min: 2 } }), item("t", "test")], [["checks", "t", "s"], ["applies", "t", "r"]]);
+  const dom = () => sections();
   const decide = () => {
     const f = g.items.get("t")!.fields;
-    set("t", { decision: "rejected", decided_version: f.version!, decided_findings: identities(f.findings!, faces().finding!) as string[] });
+    set("t", { decision: "rejected", decided_version: f.version!, decided_findings: identities(f.findings!, sections().finding!) as string[] });
   };
   await solve(["t"], g, dom, apply);
   decide();
   assert.deepEqual(g.items.get("t")!.fields.decided_findings, ["f1", "f2"]);
 
-  // The part moved, its measures with it, but f1 and f2 are still found (and f4 is new): kept, at the new version.
+  // The document changed, its counts with it, but f1 and f2 are still found (and f4 is new): kept, at the new version.
   set("s", { rev: JSON.stringify({ f1: 1.2, f2: 1.4, f3: 3, f4: 0.5 }) });
   await solve(["t"], g, dom, apply);
   let f = g.items.get("t")!.fields;
@@ -589,23 +589,23 @@ test("decisions per finding: kept while every finding decided on is still found,
 });
 
 test("decisions per finding: without the hook a decision is cleared whenever the version moves, as before", async () => {
-  const { g, apply, set } = live([item("s", "part", { rev: JSON.stringify({ f1: 1 }) }), item("r", "rule", { fn: "min", params: { min: 2 } }), item("t", "test")], [["checks", "t", "s"], ["applies", "t", "r"]]);
-  await solve(["t"], g, () => faces(false), apply);
+  const { g, apply, set } = live([item("s", "doc", { rev: JSON.stringify({ f1: 1 }) }), item("r", "rule", { fn: "min", params: { min: 2 } }), item("t", "test")], [["checks", "t", "s"], ["applies", "t", "r"]]);
+  await solve(["t"], g, () => sections(false), apply);
   set("t", { decision: "rejected", decided_version: g.items.get("t")!.fields.version! });
   set("s", { rev: JSON.stringify({ f1: 1.1 }) });
-  await solve(["t"], g, () => faces(false), apply);
+  await solve(["t"], g, () => sections(false), apply);
   assert.equal(g.items.get("t")!.fields.decision, undefined);
-  assert.deepEqual(carried({ decision: "rejected", decided_version: "a", result: "fail" }, "fail", [], "b", faces(false)), {});
+  assert.deepEqual(carried({ decision: "rejected", decided_version: "a", result: "fail" }, "fail", [], "b", sections(false)), {});
 });
 
 test("the pack: checks.decide keeps the findings' identities when the domain names them, and the checker carries it", async () => {
   const s = await setup(new Map());
   try {
-    const { stamp: _, ...byNote } = faces();
-    s.register({ fns: ["faces"], ...byNote, judge: (call) => faces().judge({ ...call, subject: { ...call.subject, fields: { rev: call.subject.fields.note! } } }) });
-    const r = await s.make("rule", "At least 2", { fn: "faces", params: { min: 2 } });
-    const p = await s.make("work", "Plate", { note: JSON.stringify({ f1: 1 }) });
-    const t = await s.make("test", "Plate walls");
+    const { stamp: _, ...byNote } = sections();
+    s.register({ fns: ["sections"], ...byNote, judge: (call) => sections().judge({ ...call, subject: { ...call.subject, fields: { rev: call.subject.fields.note! } } }) });
+    const r = await s.make("rule", "At least 2", { fn: "sections", params: { min: 2 } });
+    const p = await s.make("work", "Notes", { note: JSON.stringify({ f1: 1 }) });
+    const t = await s.make("test", "Notes words");
     await s.link("applies", t, r);
     await s.link("checks", t, p);
     await s.quiet();
@@ -634,7 +634,7 @@ test("a judge is told the test it solves and the version it solves it at, either
   const spy = (stamp?: string): Judging => ({ ...(stamp ? { stamp } : {}), judge: async (c) => (seen.push([c.test, c.version]), { passed: true, findings: [] }) });
   for (const s of ["rev", undefined]) {
     seen.length = 0;
-    const { g, writes, apply } = live([item("p", "part", { rev: "r1" }), item("r", "rule", { fn: "min" }), item("t", "test")], [["checks", "t", "p"], ["applies", "t", "r"]]);
+    const { g, writes, apply } = live([item("p", "doc", { rev: "r1" }), item("r", "rule", { fn: "min" }), item("t", "test")], [["checks", "t", "p"], ["applies", "t", "r"]]);
     await solve(["t"], g, () => spy(s), apply);
     assert.deepEqual(seen, [["t", writes[0]!.version]]);
   }
