@@ -6,13 +6,14 @@ import type { FieldIn } from "../packs/field/graph.ts";
 import type { RunInfo } from "../spec/agent.ts";
 import type { ProfileInfo } from "../spec/profile.ts";
 
-const run = (id: string, title = "") => ({ run: id, title } as unknown as RunInfo);
+const run = (id: string, title?: string, cwd?: string) => ({ run: id, title, cwd } as unknown as RunInfo);
 const filter = (id: string) => ({ id } as unknown as ProfileInfo);
 
-test("sessionsOf: each live run, named, with the filters it is in", () => {
-  const out = sessionsOf([run("r1", "landing-page"), run("abcdef123456")], new Map([["r1", [filter("f1"), filter("f2")]]]));
+test("sessionsOf: each live run, named (its title, else its folder), with the filters it is in", () => {
+  const out = sessionsOf([run("r1", "Add pricing"), run("r2", undefined, "/home/me/landing-page"), run("abcdef123456")], new Map([["r1", [filter("f1"), filter("f2")]]]));
   assert.deepEqual(out, [
-    { run: "r1", title: "landing-page", filters: ["f1", "f2"] },
+    { run: "r1", title: "Add pricing", filters: ["f1", "f2"] },
+    { run: "r2", title: "landing-page", filters: [] },
     { run: "abcdef123456", title: "abcdef12", filters: [] },
   ]);
 });

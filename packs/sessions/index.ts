@@ -6,7 +6,7 @@
  * which filters each is in, and keeps the answer in the page key
  * `sessions.live`. It writes nothing to the map.
  */
-import type { RunInfo } from "../../spec/agent.ts";
+import { runName, type RunInfo } from "../../spec/agent.ts";
 import type { Id, Json } from "../../spec/common.ts";
 import type { ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { HereDeclare, HereSet } from "../../spec/here.ts";
@@ -26,11 +26,11 @@ export interface Session {
 /** How long a session that has gone quiet still counts as live, in minutes (as the Context interface's default). */
 export const QUIET_MIN = 15;
 
-/** The sessions to draw: each live run, named, with the filters it is in (by id), in the order given. */
+/** The sessions to draw: each live run, named as people see it (runName: its title, else its folder), with the filters it is in (by id), in the order given. */
 export function sessionsOf(live: RunInfo[], placements: Map<string, ProfileInfo[]>): Session[] {
   return live.map((r) => ({
     run: r.run,
-    title: r.title || r.run.slice(0, 8),
+    title: runName(r),
     filters: (placements.get(r.run) ?? []).map((p) => p.id),
   }));
 }

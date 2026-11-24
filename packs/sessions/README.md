@@ -5,7 +5,7 @@ is in, kept for the Landscape to draw next to the map's items.
 
 A session is not an item on the map: its facts live on the exchange. This
 pack reads the live runs from `exchange.read` and asks `profile.read` which
-filters each run is in. A run counts as live while it has not ended and has
+filters each run is in. Each is named as the rest of the app names a run (its title, else its folder). A run counts as live while it has not ended and has
 not been quiet for more than `QUIET_MIN` minutes, which is 15 minutes, the
 same default as the Context interface. The pack keeps the answer in the page
 key `sessions.live`, as a list of `{ run, title, filters }`. It writes
