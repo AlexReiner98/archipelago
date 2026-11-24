@@ -62,7 +62,8 @@ export type WindowMark = "in" | "listed" | "dropped";
 export interface WindowPart {
   id: string;
   title: string;
-  source: "map" | "harness" | "agent";
+  /** `subject`: a call's own context, from the pack that made it (its type and size only). */
+  source: "map" | "harness" | "agent" | "subject";
   channel: "hook" | "rule" | "file" | "context" | "talk" | "act";
   state: WindowState;
   tokens: number;
@@ -78,10 +79,10 @@ export interface WindowRead {
   model?: string;
   compactions: number;
   compacted?: { time?: string; trigger?: string; pre?: number; post?: number };
-  sources: Record<WindowPart["source"], number>;
+  sources: Record<"map" | "harness" | "agent", number> & { subject?: number };
   channels: Record<WindowPart["channel"], number>;
   /** Of those, fitted to the model's real counts. */
-  fitted?: { sources: Record<WindowPart["source"], number>; channels: Record<WindowPart["channel"], number> };
+  fitted?: { sources: Record<"map" | "harness" | "agent", number> & { subject?: number }; channels: Record<WindowPart["channel"], number> };
   unseen: number;
   parts: WindowPart[];
 }
@@ -138,6 +139,7 @@ export function sharesOf(w: WindowRead): { sources: Share[]; channels: Share[] }
     w.channels.talk > 0
       ? { filter: "talk" as Filter, key: "agent", title: "the conversation", tokens: w.sources.agent, fitted: fs?.agent ?? 0, colour: v("write"), tip: "The conversation since the start: your prompts, Claude's replies and thinking, tool calls and results, Claude Code's notes" }
       : { key: "agent", title: "the agent's", tokens: w.sources.agent, fitted: fs?.agent ?? 0, colour: v("write"), tip: "What the agent did: tool calls and results, replies, a person's prompts" },
+    { key: "subject", title: "the subject", tokens: w.sources.subject ?? 0, fitted: fs?.subject ?? 0, colour: `color-mix(in srgb, ${v("fg")} 45%, transparent)`, tip: "A call's own context, from the pack that made the call: counted by its size, its text never kept" },
   ];
   const ink = [80, 60, 44, 30, 18];
   const channels: Share[] = [
@@ -172,12 +174,14 @@ export function useWindow(invoke: ActionInvoke, has: boolean, run: string | unde
   const [got, setGot] = useState<{ key: string; w: WindowRead }>();
   const last = useRef<{ key: string; t: number }>({ key: "", t: 0 });
   const key = `${run ?? ""}@${at ?? ""}`;
+  // What is looked at now: a read lands only if it still is (a tick alone doesn't drop a read in flight).
+  const now = useRef(key);
+  now.current = key;
   useEffect(() => {
     if (!has || !run) return;
     // A moment looked at doesn't change; live, read again as events come, not more often than AGAIN_MS.
     if (last.current.key === key && (at || Date.now() - last.current.t < AGAIN_MS)) return;
     last.current = { key, t: Date.now() };
-    let gone = false;
     void (async () => {
       let w: WindowRead | undefined;
       let after = 0;
@@ -192,11 +196,8 @@ export function useWindow(invoke: ActionInvoke, has: boolean, run: string | unde
         if (typeof o.next !== "number") break;
         after = o.next;
       }
-      if (!gone && w) setGot({ key, w });
+      if (w && now.current === key) setGot({ key, w });
     })().catch(() => (last.current.t = 0));
-    return () => {
-      gone = true;
-    };
   }, [has, key, tick]);
   // The last window read stays while the next is read, so the bar doesn't blink as the playhead moves.
   return has && run && got && got.key.startsWith(`${run}@`) ? got.w : undefined;

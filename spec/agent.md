@@ -28,6 +28,14 @@ Edition 3 adds the person's side of a run:
 | `decision` | person | `tool:<name>` | The person allowed or denied a tool call the harness asked them about: output `allow` or `deny`, and a denial is `ok: false`, a miss like a failed call |
 | `notice` | agent | `prompt` | The harness asked the person for something (a permission, input) and the run waits on them: input `{type, message}` |
 
+Edition 11 (24 Nov 2026) lets a `decision` stand at `reply_end` as well:
+a person accepted (`ok`) or rejected (`ok: false`) the run's reply, output
+`{decision}`. A call's run (the [call](../packs/call/README.md) pack's,
+`harness: "call"`: one request to a model, made by a pack) is one reply, so
+its decision judges everything said to it: the verdict pack fails or holds
+every node said before it, and only the last decision counts. A call
+follows an item through the facts `item` and `version`.
+
 ## Places
 
 A place is a moment in a run where the map can speak. The spec owns the

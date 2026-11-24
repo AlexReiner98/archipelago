@@ -36,14 +36,39 @@ const ASK_PAGES = 20;
 
 const refuse = (code: string, message: string) => new Refused({ code, message, by: { pack: "context" } });
 
-/** What an event put in the window, in characters. */
+const obj = (v: Json | undefined): Record<string, Json> | undefined => (v && typeof v === "object" && !Array.isArray(v) ? v : undefined);
+
+/**
+ * A call's subject (the call pack's): the domain's own context in the
+ * request, as an act's `input.subject` gives it, its type and tokens only.
+ */
+export function subjectOf(e: ExchangeEvent): { type: string; tokens: number } | undefined {
+  const s = e.kind === "act" ? obj(obj(e.act?.input)?.subject) : undefined;
+  return s && typeof s.type === "string" && typeof s.tokens === "number" ? { type: s.type, tokens: Math.max(0, s.tokens) } : undefined;
+}
+
+/** The model's own count an act's output carries (a call's answer): input and output tokens. */
+export function usageOf(e: ExchangeEvent): Ev["usage"] {
+  const u = e.kind === "act" ? obj(obj(e.act?.output)?.usage) : undefined;
+  if (!u || typeof u.input !== "number" || typeof u.output !== "number") return undefined;
+  return { input: u.input, output: u.output, ...(typeof u.model === "string" ? { model: u.model } : {}) };
+}
+
+/** What an event put in the window, in characters. A call's subject is counted apart, by its tokens. */
 export function sizeOf(e: ExchangeEvent): number {
   if (e.kind === "say" || e.kind === "refuse") return e.text?.length ?? 0;
-  if (e.kind === "act" && e.act) return (e.act.input === undefined ? 0 : JSON.stringify(e.act.input).length) + (e.act.output === undefined ? 0 : JSON.stringify(e.act.output).length);
+  if (e.kind === "act" && e.act) {
+    const input = subjectOf(e) ? undefined : e.act.input;
+    return (input === undefined ? 0 : JSON.stringify(input).length) + (e.act.output === undefined ? 0 : JSON.stringify(e.act.output).length);
+  }
   return 0;
 }
 
-const keep = (e: ExchangeEvent): Ev => ({ seq: e.seq, id: e.id, time: e.time, kind: e.kind, ...(e.node ? { node: e.node } : {}), ...(e.place ? { place: e.place } : {}), size: sizeOf(e) });
+const keep = (e: ExchangeEvent): Ev => {
+  const subject = subjectOf(e);
+  const usage = usageOf(e);
+  return { seq: e.seq, id: e.id, time: e.time, kind: e.kind, ...(e.node ? { node: e.node } : {}), ...(e.place ? { place: e.place } : {}), size: sizeOf(e), ...(subject ? { subject } : {}), ...(usage ? { usage } : {}) };
+};
 
 interface RunState {
   events: Ev[];

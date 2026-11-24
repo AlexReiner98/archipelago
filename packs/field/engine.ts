@@ -16,7 +16,8 @@ import type { Dial } from "./behaviour.ts";
 import { bounds, build, grid, seed, sizes, type FieldIn, type G, type Grid, type Settings } from "./graph.ts";
 import { onStyle } from "../../spec/style.ts";
 import { ink, Light, paint, palette, type Cam, type Ink } from "./paint.ts";
-import { step, warm } from "./step.ts";
+import { BEHAVIOURS, isOn, step, warm } from "./step.ts";
+import { frame } from "./behaviours/edges.ts";
 import { FAINT, FOUND } from "./filter.ts";
 import { arrived, paintTree, targetsOf, type Arranged } from "./treeover.ts";
 
@@ -46,6 +47,8 @@ export interface Field {
   settings(S: Settings, then: Dial["then"] | "none"): void;
   reseed(): void;
   fit(): void;
+  /** Rings one particle in the accent, by id, or none: a view's own pick, kept over a new input. */
+  pick(id: Id | null): void;
   stats(): Stats;
   /** The graph as it is now (read it, never change it): the Packs view's check runs on a copy. */
   graph(): G;
@@ -68,6 +71,10 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   const light = new Light();
   let colours: Ink = ink(canvas);
   let pal = palette(canvas);
+  /** The colours the input gave its types, kept over a new theme (FieldIn.colours). */
+  let given: Record<string, string> = {};
+  /** The particle a view picked, by id (Field.pick). */
+  let picked: Id | null = null;
   let hover = -1, dirty = true, awake = false, stopped = false;
   let levels: Map<Id, number> | null = null, match: Uint8Array | null = null;
   let tree: Arranged | null = null;
@@ -78,10 +85,22 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   };
   let stepMs = 0, runStart = { steps: 0, at: 0 }, settledIn: Stats["settledIn"];
   const size = () => ({ width: canvas.clientWidth, height: canvas.clientHeight, dpr: devicePixelRatio || 1 });
+  /** The panel's shape, for the aspect behaviour: its width over its height. */
+  const view = () => {
+    const { width, height } = size();
+    return { aspect: width > 0 && height > 0 ? width / height : 1 };
+  };
 
-  /** The camera that fits the picture now: while the find line has words, what it finds (what is near may run past the edges). */
+  /** The edges behaviour, when it is on: the camera fits the items with its margin round them, inside its frame. */
+  const edgesOn = () => isOn(BEHAVIOURS.find((b) => b.name === "edges")!, S);
+  /** The camera that fits the picture now: while the find line has words, what it finds (what is near may run past the edges); with edges on, the items and the margin round them, no wider than the frame. */
   const fitted = (): Cam => {
-    const [x0, y0, x1, y1] = bounds(g, match ? (i) => match![i] === FOUND : undefined), { width, height } = size();
+    let [x0, y0, x1, y1] = bounds(g, match ? (i) => match![i] === FOUND : undefined);
+    if (!match && edgesOn()) {
+      const f = frame(g, S), m = S.edges_margin!;
+      [x0, y0, x1, y1] = [Math.max(-f.w, x0 - m), Math.max(-f.h, y0 - m), Math.min(f.w, x1 + m), Math.min(f.h, y1 + m)];
+    }
+    const { width, height } = size();
     const pad = S.fit_pad!;
     const w = Math.max(1, width - 2 * pad), h = Math.max(1, height - 2 * pad);
     const k = Math.min(w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0), S.fit_zoom_most ?? Infinity);
@@ -121,6 +140,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     if (stopped || !awake) return;
     const t0 = performance.now();
     let steps = 0, energy = 0;
+    g.view = view();
     do {
       energy = step(g, S);
       steps++;
@@ -259,6 +279,9 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   const resize = new ResizeObserver(() => {
     if (!cam.moved) fit();
     dirty = true;
+    // A panel that changed its shape settles the picture again into it (the aspect behaviour).
+    const was = g.view?.aspect, now = view().aspect;
+    if (was && Math.abs(Math.log(now / was)) > 0.05) (g.view = view()), warm(g, S), wake();
   });
   resize.observe(canvas);
   // The legend opening or closing over the canvas moves where titles may go: paint again.
@@ -269,7 +292,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   const recolour = () => {
     colours = ink(canvas);
     pal = palette(canvas);
-    g.types.forEach((t, k) => (t.colour = pal[k] ?? t.colour));
+    g.types.forEach((t, k) => (t.colour = given[t.name] ?? pal[k] ?? t.colour));
     dirty = true;
   };
   scheme.addEventListener("change", recolour);
@@ -285,7 +308,9 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   return {
     input(next, warmTo, refit) {
       const first = !g.n;
+      given = next.colours ?? {};
       g = build(next, g.n ? g : null, pal);
+      light.picked = picked === null ? -1 : (g.idIx.get(picked) ?? -1);
       g.target = targetsOf(g, tree, scale());
       seed(g, S);
       if (first) g.sim = { alpha: 1, steps: 0 };
@@ -328,6 +353,11 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       fit();
       awake = false;
       wake();
+    },
+    pick(id) {
+      picked = id;
+      light.picked = id === null ? -1 : (g.idIx.get(id) ?? -1);
+      dirty = true;
     },
     fit() {
       cam.moved = false;

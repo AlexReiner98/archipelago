@@ -29,6 +29,11 @@
  * it holds the agent back to ask it something, not because anything went
  * wrong, and neither does the act it denies.
  *
+ * A person's decision on a run's reply (a `decision` act at `reply_end`: a
+ * call's answer accepted or rejected) judges every node said before it, as
+ * everything said in a one-request run was said to that reply: rejected is
+ * a miss after each, accepted holds each. Only the last decision counts.
+ *
  * Place matching follows spec/agent.md: the family must be the same, and in
  * the argument `*` stays within a path segment and `**` doesn't. It is
  * written here, not imported, so this pack doesn't name the agent pack.
@@ -200,9 +205,21 @@ export function isAsk(e: ExchangeEvent): boolean {
   return !!out && typeof out === "object" && !Array.isArray(out) && typeof out.refused === "string" && out.code === ASK;
 }
 
+/** Where a person's decision on a reply stands: what was said before it in the run was said to that reply. */
+export const REPLY_AT = "reply_end";
+
+/**
+ * Whether the event is a person's decision on the run's reply (a call's
+ * answer): accepted (`ok`) or rejected (`ok: false`), a `decision` act at
+ * `reply_end`. Only a run's last one counts: a person may change their mind.
+ */
+export function isReplyDecision(e: ExchangeEvent): boolean {
+  return e.kind === "act" && e.place === REPLY_AT && e.act?.kind === "decision" && e.act.by === "person";
+}
+
 /** Where a miss stands, or undefined when the event isn't one. `cwd` is the run's. */
 export function missPlaces(e: ExchangeEvent, cwd?: string): Place[] | undefined {
-  if (isAsk(e)) return undefined;
+  if (isAsk(e) || isReplyDecision(e)) return undefined;
   if (e.kind === "refuse" && e.place) return [e.place];
   if (e.kind === "act" && e.act?.ok === false) return [...(e.place ? [e.place] : []), ...filePlaces(e.act.input, cwd)];
   return undefined;
@@ -277,11 +294,15 @@ export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listeni
     list.push(e);
     sayings.set(e.node!, list);
   }
+  // A person's last decision on the run's reply judges every node said before it.
+  const decided = sorted.filter(isReplyDecision).pop();
   const out: RunVerdict[] = [];
   for (const [node, said] of sayings) {
     const first = said[0]!;
     const listener = listening.get(node) ?? { at: [...new Set(said.map((s) => s.place).filter((p): p is Place => !!p))] };
-    const misses = sorted.filter((e) => isMissOf(e, node, listener, cwd));
+    const misses = sorted.filter((e) => isMissOf(e, node, listener, cwd) || (e === decided && e.act?.ok === false && e.seq > first.seq));
+    // Accepted after it was said: the reply it was said to was right.
+    const accepted = !!decided && decided.act?.ok !== false && decided.seq > first.seq;
     const refused = said.some((s) => s.kind === "refuse");
     const before = misses.filter((m) => m.seq < first.seq).length;
     const afterList = misses.filter((m) => m.seq > first.seq);
@@ -290,7 +311,7 @@ export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listeni
     out.push({
       run,
       node,
-      verdict: after ? "failed" : before || refused || near ? "held" : "quiet",
+      verdict: after ? "failed" : before || refused || near || accepted ? "held" : "quiet",
       said: said.length,
       first: first.seq,
       said_at: first.time,

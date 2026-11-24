@@ -130,14 +130,31 @@ export interface TypesMark {
   watch(on: () => void): Dispose;
 }
 
+/**
+ * `types.acyclic`, edition 11: kinds of link that may never close a loop.
+ * A pack holds a kind of link acyclic; the schema pack then refuses a
+ * change set whose links of that kind would form a cycle (`schema.cycle`).
+ * Links already on the graph are not judged until a set touches them.
+ */
+export interface TypesAcyclic {
+  /** Holds links of kind `link` acyclic. The kind need not be defined yet; several packs may hold the same kind. */
+  hold(link: string): Dispose;
+  /** Every kind of link held acyclic now. */
+  held(): string[];
+  /** Calls `on` when a kind is held or let go. */
+  watch(on: () => void): Dispose;
+}
+
 export interface Capabilities {
   "types.define": TypesDefine;
   "types.read": TypesRead;
   "types.mark": TypesMark;
+  "types.acyclic": TypesAcyclic;
 }
 
 export const capabilities: Capability[] = [
   { key: "types.define", since: 1, doc: "Defines a base, a flavour of one, or a kind of link." },
   { key: "types.read", since: 1, doc: "The bases, flavours and links defined now, resolved, and when they change." },
   { key: "types.mark", since: 10, doc: "The shape each base is drawn in: named by its pack, else the first shape no base holds." },
+  { key: "types.acyclic", since: 11, doc: "Kinds of link held acyclic: the schema pack refuses a change that would close a loop of one." },
 ];

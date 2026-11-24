@@ -47,6 +47,14 @@ the act it denies: it holds the agent back to ask it something (the grow
 pack's question at `reply_end`), not because anything went wrong. A node no longer in the tree is judged at the
 places it was said.
 
+A person's **decision on a reply** (a `decision` act at `reply_end`, a
+[call](../call/README.md)'s answer accepted or rejected) judges every node
+said before it in the run, as everything said in a one-request run was said
+to that reply: rejected is a miss after each (failed), accepted holds each.
+Only the run's last decision counts, so a change of mind is followed. A
+decision at a tool's place (Claude Code's allow or deny) is a miss as any
+failed act is, where it is covered.
+
 Only runs where a node was said judge it.
 
 ## The record

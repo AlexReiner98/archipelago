@@ -10,6 +10,7 @@ against it in the write chain. Types: [types.ts](types.ts).
 |---|---|
 | `types.define` | Define a base, a flavour or a kind of link |
 | `types.read` | What is defined now, resolved, and when it changes |
+| `types.acyclic` (11) | Kinds of link held acyclic, which no change may close a loop of |
 | `types.mark` (10) | The shape each base is drawn in |
 
 ## Few bases, flavours
@@ -50,6 +51,15 @@ A kind of link names the bases its ends may be (`from`, `to`; absent, any),
 a flavour counting as its base. Edition 1's packs ship five: `part_of`,
 `depends_on`, `waits_on` (to an actor), `bears_on` (to a question) and
 `about`. A grouping is a link, never a field.
+
+## Acyclic kinds of link
+
+Edition 11: a pack can hold a kind of link acyclic (`types.acyclic`), so
+the links of that kind form a DAG: an order of steps, a tree of tests. The
+schema pack then refuses a change set whose links of that kind would close
+a loop (`schema.cycle`, naming the loop). Only what a set touches is
+judged: a loop already on the graph is refused once a set changes one of
+its links, not before. A kind stays held while any pack holds it.
 
 ## Names
 

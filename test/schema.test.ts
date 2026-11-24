@@ -4,7 +4,7 @@ import type { ActionContext, ActionInvoke, ActionRegister, Outcome } from "../sp
 import type { Fact } from "../spec/changeset.ts";
 import type { Json, Page } from "../spec/common.ts";
 import type { GraphRead } from "../spec/graph.ts";
-import { COMMON, type LinkInfo, type TypeInfo, type TypesRead } from "../spec/types.ts";
+import { COMMON, type LinkInfo, type TypeInfo, type TypesAcyclic, type TypesRead } from "../spec/types.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader, type Entry as TreeEntry } from "../runtime/loader.ts";
 import action from "../packs/action/index.ts";
@@ -30,12 +30,19 @@ const dependsOn: LinkInfo = { name: "depends_on", from: ["work"], to: ["work"], 
 
 /** Stands in for the types broker: what it holds can change while the test runs. */
 const defined = new Map<string, TypeInfo | LinkInfo>();
+/** Kinds of link held acyclic (types.acyclic), as the broker would answer. */
+const acyclic = new Set<string>();
 const types: Pack = {
   id: "types",
   apply(ctx) {
     ctx.provide<TypesRead>("types.read", () => ({
       all: () => ({ types: [...defined.values()].filter((t): t is TypeInfo => "statuses" in t), links: [...defined.values()].filter((t): t is LinkInfo => !("statuses" in t)) }),
       get: (name) => defined.get(name),
+      watch: () => () => {},
+    }));
+    ctx.provide<TypesAcyclic>("types.acyclic", () => ({
+      hold: (link) => (acyclic.add(link), () => void acyclic.delete(link)),
+      held: () => [...acyclic],
       watch: () => () => {},
     }));
   },
@@ -59,6 +66,7 @@ const probe: Pack = {
 
 async function setup(strict = false) {
   defined.clear();
+  acyclic.clear();
   for (const t of [work, bug, question, dependsOn]) defined.set(t.name, t);
   const rt = new Runtime();
   const errors: unknown[] = [];
@@ -267,4 +275,47 @@ test("a link given a new type is checked with the ends it already had, which exi
   } finally {
     await s.stop();
   }
+});
+
+const link = (id: string, from: string, to: string, type = "depends_on"): Fact[] => [["+", id, "type", type], ["+", id, "from", from], ["+", id, "to", to]];
+
+test("a kind of link held acyclic refuses a set that would close a loop, wherever the loop runs", async () => {
+  const s = await setup();
+  try {
+    await s.ok(s.write(...task("a"), ...task("b"), ...task("c"), ...link("ab", "a", "b"), ...link("bc", "b", "c")));
+    // Not held: a loop is just links.
+    await s.ok(s.write(...link("ca0", "c", "a")));
+    await s.ok(s.write(["-", "ca0", "type", "depends_on"], ["-", "ca0", "from", "c"], ["-", "ca0", "to", "a"]));
+    acyclic.add("depends_on");
+    const problems = async (facts: Fact[]) => ((await s.refused(s.write(...facts))).detail as { problems: { code: string; message: string }[] }).problems;
+
+    // Through the graph: c → a closes a → b → c.
+    const p = await problems(link("ca", "c", "a"));
+    assert.equal(p[0]!.code, "schema.cycle");
+    assert.match(p[0]!.message, /c → a → b → c/);
+    // Onto itself, and through two links of one set.
+    assert.equal((await problems(link("aa", "a", "a")))[0]!.code, "schema.cycle");
+    assert.equal((await problems([...task("d"), ...link("cd", "c", "d"), ...link("da", "d", "a")]))[0]!.code, "schema.cycle");
+    // Moving a link's end so it closes a loop.
+    assert.equal((await problems([["-", "bc", "to", "c"], ["+", "bc", "to", "a"]]))[0]!.code, "schema.cycle");
+
+    // What doesn't close a loop applies: a diamond, and a link whose loop the same set breaks.
+    await s.ok(s.write(...task("d"), ...link("ad", "a", "d"), ...link("dc", "d", "c")));
+    await s.ok(s.write(["-", "bc", "type", "depends_on"], ["-", "bc", "from", "b"], ["-", "bc", "to", "c"], ...link("cb", "c", "b")));
+    // Another kind of link is not held.
+    defined.set("about", { name: "about", pack: "types" });
+    await s.ok(s.write(...link("x", "c", "a", "about")));
+  } finally {
+    await s.stop();
+  }
+});
+
+test("past its limit the walk stops, and the set is refused as unchecked", async () => {
+  const { cycles } = await import("../packs/schema/cycle.ts");
+  const chain = async (id: string) => (id.length < 30 ? [{ id: `l${id}`, from: id, to: `${id}n` }] : []);
+  const after = new Map([["new", { type: "depends_on", from: "z", to: "a" }]]);
+  const p = await cycles(after, new Set(["depends_on"]), chain, 5);
+  assert.equal(p[0]!.code, "schema.cycle_unchecked");
+  assert.deepEqual(await cycles(after, new Set(["depends_on"]), chain), []);
+  assert.deepEqual(await cycles(after, new Set(), chain), []);
 });

@@ -32,7 +32,8 @@
 import type { NodeInfo } from "../../spec/agent.ts";
 import { channelOf, type Channel } from "../harness/channels.ts";
 
-export type Source = "map" | "harness" | "agent";
+/** `subject`: a call's own context, from the pack that made the call (its type and size, never its text). */
+export type Source = "map" | "harness" | "agent" | "subject";
 export type PartChannel = Channel | "act";
 export type State = "start" | "said" | "listed" | "dropped";
 
@@ -46,6 +47,10 @@ export interface Ev {
   place?: string;
   /** Characters it put in the window: a say's or refusal's words, an act's input and output. */
   size: number;
+  /** A call's subject: the domain's own context, by its type and tokens. */
+  subject?: { type: string; tokens: number };
+  /** The model's own count, from a call's answer. */
+  usage?: { input: number; output: number; model?: string };
 }
 
 /** A row of `transcript.given`. */
@@ -231,10 +236,21 @@ export function windowAt(p: WindowInput): Window {
     if (a.nOut) parts.push({ id: `${id}#dropped`, title: place, source: "agent", channel: "act", state: "dropped", tokens: tokensOf(a.out), count: a.nOut, fitted: 0 });
   }
 
+  // A call's subject: the domain's own context in the request, by its type, in the window from then on.
+  const subjects = new Map<string, { tokens: number; count: number }>();
+  for (const e of upTo) {
+    if (!e.subject) continue;
+    const s = subjects.get(e.subject.type) ?? { tokens: 0, count: 0 };
+    s.tokens += e.subject.tokens;
+    s.count++;
+    subjects.set(e.subject.type, s);
+  }
+  for (const [type, s] of subjects) parts.push({ id: `subject:${type}`, title: type, source: "subject", channel: "context", state: "said", tokens: s.tokens, count: s.count, fitted: 0 });
+
   parts.sort((x, y) => y.tokens - x.tokens || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
-  const sources: Record<Source, number> = { map: 0, harness: 0, agent: 0 };
+  const sources: Record<Source, number> = { map: 0, harness: 0, agent: 0, subject: 0 };
   const channels: Record<PartChannel, number> = { hook: 0, rule: 0, file: 0, context: 0, talk: 0, act: 0 };
-  const fitted = { sources: { map: 0, harness: 0, agent: 0 } as Record<Source, number>, channels: { hook: 0, rule: 0, file: 0, context: 0, talk: 0, act: 0 } as Record<PartChannel, number> };
+  const fitted = { sources: { map: 0, harness: 0, agent: 0, subject: 0 } as Record<Source, number>, channels: { hook: 0, rule: 0, file: 0, context: 0, talk: 0, act: 0 } as Record<PartChannel, number> };
   let counted = 0;
   for (const x of parts) {
     if (x.state === "dropped") continue;
@@ -245,10 +261,13 @@ export function windowAt(p: WindowInput): Window {
     counted += x.tokens;
   }
   // The total: the model's own count when there is one since the last compaction, else what a compaction left, else the parts.
-  const usage = p.usage && (!last || Number.isNaN(ms(p.usage.time)) || ms(p.usage.time) >= cut) ? p.usage : undefined;
+  // Without a transcript, a call's answer may carry the model's own count.
+  const callUsage = [...upTo].reverse().find((e) => e.usage)?.usage;
+  const given = p.usage ?? (callUsage ? { n: 0, input: callUsage.input, cacheRead: 0, cacheWrite: 0, output: callUsage.output, ...(callUsage.model ? { model: callUsage.model } : {}), ...(at ? { time: at.time } : {}) } : undefined);
+  const usage = given && (!last || Number.isNaN(ms(given.time)) || ms(given.time) >= cut) ? given : undefined;
   const real = usage ? usage.input + usage.cacheRead + usage.cacheWrite + usage.output : last?.post;
   const total = real !== undefined ? { tokens: real, from: "usage" as const } : { tokens: counted, from: "estimate" as const };
-  const model = p.usage?.model;
+  const model = given?.model;
   return {
     run: p.run,
     ...(at && p.at ? { at: at.id } : {}),

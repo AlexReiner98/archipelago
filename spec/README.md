@@ -5,18 +5,18 @@ be changed silently. Each contract is a TypeScript module (the types) and a
 short doc.
 
 <!-- contracts: written by scripts/contracts.ts from the spec -->
-This is **edition 10**. A capability that came after edition 1 shows the edition it came in.
+This is **edition 11**. A capability that came after edition 1 shows the edition it came in.
 
 | Contract | Capabilities | What it is |
 |---|---|---|
 | [graph](graph.md) | `graph.read` `graph.watch` `graph.stage` `graph.commit` | The graph pack stores items and links and is the truth. |
-| [action](action.md) | `action.register` `action.list` `action.invoke` | Every change goes through a declared action, whether a person or an agent makes it. |
+| [action](action.md) | `action.register` `action.list` `action.invoke` `action.attest` (11) | Every change goes through a declared action, whether a person or an agent makes it. |
 | [agent](agent.md) | `agent.node` `agent.tree` `agent.run` `agent.facts` (5) `agent.gate` (5) | Everything the map says to an agent and everything the agent does passes through one service. |
 | [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event for each thing that passes between the map and an agent. |
 | [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` `slot.arrange` (8) | How the UI is put together out of packs. |
 | [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | How large graphs are drawn. |
 | [here](here.md) | `here.declare` `here.read` `here.set` | What is being looked at, now. |
-| [types](types.md) | `types.define` `types.read` `types.mark` (10) | What kinds of item and link the map holds. |
+| [types](types.md) | `types.define` `types.read` `types.mark` (10) `types.acyclic` (11) | What kinds of item and link the map holds. |
 | [profile](profile.md) | `profile.read` (5) | Not every node fits every run. |
 | [loader](loader.md) | `loader.tree` (7) | The config tree as a capability. |
 | [changeset](changeset.md) | (a format) | A change, written in full. |
@@ -34,7 +34,13 @@ surface, and the spec owns the six places of edition 1 and edition 2's
 Edition 3 adds the place `compact` and the person's acts, `decision` and
 `notice` ([agent](agent.md)). Edition 4 says a node's same words once per
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
-([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 10 adds
+([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 11 adds
+`types.acyclic`, kinds of link a pack holds acyclic, which the schema pack
+keeps from closing a loop ([types](types.md)), and `action.attest`, a
+change made on a test's word at the version of its inputs
+([action](action.md)), and a person's `decision` on a run's reply, at
+`reply_end`, with the facts `item` and `version` a call follows
+([agent](agent.md)). Edition 10 adds
 `types.mark`, the shape each base is drawn in, named by its pack, and two
 mark shapes, pentagon and hexagon ([types](types.md), [style](style.md));
 from it a contract's `Capabilities` map is frozen one key at a time, as its

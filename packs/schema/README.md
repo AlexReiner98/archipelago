@@ -35,6 +35,11 @@ What it checks (check.ts):
   kind of link allows: `schema.link_end`. A link given a new type is checked
   with the ends it already had, read from the graph like any other. An item that isn't a link has
   neither: `schema.not_a_link`. Fields but no type: `schema.type_missing`.
+- A link of a kind held acyclic (`types.acyclic`, edition 11) that would
+  close a loop with the graph's links of that kind and the set's own:
+  `schema.cycle`, naming the loop (cycle.ts). The walk follows only what
+  the set's links lead to; past 10,000 items it stops and the set is
+  refused as `schema.cycle_unchecked` rather than let through.
 - A type nobody defines passes unchecked, unless `config.strict`
   (`schema.type_unknown`). The harness packs write such types today.
 
@@ -44,5 +49,5 @@ held; nothing new is held for it. Order in the tree: after the packs that
 define types and before history, so history journals only what applied.
 Without a `types.read` provider the pack is inactive and nothing is checked.
 
-Injects `graph.stage`, `graph.read`, `types.read` and `action.register`.
+Injects `graph.stage`, `graph.read`, `types.read`, `types.acyclic` and `action.register`.
 Node only.

@@ -19,7 +19,7 @@ import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import htm from "htm";
 import type { ActionInvoke } from "../../spec/action.ts";
-import { UNDO } from "../../spec/action.ts";
+import { UNDO, attested } from "../../spec/action.ts";
 import { runName, type RunInfo } from "../../spec/agent.ts";
 import type { Json, Page } from "../../spec/common.ts";
 import type { ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
@@ -225,8 +225,10 @@ const activity: Pack = {
       const s = standing(c);
       const err = refused.get(c.id);
       const t = touches(c.facts);
+      const test = attested(c.header);
+      const said = test ? `a test's result: ${test.test} at ${test.version}` : `${c.header.actor.kind} ${c.header.actor.id} · on ${c.header.authority.of}'s say${c.header.authority.basis ? `: ${c.header.authority.basis}` : ""}`;
       return html`
-        <div class=${`av-ch ${s.state}`} title=${`${c.id} · ${c.header.actor.kind} ${c.header.actor.id} · on ${c.header.authority.of}'s say${c.header.authority.basis ? `: ${c.header.authority.basis}` : ""}`}>
+        <div class=${`av-ch ${s.state}`} title=${`${c.id} · ${said}`}>
           <span class=${`av-mk ${s.state}`}>${s.mark}</span>
           <span class="a">${c.header.action}</span>
           <span class="r">${c.header.undoes ? `undoes ${c.header.undoes} · ` : ""}${c.header.reason}</span>

@@ -61,6 +61,25 @@ come.
 - **Playhead:** `here.event`, in one run. Unset, the view follows the run's
   end live.
 
+## Calls ([calls.ts](calls.ts))
+
+A call is one request to a model made by a pack (the
+[call](../call/README.md) pack's runs, `harness: "call"`), under the run
+that made it. Calls aren't agents: none is a live agent with a tree, nor a
+line in the run picker. Under the run looked at, or the agent in focus,
+they fold into one strip under the bar: "calls ▸", how many, and a ✓ ✕ ○
+tally, each call by its verdicts (✕ when a node said to it failed: its
+answer was rejected; ✓ when one held: accepted; ○ not decided, or nothing
+said to it). A click opens a line per call, newest first (the 100 newest),
+with its mark, its title, how many nodes were said to it and when. A click
+on one looks at that call alone: its **one-request tree**, only the nodes
+listening where it reached (said to it, or held back from it), ringed by
+their verdicts; the window bar over it (the map's words, the subject by its
+size, the answer, and the model's own count); its events in the run pane.
+The strip stays its parent's, that call marked, with "‹ parent" back. The
+run picker names it "call · …". Calls are read from the newest 500 runs
+(`LIMIT_MAX`), the runs from the 50 newest that aren't calls.
+
 ## The agents ([trees.ts](trees.ts), [agents.ts](agents.ts))
 
 Live mode and the agents are one idea: each live run is an agent, in the
@@ -215,7 +234,7 @@ in the transcript yet), and how many compactions. It starts folded to that
 one line; its head ("window ▸") opens the rows below, and the browser
 remembers which (`harness.window-open`). Under it two thin rows
 on the window's one scale: its share by source (the map's, Claude Code's,
-the conversation, and what the model counts beyond those), and by channel
+the conversation, a call's subject, and what the model counts beyond those), and by channel
 (hook, rule, file, context, talk). A share's tooltip says its tokens, its
 part of the window, and how sure: each number carries its mark (`~`
 fitted, `~≈` partly, `≈` estimated, none measured), and a share's bar is
@@ -233,7 +252,8 @@ biggest four are named under it, named as the tree names them, never a
 path, and the rest counted; each a click to pick the node, outlined while
 picked. Live, the
 window is read again as events come, at most every 3 seconds; at a
-playhead, once. Each node's state there is its mark on the big tree (the
+playhead, once. A read in flight lands as long as the same run and
+playhead are looked at, however many events came meanwhile. Each node's state there is its mark on the big tree (the
 table above); the small previews draw none.
 
 ## The timeline ([timeline.ts](timeline.ts), [replay.ts](replay.ts))
