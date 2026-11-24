@@ -887,7 +887,7 @@ test("while zooming, names come from an atlas: a zoom stepped to a few sizes per
 import { callsOf, isCall, outcomeOf, requestNodes, tallyOf } from "../packs/harness/calls.ts";
 
 test("calls: a parent's calls, newest first; a call's mark from its verdicts; the strip's tally", () => {
-  const run = (id: string, started: string, facts?: Record<string, string>) => ({ run: id, agent: { id: "a", kind: "agent" as const }, harness: facts?.harness ?? "claude-code", reaches: ["check:wall_thickness", "finding", "reply_end"], started, ...(facts ? { facts } : {}) });
+  const run = (id: string, started: string, facts?: Record<string, string>) => ({ run: id, agent: { id: "a", kind: "agent" as const }, harness: facts?.harness ?? "claude-code", reaches: ["check:line_length", "finding", "reply_end"], started, ...(facts ? { facts } : {}) });
   const runs = [run("p", "2026-11-24T10:00:00Z"), run("c1", "2026-11-24T10:01:00Z", { harness: "call", parent: "p" }), run("c2", "2026-11-24T10:02:00Z", { harness: "call", parent: "p" }), run("c3", "2026-11-24T10:03:00Z", { harness: "call", parent: "q" })];
   assert.deepEqual(runs.map(isCall), [false, true, true, true]);
   assert.deepEqual(callsOf(runs, "p").map((r) => r.run), ["c2", "c1"]);
@@ -898,6 +898,6 @@ test("calls: a parent's calls, newest first; a call's mark from its verdicts; th
   assert.equal(outcomeOf([{ verdict: "quiet" }]), "quiet");
   assert.deepEqual(tallyOf(["held", "failed", "quiet", "none", "held"]), { held: 2, failed: 1, quiet: 2 });
   // The one-request tree: only nodes listening where the call reached; its answer's place doesn't count.
-  const nodes = [{ id: "w/wall", at: ["check:*"] }, { id: "w/finding", at: ["finding"] }, { id: "w/bash", at: ["tool:Bash"] }, { id: "w/end", at: ["reply_end"] }];
-  assert.deepEqual(requestNodes(nodes, runs[1]!).map((n) => n.id), ["w/wall", "w/finding"]);
+  const nodes = [{ id: "w/style", at: ["check:*"] }, { id: "w/finding", at: ["finding"] }, { id: "w/bash", at: ["tool:Bash"] }, { id: "w/end", at: ["reply_end"] }];
+  assert.deepEqual(requestNodes(nodes, runs[1]!).map((n) => n.id), ["w/style", "w/finding"]);
 });
