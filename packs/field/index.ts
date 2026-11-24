@@ -226,7 +226,10 @@ const fieldPack: Pack = {
       // The live agent sessions (packs/sessions, a page key by name): drawn beside the map, each linked to its context filters.
       const live = (useHere<Json>(SESSIONS) ?? []) as unknown as Live[];
       const liveKey = JSON.stringify(live);
-      const found = useMemo(() => withFoundSessions(q.trim() ? new Set(index.run(q, S.field_limit).items.map((r) => r.id)) : null, live, !!S.sessions), [version, q, S.field_limit, liveKey, S.sessions]);
+      // What the find line found, and with it each session in a filter it found. A session coming or going is a
+      // change to the map, not a new find: the view is not fitted again for it (findOf below).
+      const queried = useMemo(() => (q.trim() ? new Set(index.run(q, S.field_limit).items.map((r) => r.id)) : null), [version, q, S.field_limit]);
+      const found = useMemo(() => withFoundSessions(queried, live, !!S.sessions), [queried, liveKey, S.sessions]);
       const shape = useMemo(() => JSON.stringify([result.items.map((r) => [r.id, r.fields.title, r.fields.status]), result.links.map((l) => l.id)]), [result]);
       const input = useMemo<FieldIn>(() => withSessions(inputOf(result), live, !!S.sessions), [shape, liveKey, S.sessions]);
 
@@ -277,12 +280,13 @@ const fieldPack: Pack = {
       }, []);
       // A filter change warms the run to alpha_filter; a change to the map, to alpha_warm.
       // A new query (or new find dials) also fits the view to what is kept.
-      const lastHide = useRef(hideKey), lastFind = useRef<Map<Id, number> | null>(levels);
+      const findOf = [queried, treeLevels, S.find_steps, S.find_faint];
+      const lastHide = useRef(hideKey), lastFind = useRef(findOf);
       useEffect(() => {
-        const byFind = lastFind.current !== levels;
+        const byFind = findOf.some((v, k) => v !== lastFind.current[k]);
         const byFilter = lastHide.current !== hideKey || byFind;
         lastHide.current = hideKey;
-        lastFind.current = levels;
+        lastFind.current = findOf;
         engineNow?.found(levels);
         engineNow?.arranged(arranged);
         engineNow?.input(laid, byFilter ? S.alpha_filter : undefined, byFind);

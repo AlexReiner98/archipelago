@@ -98,7 +98,9 @@ find line has words, only what it finds and what lies near it.
   [packs/sessions](../sessions/README.md)) are each a pentagon of the type
   `session`, linked `runs_in` to each of their context filters on the map.
   They are not items and nothing is written: they come and go with the
-  sessions. A find that finds a filter finds its sessions too. The
+  sessions. A find that finds a filter finds its sessions too; one coming
+  or going is a change to the map, not a new find, so the view is not
+  fitted again for it. The
   `sessions` dial turns them off.
 - **The legend is the filter, and holds the dials** ([legend.ts](legend.ts),
   [panel.ts](panel.ts)). Closed, one line: the count and two tabs.
