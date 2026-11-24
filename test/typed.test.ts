@@ -330,6 +330,48 @@ test("a caller's check: never passed, the call fails with its problems; it runs 
   assert.equal(list.items[0].outcome, "failed");
 });
 
+test("fields offered and fields set: the model sees only some, the caller fills the rest", () => {
+  const item = (schemaOf(chore, LINKS, { fields: ["title", "room"] }) as any).properties.items.items;
+  assert.deepEqual(Object.keys(item.properties), ["ref", "title", "room", "links"]);
+  assert.deepEqual(item.required, ["ref", "title"]);
+  assert.deepEqual((schemaOf(chore, LINKS, { fields: ["room"] }) as any).properties.items.items.required, ["ref"], "no title offered, none required");
+  let n = 0;
+  const made = factsOf({ items: [{ ref: "a", title: "Sweep", room: "hall", note: "mine", size: 9 }] }, chore, () => `n${++n}`, { fields: ["title", "room"], set: { size: 2 } });
+  assert.deepEqual(made.problems.map((p) => [p.code, p.at]), [["typed.shape", "items[0].note"]], "a field not offered is a problem");
+  assert.ok(made.facts.some((f) => f[2] === "size" && f[3] === 2) && !made.facts.some((f) => f[3] === 9), "a set field wins over the reply's");
+  const ok = factsOf({ items: [{ ref: "a", room: "hall" }] }, chore, () => `n${++n}`, { fields: ["room"], set: { title: "Set by the caller", status: "doing" } });
+  assert.deepEqual(ok.problems, []);
+  assert.deepEqual(ok.facts.map((f) => [f[2], f[3]]), [["type", "chore"], ["room", "hall"], ["title", "Set by the caller"], ["status", "doing"]]);
+});
+
+test("set fields reach the checks and the facts; follow reaches the call's run", async () => {
+  const { errors, ask, read } = await setup();
+  const model = scripted([{ items: [{ ref: "a", title: "Sweep", room: "hall" }] }]);
+  let seen: unknown;
+  const out = await ask.ask({
+    type: "chore",
+    prompt: "One chore.",
+    model,
+    fields: ["title", "room"],
+    set: { size: 3 },
+    follow: { item: "i_followed", version: "v1" },
+    check: (made) => {
+      seen = made.items[0]!.fields.size;
+      return [];
+    },
+  });
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.equal(seen, 3);
+  assert.ok(out.facts.some((f) => f[2] === "size" && f[3] === 3));
+  assert.deepEqual(Object.keys((model.asked[0]!.schema as any).properties.items.items.properties), ["ref", "title", "room", "links"]);
+  const run = (await read.runs()).items.find((r) => r.run === out.run)!;
+  assert.deepEqual([run.facts?.item, run.facts?.version], ["i_followed", "v1"]);
+  // A set field the type hasn't is the schema's problem, sent back like any other.
+  const bad = await ask.ask({ type: "chore", prompt: "x", model, set: { colour: "red" }, retries: 0 });
+  assert.equal(!bad.ok && bad.problems[0]!.code, "schema.field_unknown");
+  assert.deepEqual(errors, []);
+});
+
 test("system and retry words", () => {
   assert.equal(systemOf(work, undefined, []), "You make items for a map. Each is a work. Reply with one JSON object that matches the schema you are given, and nothing else.");
   assert.equal(retryOf([{ code: "x", message: "One." }, { code: "y", message: "Two." }]), "That reply doesn't fit the map's types:\n- One.\n- Two.\nGive the whole reply again, fixed.");

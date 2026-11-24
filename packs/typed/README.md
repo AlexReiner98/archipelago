@@ -27,6 +27,9 @@ and `agent.run` (to record attempts in the call's run).
 | `system` | More for the system prompt |
 | `links` | Kinds of link the model may give each item. Absent: every kind whose `from` allows the type's base |
 | `attach` | Links the caller adds to every item (`{type: "part_of", to: <hub>}`) |
+| `fields` | Only these of the type's fields go into the schema the model sees (title required only when offered); a field it gives that wasn't offered is a problem |
+| `set` | Fields the caller sets on every item, over the reply's, before any check: bookkeeping (a version stamp, the id it is about) the model is never offered |
+| `follow` | `{item, version}`, passed to `call.ask`: the item whose decision at this version judges the call |
 | `min`, `max` | How many items |
 | `retries` | How many times a misfit is sent back (default the config's, else 1) |
 | `model` | An adapter (below). Default the configured one |

@@ -61,6 +61,12 @@ export interface TypedStart {
   links?: string[];
   /** Links the caller adds to every item, not the model: `{ type: "part_of", to: <hub> }`. */
   attach?: { type: string; to: Id }[];
+  /** Only these of the type's fields go into the schema the model sees; the caller fills the others (`set`). Absent: every field. */
+  fields?: string[];
+  /** Fields the caller sets on every item, over the reply's, before any check: bookkeeping the model is never offered. */
+  set?: Record<string, Json>;
+  /** An item whose decision at this version judges the call (see call.ask). */
+  follow?: { item: Id; version: string };
   /** How many items, at least and at most. */
   min?: number;
   max?: number;
@@ -162,7 +168,7 @@ const typed: Pack<TypedConfig> = {
       if (!isType(t)) return refuse("type_unknown", `There is no type ${start.type} now: a base or a flavour of one.`);
       const model = start.model ?? configured;
       if (!model) return refuse("no_model", unconfigured ?? "No model is configured for typed calls: set the typed pack's `model`.");
-      const shape = { ...(start.links ? { links: start.links } : {}), ...(start.min !== undefined ? { min: start.min } : {}), ...(start.max !== undefined ? { max: start.max } : {}) };
+      const shape = { ...(start.links ? { links: start.links } : {}), ...(start.min !== undefined ? { min: start.min } : {}), ...(start.max !== undefined ? { max: start.max } : {}), ...(start.fields ? { fields: start.fields } : {}) };
       const schema: JsonSchema = schemaOf(t, types.all().links, shape);
       const retries = Math.max(0, start.retries ?? config.retries ?? 1);
       let run = "";
@@ -177,6 +183,7 @@ const typed: Pack<TypedConfig> = {
             title: start.title ?? `${t.name} items`,
             places: start.places ?? [`typed:${t.name}`],
             ...(start.parent ? { parent: start.parent } : {}),
+            ...(start.follow ? { follow: start.follow } : {}),
             facts: { ...(start.facts ?? {}), [TYPED]: t.name, model: model.id, caller: pack },
           },
           async ({ run: r, said }) => {
@@ -196,7 +203,7 @@ const typed: Pack<TypedConfig> = {
                 throw e;
               }
               usage = sum(usage, reply.usage);
-              const made = reply.json === undefined ? undefined : factsOf(reply.json, t, newId, { ...shape, ...(start.attach ? { attach: start.attach } : {}) });
+              const made = reply.json === undefined ? undefined : factsOf(reply.json, t, newId, { ...shape, ...(start.attach ? { attach: start.attach } : {}), ...(start.set ? { set: start.set } : {}) });
               let problems: Problem[] = made ? made.problems.map((p) => ({ ...p })) : [{ code: "typed.not_json", message: "The reply held no JSON: give only one JSON object." }];
               if (made && !problems.length) {
                 const out = await invoke.invoke<{ fits: boolean; problems: { code: string; message: string; id: Id; field?: string }[] }>({
@@ -278,6 +285,9 @@ const typed: Pack<TypedConfig> = {
           parent: { type: "string", description: "The run that made it" },
           links: { type: "array", items: { type: "string" } },
           attach: { type: "array", items: { type: "object", properties: { type: { type: "string" }, to: { type: "string" } }, required: ["type", "to"] } },
+          fields: { type: "array", items: { type: "string" }, description: "Only these of the type's fields are offered to the model" },
+          set: { type: "object", description: "Fields set on every item by the caller, never offered to the model" },
+          follow: { type: "object", properties: { item: { type: "string" }, version: { type: "string" } }, required: ["item", "version"] },
           min: { type: "number" },
           max: { type: "number" },
           retries: { type: "number" },

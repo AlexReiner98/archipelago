@@ -28,6 +28,8 @@ export interface ShapeOptions {
   /** How many items: at least, at most. */
   min?: number;
   max?: number;
+  /** Only these of the type's fields are offered to the model; the caller fills the rest (`set`). Absent: every field. */
+  fields?: string[];
 }
 
 export interface ShapeProblem {
@@ -70,6 +72,7 @@ export function schemaOf(t: TypeInfo, links: LinkInfo[], opts: ShapeOptions = {}
     [REF]: { type: "string", description: "A short name for this item, unique in the reply: other items' links may name it." },
   };
   for (const [name, def] of Object.entries(t.fields)) {
+    if (opts.fields && !opts.fields.includes(name)) continue;
     if (name === "status") {
       props.status = { type: "string", enum: [...t.statuses.open, ...t.statuses.closed], description: `Absent: ${t.statuses.open[0]}.` };
       continue;
@@ -93,7 +96,7 @@ export function schemaOf(t: TypeInfo, links: LinkInfo[], opts: ShapeOptions = {}
       },
     };
   }
-  const items: JsonSchema = { type: "array", items: { type: "object", properties: props, required: [REF, "title"], additionalProperties: false } };
+  const items: JsonSchema = { type: "array", items: { type: "object", properties: props, required: "title" in props ? [REF, "title"] : [REF], additionalProperties: false } };
   if (opts.min !== undefined) items.minItems = opts.min;
   if (opts.max !== undefined) items.maxItems = opts.max;
   return {
@@ -150,9 +153,13 @@ const isObj = (v: unknown): v is Record<string, Json> => !!v && typeof v === "ob
  * The facts a reply would write: each item of type `t` (its base's first
  * open status when it gives none), each link going out of it (`to` a ref in
  * the reply, else taken as an id), and the links the caller adds to every
- * item (`attach`). A null field is absent. Ids come from `newId`.
+ * item (`attach`), and the fields it sets on every item (`set`, over the
+ * reply's). With `fields`, a field the model wasn't offered is a problem. A
+ * null field is absent. Ids come from `newId`.
  */
-export function factsOf(reply: unknown, t: TypeInfo, newId: () => Id, opts: ShapeOptions & { attach?: { type: string; to: Id }[] } = {}): Made {
+export function factsOf(reply: unknown, t: TypeInfo, newId: () => Id, opts: ShapeOptions & { attach?: { type: string; to: Id }[]; set?: Record<string, Json> } = {}): Made {
+  const set = opts.set ?? {};
+  const offered = (k: string) => !opts.fields || opts.fields.includes(k);
   const made: Made = { facts: [], ids: {}, names: {}, problems: [] };
   const problem = (code: string, message: string, at?: string) => made.problems.push({ code, message, ...(at ? { at } : {}) });
   const items = isObj(reply) ? reply.items : undefined;
@@ -181,17 +188,23 @@ export function factsOf(reply: unknown, t: TypeInfo, newId: () => Id, opts: Shap
     seen.add(ref);
     const id = made.ids[ref]!;
     made.names[id] = `item ${JSON.stringify(ref)}`;
-    if (typeof item.title !== "string" || !item.title.trim()) problem("typed.shape", `item ${JSON.stringify(ref)} needs a title.`, `${at}.title`);
+    const title = set.title ?? item.title;
+    if (typeof title !== "string" || !title.trim()) problem("typed.shape", `item ${JSON.stringify(ref)} needs a title.`, `${at}.title`);
     made.facts.push(["+", id, "type", t.name]);
-    if (item.status === undefined || item.status === null) made.facts.push(["+", id, "status", t.statuses.open[0]!]);
+    if ((item.status === undefined || item.status === null) && (set.status === undefined || set.status === null)) made.facts.push(["+", id, "status", t.statuses.open[0]!]);
     for (const [k, v] of Object.entries(item)) {
-      if (k === REF || k === LINKS || v === null) continue;
+      if (k === REF || k === LINKS || v === null || k in set) continue;
       if (k === "type") {
         problem("typed.shape", `item ${JSON.stringify(ref)} has no field type: every item here is a ${t.name}.`, `${at}.type`);
         continue;
       }
+      if (!offered(k)) {
+        problem("typed.shape", `item ${JSON.stringify(ref)} has no field ${k} here: give only the fields in the schema.`, `${at}.${k}`);
+        continue;
+      }
       made.facts.push(["+", id, k, v]);
     }
+    for (const [k, v] of Object.entries(set)) if (v !== null) made.facts.push(["+", id, k, v]);
     const out = [...(Array.isArray(item[LINKS]) ? (item[LINKS] as Json[]) : []), ...(opts.attach ?? [])];
     if (item[LINKS] !== undefined && item[LINKS] !== null && !Array.isArray(item[LINKS])) problem("typed.shape", `item ${JSON.stringify(ref)}'s links are an array.`, `${at}.links`);
     out.forEach((l, k) => {
