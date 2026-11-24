@@ -376,11 +376,17 @@ export function ringFor(tree: Tree, o: { ring: number; ringMost: number; nameTex
 /** Where everything stands. The same tree is placed the same each time. */
 export function radial(tree: Tree, options: RadialOptions = {}): Placed {
   const o = { ...STYLE, measure: roughWidth, ...options };
-  const sx = o.spreadX;
   const angles = anglesOf(tree);
   const ring = ringFor(tree, o);
   const polar = new Map<string, { a: number; r: number }>();
   for (const t of tree.order) polar.set(t.id, { a: angles.get(t.id)!.a, r: ring * t.depth });
+  return placedAt(tree, polar, ring, options);
+}
+
+/** The picture from each node's polar place: its point, its branch (and the points along it), its name, the bounds. */
+export function placedAt(tree: Tree, polar: Map<string, { a: number; r: number }>, ring: number, options: RadialOptions = {}): Placed {
+  const o = { ...STYLE, measure: roughWidth, ...options };
+  const sx = o.spreadX;
   // `+ 0` keeps the root at 0, not -0.
   const at = (a: number, r: number): [number, number] => [Math.cos(a) * r * sx + 0, Math.sin(a) * r + 0];
   const xy = new Map([...polar].map(([id, p]) => {

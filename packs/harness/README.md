@@ -100,7 +100,11 @@ click on the focused agent's name looks at it alone.
 What an agent is told runs a light from the root along its tree to that
 node, in the agent's colour (red for a refusal), and the name lights when
 the light gets there; an act sparks on the bough of its place. The light
-and spark are the tree's own (see the tree, below).
+and spark are the tree's own (see the tree, below). When a node comes or
+goes, the tree glides into its new shape over `layout_ms` (600; each node's
+angle and ring eased, a new one growing out of its parent: `glide` in
+[glide.ts](glide.ts)), and a light already running
+reads its route from the tree as drawn each frame, so it follows its branch.
 
 The dials, in the bar's ⋯ menu: how long a switch of focus takes
 (`switch_s`), how long the pointer rests on a node or a bough before its

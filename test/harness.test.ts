@@ -963,3 +963,24 @@ test("markSvgPath: a filter's mark as a path beside the view's title, a hexagon 
   assert.equal(markSvgPath("triangle").split("L").length, 3);
   assert.ok(markSvgPath("circle").includes("A"), "a circle is arcs");
 });
+
+test("glide: a changed tree moves into its new shape, a new node growing out of its parent, the end exactly the new layout", async () => {
+  const { radial, treeOf } = await import("../packs/harness/layout.ts");
+  const { glide } = await import("../packs/harness/glide.ts");
+  const before = treeOf([node("words", "a", ["tool:Bash"]), node("words", "b", ["prompt"])]);
+  const after = treeOf([node("words", "a", ["tool:Bash"]), node("words", "b", ["prompt"]), node("words", "c", ["tool:Edit"])]);
+  const from = radial(before), to = radial(after);
+  assert.equal(glide(after, from, to, 1), to, "at the end, the new layout itself");
+  const start = glide(after, from, to, 0);
+  // At the start, what was there is where it was.
+  assert.deepEqual(start.polar.get("words/a"), from.polar.get("words/a"));
+  // A new node starts where its nearest old ancestor was, and every node has a branch to draw.
+  const c = after.byId.get("words/c")!;
+  let up = c.parent;
+  while (up && !from.polar.has(up.id)) up = up.parent;
+  assert.deepEqual(start.polar.get("words/c"), from.polar.get(up!.id));
+  for (const t of after.order) if (t.parent) assert.ok(start.branch.has(t.id) && start.along.has(t.id), t.id);
+  // Half way, a moved node is between its two places.
+  const mid = glide(after, from, to, 0.5).polar.get("words/a")!, a0 = from.polar.get("words/a")!, a1 = to.polar.get("words/a")!;
+  assert.ok(Math.abs(mid.r - (a0.r + a1.r) / 2) < 1e-6);
+});

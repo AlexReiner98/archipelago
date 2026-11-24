@@ -39,6 +39,7 @@ import { sheet, v } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
 import type { RootMark } from "./paint.ts";
 import { CONTEXT_FILTER, OpenFilterButton } from "./open.ts";
+import { useGlide } from "./glide.ts";
 import type { Json } from "../../spec/common.ts";
 /** Each type's mark as the Landscape draws it (packs/field), read by name: a key, not an import. */
 const FIELD_MARKS = "field.marks";
@@ -313,7 +314,9 @@ const harness: Pack = {
       const tree = useMemo(() => treeOf(treeNodes, { by, unsaid, profiles: membership, decided }), [treeNodes, by, unsaid, membership, decided]);
       const dials = useDials(here);
       const nameMost = dials.name_most || Infinity;
-      const placed = useMemo(() => radial(tree, { nameMost }), [tree, nameMost]);
+      const laid = useMemo(() => radial(tree, { nameMost }), [tree, nameMost]);
+      // A change to the tree glides into its new shape (glide.ts).
+      const placed = useGlide(tree, laid, dials.layout_ms ?? 0, nameMost);
       // The harness's given nodes are grey, not a pack hue (canvas.ts).
       const hues = useMemo(() => packHues(nodes.map((n) => n.pack)), [nodes]);
       // Live: each run an agent with a tree of its own (what it hears), in its colour, its profile over it.
@@ -445,7 +448,7 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} rootMark=${rootMark} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} fitMs=${dials.fit_ms} settleMs=${dials.fit_settle_ms} wheelMs=${dials.wheel_ms} nameMost=${dials.name_most} peekPx=${dials.peek_px} openS=${dials.open_s} />`
+              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} rootMark=${rootMark} layoutMs=${dials.layout_ms} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} fitMs=${dials.fit_ms} settleMs=${dials.fit_settle_ms} wheelMs=${dials.wheel_ms} nameMost=${dials.name_most} peekPx=${dials.peek_px} openS=${dials.open_s} />`
               : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
                   <div class="hv-onerun">
                     <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} window=${run ? marks : undefined} rootMark=${rootMark} root=${run && placements.has(run) ? ((pl) => (pl.kind === "none" ? "no context filter" : pl.title))(placementOf(placements.get(run)!, fallbacks)) : undefined} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} fitMs=${dials.fit_ms} settleMs=${dials.fit_settle_ms} wheelMs=${dials.wheel_ms} />

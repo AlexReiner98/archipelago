@@ -33,6 +33,7 @@ import { radial, treeOf, type Grouping } from "./layout.ts";
 import { stateAt } from "./replay.ts";
 import { WindowBar, type WindowMark, type WindowRead } from "./windowbar.ts";
 import type { RootMark } from "./paint.ts";
+import { useGlide } from "./glide.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -178,6 +179,8 @@ export interface TreesProps {
   sparkX?: number;
   /** How long a fit glides, in ms (the fit_ms dial). */
   fitMs?: number;
+  /** How long a tree glides into its new shape, in ms (the `layout_ms` dial). */
+  layoutMs?: number;
   /** For how long after its first fit a tree's fit still lands at once (the fit_settle_ms dial). */
   settleMs?: number;
   /** How long the wheel's zoom eases, in ms (the wheel_ms dial). */
@@ -198,7 +201,9 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
   const nodes = useMemo(() => (extra?.length ? [...heard, ...extra] : heard), [heard, extra]);
   const tree = useMemo(() => treeOf(nodes, { by: p.by }), [nodes, p.by]);
   const nameMost = p.nameMost || Infinity;
-  const placed = useMemo(() => radial(tree, { nameMost }), [tree, nameMost]);
+  const laid = useMemo(() => radial(tree, { nameMost }), [tree, nameMost]);
+  // A change to the tree glides into its new shape (glide.ts).
+  const placed = useGlide(tree, laid, p.layoutMs ?? 0, nameMost);
   const mine = useMemo(() => p.events.filter((e) => e.run === a.run.run), [p.events, a.run.run]);
   const state = useMemo(() => stateAt(mine, mine.length - 1), [mine]);
   const title = runName(a.run);

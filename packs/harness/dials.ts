@@ -21,6 +21,7 @@ export interface Dial {
 
 export const DIALS: readonly Dial[] = [
   { key: "switch_s", label: "switch s", min: 0, max: 1.5, step: 0.05, value: 0.4, doc: "Seconds a tree takes to grow into focus while the old one shrinks into the column; 0 switches at once." },
+  { key: "layout_ms", label: "layout glides ms", min: 0, max: 2000, step: 50, value: 600, doc: "How long a tree takes to move into its new shape when a node comes or goes, in ms, a light running along a branch following it; 0 jumps to the new shape at once." },
   { key: "fit_ms", label: "fit ms", min: 0, max: 2000, step: 50, value: 600, doc: "How long the tree's camera glides to fit it again (a double-click, a tree that outgrew the view), in ms; 0 jumps there at once." },
   { key: "fit_settle_ms", label: "fit settles ms", min: 0, max: 3000, step: 50, value: 800, doc: "For how long after a tree first appears its fits land at once rather than glide, while it is still finding its size; later fits glide over fit ms." },
   { key: "wheel_ms", label: "wheel ms", min: 0, max: 600, step: 10, value: 180, doc: "How long the tree's camera eases to where the wheel zooms it, in ms, so a wheel's notches glide; 0 zooms at once." },
