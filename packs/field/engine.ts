@@ -11,7 +11,7 @@
  *   about the pointer; a double-click on the sea fits the picture.
  * - The picture is fitted while it settles, until the reader moves it.
  */
-import { bornOf, goneOf, paintGone, type Ghost } from "./gone.ts";
+import { bornOf, goneLinksOf, goneOf, paintGone, type Ghost, type GoneLink } from "./gone.ts";
 import type { Id } from "../../spec/common.ts";
 import type { Dial } from "./behaviour.ts";
 import { bounds, build, grid, seed, sizes, type FieldIn, type G, type Grid, type Settings } from "./graph.ts";
@@ -174,6 +174,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   // ─── The loop ───
   let raf = 0, following = false;
   const ghosts: Ghost[] = [];
+  const goneLinks: GoneLink[] = [];
   let coming = 0;
   // What was last painted, so what leaves fades from how it was drawn.
   let drawn: { g: G | null; match: Uint8Array | null } = { g: null, match: null };
@@ -198,7 +199,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       drawn = { g, match };
       // Arranged into a profile: its tree comes in under the items as they reach their places.
       if (tree) paintTree(c, tree, cam, s.dpr, scale(), arrived(g, scale(), flight), colours, S);
-      const fading = paintGone(c, ghosts, cam, s.dpr, performance.now(), S) || performance.now() < coming;
+      const fading = paintGone(c, ghosts, cam, s.dpr, performance.now(), S, goneLinks, colours) || performance.now() < coming;
       // A link name or a ghost still fading keeps the view painting.
       dirty = easing || following || light.wiresMoving || fading;
     }
@@ -310,7 +311,9 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       g = build(next, last, pal);
       // What left the map fades out where it stood.
       const now = performance.now();
-      ghosts.push(...goneOf(last, g, now, S, drawn.g === last ? drawn.match : null));
+      const was = drawn.g === last ? drawn.match : null;
+      ghosts.push(...goneOf(last, g, now, S, was, 4000, light.named));
+      goneLinks.push(...goneLinksOf(last, g, now, S, was));
       // What came onto the map fades in where it lands.
       g.born = bornOf(last, g, now);
       coming = now + (S.come_ms ?? 0);

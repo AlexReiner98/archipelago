@@ -44,3 +44,5 @@ the query, it opens Map.
 
 An empty line is `is:open`. At most 150 items come back, and the links
 among them. Writes nothing.
+
+The suggestions list fades in over 140 ms as it opens.

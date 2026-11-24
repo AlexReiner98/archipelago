@@ -350,7 +350,9 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   c.lineJoin = "round";
   c.font = "11px ui-sans-serif, system-ui, sans-serif";
   const hub = light.hubs(g, S);
-  const lit = light.dim > 0.5;
+  // The rest's titles fade out as the light comes in (over dim_ms), and only go once it is all but in.
+  const lit = light.dim > 0.98;
+  const rest = 1 - light.dim;
   const rank = (i: number) =>
     (i === focus ? 64 : 0) + (shine[i]! > 0 ? 32 : 0) + (match?.[i] === FOUND ? 16 : 0) + (hub[i] ? 8 : 0) + (light.named.has(g.id[i]!) ? 4 : 0) + (g.closed[i] ? 0 : 2);
   const wants: number[] = [];
@@ -400,7 +402,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     const grow = shine[i]! > 0 || match?.[i] === FOUND || hub[i] ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
     // A closed item's title is muted, like its particle.
     const shut = g.closed[i] && !(shine[i]! > 0) && !within && match?.[i] !== FOUND;
-    c.globalAlpha = grow * Math.max(faint * fade(i), shine[i]!) * (shut ? 0.75 : 1) * come(i);
+    c.globalAlpha = grow * Math.max(faint * fade(i) * (shine[i]! > 0.5 ? 1 : rest), shine[i]!) * (shut ? 0.75 : 1) * come(i);
     c.fillStyle = shut ? ink.muted : ink.text;
     const lines = texts.get(i)!, mid = (box[0] + box[2]) / 2;
     c.textAlign = within ? "center" : "left";

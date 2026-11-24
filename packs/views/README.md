@@ -66,3 +66,9 @@ own.
 - **`here.view`** set by something else (an agent, a panel) shows the
   view of that kind; not while the shown view's own fill is gone, when the
   frame is only standing another fill in for it. `views.view` (page) says which view shows.
+- **A picked view fades in** ([fade.ts](fade.ts)): the page as it was (the
+  list over it too) crossfades into the new view over `switch_ms` (450),
+  once the new view has laid itself out for `switch_wait_ms` (300) under the
+  old picture, so its first unsettled frames are never seen. Both are the
+  pack's config; `switch_ms: 0`, reduced motion, or a browser without View
+  Transitions changes it at once. The list itself fades in over 120 ms.

@@ -26,6 +26,7 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet } from "../../spec/style.ts";
 import type { FindIndex, FindOffer } from "../find/index.ts";
 import { SHOWN, shower } from "./apply.ts";
+import { faded, FADE_STYLE } from "./fade.ts";
 import { byHash, firstView, search, sections, TYPE, views, type Config, type View } from "./pick.ts";
 
 /** The command line's open state (the command pack's `command.open`), read by name: a key, not an import. */
@@ -41,7 +42,7 @@ const STYLE = sheet(`
 .vw-pick .c { color:var(--dim); }
 .vw-pick:hover .c { color:var(--fg); }
 .vw-pick kbd { font:var(--text-xs)/1 var(--mono); color:var(--dim); border:1px solid var(--line); border-radius:var(--radius); padding:1px 3px; margin-left:var(--space-2); }
-.vw-veil { position:fixed; inset:0; display:flex; justify-content:center; align-items:flex-start; padding-top:12vh; background:color-mix(in srgb, var(--bg) 40%, transparent); }
+.vw-veil { animation:vw-in .12s ease-out both; position:fixed; inset:0; display:flex; justify-content:center; align-items:flex-start; padding-top:12vh; background:color-mix(in srgb, var(--bg) 40%, transparent); }
 .vw-list { width:min(420px, calc(100vw - 32px)); max-height:60vh; display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 8px 28px rgba(0,0,0,.25); }
 .vw-list input { font:inherit; background:var(--control); color:var(--fg); border:0; border-bottom:1px solid var(--line); padding:var(--space-3) var(--space-4); outline:none; border-radius:var(--radius) var(--radius) 0 0; }
 .vw-rows { overflow:auto; padding:var(--space-2) 0; }
@@ -51,6 +52,7 @@ const STYLE = sheet(`
 .vw-row .t { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .vw-row .k { color:var(--dim); font-size:var(--text-s); }
 .vw-row.on .t { color:var(--pick); }
+@keyframes vw-in { from { opacity:0; } }
 .vw-none { padding:var(--space-3) var(--space-4); color:var(--dim); }
 `);
 
@@ -107,6 +109,8 @@ const views_: Pack<Config> = {
       else if (!chosen && !keepHash && location.hash) history.replaceState(null, "", location.pathname + location.search);
       tell();
     };
+    /** A view a person (or an agent through the URL) picks: faded into from the one shown (fade.ts). */
+    const switchTo = (v: View) => faded(() => pick(v), config);
     /** How long the first view waits for home's own pack before taking what there is. */
     const WAIT = 3000;
     let waited = false;
@@ -154,7 +158,7 @@ const views_: Pack<Config> = {
     const standIn = (center: string | undefined) => !!center && !read.fills("center").some((f) => `${f.pack}/${f.name}` === center);
     const fromHash = () => {
       const v = byHash(list(), location.hash);
-      if (v && v.id !== show.shown()?.id) pick(v);
+      if (v && v.id !== show.shown()?.id) switchTo(v);
     };
     ctx.effect(() => read.watch("center", follow) as () => void);
     ctx.effect(() => index.watch(follow) as () => void);
@@ -209,7 +213,7 @@ const views_: Pack<Config> = {
       const found = search(all, q);
       const now = show.shown();
       const choose = (v: View | undefined) => {
-        if (v) pick(v);
+        if (v) switchTo(v);
         setOpen(false);
       };
       const key = (e: KeyboardEvent) => {
@@ -248,7 +252,7 @@ const views_: Pack<Config> = {
           key: `view:${v.id}`,
           title: v.title,
           hint: v.home ? "home" : v.section?.title,
-          run: () => pick(v),
+          run: () => switchTo(v),
         })),
     });
     // Escape closes the list wherever the focus is; so does the command line opening over it.
@@ -258,7 +262,7 @@ const views_: Pack<Config> = {
     ctx.effect(() => here.watch(COMMAND_OPEN, (c) => c.value && open && setOpen(false)) as () => void);
     ctx.effect(() => {
       const style = document.createElement("style");
-      style.textContent = STYLE;
+      style.textContent = STYLE + FADE_STYLE;
       document.head.append(style);
       addEventListener("hashchange", fromHash);
       addEventListener("keydown", escape);

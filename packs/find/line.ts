@@ -28,7 +28,8 @@ export const STYLE = sheet(`
 .fd { position:relative; display:flex; align-items:center; gap:var(--space-3); flex:1; min-width:0; }
 .fd input { flex:1; min-width:0; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-1) var(--space-3); }
 .fd .n { color:var(--dim); white-space:nowrap; font-variant-numeric:tabular-nums; }
-.fd-list { position:absolute; top:calc(100% + var(--space-1)); left:0; right:0; z-index:20; background:var(--panel); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-1) 0; white-space:nowrap; box-shadow:0 4px 14px color-mix(in srgb, var(--fg) 14%, transparent); }
+.fd-list { animation:fd-in .14s ease-out both; position:absolute; top:calc(100% + var(--space-1)); left:0; right:0; z-index:20; background:var(--panel); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-1) 0; white-space:nowrap; box-shadow:0 4px 14px color-mix(in srgb, var(--fg) 14%, transparent); }
+@keyframes fd-in { from { opacity:0; transform:translateY(-3px); } }
 .fd-row { display:flex; gap:var(--space-3); align-items:baseline; padding:var(--space-1) var(--space-3); cursor:pointer; }
 .fd-row.on { background:color-mix(in srgb, var(--pick) 16%, transparent); }
 .fd-row .k { color:var(--dim); width:3.6em; flex:none; font-size:var(--text-s); }

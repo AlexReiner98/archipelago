@@ -361,6 +361,24 @@ test("an item that leaves the map fades out where it stood over gone_ms, closed 
   assert.ok(ghostFade(150, 600) > 0.75 && ghostFade(450, 600) < 0.25, "eased: slow to start, slow to end");
 });
 
+test("a link with an end that left fades out with it, and a ghost keeps the title it was shown with", async () => {
+  const { goneLinksOf, goneOf } = await import("../packs/field/gone.ts");
+  const item = (id: string) => ({ id, title: "Item " + id, type: "work", status: "", closed: false });
+  const whole: FieldIn = { items: [item("a"), item("b"), item("c")], links: [{ id: "l1", type: "part_of", from: "b", to: "a" }, { id: "l2", type: "depends_on", from: "c", to: "a" }], types: ["work"] };
+  const S = { ...settings(), gone_ms: 600, link_alpha: 0.5, shapes: 0 };
+  const all = build(whole, null);
+  seed(all, S);
+  const less = build({ items: [item("a"), item("c")], links: [whole.links[1]!], types: ["work"] }, all);
+  const gone = goneLinksOf(all, less, 1000, S);
+  const at = (id: string) => [all.x[all.idIx.get(id)!], all.y[all.idIx.get(id)!]];
+  assert.equal(gone.length, 1, "only b's link went");
+  assert.deepEqual([gone[0]!.x1, gone[0]!.y1, gone[0]!.x2, gone[0]!.y2], [...at("b"), ...at("a")]);
+  assert.equal(gone[0]!.alpha, 0.5 * 1.4, "part_of as strong as it is drawn");
+  assert.deepEqual(goneLinksOf(all, less, 1000, { ...S, gone_ms: 0 }), []);
+  assert.deepEqual(goneOf(all, less, 1000, S, null, 4000, new Set(["b"])).map((q) => q.title), ["Item b"]);
+  assert.deepEqual(goneOf(all, less, 1000, S).map((q) => q.title), [undefined], "not shown, no title");
+});
+
 test("the map follows the find line once typing pauses: a value is taken only after it holds still for find_wait_ms", async (t) => {
   const { Settle } = await import("../packs/field/filter.ts");
   t.mock.timers.enable({ apis: ["setTimeout"] });

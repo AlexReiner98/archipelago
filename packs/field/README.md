@@ -59,7 +59,9 @@ find line has words, only what it finds and what lies near it.
   not at every letter. Whatever leaves the map, by the find line or the
   legend, fades out where it stood over `gone_ms` ([gone.ts](gone.ts)),
   from as strong as it was drawn, and whatever comes onto it fades in where
-  it lands over `come_ms`.
+  it lands over `come_ms`. Its links and its title (if shown) leave with it,
+  and a pointed-at item's light fades the other titles out over `dim_ms`
+  before they go.
   What it finds is drawn whole, closed or not, and named first; the
   legend's open and closed switches do not apply while it has words, so a
   plan shows its done steps.
