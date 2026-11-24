@@ -146,8 +146,8 @@ function rootName(c: CanvasRenderingContext2D, name: string, k: number, ink: Ink
   c.font = `${ink.bold} ${S.rootName}px ${ink.font}`;
   c.textAlign = "center";
   c.textBaseline = "middle";
-  const w = c.measureText(name).width, h = S.rootName * 1.5, y = Math.max(S.root * k, under) + 4 + h / 2;
-  c.globalAlpha = 0.85;
+  const w = c.measureText(name).width, h = S.rootName * 1.5, y = Math.max(S.root * k, under) + 2 + h / 2;
+  c.globalAlpha = 0.95;
   c.fillStyle = ink.color(INK.bg);
   c.beginPath();
   c.roundRect(-w / 2 - 6, y - h / 2, w + 12, h, h / 2);

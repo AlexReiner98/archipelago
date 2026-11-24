@@ -251,7 +251,7 @@ export const STYLE = {
   /** The size of the context filter's name at the root, in screen px. */
   rootName: 14,
   /** The radius the root is drawn at as its context filter's mark, in screen px. */
-  rootMark: 14,
+  rootMark: 20,
   hit: 8,
   branch: 3.2,
   branchStep: 0.45,
