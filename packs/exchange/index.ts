@@ -4,6 +4,11 @@
  *
  * Events are kept in memory and, when `config.journal` names a file, appended
  * to it as JSON lines and read back on load, so the record outlives a restart.
+ * With a journal, an act's body (its input and output, nearly all of the
+ * record's bytes) stays in the file: memory keeps where its line is, and a
+ * page of events reads the bodies it holds back from there. Loading streams
+ * the file a line at a time, so the heap holds neither the whole text nor
+ * every act.
  */
 import type { RunId, RunInfo } from "../../spec/agent.ts";
 import type { Dispose, Page, PageRequest } from "../../spec/common.ts";
@@ -53,6 +58,13 @@ export class Log {
   /** Events per node, oldest first. */
   readonly byNode = new Map<string, ExchangeEvent[]>();
 
+  /** `keep` gives what is held for an event (the journal drops an act's body); `add` still answers the whole event. */
+  private readonly keep: (e: ExchangeEvent) => ExchangeEvent;
+
+  constructor(keep: (e: ExchangeEvent) => ExchangeEvent = (e) => e) {
+    this.keep = keep;
+  }
+
   add(e: Omit<ExchangeEvent, "id" | "seq"> & Partial<Pick<ExchangeEvent, "id" | "seq">>): ExchangeEvent {
     let list = this.runs.get(e.run);
     if (!list) {
@@ -63,10 +75,11 @@ export class Log {
     this.order.add(e.run);
     const seq = e.seq ?? list.length + 1;
     const event: ExchangeEvent = { ...e, seq, id: e.id ?? `${e.run}:${seq}` };
-    list.push(event);
+    const held = this.keep(event);
+    list.push(held);
     if (event.node) {
       const n = this.byNode.get(event.node) ?? [];
-      n.push(event);
+      n.push(held);
       this.byNode.set(event.node, n);
     }
     return event;
@@ -91,30 +104,114 @@ export class Log {
   }
 }
 
-async function readJournal(file: string, into: Log): Promise<void> {
-  const { readFile } = await import("node:fs/promises");
-  let text: string;
-  try {
-    text = await readFile(file, "utf8");
-  } catch {
-    return;
-  }
-  for (const line of text.split("\n")) if (line.trim()) into.add(JSON.parse(line) as ExchangeEvent);
-}
+/** Where an event's line is in the journal: its first byte and its length, newline left out. */
+type Span = { at: number; len: number };
 
-async function journalWriter(file: string): Promise<(e: ExchangeEvent) => Promise<void>> {
-  const { appendFile } = await import("node:fs/promises");
-  let queue = Promise.resolve();
-  return (e) => (queue = queue.then(() => appendFile(file, JSON.stringify(e) + "\n")));
+/**
+ * The journal file: appended to, read back a line at a time on load, and
+ * read at a line's place for an act's body. `size` is where the next line
+ * goes, counted as each is queued, so a span is known before it is written.
+ */
+export class Journal {
+  private size = 0;
+  private queue: Promise<unknown> = Promise.resolve();
+  /** Each act's line, by event id: its body is read from there. */
+  private readonly spans = new Map<string, Span>();
+
+  readonly file: string;
+
+  constructor(file: string) {
+    this.file = file;
+  }
+
+  /**
+   * What memory holds of an event: an act without its body. Its span is set
+   * on load before `add`, and on append right after it with nothing awaited
+   * between, so no read finds an act with neither.
+   */
+  readonly keep = (e: ExchangeEvent): ExchangeEvent => {
+    if (!e.act) return e;
+    const { act: _body, ...rest } = e;
+    return rest;
+  };
+
+  /** Streams the file into `into`, a line at a time. A missing file is an empty record. */
+  async load(into: Log): Promise<void> {
+    const { createReadStream } = await import("node:fs");
+    const { stat } = await import("node:fs/promises");
+    try {
+      await stat(this.file);
+    } catch {
+      return;
+    }
+    let at = 0;
+    let rest = Buffer.alloc(0);
+    const take = (line: Buffer, start: number) => {
+      const text = line.toString("utf8");
+      if (!text.trim()) return;
+      const e = JSON.parse(text) as ExchangeEvent;
+      if (e.act && e.id) this.spans.set(e.id, { at: start, len: line.length });
+      into.add(e);
+    };
+    for await (const chunk of createReadStream(this.file) as AsyncIterable<Buffer>) {
+      const buf = rest.length ? Buffer.concat([rest, chunk]) : chunk;
+      let from = 0;
+      for (let nl = buf.indexOf(10, from); nl !== -1; nl = buf.indexOf(10, from)) {
+        take(buf.subarray(from, nl), at + from);
+        from = nl + 1;
+      }
+      at += from;
+      rest = Buffer.from(buf.subarray(from));
+    }
+    if (rest.length) take(rest, at);
+    this.size = at + rest.length;
+  }
+
+  /** Appends an event; its span is known at once, its bytes once the queue reaches it. */
+  append(e: ExchangeEvent): Promise<void> {
+    const line = Buffer.from(JSON.stringify(e) + "\n", "utf8");
+    const span = { at: this.size, len: line.length - 1 };
+    this.size += line.length;
+    if (e.act) this.spans.set(e.id, span);
+    const done = this.queue.then(async () => {
+      const { appendFile } = await import("node:fs/promises");
+      await appendFile(this.file, line);
+    });
+    this.queue = done.catch(() => {});
+    return done;
+  }
+
+  /** The events with their acts' bodies read back from the file, one open for the page. */
+  async whole(events: ExchangeEvent[]): Promise<ExchangeEvent[]> {
+    const need = events.filter((e) => e.kind === "act" && !e.act && this.spans.has(e.id));
+    if (!need.length) return events;
+    await this.queue;
+    const { open } = await import("node:fs/promises");
+    const fh = await open(this.file, "r");
+    const bodies = new Map<string, ExchangeEvent["act"]>();
+    try {
+      for (const e of need) {
+        const { at, len } = this.spans.get(e.id)!;
+        const buf = Buffer.alloc(len);
+        await fh.read(buf, 0, len, at);
+        bodies.set(e.id, (JSON.parse(buf.toString("utf8")) as ExchangeEvent).act);
+      }
+    } finally {
+      await fh.close();
+    }
+    return events.map((e) => (bodies.has(e.id) ? { ...e, act: bodies.get(e.id) } : e));
+  }
 }
 
 const exchange: Pack<ExchangeConfig> = {
   id: "exchange",
   about: "Records everything said to agents and everything they do, in order.",
   async apply(ctx: Context, config: ExchangeConfig = {}) {
-    const record = new Log();
-    if (config.journal) await readJournal(config.journal, record);
-    const write = config.journal ? await journalWriter(config.journal) : undefined;
+    const journal = config.journal ? new Journal(config.journal) : undefined;
+    const record = new Log(journal?.keep);
+    await journal?.load(record);
+    const write = journal ? (e: ExchangeEvent) => journal.append(e) : undefined;
+    const whole = async (p: Page<ExchangeEvent>): Promise<Page<ExchangeEvent>> => (journal ? { ...p, items: await journal.whole(p.items) } : p);
     const watchers = new Set<Watcher>();
 
     ctx.provide<ExchangeAppend>("exchange.append", () => ({
@@ -142,10 +239,10 @@ const exchange: Pack<ExchangeConfig> = {
         return pageOf(infos, page);
       },
       async events(run, page) {
-        return pageOf(record.runs.get(run) ?? [], page);
+        return whole(pageOf(record.runs.get(run) ?? [], page));
       },
       async said(node, page) {
-        return pageOf([...(record.byNode.get(node) ?? [])].reverse(), page);
+        return whole(pageOf([...(record.byNode.get(node) ?? [])].reverse(), page));
       },
     }));
 
