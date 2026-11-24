@@ -74,7 +74,7 @@ export function placeWires(wants: WireWant[], at: { width: number; height: numbe
 }
 
 /** A link type as words: depends_on → depends on. */
-export const wireName = (type: string, places?: string[]) => type.replace(/_/g, " ") + (places?.length ? ` · ${places.join(", ")}` : "");
+export const wireName = (type: string, places?: string[]) => (places?.length ? `at ${places.join(", ")}` : type.replace(/_/g, " "));
 
 /** A link name's size on screen at zoom `k`: its size in the map times the zoom, at most `most`; 0 when below `least`, too small to read. */
 export function wireSize(size: number, k: number, least: number, most: number): number {

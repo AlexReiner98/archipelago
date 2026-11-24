@@ -87,8 +87,8 @@ find line has words, only what it finds and what lies near it.
   B). A head is `arrow_strength` times as strong as its line, keeps
   `arrow_keep` of that while a pointer dims the rest or find fades its
   edge, and is `arrow_lit` times bigger on a lit link. A link long enough on screen, whose ends are big enough to be
-  titled, or lit, has its type's name along its middle (with where it says its item, when it has
-  places: `in context filter · tool:Edit`), over no title and
+  titled, or lit, has its type's name along its middle (or, a link with places, where it has its item said:
+  `at tool:Edit`, short enough to fit the link), over no title and
   no other name. A name grows and shrinks with the zoom (`link_name_size`
   times the zoom, between `link_name_least_px` and `link_name_most_px`),
   and fades in and out over `link_name_fade_ms` as it gains or loses its

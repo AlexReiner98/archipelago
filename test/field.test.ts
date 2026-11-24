@@ -504,7 +504,7 @@ test("a placed name's corners reach along its turned line, so the arranged tree'
 test("a link with places is named with them, so the map shows where its item is said", async () => {
   const { wireName } = await import("../packs/field/wires.ts");
   assert.equal(wireName("in_context_filter"), "in context filter");
-  assert.equal(wireName("in_context_filter", ["tool:Edit", "file:*.html"]), "in context filter · tool:Edit, file:*.html");
+  assert.equal(wireName("in_context_filter", ["tool:Edit", "file:*.html"]), "at tool:Edit, file:*.html", "the places are what it says: the filter it points to says the rest");
   const g = build({ items: [{ id: "a", title: "a", type: "record", status: "", closed: false }, { id: "b", title: "b", type: "context_filter", status: "", closed: false }], links: [{ id: "l", type: "in_context_filter", from: "a", to: "b", places: ["prompt"] }], types: ["record", "context_filter"] }, null);
   assert.deepEqual(g.places?.[0], ["prompt"]);
 });
