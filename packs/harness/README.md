@@ -283,6 +283,16 @@ A say is led by "re-said ·" when it came again after a compaction, and by
 agent pack's `reworded`); what a run heard and was told changed is the
 node "Changed since heard" (`words/changed`).
 
+## Spend against estimate ([spend.ts](spend.ts))
+
+With the [budget](../budget/README.md) pack loaded, each run's row in the
+runs list, and the run pane's head, show its measured tokens over its
+task's `tokens_estimated` (`182k / 200k`, read through `budget.spend`, at
+most every five seconds as events come): dim under the estimate, plain past
+it, red past the ratio it is asked at, `⊘` once it was asked (the refusal's mark in the run). The tooltip
+gives the share, what is counted, and the ratio. A run whose task has no
+estimate shows nothing.
+
 ## What the harness gave ([given.ts](given.ts))
 
 With the transcript pack ([transcript](../transcript/README.md)), each

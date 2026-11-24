@@ -14,7 +14,7 @@ profile, as the harness pack kept its own.
 
 | | |
 |---|---|
-| `umwelt` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members`, `fallback`, `leave_out` (what Claude Code is to leave out of its runs: the [lean](../lean/README.md) pack's) |
+| `umwelt` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members`, `fallback`, `leave_out` (what Claude Code is to leave out of its runs: the [lean](../lean/README.md) pack's), `budget_ratio` (spend over estimate past which its runs are asked once: the [budget](../budget/README.md) pack's) |
 | `in_umwelt` | Any item → the umwelt that holds it. With places, the link is said there itself (below) |
 | `out_of_umwelt` | An item → an umwelt it is taken out of |
 | `uses` | An item → an umwelt: runs with that item in their facts (a repo, a hub) are in it |

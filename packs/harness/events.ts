@@ -15,6 +15,7 @@ import type { ProfileInfo } from "../../spec/profile.ts";
 import { read, verdictGlyph } from "../../spec/style.ts";
 import { expand, fold, type Part } from "./expand.ts";
 import { gotAt } from "./got.ts";
+import { SpendMark, type Spend } from "./spend.ts";
 import type { Speaker } from "../claude-code/context.ts";
 import type { RunVerdict, Verdict } from "./hooks.ts";
 
@@ -102,6 +103,8 @@ export interface EventsProps {
   speakers?: Map<string, Speaker>;
   node?: string;
   profiles?: ProfileInfo[];
+  /** Spend against the task's estimate (spend.ts). */
+  spend?: Spend;
   onPick(e: ExchangeEvent): void;
 }
 
@@ -110,7 +113,7 @@ export function atFoot(scrollHeight: number, scrollTop: number, clientHeight: nu
   return scrollHeight - scrollTop - clientHeight <= slack;
 }
 
-export const Events = ({ info, events, index, end, verdicts, titles, speakers, node, profiles, onPick }: EventsProps) => {
+export const Events = ({ info, events, index, end, verdicts, titles, speakers, node, profiles, spend, onPick }: EventsProps) => {
   const body = useRef<HTMLDivElement>(null);
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const stick = useRef(true);
@@ -140,6 +143,7 @@ export const Events = ({ info, events, index, end, verdicts, titles, speakers, n
         <span class="t">Run</span>
         <span class="hv-dim">${events.length}</span>
         <span class="sp"></span>
+        <${SpendMark} s=${spend} />
         ${facts.remote && html`<span class="hv-dim hv-cut">${String(facts.remote).split("/").slice(-1)[0]}${facts.branch ? ` · ${facts.branch}` : ""}</span>`}
       </div>
       ${info && html`<div class="hv-prof">
