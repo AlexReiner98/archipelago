@@ -42,7 +42,7 @@ export const DRAW: Dial[] = [
   { key: "link_name_fade_ms", label: "link names fade", min: 0, max: 1000, step: 10, value: 220, then: "paint", doc: "How long a link name takes to fade in or out when it gains or loses its room, in ms." },
   { key: "link_name_most", label: "link names at most", min: 0, max: 200, step: 5, value: 40, then: "paint", doc: "At most this many link names at once: the lit first, then the longest." },
   { key: "label_px", label: "titles from", min: 2, max: 40, step: 0.5, value: 9, then: "paint", doc: "A particle's title shows once its radius reaches this on screen, in px." },
-  { key: "label_hubs", label: "always name hubs", min: 0, max: 100, step: 1, value: 12, then: "paint", doc: "The this-many most linked items, the map's central topics, are named at any zoom and stay named, over other particles if need be, so the picture reads before you zoom in." },
+  { key: "label_hubs", label: "always name hubs", min: 0, max: 100, step: 1, value: 60, then: "paint", doc: "The this-many most linked items, the map's central topics, are named at any zoom and stay named, over other particles if need be, so the picture reads before you zoom in." },
   { key: "label_hub_links", label: "hubs from", min: 1, max: 100, step: 1, value: 8, then: "paint", doc: "An item needs at least this many links to be named as a hub." },
   { key: "label_hub_keep", label: "hubs hold", min: 0, max: 50, step: 1, value: 4, then: "paint", doc: "A hub stays named until this many more items outrank it, so the named set holds still while links come and go." },
   { key: "label_most", label: "titles at most", min: 0, max: 600, step: 10, value: 120, then: "paint", doc: "At most this many titles at once." },

@@ -130,8 +130,9 @@ find line has words, only what it finds and what lies near it.
   pointed at and its neighbours, what the find line finds, the hubs, what
   was named last frame (so names hold still while it settles), then the
   largest on screen. The hubs are the map's central topics: the
-  `label_hubs` most linked with at least `label_hub_links` links, named at
-  any zoom, over other particles if need be. The set is worked out only
+  `label_hubs` (60) most linked with at least `label_hub_links` (8) links,
+  named at any zoom, over other particles if need be but never over another
+  title, so each cluster a map shows zoomed out is named. The set is worked out only
   when the graph or a dial changes, and a hub stays until `label_hub_keep`
   more items outrank it, so zoomed out the same few names hold through the
   solve. A title stays beside its particle at every zoom, as zoomed out;
