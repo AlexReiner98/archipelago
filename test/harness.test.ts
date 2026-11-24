@@ -919,3 +919,11 @@ test("harness: a fit lands at once first and while the tree finds its size (fit_
   assert.equal(snapsFit(false, 900, 800, 600), false, "after: it glides");
   assert.equal(snapsFit(false, 900, 800, 0), true, "fit_ms 0: always at once");
 });
+
+test("placeLabel: an MCP tool's place reads as its server and name; any other place as it is", async () => {
+  const { placeLabel } = await import("../packs/harness/events.ts");
+  assert.equal(placeLabel("tool:mcp__archipelago__query"), "tool:archipelago.query");
+  assert.equal(placeLabel("tool:mcp__my_server__do_it"), "tool:my_server.do_it");
+  assert.equal(placeLabel("tool:Edit"), "tool:Edit");
+  assert.equal(placeLabel("file:index.html"), "file:index.html");
+});

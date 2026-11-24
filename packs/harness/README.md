@@ -99,7 +99,7 @@ the size on screen below which a node's name shows only if the run said
 it, refused with it, or it is picked (`quiet_px`, 0 for every name, as it starts),
 the most characters a name shows (`name_most`, 28; 0 for whole),
 whether wire names give way where they overlap (`give_way`, 0: they always show),
-how long and how big an act's spark is (`spark_s`, 1.6; `spark_x`, 2.2 times the style's), how long a new line of the run is lit as it lands (`row_ms`, 600: a background that fades, painted rather than composited, as an opacity fade on each new row made Chrome show half-drawn frames), how tall each agent preview is (`peek_px`, 200, its column a third wider, opening from nothing over `open_s` as a second agent arrives), so
+how long and how big an act's spark is (`spark_s`, 1.6; `spark_x`, 2.2 times the style's), how long a new line of the run is lit as it lands (`row_ms`, 600: a background that fades, painted rather than composited, as an opacity fade on each new row made Chrome show half-drawn frames; the list glides to its foot rather than jumping, and an MCP tool's place reads `tool:archipelago.query`, `placeLabel`), how tall each agent preview is (`peek_px`, 200, its column a third wider, opening from nothing over `open_s` as a second agent arrives), so
 a tree seen whole reads by its shape and what it was told, and how long a run may be
 quiet and still be live (`quiet_min`). Its value is `harness.dials` (page scope), so an agent can
 set it; the browser remembers it. Colours are style tokens only.
