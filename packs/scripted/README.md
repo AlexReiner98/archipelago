@@ -58,6 +58,9 @@ harness `scripted`, titled "Replay of …", with the fact `replay_of`.
   added since is heard at the places the run reached, where it went quiet
   too, and judged there.
 
+The [replay](../replay/README.md) pack uses this to judge a trial node on
+past runs where its place came up.
+
 A call Claude Code rejected before any hook ran (read back from the
 transcript at Stop) reached nothing in the recorded run; replayed, it
 reaches its places like any call.

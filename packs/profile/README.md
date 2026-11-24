@@ -62,7 +62,9 @@ Decided (20 Nov 2026, all five):
 - A profile in `shadow` holds nothing: the gate's hold is a trial, recorded
   as a `gated` event with `trial`, and the node is still said.
 - A miss in a run, at a place a held node listens at, is told on the
-  profiles (`profile.missed`: a finding about them and the node).
+  profiles (`profile.missed`: a finding about them and the node). Not in
+  a replay (a run with `replay_of`, the [replay](../replay/README.md)
+  pack's): its misses were told about in the recorded run.
 
 ## Moving a run
 

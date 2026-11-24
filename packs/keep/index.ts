@@ -37,7 +37,7 @@ import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { DEFAULTS, standing, wordsProblems, type Peer, type Standing, type Tally, type Thresholds } from "./rule.ts";
 
-export { DEFAULTS, overlap, standing, wordsProblems } from "./rule.ts";
+export { DEFAULTS, overlap, standing, weigh, wordsProblems } from "./rule.ts";
 
 const TYPE = "node";
 /** The words pack's trial mark: a node's own words never carry it. */
@@ -54,7 +54,11 @@ export interface KeepConfig extends Partial<Thresholds> {
 interface VerdictRead {
   run(run: string): Promise<{ node: string; verdict: string; after: number; failed_by: number[] }[]>;
   record(node: string): Promise<(Tally & { last?: string; places: Record<string, number> }) | undefined>;
-  verdicts(node: string, page?: { limit?: number; after?: string }): Promise<{ items: { run: string; verdict: "held" | "failed" | "quiet"; said: number }[]; next?: string }>;
+  replayed(node: string): Promise<(Tally & { last?: string }) | undefined>;
+  verdicts(
+    node: string,
+    page?: { limit?: number; after?: string },
+  ): Promise<{ items: { run: string; verdict: "held" | "failed" | "quiet"; said: number; label?: "allow" | "deny"; replay_of?: string }[]; next?: string }>;
   watch(on: (c: { run?: string }) => void): () => void;
 }
 
@@ -68,6 +72,20 @@ export interface Decided {
   /** The node in the tree it was, so its record can be found once it is retired. */
   node?: string;
   record?: Tally;
+  replayed?: Tally;
+}
+
+/**
+ * A node's verdicts against a person's decisions in the same runs (allow or
+ * deny after it was said: the verdict's `label`), live runs only: held with
+ * allow and failed with deny agree; held with deny and failed with allow
+ * disagree. What the thresholds are checked against, never changed by.
+ */
+export interface Labels {
+  allow: number;
+  deny: number;
+  agree: number;
+  disagree: number;
 }
 
 export interface Reviewed {
@@ -79,6 +97,10 @@ export interface Reviewed {
   at: string[];
   status: string;
   record?: Tally & { last?: string };
+  /** Its record from replays, apart from the live one. */
+  replayed?: Tally & { last?: string };
+  /** Its verdicts against the person's decisions, when there were any. */
+  labels?: Labels;
   standing?: Standing;
   /** Why it is held back from every run; empty when nothing is wrong. */
   checks: string[];
@@ -89,6 +111,13 @@ export interface Review {
   thresholds: Thresholds;
   apply: boolean;
   nodes: Reviewed[];
+  /**
+   * The thresholds against the person's decisions, over the nodes shown:
+   * how many verdicts a label agreed or disagreed with, and the nodes whose
+   * standing (or decision) goes against their labels: promoted with a deny
+   * after it was said, retired with an allow.
+   */
+  labels: Labels & { against: { item: Id; title: string; state: string; allow: number; deny: number }[] };
 }
 
 const by = { pack: "keep" };
@@ -109,6 +138,7 @@ const keep: Pack<KeepConfig> = {
       fail: config.fail ?? DEFAULTS.fail,
       idle: config.idle ?? DEFAULTS.idle,
       same: config.same ?? DEFAULTS.same,
+      replay: config.replay ?? DEFAULTS.replay,
     };
     const applying = config.apply !== false;
     const verdicts = ctx.get<VerdictRead>("verdict.read");
@@ -254,7 +284,7 @@ const keep: Pack<KeepConfig> = {
       const t: Tally & { last?: string } = { said: rec.said, runs: rec.runs, held: rec.held, failed: rec.failed, quiet: rec.quiet, ...(rec.last ? { last: rec.last } : {}) };
       if (!from) return t;
       for (let p = await verdicts.verdicts(node, { limit: LIMIT_MAX }); ; p = await verdicts.verdicts(node, { limit: LIMIT_MAX, after: p.next })) {
-        const v = p.items.find((x) => x.run === from);
+        const v = p.items.find((x) => x.run === from && !x.replay_of);
         if (v) {
           t.runs--;
           t[v.verdict]--;
@@ -265,9 +295,51 @@ const keep: Pack<KeepConfig> = {
       }
     };
 
+    /**
+     * A node's replayed record, without the replays that tell nothing new:
+     * of the run it was written in (no evidence there either), and of a run
+     * it was said in live (that run's live verdict counts already).
+     */
+    const replayedOf = async (node: string, from?: string): Promise<(Tally & { last?: string }) | undefined> => {
+      const rec = await verdicts.replayed(node);
+      if (!rec) return undefined;
+      const t: Tally & { last?: string } = { said: rec.said, runs: rec.runs, held: rec.held, failed: rec.failed, quiet: rec.quiet, ...(rec.last ? { last: rec.last } : {}) };
+      const live = new Set<string>(from ? [from] : []);
+      const replays: { replay_of: string; verdict: "held" | "failed" | "quiet"; said: number }[] = [];
+      for (let p = await verdicts.verdicts(node, { limit: LIMIT_MAX }); ; p = await verdicts.verdicts(node, { limit: LIMIT_MAX, after: p.next })) {
+        for (const v of p.items) (v.replay_of ? replays.push({ replay_of: v.replay_of, verdict: v.verdict, said: v.said }) : live.add(v.run));
+        if (!p.next) break;
+      }
+      for (const v of replays.filter((x) => live.has(x.replay_of))) {
+        t.runs--;
+        t[v.verdict]--;
+        t.said -= v.said;
+      }
+      return t.runs > 0 ? t : undefined;
+    };
+
+    /** A node's live verdicts against the person's decisions in those runs. */
+    const labelsOf = async (node: string): Promise<Labels | undefined> => {
+      const l: Labels = { allow: 0, deny: 0, agree: 0, disagree: 0 };
+      for (let p = await verdicts.verdicts(node, { limit: LIMIT_MAX }); ; p = await verdicts.verdicts(node, { limit: LIMIT_MAX, after: p.next })) {
+        for (const v of p.items) {
+          if (!v.label || v.replay_of) continue;
+          l[v.label]++;
+          if (v.verdict === "quiet") continue;
+          if ((v.verdict === "held") === (v.label === "allow")) l.agree++;
+          else l.disagree++;
+        }
+        if (!p.next) break;
+      }
+      return l.allow || l.deny ? l : undefined;
+    };
+
     const reviewOne = async (item: Item, all: Peer[]): Promise<Reviewed> => {
       const n = nodeOf(item.id);
-      const record = n ? await tallyOf(n.id, str(item.fields.from_run) || undefined) : undefined;
+      const from = str(item.fields.from_run) || undefined;
+      const record = n ? await tallyOf(n.id, from) : undefined;
+      const replayed = n ? await replayedOf(n.id, from) : undefined;
+      const labels = n ? await labelsOf(n.id) : undefined;
       const status = str(item.fields.status) || "kept";
       const decided = decidedOf(item);
       return {
@@ -277,7 +349,9 @@ const keep: Pack<KeepConfig> = {
         at: atOf(item),
         status,
         ...(record ? { record } : {}),
-        ...(status === "trial" ? { standing: standing({ id: item.id, at: atOf(item), words: str(item.fields.words) }, record, all, t) } : {}),
+        ...(replayed ? { replayed } : {}),
+        ...(labels ? { labels } : {}),
+        ...(status === "trial" ? { standing: standing({ id: item.id, at: atOf(item), words: str(item.fields.words) }, record, all, t, replayed) } : {}),
         checks: await checksOf(item),
         ...(decided ? { decided } : {}),
       };
@@ -286,7 +360,17 @@ const keep: Pack<KeepConfig> = {
     const review = async (only?: Id): Promise<Review> => {
       const all = peers();
       const list = [...items.values()].filter((i) => (only ? i.id === only : i.fields.status === "trial" || !!decidedOf(i)) && !str(i.fields.voice));
-      return { thresholds: t, apply: applying, nodes: await Promise.all(list.map((i) => reviewOne(i, all))) };
+      const nodes = await Promise.all(list.map((i) => reviewOne(i, all)));
+      const labels: Review["labels"] = { allow: 0, deny: 0, agree: 0, disagree: 0, against: [] };
+      for (const r of nodes) {
+        if (!r.labels) continue;
+        for (const k of ["allow", "deny", "agree", "disagree"] as const) labels[k] += r.labels[k];
+        const state = r.decided?.state ?? r.standing?.state;
+        if ((state === "promote" && r.labels.deny) || (state === "retire" && r.labels.allow)) {
+          labels.against.push({ item: r.item, title: r.title, state, allow: r.labels.allow, deny: r.labels.deny });
+        }
+      }
+      return { thresholds: t, apply: applying, nodes, labels };
     };
 
     const register = ctx.get<ActionRegister>("action.register");
@@ -321,6 +405,7 @@ const keep: Pack<KeepConfig> = {
         await call.call(input.state === "promote" ? "words.promote" : "words.retire", { node: input.node });
         const n = nodeOf(input.node);
         const rec = n ? await tallyOf(n.id, str(item.fields.from_run) || undefined) : undefined;
+        const rep = n ? await replayedOf(n.id, str(item.fields.from_run) || undefined) : undefined;
         const decided: Decided = {
           state: input.state,
           ...(input.rule ? { rule: input.rule } : {}),
@@ -329,6 +414,7 @@ const keep: Pack<KeepConfig> = {
           at: new Date().toISOString(),
           ...(n ? { node: n.id } : {}),
           ...(rec ? { record: { said: rec.said, runs: rec.runs, held: rec.held, failed: rec.failed, quiet: rec.quiet } } : {}),
+          ...(rep ? { replayed: { said: rep.said, runs: rep.runs, held: rep.held, failed: rep.failed, quiet: rep.quiet } } : {}),
         };
         const facts: Fact[] = [];
         if (item.fields.decided !== undefined) facts.push(["-", input.node, "decided", item.fields.decided]);
@@ -346,7 +432,7 @@ const keep: Pack<KeepConfig> = {
         const r = await reviewOne(item, all);
         const s = r.standing;
         if (!s || s.state === "trial") continue;
-        const runs = r.record?.runs ?? 0;
+        const runs = (r.record?.runs ?? 0) + (r.replayed?.runs ?? 0);
         if ((decidedAt.get(item.id) ?? -1) >= runs) continue;
         decidedAt.set(item.id, runs);
         const out = await invoke.invoke({

@@ -28,6 +28,9 @@ code `ask` and the act it denies (the held-back reply), so a `reply_end`
 node isn't judged failed by a question.
 
 The [keep](../keep/README.md) pack promotes or retires a trial by its record.
+The [replay](../replay/README.md) pack plays past runs again with it said
+first; the asking node says nothing in a replay (a run with `replay_of`),
+since its misses were asked about in the recorded run.
 
 The question's wording is on the map: a `node` item whose `voice` is
 `grow/ask`, made through `words.voice` the first time. The code fills in

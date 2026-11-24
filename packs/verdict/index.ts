@@ -16,7 +16,7 @@ import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exch
 import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { judgeRun, listeningOf, records, type Listening, type NodeRecord, type RunVerdict } from "./judge.ts";
+import { judgeRun, listeningOf, records, replayOf, type Listening, type NodeRecord, type RunVerdict } from "./judge.ts";
 
 export type { NodeRecord, RunVerdict, Verdict } from "./judge.ts";
 
@@ -29,11 +29,13 @@ export interface VerdictChange {
 export interface VerdictRead {
   /** A run's verdicts, one per node said in it, in the order each was first said. */
   run(run: RunId): Promise<RunVerdict[]>;
-  /** Every node's record, the one said most recently first. */
+  /** Every node's record from live runs, the one said most recently first. */
   records(page?: PageRequest): Promise<Page<NodeRecord>>;
-  /** One node's record; undefined if it was never said. */
+  /** One node's record from live runs; undefined if it was never said in one. */
   record(node: string): Promise<NodeRecord | undefined>;
-  /** One node's verdicts across runs, newest run first: the node page's list. */
+  /** One node's record from replays (runs with `replay_of`), apart from the live one; undefined if none said it. */
+  replayed(node: string): Promise<NodeRecord | undefined>;
+  /** One node's verdicts across runs, live and replayed (a replay's has `replay_of`), newest run first: the node page's list. */
   verdicts(node: string, page?: PageRequest): Promise<Page<RunVerdict>>;
   /** Called after verdicts may have changed. */
   watch(on: (change: VerdictChange) => void): Dispose;
@@ -109,8 +111,9 @@ const verdict: Pack = {
       if (!v) judged.set(run, (v = judgeRun(run, eventsOf(run), listening)));
       return v;
     };
-    const allRecords = () =>
-      records(order.map((run) => ({ verdicts: verdictsOf(run), events: eventsOf(run) }))).sort((a, b) =>
+    /** Live runs' records, or replays' (a run with `replay_of`): kept apart, so a replay never stands for a live run. */
+    const allRecords = (replays = false) =>
+      records(order.filter((run) => !!replayOf(eventsOf(run)) === replays).map((run) => ({ verdicts: verdictsOf(run), events: eventsOf(run) }))).sort((a, b) =>
         (b.last ?? "").localeCompare(a.last ?? ""),
       );
 
@@ -160,6 +163,9 @@ const verdict: Pack = {
       },
       async record(node) {
         return allRecords().find((r) => r.node === node);
+      },
+      async replayed(node) {
+        return allRecords(true).find((r) => r.node === node);
       },
       async verdicts(node, page) {
         const list = [...order]

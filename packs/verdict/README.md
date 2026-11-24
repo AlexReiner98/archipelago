@@ -57,6 +57,15 @@ failed act is, where it is covered.
 
 Only runs where a node was said judge it.
 
+A person's last decision after a node was said, at a place it listens or
+on the reply, is its verdict's **label** (`allow` or `deny`): what the
+[keep](../keep/README.md) pack checks its thresholds against.
+
+A **replay** (a run whose `begin` has the fact `replay_of`: a recorded run
+played again by the [replay](../replay/README.md) pack) is judged the same
+way, and its verdict says `replay_of`. Its record is kept apart: `record`
+and `records` are live runs only, `replayed` is the replays'.
+
 ## The record
 
 Per node: `said`, `runs`, `held`, `failed`, `quiet`, `last`, and `places`
@@ -66,8 +75,9 @@ and retires trial nodes by it.
 ## `verdict.read`
 
 - `run(run)`: a run's verdicts, in the order each node was first said.
-- `records(page)`, `record(node)`: records, most recently said first.
-- `verdicts(node, page)`: one node's verdicts, newest run first.
+- `records(page)`, `record(node)`: records from live runs, most recently said first.
+- `replayed(node)`: a node's record from replays, apart from the live one.
+- `verdicts(node, page)`: one node's verdicts, live and replayed, newest run first.
 - `watch(on)`: called with `{ run }` when a run's verdicts may have
   changed, or `{}` when the tree did. Returns a disposer.
 

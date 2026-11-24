@@ -26,6 +26,10 @@ export interface RunVerdict {
   first: number;
   said_at: string;
   failed_by: number[];
+  /** A person's decision after it was said: the label its verdict is checked against. */
+  label?: "allow" | "deny";
+  /** The recorded run, when this run replays it (packs/replay). */
+  replay_of?: string;
 }
 export interface NodeRecord {
   node: string;
@@ -40,6 +44,8 @@ export interface VerdictRead {
   run(run: string): Promise<RunVerdict[]>;
   records(page?: { limit?: number }): Promise<{ items: NodeRecord[] }>;
   record(node: string): Promise<NodeRecord | undefined>;
+  /** The record from replays, apart from the live one. */
+  replayed?(node: string): Promise<NodeRecord | undefined>;
   verdicts(node: string, page?: { limit?: number }): Promise<{ items: RunVerdict[] }>;
   watch(on: (c: { run?: string }) => void): () => void;
 }

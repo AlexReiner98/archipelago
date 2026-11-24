@@ -144,6 +144,8 @@ const grow: Pack = {
       at: ["reply_end"],
       ...(source ? { source } : {}),
       async speak(moment, run) {
+        // A replay (packs/replay) plays a recorded run again: its misses were asked about then.
+        if (run.facts?.replay_of) return null;
         const events = await eventsOf(read, moment.run);
         const asked = askedIn(events, ASKER);
         const nodes = await withMisses(graph, tree.nodes());

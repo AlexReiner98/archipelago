@@ -67,6 +67,15 @@ test("held: its miss's situation came up again after it was said, and worked (a 
   assert.equal(judgeRun("r", [said("r", 1, "w/retry", "tool:Bash"), ok(2, '{"input": "x", "parse": true, "end": 1}')], short)[0]!.verdict, "quiet");
 });
 
+test("a person's last decision after a node was said, where it listens or on the reply, is its verdict's label; a replay says what it replays", () => {
+  const decision = (seq: number, place: string, ok: boolean) => ev("r", seq, { kind: "act", place, act: { kind: "decision", by: "person", input: {}, output: ok ? "allow" : "deny", ok } });
+  const begin = ev("r", 0, { kind: "begin", detail: { facts: { replay_of: "r0" } } as never });
+  const v = judgeRun("r", [begin, said("r", 1, "a/schema", "tool:change"), decision(2, "tool:change", false), decision(3, "tool:Edit", true)], listening);
+  assert.deepEqual([v[0]!.label, v[0]!.replay_of], ["deny", "r0"], "the decision at tool:Edit isn't where it listens");
+  assert.equal(judgeRun("r", [decision(1, "tool:change", false), said("r", 2, "a/schema", "tool:change")], listening)[0]!.label, undefined, "a decision before it was said labels nothing");
+  assert.equal(judgeRun("r", [said("r", 1, "a/schema", "tool:change"), decision(2, "reply_end", true)], listening)[0]!.label, "allow");
+});
+
 test("a node not said in a run isn't judged there", () => {
   assert.deepEqual(judgeRun("r", [failedAct("r", 1, "tool:change")], listening), []);
 });
