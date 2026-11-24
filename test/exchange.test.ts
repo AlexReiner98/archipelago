@@ -4,7 +4,10 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import exchange, { Log } from "../packs/exchange/index.ts";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import exchange, { Journal, Log } from "../packs/exchange/index.ts";
 import type { ExchangeAppend, ExchangeEvent, ExchangeRead } from "../spec/exchange.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
@@ -74,4 +77,51 @@ test("exchange.read.runs is last active first, through the pack", async () => {
   assert.deepEqual(runs.map((r) => r.run), ["long", "short"]);
   assert.equal(runs[0]!.ended, undefined);
   assert.equal(runs[1]!.ended, "2026-11-21T09:05:00Z");
+});
+
+const act = (run: string, time: string, output: string): Omit<ExchangeEvent, "id" | "seq"> => ({
+  run,
+  time,
+  direction: "from_agent",
+  kind: "act",
+  act: { kind: "tool", input: { q: "é" }, output } as unknown as ExchangeEvent["act"],
+});
+
+/** The pack over a journal file, as a fresh start reads it. */
+async function packOver(journal: string) {
+  const rt = new Runtime();
+  const probe: Pack = { id: "probe", inject: ["exchange.append", "exchange.read"], apply() {} };
+  const modules: Record<string, Pack> = { "exchange.ts": exchange, "probe.ts": probe };
+  const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)]! }) });
+  await loader.apply([
+    { id: "exchange", pack: "exchange.ts", config: { journal } },
+    { id: "probe", pack: "probe.ts" },
+  ]);
+  const ctx = loader.fiber("probe")!.ctx;
+  return { append: ctx.get<ExchangeAppend>("exchange.append"), read: ctx.get<ExchangeRead>("exchange.read") };
+}
+
+test("with a journal, an act's body stays in the file and a page reads it back whole, before and after a restart", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "exchange-"));
+  try {
+    const file = join(dir, "exchange.jsonl");
+    const first = await packOver(file);
+    await first.append.append(begin("r", "2026-11-24T09:00:00Z", "R"));
+    await first.append.append(act("r", "2026-11-24T09:01:00Z", "ü".repeat(70_000)));
+    await first.append.append(say("r", "2026-11-24T09:02:00Z"));
+    await first.append.append(act("r", "2026-11-24T09:03:00Z", "second"));
+    const before = (await first.read.events("r")).items;
+    assert.equal((before[1]!.act as { output: string }).output.length, 70_000);
+    assert.equal((before[3]!.act as { output: string }).output, "second");
+    const again = await packOver(file);
+    const after = (await again.read.events("r")).items;
+    assert.deepEqual(after, before);
+    assert.equal((await again.read.events("r", { after: "3", limit: 1 })).items[0]!.act !== undefined, true);
+    const j = new Journal(file);
+    const held = new Log(j.keep);
+    await j.load(held);
+    assert.equal(held.runs.get("r")!.filter((e) => e.act).length, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
