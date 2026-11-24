@@ -475,4 +475,7 @@ test("a title that takes another spot than last frame's has moved, and fades acr
   const was = new Map([["a", 0], ["b", 2], ["c", 1]]);
   assert.deepEqual(movedTitles(was, [["a", 0], ["b", 3], ["d", 1], ["c", undefined]]), ["b", "c"]);
   assert.deepEqual(movedTitles(new Map(), [["a", 0]]), [], "a first frame moves nothing");
+  const at0 = new Map<string, [number, number]>([["b", [10, 10]], ["c", [50, 50]]]);
+  const at1 = new Map<string, [number, number]>([["b", [11, 10]], ["c", [80, 50]]]);
+  assert.deepEqual(movedTitles(was, [["b", 3], ["c", 2]], at0, at1), ["b"], "c's particle is flying: its title goes with it, no fade");
 });

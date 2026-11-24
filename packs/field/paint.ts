@@ -80,9 +80,18 @@ export function ink(el: Element): Ink {
   return { sea: read("bg", el), text: read("fg", el), muted: read("dim", el), line: read("dim", el), accent: read("pick", el), branch: read("say", el) };
 }
 
-/** The titles that took another spot than last frame's: one newly named, or kept where it was, has not moved. */
-export function movedTitles(was: ReadonlyMap<string, number>, now: [string, number | undefined][]): string[] {
-  return now.filter(([id, spot]) => was.has(id) && was.get(id) !== spot).map(([id]) => id);
+/**
+ * The titles that took another spot than last frame's while their particle held still (within `still` px on
+ * screen since then): one newly named, kept where it was, or carried by a moving particle has not moved.
+ */
+export function movedTitles(was: ReadonlyMap<string, number>, now: [string, number | undefined][], wasAt?: ReadonlyMap<string, [number, number]>, at?: ReadonlyMap<string, [number, number]>, still = 2): string[] {
+  return now
+    .filter(([id, spot]) => {
+      if (!was.has(id) || was.get(id) === spot) return false;
+      const a = wasAt?.get(id), b = at?.get(id);
+      return !a || !b || Math.hypot(a[0] - b[0], a[1] - b[1]) <= still;
+    })
+    .map(([id]) => id);
 }
 
 /** The style's hues, for types in order; a type past the sixth gets its own (graph.ts hue). */
@@ -119,6 +128,8 @@ export class Light {
   labels = new Map<string, Label>();
   /** The spot each title took last frame (labels.ts), tried first so it keeps its side. */
   spots = new Map<string, number>();
+  /** Where each named particle stood on screen last frame, so a title it carries as it moves is not faded. */
+  spotsAt = new Map<string, [number, number]>();
   /** When each title last took another spot (performance.now), so it fades in there. */
   movedAt = new Map<string, number>();
   /** Titles fading out from where they stood before they moved. */
@@ -413,7 +424,8 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   // A title that takes another spot fades out where it stood and in where it goes (label_move_ms).
   const moveMs = S.label_move_ms ?? 0;
   if (moveMs > 0) {
-    for (const id of movedTitles(light.spots, placed.map((p) => [g.id[p.i]!, p.spot]))) {
+    const nowAt = new Map(placed.map((p) => [g.id[p.i]!, [g.x[p.i]! * cam.k + cam.tx, g.y[p.i]! * cam.k + cam.ty] as [number, number]]));
+    for (const id of movedTitles(light.spots, placed.map((p) => [g.id[p.i]!, p.spot]), light.spotsAt, nowAt)) {
       light.movedAt.set(id, at);
       const old = light.labels.get(id);
       if (old) light.leaving.push({ label: old, at });
@@ -422,6 +434,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   // Where each title stands, in world units, so one that leaves the map fades where it was read (gone.ts).
   light.labels = new Map(placed.map((p) => [g.id[p.i]!, { x: ((p.within ? (p.box[0] + p.box[2]) / 2 : p.box[0] + 2) - cam.tx) / cam.k, y: (p.box[1] - cam.ty) / cam.k, lines: texts.get(p.i)!, center: !!p.within }]));
   light.spots = new Map(placed.map((p) => [g.id[p.i]!, p.spot]));
+  light.spotsAt = new Map(placed.map((p) => [g.id[p.i]!, [g.x[p.i]! * cam.k + cam.tx, g.y[p.i]! * cam.k + cam.ty] as [number, number]]));
   const moved = (i: number) => {
     const t = light.movedAt.get(g.id[i]!);
     return t === undefined || !moveMs ? 1 : comeFade(at - t, moveMs);

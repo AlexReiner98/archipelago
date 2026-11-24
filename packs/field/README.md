@@ -43,7 +43,7 @@ find line has words, only what it finds and what lies near it.
   tree over `tree_ms`, eased, however fast the run steps; only those items
   are laid out, the camera keeps the whole tree in view, and the tree's
   branches and names ([treeover.ts](treeover.ts)) come in under them as
-  they arrive, once what left the map has faded for `tree_in_ms` (450) so
+  they arrive, once what left the map has faded for `tree_in_ms` (600, as long as `gone_ms`) so
   the two are never drawn over each other, and then at least as fast as
   `gone_ms`; the
   items' titles give way to its names once it shows).
@@ -67,7 +67,8 @@ find line has words, only what it finds and what lies near it.
   hollow or half shape it was drawn with. Its links (arrowheads and names too) and its title, where it was placed, leave with it,
   and a pointed-at item's light fades the other titles out over `dim_ms`
   before they go. A title that must take another side of its particle fades
-  out where it was and in where it goes over `label_move_ms` (220).
+  out where it was and in where it goes over `label_move_ms` (220); one carried by a moving particle
+  moves with it.
   What it finds is drawn whole, closed or not, and named first; the
   legend's open and closed switches do not apply while it has words, so a
   plan shows its done steps.
