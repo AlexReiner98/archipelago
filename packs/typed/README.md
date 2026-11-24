@@ -30,6 +30,7 @@ and `agent.run` (to record attempts in the call's run).
 | `min`, `max` | How many items |
 | `retries` | How many times a misfit is sent back (default the config's, else 1) |
 | `model` | An adapter (below). Default the configured one |
+| `check` | The caller's own rule, for what a schema can't say: `({ items, facts }) => problems`, run once `schema.check` finds nothing. Its problems (`by: "caller"`) are sent back and fail the call like the schema's; a throw fails it like the model's. Programmatic only, not in the `typed.ask` action |
 | `title`, `parent`, `places`, `facts` | As `call.ask`'s. `places` default `typed:<type>`: what nodes say there goes into the system prompt |
 
 It answers `{ ok: true, run, facts, ids, attempts, usage }` (`ids`: each

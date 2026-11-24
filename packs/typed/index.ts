@@ -70,6 +70,20 @@ export interface TypedStart {
   model?: Model;
   /** More facts on the call's run. */
   facts?: Facts;
+  /**
+   * The caller's own check, for a rule the schema can't say (a field must
+   * name these numbers). Runs once schema.check finds nothing, on the items
+   * as they would be made; its problems (marked `by: "caller"`) are sent
+   * back and fail the call like the schema's. A throw fails the call like
+   * the model's. Programmatic only: not in the `typed.ask` action's input.
+   */
+  check?: (made: Made) => Problem[] | Promise<Problem[]>;
+}
+
+/** What a caller's check is given: each item as it would be made, and every fact. */
+export interface Made {
+  items: { ref: string; id: Id; type: string; title?: string; fields: Record<string, Json> }[];
+  facts: Fact[];
 }
 
 export interface Problem {
@@ -78,6 +92,8 @@ export interface Problem {
   /** Where in the reply, when known: `item "a"`, `items[2].title`. */
   at?: string;
   field?: string;
+  /** Whose problem: absent for the schema's and the reply's shape, `caller` for the caller's own check. */
+  by?: "caller";
 }
 
 export type TypedResult =
@@ -110,7 +126,7 @@ export function systemOf(t: TypeInfo, extra: string | undefined, said: { text: s
 
 /** What is sent back to the model after a misfit. */
 export function retryOf(problems: Problem[]): string {
-  return `That reply doesn't fit the map's types:\n${problems.map((p) => `- ${p.message}`).join("\n")}\nGive the whole reply again, fixed.`;
+  return `That reply doesn't fit${problems.some((p) => p.by === "caller") ? "" : " the map's types"}:\n${problems.map((p) => `- ${p.message}`).join("\n")}\nGive the whole reply again, fixed.`;
 }
 
 class Misfit extends Error {
@@ -197,12 +213,27 @@ const typed: Pack<TypedConfig> = {
                   ...(p.field ? { field: p.field } : {}),
                 }));
               }
+              if (made && !problems.length && start.check) {
+                const items = Object.entries(made.ids).map(([ref, id]) => {
+                  const fields: Record<string, Json> = {};
+                  for (const [op, fid, field, value] of made.facts) if (op === "+" && fid === id && field !== "type") fields[field] = value;
+                  return { ref, id, type: t.name, ...(typeof fields.title === "string" ? { title: fields.title } : {}), fields };
+                });
+                let theirs: Problem[];
+                try {
+                  theirs = await start.check({ items, facts: made.facts });
+                } catch (e) {
+                  await act(ATTEMPT_AT, "reply", false, input, { ...(reply.json !== undefined ? { json: reply.json as Json } : { text: reply.text }), error: `the caller's check threw: ${String((e as Error)?.message ?? e)}` });
+                  throw e;
+                }
+                problems = (theirs ?? []).map((p) => ({ ...p, by: "caller" as const }));
+              }
               const fits = problems.length === 0;
               const again = !fits && n <= retries;
               retry = again ? retryOf(problems) : undefined;
               await act(ATTEMPT_AT, "reply", fits, input, { ...(reply.json !== undefined ? { json: reply.json as Json } : { text: reply.text }), ...(reply.usage ? { usage: reply.usage as unknown as Json } : {}) });
               const facts = made?.facts ?? [];
-              await act(CHECK_AT, "tool", fits, { description: `schema.check, attempt ${n}: ${fits ? "fits" : `${problems.length} problem${problems.length === 1 ? "" : "s"}`} in ${facts.length} facts of ${t.name}`, facts: facts as unknown as Json }, {
+              await act(CHECK_AT, "tool", fits, { description: `${start.check ? "schema.check and the caller's check" : "schema.check"}, attempt ${n}: ${fits ? "fits" : `${problems.length} problem${problems.length === 1 ? "" : "s"}`} in ${facts.length} facts of ${t.name}`, facts: facts as unknown as Json }, {
                 fits,
                 problems: problems as unknown as Json,
                 ...(retry ? { retry } : !fits ? { failed: `no retries left (${retries})` } : {}),

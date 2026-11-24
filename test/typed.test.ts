@@ -288,6 +288,48 @@ test("a model that throws fails the call, recorded; an unknown type or no model 
   assert.equal(!viaAction.ok && viaAction.refused.code, "typed.no_model");
 });
 
+test("a caller's check: a reply that fits the schema but not the caller's rule is sent back, then fits", async () => {
+  const { errors, ask, act } = await setup();
+  const model = scripted([{ items: [{ ref: "a", title: "Sweep", note: "About an hour." }] }, { items: [{ ref: "a", title: "Sweep", note: "Takes 2 hours." }] }]);
+  const seen: unknown[] = [];
+  const out = await ask.ask({
+    type: "chore",
+    prompt: "One chore.",
+    model,
+    check: (made) => {
+      seen.push(made.items.map((i) => [i.ref, i.type, i.title, i.fields.status]));
+      return made.items.filter((i) => !String(i.fields.note ?? "").includes("2")).map((i) => ({ code: "rule.numbers", message: `item "${i.ref}": its note must say 2.`, at: `item "${i.ref}"` }));
+    },
+  });
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.equal(out.attempts, 2);
+  assert.deepEqual(seen, [[["a", "chore", "Sweep", "todo"]], [["a", "chore", "Sweep", "todo"]]]);
+  assert.match(model.asked[1]!.messages[2]!.content, /^That reply doesn't fit:\n- item "a": its note must say 2\./);
+  const rec = ((await act("typed.get", { run: out.run })) as any).output as TypedRecord;
+  assert.deepEqual(rec.attempts[0]!.problems, [{ code: "rule.numbers", message: 'item "a": its note must say 2.', at: 'item "a"', by: "caller" }]);
+  assert.equal(rec.outcome, "fit");
+  assert.deepEqual(errors, []);
+});
+
+test("a caller's check: never passed, the call fails with its problems; it runs only on what fits the schema; a throw fails the call", async () => {
+  const { ask, act } = await setup();
+  let calls = 0;
+  const never = () => {
+    calls++;
+    return [{ code: "rule.never", message: "Never good enough." }];
+  };
+  const model = scripted([{ items: [{ ref: "a", title: "A", size: "big" }] }, { items: [{ ref: "a", title: "A" }] }]);
+  const out = await ask.ask({ type: "work", prompt: "x", model, check: never });
+  assert.equal(out.ok, false);
+  if (out.ok) return;
+  assert.equal(calls, 1, "not on the schema misfit");
+  assert.deepEqual(out.problems, [{ code: "rule.never", message: "Never good enough.", by: "caller" }]);
+  const broken = scripted([{ items: [{ ref: "a", title: "A" }] }]);
+  await assert.rejects(ask.ask({ type: "work", prompt: "x", model: broken, check: () => { throw new Error("rule broke"); } }), /rule broke/);
+  const list = ((await act("typed.calls", {})) as any).output;
+  assert.equal(list.items[0].outcome, "failed");
+});
+
 test("system and retry words", () => {
   assert.equal(systemOf(work, undefined, []), "You make items for a map. Each is a work. Reply with one JSON object that matches the schema you are given, and nothing else.");
   assert.equal(retryOf([{ code: "x", message: "One." }, { code: "y", message: "Two." }]), "That reply doesn't fit the map's types:\n- One.\n- Two.\nGive the whole reply again, fixed.");
