@@ -87,8 +87,8 @@ export function headings(note: string): string[] {
 
 /**
  * Whether a part is a section of its holder's note: its title ends with one
- * of the note's headings ("Sunday — 9–10:30 a.m. — readiness check" under
- * "## 9–10:30 a.m. — readiness check"). Such a part was split out of the
+ * of the note's headings ("Launch — Week 1 — set up" under
+ * "## Week 1 — set up"). Such a part was split out of the
  * note; the note already reads it, in its own order.
  */
 export function restates(title: string, heads: string[]): boolean {
