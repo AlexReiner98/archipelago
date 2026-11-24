@@ -219,12 +219,12 @@ export const Events = ({ info, events, index, end, verdicts, titles, speakers, n
           const here = index >= from && index <= to && !end;
           return html`
             <div key=${key} class=${`hv-ev hv-held${here && !isOpen ? " hv-pick hv-lit" : ""}`} onClick=${() => toggle(key)}>
-              <div class="hv-line" title=${`#${events[from]!.seq}–${events[to]!.seq}: nodes other context filters keep from this run, held back${f.place ? ` @${f.place}` : ""}`}>
+              <div class="hv-line" title=${`#${events[from]!.seq}–${events[to]!.seq}: nodes this run's context filters keep from it (another filter's, or no filter's under a strict one)${f.place ? ` @${f.place}` : ""}`}>
                 <span class="s">${events[from]!.seq}</span>
                 <span class="hv-dir">→</span>
                 <span class="hv-m m-quiet">⊝</span>
                 ${f.place && html`<span class="p" title=${f.place}>${placeLabel(f.place)}</span>`}
-                <span class="x">${to - from + 1} held back, for other context filters ${isOpen ? "▾" : "▸"}</span>
+                <span class="x">${to - from + 1} held back from this run ${isOpen ? "▾" : "▸"}</span>
               </div>
             </div>
             ${isOpen && events.slice(from, to + 1).map((e, k) => row(e, from + k))}
