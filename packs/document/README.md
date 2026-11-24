@@ -18,8 +18,8 @@ with its note, what is part of it nested beneath, work as a checklist.
   Siblings keep the order found, except that one comes after what it
   `depends_on`.
 - **Read once.** A part whose title is a heading of its holder's note
-  (the note's `## 9–9:30 a.m. — set up` and the part "Friday — 9–9:30 a.m.
-  — set up") was split out of that note: the note reads it, in its own
+  (the note's `## Week 1 — set up` and the part "Launch — Week 1 — set
+  up") was split out of that note: the note reads it, in its own
   order, and the part is left out. A title cut at 60 characters still
   matches the heading it begins.
 - **What holds now.** A closed item that is not work (a superseded

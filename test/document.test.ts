@@ -29,33 +29,34 @@ test("named sections come in their order; without them, the roots of what was fo
 test("parts nest under what holds them; what is closed and not work is left out", () => {
   const src = map(
     [
-      ["day", "record", "Friday"],
+      ["phase", "record", "Phase one"],
       ["old", "record", "Old plan", "", true],
       ["under-old", "record", "Under the old plan"],
-      ["step", "work", "Bake", "", true],
-      ["block", "record", "Morning"],
+      ["step", "work", "Ship it", "", true],
+      ["block", "record", "Week one"],
     ],
-    [["part_of", "old", "day"], ["part_of", "under-old", "old"], ["part_of", "step", "block"], ["part_of", "block", "day"]],
+    [["part_of", "old", "phase"], ["part_of", "under-old", "old"], ["part_of", "step", "block"], ["part_of", "block", "phase"]],
   );
-  assert.deepEqual(titles(outline(["day"], src)), [["Friday", [["Morning", ["Bake"]]]]]);
+  assert.deepEqual(titles(outline(["phase"], src)), [["Phase one", [["Week one", ["Ship it"]]]]]);
 });
 
 test("a part its holder's note already has as a section is read once, in the note", () => {
-  const note = "# Friday\n\n## 9–9:30 a.m. — set up\n\n1. Check\n\n## 9:30–11:30 a.m. — dough chilling, sauce and cookie filling\n\n1. Mix";
-  assert.deepEqual(headings(note), ["friday", "9 9 30 a m set up", "9 30 11 30 a m dough chilling sauce and cookie filling"]);
+  const note = ["# Launch", "", "## Week 1 — set up", "", "1. Check", "", "## Week 2–3 — write the guide, record the demo and post it", "", "1. Write"].join("\n");
   const heads = headings(note);
-  assert.equal(restates("Friday — 9–9:30 a.m. — set up", heads), true);
+  assert.deepEqual(heads, ["launch", "week 1 set up", "week 2 3 write the guide record the demo and post it"]);
+  assert.equal(restates("Launch — Week 1 — set up", heads), true);
   // Cut at 60 characters, it still begins the heading.
-  assert.equal(restates("Friday — 9:30–11:30 a.m. — dough chilling, sauce and cookie", heads), true);
-  assert.equal(restates("Saturday — 4:30–7 p.m. — make and shape rolls", heads), false);
+  assert.equal(restates("Launch plan — Week 2–3 — write the guide, record the demo…", heads), true);
+  assert.equal(restates("Launch — Week 4 — review", heads), false);
   const src = map(
-    [["outline", "record", "Friday outline", note], ["b1", "record", "Friday — 9–9:30 a.m. — set up"], ["b2", "record", "Friday — Extra block"]],
+    [["outline", "record", "Launch outline", note], ["b1", "record", "Launch — Week 1 — set up"], ["b2", "record", "Launch — Extra week"]],
     [["part_of", "b1", "outline"], ["part_of", "b2", "outline"]],
   );
-  assert.deepEqual(titles(outline(["outline"], src)), [["Friday outline", ["Friday — Extra block"]]]);
+  assert.deepEqual(titles(outline(["outline"], src)), [["Launch outline", ["Launch — Extra week"]]]);
 });
 
 test("work reads its first paragraph whole when its title is that paragraph cut short", () => {
-  assert.equal(workLine("Beat cookie filling: 9 oz cream cheese, 4½ tbsp sugar, ¾ …", "Beat cookie filling: 9 oz cream cheese, 4½ tbsp sugar, ¾ tsp vanilla. Freeze 24 portions.\n\nMore."), "Beat cookie filling: 9 oz cream cheese, 4½ tbsp sugar, ¾ tsp vanilla. Freeze 24 portions.");
-  assert.equal(workLine("Complete Friday prep", "Current outline for Friday."), "Complete Friday prep");
+  const first = "Run the import on a copy, check the counts per type and spot-check twenty notes.";
+  assert.equal(workLine("Run the import on a copy, check the counts per type and…", `${first}\n\nMore.`), first);
+  assert.equal(workLine("Finish phase one", "Current outline for phase one."), "Finish phase one");
 });
