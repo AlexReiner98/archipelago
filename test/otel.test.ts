@@ -4,6 +4,7 @@ import type { AddressInfo } from "node:net";
 import { test } from "node:test";
 import type { ActionInvoke, ActionRegister } from "../spec/action.ts";
 import type { AgentNode, AgentRun } from "../spec/agent.ts";
+import { LIMIT_MAX } from "../spec/graph.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
 import action from "../packs/action/index.ts";
@@ -228,8 +229,12 @@ test("otel: off without an endpoint; a failed send is tried once more, and its s
     assert.ok(st.ok);
     assert.equal((st.output as any).on, false);
     assert.equal(markOf(st.output as any, RUN), undefined, "nothing shows while off");
+    // Not a list: the action pack refuses it against the declared input, before otel sees it.
     const bad = await off.invoke("otel.status", { runs: "x" });
-    assert.ok(!bad.ok && bad.refused.code === "otel.runs");
+    assert.ok(!bad.ok && bad.refused.code === "action.input");
+    // A list past the read limit: otel's own refusal.
+    const long = await off.invoke("otel.status", { runs: Array.from({ length: LIMIT_MAX + 1 }, (_, i) => `r${i}`) });
+    assert.ok(!long.ok && long.refused.code === "otel.runs");
   } finally {
     await off.stop();
   }
