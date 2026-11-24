@@ -58,6 +58,7 @@ export const PROFILE: BaseDef = {
     members: { kind: "text", doc: "A find-line over nodes (at:file:packs/**, at:skill:rhino*, kind:, words): what it holds besides its links." },
     fallback: { kind: "boolean", doc: "A run no profile matches is in this one: the workspace's default." },
     leave_out: { kind: "json", doc: "Given nodes Claude Code is to leave out of its runs (tool:<name>, mcp:<server>): the lean pack sets and writes them." },
+    budget_ratio: { kind: "number", doc: "Spend over its task's estimate past which a run here is asked once (the budget pack's; default 1.5)." },
   },
 };
 

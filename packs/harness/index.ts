@@ -54,6 +54,7 @@ import { day } from "./clock.ts";
 import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
 import { useWindow, WINDOW, WindowBar, WINDOWBAR_STYLE, windowMarks } from "./windowbar.ts";
 import { NODE as NODE_WINDOW, TREND_STYLE } from "./trend.ts";
+import { SpendMark, SPEND, type Spend, SPEND_STYLE, useSpend } from "./spend.ts";
 import { CallStrip, CALLS_STYLE, callsOf, isCall, parentOf, requestNodes } from "./calls.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
@@ -75,8 +76,8 @@ const STYLE = sheet(`
 .hv-body { flex:1; overflow:auto; min-height:0; }
 .hv-row { display:flex; gap:var(--space-3); align-items:baseline; padding:1px var(--space-4); white-space:nowrap; cursor:pointer; }
 .hv-row:hover, .hv-ev:hover { background:color-mix(in srgb, var(--line) 50%, transparent); }
-.hv-row .x { overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0; }
-.hv-row .n { color:var(--dim); font-variant-numeric:tabular-nums; }
+.hv-row .x { overflow:hidden; text-overflow:ellipsis; flex:1; min-width:6em; }
+.hv-row .n { color:var(--dim); font-variant-numeric:tabular-nums; min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .hv-group { padding:var(--space-3) var(--space-4) 1px; color:var(--dim); font-size:var(--text-s); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .hv-lit { background:var(--lit) !important; }
 .hv-pick { box-shadow:inset 3px 0 0 var(--pick); }
@@ -130,6 +131,7 @@ ${TIMELINE_STYLE}
 ${WINDOWBAR_STYLE}
 ${TREND_STYLE}
 ${CALLS_STYLE}
+${SPEND_STYLE}
 .hv-onerun { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; min-width:0; }
 .hv-onerun > .rx-canvas { grid-row:2; }`);
 
@@ -496,8 +498,12 @@ const harness: Pack = {
       const titles = useMemo(() => new Map(nodes.map((n) => [n.id, n.title])), [nodes]);
       const speakers = useMemo(() => new Map(nodes.map((n) => [n.id, { title: n.title, kind: n.kind }])), [nodes]);
       const inProfiles = hk.useRunProfiles(shownInfo);
-      if (all) return html`<${Runs} runs=${inProfile} of=${profile ? (profileTitle ?? profile) : undefined} />`;
-      return html`<${Events} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} speakers=${speakers} node=${picked} profiles=${inProfiles} onPick=${(e: ExchangeEvent) => {
+      // Spend against estimate: the runs listed, or the one shown (the budget pack's action).
+      const hasSpend = hk.useHas(SPEND);
+      const spendRuns = all ? (inProfile ?? []).map((r) => r.run) : shown ? [shown] : [];
+      const spend = useSpend(invoke, hasSpend, spendRuns, all ? runs.length : events.length);
+      if (all) return html`<${Runs} runs=${inProfile} of=${profile ? (profileTitle ?? profile) : undefined} spend=${spend} />`;
+      return html`<${Events} spend=${shown ? spend.get(shown) : undefined} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} speakers=${speakers} node=${picked} profiles=${inProfiles} onPick=${(e: ExchangeEvent) => {
         set.set(KEYS.event, e.id);
         // The node pane follows: the event's node, or for an act the node it failed or was told just before.
         set.set(KEYS.node, nodeOf(events, events.indexOf(e), verdictsOfRun));
@@ -505,13 +511,13 @@ const harness: Pack = {
     };
 
     /** Every run, or a profile's (`of`), last active first: a click looks at it alone. */
-    const Runs = ({ runs, of }: { runs?: RunInfo[]; of?: string }) => html`
+    const Runs = ({ runs, of, spend }: { runs?: RunInfo[]; of?: string; spend?: Map<string, Spend> }) => html`
       <div class="hv-pane">
         <div class="hv-head"><span class="t">Runs</span>${of && html`<span class="hv-cut" title="Only the runs this profile has in it">in ${of}</span>`}<span class="hv-dim">${runs ? runs.length : "…"}</span></div>
         <div class="hv-body">
           ${runs && !runs.length && html`<div class="hv-empty" title="Of the last 50 runs, by profile.read.of">${of ? `No run in ${of}` : "No run yet"}</div>`}
           ${(runs ?? []).map((r) => html`<div class="hv-row" title=${r.title ?? r.run} onClick=${() => set.set(KEYS.run, r.run)}>
-            <span class="hv-m">${r.ended ? "○" : "●"}</span><span class="x" title=${runName(r)}>${runName(r)}</span><span class="n">${day(r.started)}</span>
+            <span class="hv-m">${r.ended ? "○" : "●"}</span><span class="x" title=${runName(r)}>${runName(r)}</span><${SpendMark} s=${spend?.get(r.run)} /><span class="n">${day(r.started)}</span>
           </div>`)}
         </div>
       </div>`;
