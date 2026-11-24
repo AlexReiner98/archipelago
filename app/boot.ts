@@ -49,6 +49,7 @@ const host = await startBrowser({
     { id: "column", pack: "packs/examples/column.ts", disabled: true },
     // The Checks view (packs/checks/view.ts), off until a server runs the checks pack: page.set { pack: "checks", on: true }.
     { id: "checks", pack: "packs/checks/view.ts", disabled: true },
+    { id: "document", pack: "packs/document/index.ts" },
     { id: "item", pack: "packs/item/index.ts" },
     { id: "style-view", pack: "packs/style/view.ts" },
     { id: "docs", pack: "packs/docs/view.ts" },
