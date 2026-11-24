@@ -19,10 +19,12 @@ export interface Part {
   text: string;
 }
 
-/** A value as text: a string as it is, anything else as indented JSON. */
+/** A value as text: a string as it is, anything else as indented JSON; a list of short rows (facts, `[op, id, field, value]`) a row a line. */
 export function asText(v: Json | undefined): string {
   if (v === undefined) return "";
   if (typeof v === "string") return v;
+  const row = (x: Json) => Array.isArray(x) && x.every((c) => c === null || typeof c !== "object");
+  if (Array.isArray(v) && v.length && v.every(row)) return `[\n${v.map((x) => `  ${JSON.stringify(x)}`).join(",\n")}\n]`;
   return JSON.stringify(v, null, 2);
 }
 

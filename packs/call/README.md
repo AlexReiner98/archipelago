@@ -54,4 +54,7 @@ the last one: rejected fails them, accepted holds them. On load, the newest
 The [context](../context/README.md) pack counts a call's subject as a
 source of its own (`subject`, one part per type, its tokens as given), and,
 with no transcript, the answer's `usage` as the model's own total.
+A [typed call](../typed/README.md) is a call whose answer is held to the
+map's types: its attempts and checks are acts in the same run.
+
 Tested in `test/call.test.ts`.
