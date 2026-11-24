@@ -10,9 +10,11 @@ import type { Json } from "../spec/common.ts";
 import type { Item } from "../spec/graph.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
-import { order, seeds, solve, stamp, type Judging, type Read, type Write } from "../packs/checks/checker.ts";
+import { carried, identities, order, readsOf, ReadsIndex, seeds, solve, stamp, type Judging, type Read, type Write } from "../packs/checks/checker.ts";
+import { LIMIT_MAX } from "../spec/graph.ts";
 import { decidedOf, read as reading, type Decided, type RuleLimit } from "../packs/checks/rejections.ts";
 import checks, { type CheckDomain, type ChecksDomain } from "../packs/checks/index.ts";
+import { preview } from "../packs/checks/preview.ts";
 
 /** A graph as data: items by id, and links as [type, from, to]. */
 function graph(items: Item[], links: [string, string, string][]): Read & { items: Map<string, Item> } {
@@ -194,7 +196,7 @@ async function setup(thickness: Map<string, number>) {
   for (const id of BASES) packs[id] = (await import(`../packs/${id}/index.ts`)).default;
   packs.checks = checks;
   packs.parts = partDomain(thickness, calls);
-  packs.probe = { id: "probe", inject: ["action.invoke", "graph.read"], apply() {} };
+  packs.probe = { id: "probe", inject: ["action.invoke", "graph.read", "checks.domain"], apply() {} };
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => void errors.push(e);
@@ -221,7 +223,8 @@ async function setup(thickness: Map<string, number>) {
     assert.fail(`still pending: ${JSON.stringify((await g.get(ids)).map((t: any) => [t.id, t.fields.result]))}`);
   };
   const quiet = () => new Promise((r) => setTimeout(r, 40));
-  return { act, make, link, get, settled, quiet, calls, errors, history: (page: any) => g.since(page), stop: () => loader.apply([]) };
+  const register = (d: CheckDomain) => ctx.get<ChecksDomain>("checks.domain").register(d);
+  return { act, make, link, get, settled, quiet, register, calls, errors, history: (page: any) => g.since(page), stop: () => loader.apply([]) };
 }
 
 test("the pack solves a test through its domain's judge, on the test's word, and again when its inputs move", async () => {
@@ -300,4 +303,339 @@ test("needs is held acyclic, and a domain can't take a subject or stamp field th
   await rt.settle();
   assert.deepEqual(tries, ["checks.stamp", "checks.subject", "ok", "checks.subject_taken"]);
   await loader.apply([]);
+});
+
+// ---- Recorded reads ----
+
+/** A judge that reads the graph: a subject passes when it has an owner and what it is part_of is open. Records its calls. */
+function readingJudge(calls: string[] = []): Judging {
+  return {
+    async judge({ subject, subjects, fn, read }) {
+      calls.push(`${subjects.map((s) => s.id).join("+")}:${fn}`);
+      const owner = subject.fields.owner;
+      const up = await read!.links(subject.id, { type: "part_of", dir: "out" }, { limit: 5 });
+      const parents = await read!.get(up.items.map((l) => l.to));
+      const closed = parents.filter((p) => p && (p.fields.status === "done" || p.fields.status === "dropped")).map((p) => p!.id);
+      const findings: Json[] = [...(owner ? [] : [{ message: "no owner" }]), ...closed.map((id) => ({ message: `${id} is closed` }))];
+      return { passed: !findings.length, findings };
+    },
+  };
+}
+
+/** A graph whose items and links can change, and a write that applies to it. */
+function live(items: Item[], links: [string, string, string][]) {
+  const g = graph(items, links);
+  const writes: Write[] = [];
+  const apply = async (w: Write) => {
+    writes.push(w);
+    const t = g.items.get(w.test)!;
+    const fields = { ...t.fields };
+    for (const [k, v] of Object.entries(w.fields)) {
+      if (v === null) delete fields[k];
+      else fields[k] = v;
+    }
+    g.items.set(w.test, { ...t, fields });
+  };
+  const set = (id: string, fields: Record<string, Json>) => g.items.set(id, { ...g.items.get(id)!, fields: { ...g.items.get(id)!.fields, ...fields } });
+  return { g, links, writes, apply, set };
+}
+
+test("recorded reads: the stamp is what the judge read; an unread field moves nothing, a read one or a linked item does", async () => {
+  const { g, links, writes, apply, set } = live(
+    [item("task", "work", { title: "Do it", owner: "pat" }), item("hub", "work", { status: "open" }), item("r", "rule", { fn: "owned", params: {} }), item("t", "test")],
+    [["checks", "t", "task"], ["applies", "t", "r"], ["part_of", "task", "hub"]],
+  );
+  const calls: string[] = [];
+  const dom = () => readingJudge(calls);
+  await solve(["t"], g, dom, apply);
+  assert.equal(g.items.get("t")!.fields.result, "pass");
+  assert.deepEqual(g.items.get("t")!.fields.reads, { items: [["hub", ["status"]], ["task", ["owner"]]], links: [["task", "part_of", "out", 5, null]] });
+  assert.equal(calls.length, 1);
+
+  // Nothing it read moved: replayed, not judged, nothing written.
+  writes.length = 0;
+  set("task", { title: "Do it now" });
+  await solve(["t"], g, dom, apply);
+  assert.deepEqual([writes.length, calls.length], [0, 1]);
+
+  // What it reached through a link moved: judged again.
+  set("hub", { status: "done" });
+  await solve(["t"], g, dom, apply);
+  assert.equal(g.items.get("t")!.fields.result, "fail");
+  assert.deepEqual(g.items.get("t")!.fields.findings, [{ message: "hub is closed" }]);
+
+  // A new link on a page it read: judged again, and what it reads now is kept.
+  g.items.set("hub2", item("hub2", "work", { status: "open" }));
+  links.push(["part_of", "task", "hub2"]);
+  set("hub", { status: "open" });
+  await solve(["t"], g, dom, apply);
+  assert.equal(calls.length, 3);
+  assert.deepEqual(g.items.get("t")!.fields.reads, { items: [["hub", ["status"]], ["hub2", ["status"]], ["task", ["owner"]]], links: [["task", "part_of", "out", 5, null]] });
+  assert.equal(g.items.get("t")!.fields.result, "pass");
+});
+
+test("recorded reads: any number of subjects, and the stamp covers which ones", async () => {
+  const { g, links, apply } = live(
+    [item("a", "work", { owner: "x" }), item("b", "work"), item("c", "work"), item("d", "work"), item("r", "rule", { fn: "owned" }), item("t", "test")],
+    [["checks", "t", "a"], ["checks", "t", "b"], ["against", "t", "c"], ["applies", "t", "r"]],
+  );
+  const calls: string[] = [];
+  await solve(["t"], g, () => readingJudge(calls), apply);
+  assert.deepEqual(calls, ["a+b+c:owned"]);
+  const v = g.items.get("t")!.fields.version;
+  // Pointing one of them elsewhere moves the stamp, though the judge read nothing of it.
+  links[1] = ["checks", "t", "d"];
+  await solve(["t"], g, () => readingJudge(calls), apply);
+  assert.equal(calls.at(-1), "a+d+c:owned");
+  assert.notEqual(g.items.get("t")!.fields.version, v);
+});
+
+test("recorded reads: the day is a read; reads are bounded; a domain judges by function, whatever the subject", async () => {
+  const { g, apply } = live([item("s", "work", { due: "2026-01-10" }), item("r", "rule", { fn: "late", params: { grace: 2 } }), item("t", "test")], [["checks", "t", "s"], ["applies", "t", "r"]]);
+  let day = "2026-01-11";
+  const late: Judging = {
+    async judge({ subject, params, read }) {
+      const over = (Date.parse(read!.today()) - Date.parse(subject.fields.due as string)) / 864e5;
+      return { passed: over <= (params as { grace: number }).grace, findings: [] };
+    },
+  };
+  const byFn = (_type: string, fn?: string) => (fn === "late" ? late : undefined);
+  await solve(["t"], g, byFn, apply, { today: () => day });
+  assert.equal(g.items.get("t")!.fields.result, "pass");
+  const idx = new ReadsIndex();
+  idx.set("t", readsOf(g.items.get("t")!.fields.reads));
+  assert.deepEqual(idx.today(), ["t"]);
+  day = "2026-01-14";
+  await solve(idx.today(), g, byFn, apply, { today: () => day });
+  assert.equal(g.items.get("t")!.fields.result, "fail");
+
+  // A read over the bound is an error, not a hang.
+  const greedy: Judging = { judge: async ({ read }) => (await read!.get(Array.from({ length: LIMIT_MAX + 1 }, (_, i) => `x${i}`)), { passed: true, findings: [] }) };
+  const h = live([item("s", "work"), item("r", "rule", { fn: "greedy" }), item("t", "test")], [["checks", "t", "s"], ["applies", "t", "r"]]);
+  await solve(["t"], h.g, () => greedy, h.apply);
+  assert.equal(h.g.items.get("t")!.fields.result, "error");
+  assert.match(JSON.stringify(h.g.items.get("t")!.fields.findings), /at most 500 ids/);
+});
+
+test("recorded reads: the index seeds a test from an item it read, or a link at one", () => {
+  const idx = new ReadsIndex();
+  idx.set("t", { items: [["a", ["owner"]]], links: [["a", "part_of", "out", 5, null]] });
+  assert.deepEqual(idx.seeds([["+", "a", "title", "x"]]), ["t"]);
+  assert.deepEqual(idx.seeds([["+", "l1", "type", "part_of"], ["+", "l1", "from", "a"], ["+", "l1", "to", "b"]]), ["t"]);
+  assert.deepEqual(idx.seeds([["+", "b", "title", "x"]]), []);
+  idx.set("t", null);
+  assert.deepEqual(idx.seeds([["+", "a", "title", "x"]]), []);
+});
+
+test("the pack: a domain that judges by function reads the graph, and a change to what it read solves the test again", async () => {
+  const calls: string[] = [];
+  const s = await setup(new Map());
+  try {
+    const p = await s.make("work", "Task");
+    const hub = await s.make("work", "Hub");
+    await s.link("part_of", p, hub);
+    const r = await s.make("rule", "Owned", { fn: "owned", params: {} });
+    const t = await s.make("test", "Task owned");
+    await s.link("checks", t, p);
+    await s.link("applies", t, r);
+    await s.quiet();
+    assert.equal(calls.length, 0); // nothing judges `owned` yet
+
+    s.register({ fns: ["owned"], ...readingJudge(calls) });
+    await s.quiet();
+    let [x] = await s.settled([t]);
+    assert.deepEqual([x.fields.result, x.fields.findings], ["fail", [{ message: "no owner" }]]);
+
+    await s.act("items.set", { id: p, fields: { title: "Task, renamed" } });
+    await s.quiet();
+    assert.equal(calls.length, 1);
+    await s.act("items.set", { id: hub, fields: { status: "done" } });
+    await s.quiet();
+    [x] = await s.settled([t]);
+    assert.deepEqual(x.fields.findings, [{ message: "no owner" }, { message: `${hub} is closed` }]);
+    assert.equal(calls.length, 2);
+
+    assert.throws(() => s.register({ fns: ["owned"], ...readingJudge() }), /fn_taken|already judged/);
+    assert.throws(() => s.register({ fns: ["other"], stamp: "rev", ...readingJudge() }), /declares no stamp/);
+    assert.deepEqual(s.errors, []);
+  } finally {
+    await s.stop();
+  }
+});
+
+// ---- Preview ----
+
+test("preview: which tests a rule change would flip, judged only where the stamp moves, nothing written", async () => {
+  const { g, writes, apply } = live(
+    [
+      item("a", "part", { rev: "ra" }),
+      item("b", "part", { rev: "rb" }),
+      item("c", "part", { rev: "rc" }),
+      item("walls", "rule", { fn: "min", params: { min: 2 } }),
+      item("other", "rule", { fn: "min", params: { min: 0 } }),
+      item("ta", "test", { title: "A walls" }),
+      item("tb", "test", { title: "B walls" }),
+      item("tc", "test", { title: "C other" }),
+      item("ready", "test", { title: "A ready" }),
+    ],
+    [
+      ["checks", "ta", "a"], ["applies", "ta", "walls"],
+      ["checks", "tb", "b"], ["applies", "tb", "walls"],
+      ["checks", "tc", "c"], ["applies", "tc", "other"],
+      ["checks", "ready", "a"], ["applies", "ready", "other"], ["needs", "ready", "ta"],
+    ],
+  );
+  const calls: string[] = [];
+  const dom = () => judging({ ra: 1.5, rb: 3, rc: 1 }, calls);
+  await solve(["ta", "tb", "tc", "ready"], g, dom, apply);
+  assert.deepEqual(["ta", "tb", "tc", "ready"].map((id) => g.items.get(id)!.fields.result), ["fail", "pass", "pass", "blocked"]);
+  const snapshot = JSON.stringify([...g.items]);
+  writes.length = 0;
+  calls.length = 0;
+
+  const p = await preview("walls", { min: 1 }, g, dom);
+  assert.equal(writes.length, 0);
+  assert.equal(JSON.stringify([...g.items]), snapshot);
+  // Both walls tests move (their params did), and `ready` with them; `tc` doesn't.
+  assert.deepEqual(p.tests.map((t) => [t.test, t.before.result, t.after.result, t.flips]), [
+    ["ta", "fail", "pass", true],
+    ["tb", "pass", "pass", false],
+    ["ready", "blocked", "pass", true],
+  ]);
+  assert.deepEqual(calls.sort(), ["ra:min", "ra:min", "rb:min"]);
+  assert.deepEqual([p.flips, p.judged, p.held_back], [2, 3, 0]);
+
+  // judge: 0 judges nothing, and says what would be judged.
+  calls.length = 0;
+  const q = await preview("walls", { min: 1 }, g, dom, { judge: 0 });
+  assert.deepEqual(calls, []);
+  assert.deepEqual(q.tests.map((t) => [t.test, t.after.result, t.judged]), [["ta", "pending", false], ["tb", "pending", false], ["ready", "pending", false]]);
+  assert.equal(q.held_back, 3);
+  await assert.rejects(preview("ta", {}, g, dom), /not a rule/);
+});
+
+test("the pack: checks.preview writes nothing to the map", async () => {
+  const s = await setup(new Map([["r1", 1]]));
+  try {
+    const p = await s.make("part", "Bracket", { rev: "r1" });
+    const r = await s.make("rule", "At least 2", { fn: "min", params: { min: 2 } });
+    const t = await s.make("test", "Bracket walls");
+    await s.link("checks", t, p);
+    await s.link("applies", t, r);
+    await s.settled([t]);
+    await s.quiet();
+    const before = (await s.history({ limit: 500 })).items.length;
+    const out = await s.act("checks.preview", { rule: r, params: { min: 0.5 } });
+    assert.deepEqual(out.tests.map((x: any) => [x.test, x.before.result, x.after.result, x.flips]), [[t, "fail", "pass", true]]);
+    await s.quiet();
+    assert.equal((await s.history({ limit: 500 })).items.length, before);
+    assert.equal((await s.get(t)).fields.result, "fail");
+    assert.deepEqual((await s.get(r)).fields.params, { min: 2 });
+  } finally {
+    await s.stop();
+  }
+});
+
+// ---- Decisions per finding ----
+
+/** A judge whose findings are the faces of its subject thinner than the limit, named by face. */
+function faces(finding = true): Judging {
+  return {
+    stamp: "rev",
+    async judge({ subject, params }) {
+      const walls = JSON.parse(subject.fields.rev as string) as Record<string, number>;
+      const min = (params as { min: number }).min;
+      const findings = Object.entries(walls).filter(([, t]) => t < min).map(([face, t]) => ({ face, measured: t }));
+      return { passed: !findings.length, findings };
+    },
+    ...(finding ? { finding: (f: Json) => ((f as { face?: string }).face ?? undefined) } : {}),
+  };
+}
+
+test("decisions per finding: kept while every finding decided on is still found, cleared when one goes or the result turns", async () => {
+  const { g, apply, set } = live([item("s", "part", { rev: JSON.stringify({ f1: 1, f2: 1.5, f3: 3 }) }), item("r", "rule", { fn: "min", params: { min: 2 } }), item("t", "test")], [["checks", "t", "s"], ["applies", "t", "r"]]);
+  const dom = () => faces();
+  const decide = () => {
+    const f = g.items.get("t")!.fields;
+    set("t", { decision: "rejected", decided_version: f.version!, decided_findings: identities(f.findings!, faces().finding!) as string[] });
+  };
+  await solve(["t"], g, dom, apply);
+  decide();
+  assert.deepEqual(g.items.get("t")!.fields.decided_findings, ["f1", "f2"]);
+
+  // The part moved, its measures with it, but f1 and f2 are still found (and f4 is new): kept, at the new version.
+  set("s", { rev: JSON.stringify({ f1: 1.2, f2: 1.4, f3: 3, f4: 0.5 }) });
+  await solve(["t"], g, dom, apply);
+  let f = g.items.get("t")!.fields;
+  assert.equal(f.result, "fail");
+  assert.deepEqual([f.decision, f.decided_version === f.version], ["rejected", true]);
+
+  // f2 is gone: cleared.
+  set("s", { rev: JSON.stringify({ f1: 1.2, f2: 2.5, f3: 3, f4: 0.5 }) });
+  await solve(["t"], g, dom, apply);
+  f = g.items.get("t")!.fields;
+  assert.deepEqual([f.decision, f.decided_version, f.decided_findings], [undefined, undefined, undefined]);
+
+  // A decided pass is carried while it passes, and cleared when it fails.
+  set("s", { rev: JSON.stringify({ f1: 3 }) });
+  await solve(["t"], g, dom, apply);
+  decide();
+  set("s", { rev: JSON.stringify({ f1: 4 }) });
+  await solve(["t"], g, dom, apply);
+  assert.equal(g.items.get("t")!.fields.decision, "rejected");
+  set("s", { rev: JSON.stringify({ f1: 1 }) });
+  await solve(["t"], g, dom, apply);
+  assert.equal(g.items.get("t")!.fields.decision, undefined);
+});
+
+test("decisions per finding: without the hook a decision is cleared whenever the version moves, as before", async () => {
+  const { g, apply, set } = live([item("s", "part", { rev: JSON.stringify({ f1: 1 }) }), item("r", "rule", { fn: "min", params: { min: 2 } }), item("t", "test")], [["checks", "t", "s"], ["applies", "t", "r"]]);
+  await solve(["t"], g, () => faces(false), apply);
+  set("t", { decision: "rejected", decided_version: g.items.get("t")!.fields.version! });
+  set("s", { rev: JSON.stringify({ f1: 1.1 }) });
+  await solve(["t"], g, () => faces(false), apply);
+  assert.equal(g.items.get("t")!.fields.decision, undefined);
+  assert.deepEqual(carried({ decision: "rejected", decided_version: "a", result: "fail" }, "fail", [], "b", faces(false)), {});
+});
+
+test("the pack: checks.decide keeps the findings' identities when the domain names them, and the checker carries it", async () => {
+  const s = await setup(new Map());
+  try {
+    const { stamp: _, ...byNote } = faces();
+    s.register({ fns: ["faces"], ...byNote, judge: (call) => faces().judge({ ...call, subject: { ...call.subject, fields: { rev: call.subject.fields.note! } } }) });
+    const r = await s.make("rule", "At least 2", { fn: "faces", params: { min: 2 } });
+    const p = await s.make("work", "Plate", { note: JSON.stringify({ f1: 1 }) });
+    const t = await s.make("test", "Plate walls");
+    await s.link("applies", t, r);
+    await s.link("checks", t, p);
+    await s.quiet();
+    await s.settled([t]);
+    const out = await s.act("checks.decide", { test: t, decision: "rejected" });
+    assert.deepEqual(out.findings, ["f1"]);
+    assert.deepEqual((await s.get(t)).fields.decided_findings, ["f1"]);
+
+    await s.act("items.set", { id: p, fields: { note: JSON.stringify({ f1: 1.2 }) } });
+    await s.quiet();
+    let [x] = await s.settled([t]);
+    assert.deepEqual([x.fields.result, x.fields.decision, x.fields.decided_version === x.fields.version], ["fail", "rejected", true]);
+
+    await s.act("items.set", { id: p, fields: { note: JSON.stringify({ f2: 1 }) } });
+    await s.quiet();
+    [x] = await s.settled([t]);
+    assert.deepEqual([x.fields.result, x.fields.decision, x.fields.decided_findings], ["fail", undefined, undefined]);
+    assert.deepEqual(s.errors, []);
+  } finally {
+    await s.stop();
+  }
+});
+
+test("a judge is told the test it solves and the version it solves it at, either way of stamping", async () => {
+  const seen: [string, string][] = [];
+  const spy = (stamp?: string): Judging => ({ ...(stamp ? { stamp } : {}), judge: async (c) => (seen.push([c.test, c.version]), { passed: true, findings: [] }) });
+  for (const s of ["rev", undefined]) {
+    seen.length = 0;
+    const { g, writes, apply } = live([item("p", "part", { rev: "r1" }), item("r", "rule", { fn: "min" }), item("t", "test")], [["checks", "t", "p"], ["applies", "t", "r"]]);
+    await solve(["t"], g, () => spy(s), apply);
+    assert.deepEqual(seen, [["t", writes[0]!.version]]);
+  }
 });

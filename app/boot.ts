@@ -47,6 +47,8 @@ const host = await startBrowser({
     // Examples to copy, off until turned on (packs/examples): a panel, and a frame of your own.
     { id: "today", pack: "packs/examples/today.ts", disabled: true },
     { id: "column", pack: "packs/examples/column.ts", disabled: true },
+    // The Checks view (packs/checks/view.ts), off until a server runs the checks pack: page.set { pack: "checks", on: true }.
+    { id: "checks", pack: "packs/checks/view.ts", disabled: true },
     { id: "item", pack: "packs/item/index.ts" },
     { id: "style-view", pack: "packs/style/view.ts" },
     { id: "docs", pack: "packs/docs/view.ts" },
