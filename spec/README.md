@@ -38,7 +38,9 @@ context (`repeat`, `again`). Edition 5 adds a run's facts and gates
 `types.acyclic`, kinds of link a pack holds acyclic, which the schema pack
 keeps from closing a loop ([types](types.md)), and `action.attest`, a
 change made on a test's word at the version of its inputs
-([action](action.md)). Edition 10 adds
+([action](action.md)), and a person's `decision` on a run's reply, at
+`reply_end`, with the facts `item` and `version` a call follows
+([agent](agent.md)). Edition 10 adds
 `types.mark`, the shape each base is drawn in, named by its pack, and two
 mark shapes, pentagon and hexagon ([types](types.md), [style](style.md));
 from it a contract's `Capabilities` map is frozen one key at a time, as its

@@ -11,6 +11,7 @@ focus, and as marks on its tree ([harness](../harness/README.md)). Injects
 |---|---|
 | `map` | each node the map said (or refused with) in the run; a skill of the map's never loaded |
 | `harness` | each node Claude Code gave ([transcript](../transcript/README.md)): system prompt, tool definitions, MCP instructions, listings, the model, other hooks' words |
+| `subject` | a [call](../call/README.md)'s own context, from the pack that made the call: one part per type (`subject:<type>`), its tokens as the call gave them, never its text |
 | `agent` | the conversation since the start (the transcript pack's `talk:*` nodes: prompts, replies, thinking, each tool's calls and results, notes); without a transcript, the agent's acts by place |
 
 Each part's channel is how it reaches the agent, as the tree shapes its
@@ -36,6 +37,9 @@ transcript, are `act`.
   last compaction left if it came after; else the parts summed
   (`"estimate"`). `unseen` is the real total over what the parts account
   for.
+- **A call.** A call's answer may carry the model's own count (`usage`):
+  with no transcript, that is the total (`from: "usage"`). Its subject is
+  counted by its tokens, apart from the answer's size.
 - **The limit.** 1,000,000 for a model named with `[1m]` or of the Claude 5
   family (`limit.from: "model"`), or once more than 200,000 was seen in the
   run (`"seen"`); else 200,000 (`"default"`).

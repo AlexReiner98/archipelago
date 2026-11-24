@@ -167,6 +167,8 @@ export const FACTS: Term[] = [
   { term: "profiles", since: 5, doc: "Profiles the run says it is in (the `run` tool's `profiles`)." },
   { term: "profiles_drop", since: 5, doc: "Profiles the run says it is not in (the `run` tool's `drop`)." },
   { term: "agent_type", since: 5, doc: "A subagent's type, as the harness names it." },
+  { term: "item", since: 11, doc: "The item a call follows: a person's decision on it, at `version`, is the call's (a `decision` at `reply_end`)." },
+  { term: "version", since: 11, doc: "The version of `item` the call answered for." },
 ];
 
 /**
