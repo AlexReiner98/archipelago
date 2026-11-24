@@ -134,8 +134,9 @@ find line has words, only what it finds and what lies near it.
   any zoom, over other particles if need be. The set is worked out only
   when the graph or a dial changes, and a hub stays until `label_hub_keep`
   more items outrank it, so zoomed out the same few names hold through the
-  solve. A particle wide enough (`label_inside`) holds its title inside,
-  wrapped onto up to three lines; otherwise a title tries eight spots round
+  solve. A title stays beside its particle at every zoom, as zoomed out;
+  the dial `label_inside` (0, never, as shipped) lets a particle wide
+  enough hold its title inside, wrapped onto up to three lines. A title tries eight spots round
   its particle, the one it had last frame first, and takes the first inside
   the view that overlaps no title, no particle and not the legend. At most
   one per `label_room` square pixels.

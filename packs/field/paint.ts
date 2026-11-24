@@ -49,7 +49,7 @@ export const DRAW: Dial[] = [
   { key: "label_room", label: "room per title", min: 1000, max: 40000, step: 500, value: 9000, then: "paint", doc: "At most one title per this many square pixels of the view, so a small view is not buried in words." },
   { key: "label_gap", label: "title gap", min: 0, max: 20, step: 1, value: 4, then: "paint", doc: "Space between a particle and its title, in screen px." },
   { key: "label_chars", label: "title length", min: 8, max: 120, step: 1, value: 36, then: "paint", doc: "A title longer than this many letters is cut, with …; the whole of it shows on hover." },
-  { key: "label_inside", label: "title inside from", min: 0, max: 200, step: 2, value: 40, then: "paint", doc: "A particle this many screen px across or more holds its title inside itself, cut to fit (0: never)." },
+  { key: "label_inside", label: "title inside from", min: 0, max: 200, step: 2, value: 0, then: "paint", doc: "A particle this many screen px across or more holds its title inside itself, cut to fit (0: never)." },
   { key: "label_cover_px", label: "titles avoid", min: 0, max: 20, step: 0.5, value: 2, then: "paint", doc: "A title never covers another particle this many screen px across or more (0: it covers none at all)." },
   { key: "label_move_ms", label: "moved title fades", min: 0, max: 1000, step: 10, value: 220, then: "paint", doc: "A title that must take another side of its particle (room taken) fades out where it was and in where it goes over this long, rather than jump (0: it jumps)." },
   { key: "label_halo", label: "title halo", min: 0, max: 8, step: 0.5, value: 3, then: "paint", doc: "A ring of the sea round every letter, in screen px, so words read over particles and links." },
