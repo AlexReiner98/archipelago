@@ -54,6 +54,8 @@ export interface Field {
   graph(): G;
   /** Where each particle is now, by id: for tests and for whoever asks. */
   places(): Map<Id, [number, number]>;
+  /** The camera now (a copy): a place's spot on the canvas is place × k + (tx, ty), in css px. */
+  view(): Cam;
   destroy(): void;
 }
 
@@ -401,6 +403,9 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     },
     places() {
       return new Map(g.id.map((id, i) => [id, [g.x[i]!, g.y[i]!]]));
+    },
+    view() {
+      return { k: cam.k, tx: cam.tx, ty: cam.ty };
     },
     destroy() {
       stopped = true;
