@@ -254,8 +254,10 @@ filter.
 A third row is what the map controls alone, node by node (`mapShares`):
 each of its nodes said, or only listed (faded), in the window at the
 playhead, in the hue of the channel it came in by (a node beside another of
-the same hue a shade darker, so each shows), biggest first, on a scale of its own (the
-map's whole share), headed by that share and its part of the window. The
+the same hue a shade darker, so each shows), biggest first, on a scale of round steps just
+above the map's whole share (250, 500, 1k, 2.5k…: `stepScale`), so a
+session's start is part full and the row grows as the map says more,
+headed by that share, its scale and its part of the window. The
 biggest four are named under it, named as the tree names them, never a
 path, and the rest counted; each a click to pick the node, outlined while
 picked. Live, the

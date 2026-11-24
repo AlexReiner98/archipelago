@@ -984,3 +984,14 @@ test("glide: a changed tree moves into its new shape, a new node growing out of 
   const mid = glide(after, from, to, 0.5).polar.get("words/a")!, a0 = from.polar.get("words/a")!, a1 = to.polar.get("words/a")!;
   assert.ok(Math.abs(mid.r - (a0.r + a1.r) / 2) < 1e-6);
 });
+
+test("stepScale: the map's own row grows on round steps from 250, so a session's start is part full", async () => {
+  const { stepScale } = await import("../packs/harness/windowbar.ts");
+  assert.equal(stepScale(0), 250);
+  assert.equal(stepScale(116), 250);
+  assert.equal(stepScale(250), 250);
+  assert.equal(stepScale(251), 500);
+  assert.equal(stepScale(900), 1000);
+  assert.equal(stepScale(1200), 2500);
+  assert.equal(stepScale(30_000), 50_000);
+});

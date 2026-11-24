@@ -7,8 +7,8 @@
  * acts). A click on a share filters the tree to it, through the key's
  * filter (key.ts): a second click shows everything again.
  *
- * A third row is what the map controls alone, node by node, on a scale of
- * its own (the map's whole share): each node it said, or listed, in its
+ * A third row is what the map controls alone, node by node, on a stepped scale of
+ * its own (round steps just above the map's whole share, `stepScale`): each node it said, or listed, in its
  * channel's hue (`CHANNEL_HUE`), biggest first; a click picks the node (`mapShares`).
  *
  * Also each node's state at the playhead (`windowMarks`): in the window,
@@ -284,6 +284,15 @@ export function mapShares(w: WindowRead): MapShare[] {
     .sort((a, b) => b.tokens - a.tokens || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
+/**
+ * The map's own row's scale: the round number at or just above what it holds (1, 2.5 and 5 of each power of ten,
+ * from 250), so the row starts part full at a session's start and grows as the map says more, stepping up only
+ * when it passes the mark.
+ */
+export function stepScale(tokens: number): number {
+  for (let ten = 100; ; ten *= 10) for (const k of [2.5, 5, 10]) if (k * ten >= tokens) return k * ten;
+}
+
 /** How many of the biggest are named under the row; the rest are counted. */
 const NAMED = 4;
 
@@ -292,6 +301,7 @@ const MapRow = ({ w, picked, onPick }: { w: WindowRead; hues?: Map<string, strin
   const shares = mapShares(w);
   if (!shares.length) return "";
   const all = shares.reduce((n, s) => n + s.tokens, 0);
+  const scale = stepScale(all);
   // Each node in its channel's hue; one beside another of the same hue is a shade darker, so every node shows.
   const shade: number[] = shares.map((s, i) => (i > 0 && shares[i - 1]!.channel === s.channel ? 1 : 0));
   for (let i = 1; i < shares.length; i++) if (shade[i]) shade[i] = 1 - shade[i - 1]!;
@@ -304,11 +314,11 @@ const MapRow = ({ w, picked, onPick }: { w: WindowRead; hues?: Map<string, strin
   };
   const rest = shares.length - NAMED;
   return html`
-    <div class="t mine" title="What the map controls: its own nodes in the window, each by its size, on a scale of their own">
-      <span>the map's own</span><span><b>${sure(all).text}</b> · ${pct(all, w.total.tokens).toFixed(1)}% of the window · ${shares.length} node${shares.length === 1 ? "" : "s"}</span>
+    <div class="t mine" title="What the map controls: its own nodes in the window, each by its size, on a scale of round steps (250, 500, 1k, 2.5k…) just above what it holds">
+      <span>the map's own</span><span><b>${sure(all).text}</b> of ${tok(scale)} · ${pct(all, w.total.tokens).toFixed(1)}% of the window · ${shares.length} node${shares.length === 1 ? "" : "s"}</span>
     </div>
     <div class="row" role="group" aria-label="the map's nodes">
-      ${shares.map((s, i) => html`<button key=${s.id} class=${`${onPick ? "" : "plain"}${s.state === "listed" ? " listed" : ""}${picked === s.id ? " on" : ""}`} style=${`width:${pct(s.tokens, all)}%;background:${hue(s, i)}`} title=${tip(s)} onClick=${click(s)}></button>`)}
+      ${shares.map((s, i) => html`<button key=${s.id} class=${`${onPick ? "" : "plain"}${s.state === "listed" ? " listed" : ""}${picked === s.id ? " on" : ""}`} style=${`width:${pct(s.tokens, scale)}%;background:${hue(s, i)}`} title=${tip(s)} onClick=${click(s)}></button>`)}
     </div>
     <div class="lg">
       ${shares.slice(0, NAMED).map((s) => html`<button key=${s.id} class=${onPick ? "" : "plain"} title=${tip(s)} onClick=${click(s)}><i style=${`background:${hue(s)}`}></i>${s.title} ${sure(s.tokens).text}</button>`)}
