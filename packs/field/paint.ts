@@ -12,6 +12,7 @@ import { FAINT, FOUND } from "./filter.ts";
 import { CIRCLE, edge, fill, outline, reach } from "./shapes.ts";
 import { arrow, easeWires, placeWires, wireName, wireSize, type WireFade, type WireWant } from "./wires.ts";
 import { comeFade, type Label } from "./gone.ts";
+import { carryLight } from "./carry.ts";
 
 /** The drawing's own dials. */
 export const DRAW: Dial[] = [
@@ -109,9 +110,11 @@ export interface Cam {
 /** What is lit, eased over time: dim is how far the rest has faded, shine[i] how lit particle i is. */
 export class Light {
   dim = 0;
-  shine = new Float32Array(0);
+  shine: Float32Array = new Float32Array(0);
   shining = new Set<number>();
   focus = -1;
+  /** The graph shine and focus are numbered for. */
+  private of: G | null = null;
   /** Each link name's fade, by link: names fade in and out, never pop (wires.ts). */
   wires = new Map<number, WireFade>();
   /** True while a link name is still fading: the view keeps painting. */
@@ -156,7 +159,8 @@ export class Light {
   ease(g: G, hover: number, S: Settings): boolean {
     const now = performance.now(), dt = this.last ? Math.min(100, now - this.last) : 16;
     this.last = now;
-    if (this.shine.length !== g.n) (this.shine = new Float32Array(g.n)), this.shining.clear(), (this.focus = -1);
+    // A new graph renumbers the particles: what was lit stays lit, by id (carry.ts).
+    if (g !== this.of) ({ shine: this.shine, shining: this.shining, focus: this.focus } = carryLight(this.of, g, this.shine, this.shining, this.focus)), (this.of = g);
     if (hover >= 0) (this.focus = hover), (this.leftAt = 0);
     else if (this.focus >= 0 && !this.leftAt) this.leftAt = now;
     if (this.focus >= 0 && this.leftAt && now - this.leftAt > S.dim_hold_ms!) this.focus = -1;

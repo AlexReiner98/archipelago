@@ -13,6 +13,7 @@
  */
 import { wireSize } from "./wires.ts";
 import { followShare } from "./follow.ts";
+import { carryIndex } from "./carry.ts";
 import { bornOf, comeFade, goneLinksOf, goneOf, paintGone, rekeyWires, resizeAt, resizeOf, type Ghost, type GoneLink, type GoneName, type Resize } from "./gone.ts";
 import type { Id } from "../../spec/common.ts";
 import type { Dial } from "./behaviour.ts";
@@ -342,6 +343,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       const first = !g.n;
       const last = g.n ? g : null;
       g = build(next, last, pal);
+      // The particle pointed at stays pointed at, by id: a new item elsewhere never drops the hover (carry.ts).
+      const pointed = carryIndex(last, g, hover);
       // What left the map fades out where it stood.
       const now = performance.now();
       const was = drawn.g === last ? drawn.match : null;
@@ -358,7 +361,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       if (first) g.sim = { alpha: 1, steps: 0 };
       else warm(g, S, warmTo);
       pick = grid(g);
-      hover = -1;
+      hover = pointed;
+      if (hover < 0) hooks.hover(null);
       remark();
       if (first && !cam.moved) fit();
       if (refit) (cam.moved = false), (jump = true), (jumpAt = performance.now());

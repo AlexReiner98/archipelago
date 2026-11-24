@@ -134,7 +134,10 @@ find line has words, only what it finds and what lies near it.
   one per `label_room` square pixels.
 - **Hover** lights a particle, its links and its neighbours, dims the rest,
   and names them ([paint.ts](paint.ts)); the pointer picks the nearest
-  particle within `hover_px` of its edge. A click sets `here.item`; the item
+  particle within `hover_px` of its edge. A change to the map (an item or a
+  session coming) renumbers the particles, and the hover and the light stay
+  on the same items, by id ([carry.ts](carry.ts)), so nothing pointed at
+  goes dark in one frame. A click sets `here.item`; the item
   page opens in `right`. Drag a particle to move it (it settles again when
   let go), drag the sea to pan, wheel to zoom, double-click the sea to fit.
   While it settles the view eases after the picture (`follow_ms`).
