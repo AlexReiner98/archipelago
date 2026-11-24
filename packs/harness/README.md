@@ -238,7 +238,10 @@ window's size and the share that is, "≈" when it is an estimate (no usage
 in the transcript yet), and how many compactions. It starts open; its
 head ("window ▾") folds it to that one line, and the browser remembers
 which (`harness.window-open`). Before the window is read it keeps its
-room, open or folded, so the tree above never moves when it comes. Under it two thin rows
+room, open or folded, so the tree above never moves when it comes. Live,
+it is read again as events come, at most every 3 s; an event inside that
+time reads once the time is up, and a read in flight is kept unless the
+run or the moment looked at changed, so a busy session's bar keeps up. Under it two thin rows
 on the window's one scale: its share by source (the map's, Claude Code's,
 the conversation, and what the model counts beyond those), and by channel
 (hook, rule, file, context, talk), each channel in a hue of its own

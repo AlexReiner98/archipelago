@@ -184,31 +184,45 @@ export function useWindow(invoke: ActionInvoke, has: boolean, run: string | unde
   const [got, setGot] = useState<{ key: string; w: WindowRead }>();
   const last = useRef<{ key: string; t: number }>({ key: "", t: 0 });
   const key = `${run ?? ""}@${at ?? ""}`;
+  // The key a read is for now: a read that lands for another (the run or the moment changed) is dropped.
+  const want = useRef(key);
+  want.current = key;
+  const later = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(later.current), []);
   useEffect(() => {
     if (!has || !run) return;
-    // A moment looked at doesn't change; live, read again as events come, not more often than AGAIN_MS.
-    if (last.current.key === key && (at || Date.now() - last.current.t < AGAIN_MS)) return;
-    last.current = { key, t: Date.now() };
-    let gone = false;
-    void (async () => {
-      let w: WindowRead | undefined;
-      let after = 0;
-      for (let i = 0; i < PAGES; i++) {
-        const out = await invoke.invoke({ action: WINDOW, input: { run, limit: LIMIT_MAX, ...(at ? { at } : {}), ...(after ? { after } : {}) }, authority: { of: "human", basis: "read in the context interface" }, reason: "Show what is in the agent's window" });
-        if (!out.ok) {
-          last.current.t = 0;
-          return;
+    const read = () => {
+      clearTimeout(later.current);
+      last.current = { key, t: Date.now() };
+      void (async () => {
+        let w: WindowRead | undefined;
+        let after = 0;
+        for (let i = 0; i < PAGES; i++) {
+          const out = await invoke.invoke({ action: WINDOW, input: { run, limit: LIMIT_MAX, ...(at ? { at } : {}), ...(after ? { after } : {}) }, authority: { of: "human", basis: "read in the context interface" }, reason: "Show what is in the agent's window" });
+          if (!out.ok) {
+            last.current.t = 0;
+            return;
+          }
+          const o = out.output as unknown as WindowRead & { next?: number };
+          w = w ? { ...w, parts: [...w.parts, ...o.parts] } : o;
+          if (typeof o.next !== "number") break;
+          after = o.next;
         }
-        const o = out.output as unknown as WindowRead & { next?: number };
-        w = w ? { ...w, parts: [...w.parts, ...o.parts] } : o;
-        if (typeof o.next !== "number") break;
-        after = o.next;
-      }
-      if (!gone && w) setGot({ key, w });
-    })().catch(() => (last.current.t = 0));
-    return () => {
-      gone = true;
+        if (w && want.current === key) setGot({ key, w });
+      })().catch(() => (last.current.t = 0));
     };
+    // A moment looked at doesn't change. Live, read again as events come, not more often than AGAIN_MS: an event
+    // inside that time reads once the time is up, so the bar always ends on the latest, even while events keep coming.
+    if (last.current.key === key) {
+      if (at) return;
+      const wait = AGAIN_MS - (Date.now() - last.current.t);
+      if (wait > 0) {
+        clearTimeout(later.current);
+        later.current = setTimeout(read, wait);
+        return;
+      }
+    }
+    read();
   }, [has, key, tick]);
   // The last window read stays while the next is read, so the bar doesn't blink as the playhead moves.
   return has && run && got && got.key.startsWith(`${run}@`) ? got.w : undefined;
