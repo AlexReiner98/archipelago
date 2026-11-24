@@ -379,6 +379,28 @@ test("a link with an end that left fades out with it, and a ghost keeps the titl
   assert.deepEqual(goneOf(all, less, 1000, S).map((q) => q.title), [undefined], "not shown, no title");
 });
 
+test("an item that stays but takes a new size eases to it over resize_ms; a ghost leaves as hollow as it was drawn", async () => {
+  const { resizeOf, resizeAt, goneOf } = await import("../packs/field/gone.ts");
+  const item = (id: string) => ({ id, title: id, type: "work", status: "", closed: false });
+  const whole: FieldIn = { items: [item("a"), item("b"), item("c")], links: [{ id: "l1", type: "depends_on", from: "a", to: "b" }, { id: "l2", type: "depends_on", from: "a", to: "c" }], types: ["work"] };
+  const S = { ...settings(), shapes: 1 };
+  const all = build(whole, null);
+  seed(all, S);
+  const less = build({ items: [item("a"), item("b")], links: [whole.links[0]!], types: ["work"] }, all);
+  seed(less, S);
+  const before = all.r[all.idIx.get("a")!]!, after = less.r[less.idIx.get("a")!]!;
+  assert.ok(after < before, "a lost a link, so it is smaller");
+  const rs = resizeOf(all, less, 1000)!;
+  assert.equal(resizeAt(less, rs, 1000, 600), true);
+  assert.ok(Math.abs(less.r[less.idIx.get("a")!]! - before) < 1e-4, "it starts at its old size");
+  assert.equal(resizeAt(less, rs, 1600, 600), false);
+  assert.ok(Math.abs(less.r[less.idIx.get("a")!]! - after) < 1e-4, "and ends at its new one");
+  assert.equal(resizeOf(null, less, 0), null);
+  assert.equal(resizeOf(less, less, 0), null, "nothing changed size: nothing to ease");
+  const gone = goneOf(all, less, 1000, S);
+  assert.deepEqual(gone.map((q) => q.how), [all.side && (await import("../packs/field/shapes.ts")).fill(all.side[all.idIx.get("c")!]!)]);
+});
+
 test("the map follows the find line once typing pauses: a value is taken only after it holds still for find_wait_ms", async (t) => {
   const { Settle } = await import("../packs/field/filter.ts");
   t.mock.timers.enable({ apis: ["setTimeout"] });

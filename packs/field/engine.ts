@@ -11,7 +11,7 @@
  *   about the pointer; a double-click on the sea fits the picture.
  * - The picture is fitted while it settles, until the reader moves it.
  */
-import { bornOf, goneLinksOf, goneOf, paintGone, type Ghost, type GoneLink } from "./gone.ts";
+import { bornOf, comeFade, goneLinksOf, goneOf, paintGone, resizeAt, resizeOf, type Ghost, type GoneLink, type Resize } from "./gone.ts";
 import type { Id } from "../../spec/common.ts";
 import type { Dial } from "./behaviour.ts";
 import { bounds, build, grid, seed, sizes, type FieldIn, type G, type Grid, type Settings } from "./graph.ts";
@@ -175,6 +175,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   let raf = 0, following = false;
   const ghosts: Ghost[] = [];
   const goneLinks: GoneLink[] = [];
+  let sizing: Resize | null = null;
   let coming = 0;
   // What was last painted, so what leaves fades from how it was drawn.
   let drawn: { g: G | null; match: Uint8Array | null } = { g: null, match: null };
@@ -189,6 +190,9 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
         canvas.height = Math.round(s.height * s.dpr);
       }
       const easing = light.ease(g, hover, S);
+      // A kept particle that changes size grows or shrinks to it over resize_ms.
+      const resizing = !!sizing && resizeAt(g, sizing, performance.now(), S.resize_ms ?? 0);
+      if (!resizing) sizing = null;
       // What lies over the canvas (the legend), in canvas pixels: no title goes under it.
       const at = canvas.getBoundingClientRect();
       const clear = Array.from(canvas.parentElement?.querySelectorAll(".fl-key") ?? [], (el) => {
@@ -198,10 +202,11 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       paint(c, g, cam, S, light, colours, pick, s, match, clear);
       drawn = { g, match };
       // Arranged into a profile: its tree comes in under the items as they reach their places.
-      if (tree) paintTree(c, tree, cam, s.dpr, scale(), arrived(g, scale(), flight), colours, S);
+      // It comes in as the items arrive, and at least as fast as what left fades out (gone_ms), so the two crossfade.
+      if (tree) paintTree(c, tree, cam, s.dpr, scale(), Math.max(arrived(g, scale(), flight), flight ? comeFade(performance.now() - flight.at, S.gone_ms ?? 0) : 0), colours, S);
       const fading = paintGone(c, ghosts, cam, s.dpr, performance.now(), S, goneLinks, colours) || performance.now() < coming;
       // A link name or a ghost still fading keeps the view painting.
-      dirty = easing || following || light.wiresMoving || fading;
+      dirty = easing || following || light.wiresMoving || fading || resizing;
     }
     raf = requestAnimationFrame(tick);
   };
@@ -319,6 +324,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       coming = now + (S.come_ms ?? 0);
       aim();
       seed(g, S);
+      sizing = S.resize_ms ? resizeOf(last, g, now) : null;
+      if (sizing) resizeAt(g, sizing, now, S.resize_ms!);
       if (first) g.sim = { alpha: 1, steps: 0 };
       else warm(g, S, warmTo);
       pick = grid(g);

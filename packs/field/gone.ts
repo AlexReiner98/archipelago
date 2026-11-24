@@ -7,7 +7,7 @@
  */
 import type { G, Settings } from "./graph.ts";
 import type { Cam, Ink } from "./paint.ts";
-import { outline, CIRCLE } from "./shapes.ts";
+import { outline, CIRCLE, fill, reach } from "./shapes.ts";
 import { FAINT, FOUND } from "./filter.ts";
 
 export interface Ghost {
@@ -22,6 +22,8 @@ export interface Ghost {
   at: number;
   /** Its title, when it was shown as it left. */
   title?: string;
+  /** How it was filled: 0 hollow, 1 half, 2 solid (shapes.ts fill). */
+  how: 0 | 1 | 2;
 }
 
 /** A link that left with one of its ends: a line where it was drawn, fading as its ghost does. */
@@ -73,10 +75,43 @@ export function goneOf(last: G | null, next: G, now: number, S: Settings, match:
       colour: last.types[last.typeIx[i]!]?.colour ?? "#888",
       alpha: (last.closed[i] && match?.[i] !== FOUND ? S.closed_fade! : 1) * (match?.[i] === FAINT ? S.query_fade! : 1),
       at: now,
+      how: S.shapes ? fill(last.side[i]!) : 2,
       ...(named?.has(last.id[i]!) ? { title: last.title[i]! } : {}),
     });
   }
   return out;
+}
+
+/** A change of size under way: each particle's radius before (NaN: new, none) and the one it goes to. */
+export interface Resize {
+  at: number;
+  from: Float32Array;
+  to: Float32Array;
+}
+
+/** The sizes `next` takes, from what each particle of `last` had: none when nothing kept changes size. */
+export function resizeOf(last: G | null, next: G, now: number): Resize | null {
+  if (!last) return null;
+  const from = new Float32Array(next.n).fill(NaN);
+  let any = false;
+  for (let i = 0; i < next.n; i++) {
+    const j = last.idIx.get(next.id[i]!);
+    if (j === undefined) continue;
+    from[i] = last.r[j]!;
+    if (Math.abs(from[i]! - next.r[i]!) > 0.01) any = true;
+  }
+  return any ? { at: now, from, to: next.r.slice() } : null;
+}
+
+/** Sets each kept particle's radius along its change at `now`, eased over `ms`; true while still changing. */
+export function resizeAt(g: G, rs: Resize, now: number, ms: number): boolean {
+  if (rs.to.length !== g.n) return false;
+  const k = comeFade(now - rs.at, ms);
+  for (let i = 0; i < g.n; i++) {
+    const f = rs.from[i]!;
+    g.r[i] = Number.isNaN(f) ? rs.to[i]! : f + (rs.to[i]! - f) * k;
+  }
+  return k < 1;
 }
 
 /** When each particle of `next` came: what `last` held keeps its time, what is new came `now`; a first map, long ago. */
@@ -128,9 +163,27 @@ export function paintGone(c: CanvasRenderingContext2D, ghosts: Ghost[], cam: Cam
     ghosts[w++] = q;
     c.globalAlpha = q.alpha * f;
     c.fillStyle = q.colour;
+    const r = q.r * (0.6 + 0.4 * f);
     c.beginPath();
-    outline(c, q.shape, q.x, q.y, q.r * (0.6 + 0.4 * f));
+    outline(c, q.shape, q.x, q.y, r);
     c.fill();
+    // Hollow or half as it was drawn (big enough on screen), its middle the sea, so it does not turn solid as it goes.
+    if (q.how !== 2 && ink && r * cam.k >= S.hollow_px!) {
+      const colour = c.fillStyle;
+      c.fillStyle = ink.sea;
+      c.save();
+      if (q.how === 1) {
+        const R = reach(q.shape) * r;
+        c.beginPath();
+        c.rect(q.x, q.y - R, R, 2 * R);
+        c.clip();
+      }
+      c.beginPath();
+      outline(c, q.shape, q.x, q.y, r * (1 - S.hollow_line!));
+      c.fill();
+      c.restore();
+      c.fillStyle = colour;
+    }
   }
   ghosts.length = w;
   // Titles over them, at the size they were read, fading with them.

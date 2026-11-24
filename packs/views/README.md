@@ -71,4 +71,5 @@ own.
   once the new view has laid itself out for `switch_wait_ms` (300) under the
   old picture, so its first unsettled frames are never seen. Both are the
   pack's config; `switch_ms: 0`, reduced motion, or a browser without View
-  Transitions changes it at once. The list itself fades in over 120 ms.
+  Transitions changes it at once. The list itself fades in over 120 ms, and
+  out with the view it was over.

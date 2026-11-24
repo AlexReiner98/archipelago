@@ -43,7 +43,7 @@ find line has words, only what it finds and what lies near it.
   tree over `tree_ms`, eased, however fast the run steps; only those items
   are laid out, the camera keeps the whole tree in view, and the tree's
   branches and names ([treeover.ts](treeover.ts)) come in under them as
-  they arrive).
+  they arrive, and at least as fast as what left fades out, `gone_ms`).
 - **Every number is a dial**, in the legend's dials tab: each behaviour's,
   then the start, find, the run and the drawing, in sections that start
   closed and say how many of their dials are changed; springs and flow are
@@ -59,7 +59,9 @@ find line has words, only what it finds and what lies near it.
   not at every letter. Whatever leaves the map, by the find line or the
   legend, fades out where it stood over `gone_ms` ([gone.ts](gone.ts)),
   from as strong as it was drawn, and whatever comes onto it fades in where
-  it lands over `come_ms`. Its links and its title (if shown) leave with it,
+  it lands over `come_ms`. What stays but takes a new size (fewer of its
+  links shown) grows or shrinks to it over `resize_ms`. A ghost keeps the
+  hollow or half shape it was drawn with. Its links and its title (if shown) leave with it,
   and a pointed-at item's light fades the other titles out over `dim_ms`
   before they go.
   What it finds is drawn whole, closed or not, and named first; the

@@ -213,8 +213,9 @@ const views_: Pack<Config> = {
       const found = search(all, q);
       const now = show.shown();
       const choose = (v: View | undefined) => {
-        if (v) switchTo(v);
-        setOpen(false);
+        // Closed inside the switch, so the list fades out with the view it was over.
+        if (v) faded(() => (pick(v), setOpen(false)), config);
+        else setOpen(false);
       };
       const key = (e: KeyboardEvent) => {
         if (e.key === "Escape") setOpen(false);
