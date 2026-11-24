@@ -153,8 +153,29 @@ export class Light {
  * half is that ring and whose left half stays solid, as ◐ (one fill, the
  * hole punched only on the right, so it never reads as two shapes).
  */
+/** Each icon's path, made once (Path2D is the page's, so it is made where it is drawn). */
+const ICONS = new Map<string, Path2D>();
+
+/** A type's icon in place of its shape: the 24 by 24 path stroked in the particle's colour, as wide as the shape would be. */
+function icon(c: CanvasRenderingContext2D, d: string, x: number, y: number, r: number): void {
+  let p = ICONS.get(d);
+  if (!p) ICONS.set(d, (p = new Path2D(d)));
+  const s = (r * 2.2) / 24;
+  c.save();
+  c.translate(x - 12 * s, y - 12 * s);
+  c.scale(s, s);
+  c.strokeStyle = c.fillStyle;
+  c.lineWidth = 2;
+  c.lineJoin = "round";
+  c.lineCap = "round";
+  c.stroke(p);
+  c.restore();
+}
+
 function particle(c: CanvasRenderingContext2D, g: G, i: number, r: number, S: Settings, k: number, sea: string): void {
   const shape = S.shapes ? g.shape[i]! : CIRCLE, x = g.x[i]!, y = g.y[i]!;
+  const d = g.types[g.typeIx[i]!]?.icon;
+  if (d) return icon(c, d, x, y, r);
   c.beginPath();
   outline(c, shape, x, y, r);
   c.fill();
@@ -362,7 +383,8 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     const r = g.r[i]! * cam.k;
     // Wide enough: the title inside the particle, on as many lines as fit across it (at most three), the last cut with ….
     const rows = Math.min(3, Math.floor((2 * r * 0.75) / LINE));
-    const lines = S.label_inside! > 0 && 2 * r >= S.label_inside! && rows >= 1 ? wrap(c, clip(g.title[i]!, S.label_chars!), 2 * r * 0.8, rows) : [];
+    // An icon is drawn lines, not a filled shape: its title goes beside it, never over it.
+    const lines = S.label_inside! > 0 && 2 * r >= S.label_inside! && rows >= 1 && !g.types[g.typeIx[i]!]?.icon ? wrap(c, clip(g.title[i]!, S.label_chars!), 2 * r * 0.8, rows) : [];
     // Lines of under four letters in all say nothing: then the title goes beside, whole.
     const inside = lines.join("").replace("…", "").length >= 4;
     const text = inside ? lines : [clip(g.title[i]!, S.label_chars!)];

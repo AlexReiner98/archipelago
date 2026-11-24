@@ -23,6 +23,12 @@ export interface FieldIn {
    * something else (a review's pass and fail). Absent: every type its hue.
    */
   colours?: Record<string, string>;
+  /**
+   * An icon for some types, by name, drawn in place of the mark's shape: an
+   * SVG path in a 24 by 24 box, stroked in the type's colour (a part as a
+   * cube, a rule as a ruler). Absent: the mark's shape.
+   */
+  icons?: Record<string, string>;
   links: { id: Id; type: string; from: Id; to: Id }[];
 }
 
@@ -56,8 +62,8 @@ export interface G {
   /** Each particle's shape (MARK_SHAPES) and how full it is (SIDES): shapes.ts. */
   shape: Uint8Array;
   side: Uint8Array;
-  /** The types drawn, each with its colour; a particle's colour is its type's. */
-  types: { name: string; colour: string }[];
+  /** The types drawn, each with its colour and any icon (FieldIn.icons); a particle's colour is its type's. */
+  types: { name: string; colour: string; icon?: string }[];
   typeIx: Int32Array;
   linkKinds: string[];
   x: Float32Array;
@@ -96,7 +102,7 @@ export function build(input: FieldIn, last: G | null, pal: string[] = []): G {
   const items = input.items;
   const n = items.length;
   const at = new Map(items.map((it, i) => [it.id, i]));
-  const types = typeColours(input.types ?? items.map((it) => it.type), pal, input.colours);
+  const types = typeColours(input.types ?? items.map((it) => it.type), pal, input.colours).map((t) => (input.icons?.[t.name] ? { ...t, icon: input.icons[t.name] } : t));
   const typeNames = types.map((t) => t.name);
   const typeIx = new Map(typeNames.map((t, k) => [t, k]));
   const links = input.links.filter((l) => at.has(l.from) && at.has(l.to) && l.from !== l.to);
