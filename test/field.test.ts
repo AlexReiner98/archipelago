@@ -445,3 +445,15 @@ test("an item that comes onto the map fades in where it lands over come_ms; what
   assert.equal(comeFade(0, 600), 0);
   assert.equal(comeFade(100, 0), 1, "0: it shows at once");
 });
+
+test("an arranged tree's names are boxes on screen that the items' titles give way to: ghosts' below, boughs' above", async () => {
+  const { treeNameBoxes } = await import("../packs/field/treeover.ts");
+  const a = { profile: "P", items: {}, wires: [], boughs: [{ at: [10, 0] as [number, number], text: "tool" }], ghosts: [{ at: [0, 0] as [number, number], text: "Check" }] };
+  const S = { ...settings(), tree_text: 10, tree_ghost_text: 5 };
+  const boxes = treeNameBoxes(a, { k: 2, tx: 100, ty: 50 }, 1, S, (t, px) => t.length * px * 0.5);
+  assert.equal(boxes.length, 2);
+  const [g, b] = boxes as [number[], number[]];
+  assert.ok(g[0]! < 100 && g[2]! > 100, "the ghost's name is centred on its spot");
+  assert.ok(g[1]! > 50, "and sits below it");
+  assert.ok(b[3]! < 50 && b[0]! < 120 && b[2]! > 120, "a bough's name sits above its spot, centred");
+});

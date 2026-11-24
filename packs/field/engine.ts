@@ -20,7 +20,7 @@ import { onStyle } from "../../spec/style.ts";
 import { ink, Light, paint, palette, type Cam, type Ink } from "./paint.ts";
 import { step, warm } from "./step.ts";
 import { FAINT, FOUND } from "./filter.ts";
-import { arrived, fly, paintTree, takeOff, targetsOf, treeBox, type Arranged, type Flight } from "./treeover.ts";
+import { arrived, fly, paintTree, takeOff, targetsOf, treeBox, treeNameBoxes, type Arranged, type Flight } from "./treeover.ts";
 
 export interface Stats {
   n: number;
@@ -201,6 +201,11 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
         const r = el.getBoundingClientRect();
         return [r.left - at.left - 4, r.top - at.top - 4, r.right - at.left + 4, r.bottom - at.top + 4] as [number, number, number, number];
       });
+      // Arranged, the tree's own names are taken too: an item's title gives way to them.
+      if (tree) {
+        c.font = "500 10px ui-sans-serif, system-ui, sans-serif";
+        clear.push(...treeNameBoxes(tree, cam, scale(), S, (t, px) => (c.measureText(t).width * px) / 10));
+      }
       paint(c, g, cam, S, light, colours, pick, s, match, clear);
       drawn = { g, match };
       // Arranged into a profile: its tree comes in under the items as they reach their places.

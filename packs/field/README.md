@@ -43,7 +43,8 @@ find line has words, only what it finds and what lies near it.
   tree over `tree_ms`, eased, however fast the run steps; only those items
   are laid out, the camera keeps the whole tree in view, and the tree's
   branches and names ([treeover.ts](treeover.ts)) come in under them as
-  they arrive, and at least as fast as what left fades out, `gone_ms`).
+  they arrive, and at least as fast as what left fades out, `gone_ms`; the
+  items' titles give way to its names).
 - **Every number is a dial**, in the legend's dials tab: each behaviour's,
   then the start, find, the run and the drawing, in sections that start
   closed and say how many of their dials are changed; springs and flow are

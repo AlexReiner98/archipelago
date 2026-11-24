@@ -108,6 +108,21 @@ function pathOf(d: string): Path2D {
   return p;
 }
 
+type Box = [number, number, number, number];
+
+/**
+ * Where the tree's own names stand on screen (css px, as paintTree draws them: the boughs' above their
+ * spot, the ghosts' below theirs), so the items' titles give way to them. `measure` gives a text's width at a size.
+ */
+export function treeNameBoxes(a: Arranged, cam: Cam, scale: number, S: Settings, measure: (text: string, px: number) => number): Box[] {
+  const size = (S.tree_text ?? 11) * scale * cam.k, ghost = (S.tree_ghost_text ?? 7) * scale * cam.k;
+  const box = (x: number, y: number, text: string, px: number, dy: number): Box => {
+    const sx = x * scale * cam.k + cam.tx, sy = y * scale * cam.k + cam.ty + dy, w = measure(text, px) / 2 + 2;
+    return [sx - w, sy - px * 0.7, sx + w, sy + px * 0.7];
+  };
+  return [...a.ghosts.map((g) => box(g.at[0], g.at[1], g.text, ghost, ghost * 1.3)), ...a.boughs.map((b) => box(b.at[0], b.at[1], b.text, size, -size * 0.9))];
+}
+
 /** Paints the tree: branches, then the ghosts' dots and every name, at strength `alpha`. */
 export function paintTree(c: CanvasRenderingContext2D, a: Arranged, cam: Cam, dpr: number, scale: number, alpha: number, ink: Ink, S: Settings): void {
   if (alpha <= 0.01) return;
