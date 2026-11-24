@@ -1,8 +1,9 @@
 /**
  * A view picked fades into the one shown: the page as it was (the list over
- * it too) crossfades into the new view over `switch_ms`, once the new view
- * has had `switch_wait_ms` to lay itself out, so its first, unsettled
- * frames are never seen. Without View Transitions in the browser, with
+ * it too) fades out over the first half of `switch_ms` and the new view in
+ * over the second, never both at once (two layouts over each other read as
+ * a double image), once the new view has had `switch_wait_ms` to lay itself
+ * out, so its first, unsettled frames are never seen. Without View Transitions in the browser, with
  * reduced motion asked for, or with `switch_ms` 0, the view changes at once.
  */
 export interface Fade {
@@ -32,15 +33,25 @@ export function faded(update: () => void, fade: Fade = {}, start: Start | undefi
     update();
     return false;
   }
-  if (typeof document !== "undefined") document.documentElement.style.setProperty("--vw-switch", `${ms}ms`);
-  start(async () => {
+  const root = typeof document !== "undefined" ? document.documentElement : undefined;
+  root?.style.setProperty("--vw-switch", `${ms}ms`);
+  // While it runs, every part of the page (a view's own named parts too) fades out, then in.
+  root?.classList.add("vw-switch");
+  const t = start(async () => {
     update();
     await wait(fade.switch_wait_ms ?? FADE_DEFAULTS.switch_wait_ms);
-  });
+  }) as { finished?: Promise<unknown> } | undefined;
+  const done = () => root?.classList.remove("vw-switch");
+  if (t?.finished) t.finished.then(done, done);
+  else done();
   return true;
 }
 
 /** The crossfade's timing, for the page's style sheet. */
 export const FADE_STYLE = `
-::view-transition-old(root), ::view-transition-new(root) { animation-duration:var(--vw-switch, .45s); animation-timing-function:ease-in-out; }
+html.vw-switch::view-transition-group(*) { animation-duration:var(--vw-switch, .45s); }
+html.vw-switch::view-transition-old(*) { animation:vw-old var(--vw-switch, .45s) ease-in both; }
+html.vw-switch::view-transition-new(*) { animation:vw-new var(--vw-switch, .45s) ease-out both; }
+@keyframes vw-old { 0% { opacity:1; } 50%, 100% { opacity:0; } }
+@keyframes vw-new { 0%, 45% { opacity:0; } 100% { opacity:1; } }
 `;

@@ -67,7 +67,7 @@ own.
   view of that kind; not while the shown view's own fill is gone, when the
   frame is only standing another fill in for it. `views.view` (page) says which view shows.
 - **A picked view fades in** ([fade.ts](fade.ts)): the page as it was (the
-  list over it too) crossfades into the new view over `switch_ms` (450),
+  list over it too) fades out over the first half of `switch_ms` (450) and the new view in over the second, never both at once,
   once the new view has laid itself out for `switch_wait_ms` (300) under the
   old picture, so its first unsettled frames are never seen. Both are the
   pack's config; `switch_ms: 0`, reduced motion, or a browser without View
