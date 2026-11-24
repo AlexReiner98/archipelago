@@ -34,6 +34,9 @@ export function placementOf(ps: ProfileInfo[], fallbacks: ReadonlySet<string>, s
   return { kind: fallback ? "fallback" : "matched", title: matched.map((p) => p.title).join(", "), ids: ps.map((p) => p.id), id: matched[0]!.id };
 }
 
+/** Whether an agent's tree can be drawn yet: what it hears, and where it is placed, are both known. */
+export const heardYet = (a: { hears?: ReadonlySet<string>; placement?: Placement }): boolean => a.hears !== undefined && a.placement !== undefined;
+
 export const PLACEMENT_MARK: Record<Placement["kind"], string> = { matched: "●", fallback: "○", none: "–" };
 export const placementText = (p: Placement) => `${PLACEMENT_MARK[p.kind]} ${p.kind === "none" ? "no context filter" : p.title}`;
 export const placementTip = (p: Placement) =>

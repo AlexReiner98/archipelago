@@ -72,7 +72,10 @@ the filter's own tree (`openFilter`).
 ## The agents ([trees.ts](trees.ts), [agents.ts](agents.ts))
 
 Live mode and the agents are one idea: each live run is an agent, in the
-colour live mode gives it, with a tree of its own. One is in focus, big,
+colour live mode gives it, with a tree of its own. An agent's tree is drawn
+once both where it is placed and what it hears are known (`heardYet`), and
+"No agent is live" only once the runs are read: the view never shows every
+node, or none, before its filter's tree. One is in focus, big,
 with every name; the others are small previews in a column to its left, in
 the order of their colours so each keeps its place, and a click on one
 brings it into focus. The switch is smooth: the one clicked grows into

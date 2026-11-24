@@ -947,3 +947,12 @@ test("openFilter: a context filter's view, live on its session when one is live,
   assert.equal(none.get("harness.live"), undefined);
   assert.equal(none.get("here.view"), VIEW);
 });
+
+test("heardYet: an agent's tree waits for what it hears and where it is placed, never every node first", async () => {
+  const { heardYet } = await import("../packs/harness/agents.ts");
+  const placement = { kind: "matched" as const, title: "F", ids: ["f"], id: "f" };
+  assert.equal(heardYet({}), false);
+  assert.equal(heardYet({ hears: new Set(["a"]) }), false, "placed not yet known");
+  assert.equal(heardYet({ placement }), false, "what it hears not yet known");
+  assert.equal(heardYet({ hears: new Set(), placement }), true);
+});

@@ -45,7 +45,7 @@ const FIELD_MARKS = "field.marks";
 import { Events, short } from "./events.ts";
 import { ALL, FOCUS, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
 import { colourOf, colours } from "./live.ts";
-import { AGENTS_STYLE, placementOf, ProfileMenu } from "./agents.ts";
+import { AGENTS_STYLE, heardYet, placementOf, ProfileMenu } from "./agents.ts";
 import { focusOf, switchFocus, Trees, TREES_STYLE, treesAndRows } from "./trees.ts";
 import { DIALS_KEY, DIALS_STYLE, DialsPane, useDials } from "./dials.ts";
 import { Bar, BAR_STYLE } from "./bar.ts";
@@ -216,7 +216,7 @@ const harness: Pack = {
 
     const Center = () => {
       const nodes = hk.useNodes();
-      const { runs, run, pinned, all, live, lives, current, info } = hk.useRun();
+      const { runs, run, pinned, all, live, lives, current, info, loaded } = hk.useRun();
       const colour = useLiveColours(lives);
       const liveEvents = hk.useLiveEvents(lives.map((r) => r.run), live);
       const fires = useRef<Fire | undefined>(undefined);
@@ -346,7 +346,8 @@ const harness: Pack = {
           }),
         [lives, colour, placements, fallbacks, acting, hears],
       );
-      const agents = useMemo(() => everyAgent.filter((a) => split.trees.includes(a.run.run)), [everyAgent, split]);
+      // An agent's tree is drawn once what it hears is known: never every node first, then its filter's.
+      const agents = useMemo(() => everyAgent.filter((a) => split.trees.includes(a.run.run) && heardYet(a)), [everyAgent, split]);
       // The root of the run looked at, drawn as its context filter is on the Landscape: its item's type's mark
       // there (field.marks, a page key by name), so the tree reads as that item.
       const rootFilter = windowRun && placements.has(windowRun) ? placementOf(placements.get(windowRun)!, fallbacks).id : undefined;
@@ -452,7 +453,7 @@ const harness: Pack = {
                   </div>
                   ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} run=${windowRun} /></div>`}
                 </div>`}
-            ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
+            ${live && loaded && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
             ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${((r) => (r ? runName(r) : menu.run.slice(0, 8)))(lives.find((r) => r.run === menu.run))} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}
           </div>
           ${run && html`<${Timeline}

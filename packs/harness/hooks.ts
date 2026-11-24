@@ -113,8 +113,9 @@ export function hooks(c: Caps) {
     return nodes;
   };
 
-  const useRuns = (): RunInfo[] => {
-    const [runs, setRuns] = useState<RunInfo[]>([]);
+  /** The runs, last active first; undefined until first read, so a view never says "none" before it knows. */
+  const useRuns = (): RunInfo[] | undefined => {
+    const [runs, setRuns] = useState<RunInfo[]>();
     useEffect(() => {
       // Runs come last active first, so any event may move one up: read again, at most every so often.
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -141,7 +142,9 @@ export function hooks(c: Caps) {
    * the view lands on them.
    */
   const useRun = () => {
-    const runs = useRuns();
+    const read = useRuns();
+    const loaded = read !== undefined;
+    const runs = useMemo(() => read ?? [], [read]);
     const pinned = useHere<string>("here.run");
     const said = useHere<boolean>(LIVE);
     const every = useHere<boolean>(ALL) === true;
@@ -156,7 +159,7 @@ export function hooks(c: Caps) {
     const live = landsLive(said, pinned, every, current.length > 0);
     const all = !live && every;
     const run = all || live ? undefined : (pinned ?? runs[0]?.run);
-    return { runs, run, pinned, all, live, lives: live ? current : [], current, info: runs.find((r) => r.run === run) };
+    return { runs, run, pinned, all, live, lives: live ? current : [], current, info: runs.find((r) => r.run === run), loaded };
   };
 
   /** The runs a profile has in it (`profile.read.of`), from those given; undefined while it reads. */
@@ -369,10 +372,17 @@ export function hooks(c: Caps) {
    * kept live: each agent's own tree. Runs in the same profiles hear the
    * same nodes, so it is asked once per set of profiles, not once per run.
    */
+  /** No run's answer yet. */
+  const EMPTY_HEARS = new Map<string, Set<string>>();
   const useHears = (runs: RunInfo[], nodes: NodeInfo[], placements: Map<string, ProfileInfo[]>): Map<string, Set<string>> => {
-    const [m, setM] = useState<Map<string, Set<string>>>(new Map());
+    // Kept with the placements it was read for: a run's answer shows only for the placements it has now, never one
+    // read before they came (which would be every node, then its filter's).
+    const [got, setGot] = useState<{ key: string; m: Map<string, Set<string>> }>({ key: "", m: new Map() });
     const groups = groupsOf(runs, placements);
-    const key = `${[...groups].map(([g, rs]) => `${g}:${rs.map((r) => r.run).join(",")}`).join("\n")}|${nodes.map((n) => n.id).join(",")}`;
+    const placed = [...groups].map(([g, rs]) => `${g}:${rs.map((r) => r.run).join(",")}`).join("\n");
+    const key = `${placed}|${nodes.map((n) => n.id).join(",")}`;
+    // Read again for new nodes, the last answer stands meanwhile; only new placements wait for theirs.
+    const setM = (m: Map<string, Set<string>>) => setGot({ key: placed, m });
     useEffect(() => {
       let gone = false;
       const load = () =>
@@ -390,7 +400,7 @@ export function hooks(c: Caps) {
         void stop();
       };
     }, [key]);
-    return m;
+    return got.key === placed ? got.m : EMPTY_HEARS;
   };
 
   /**
