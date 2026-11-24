@@ -215,7 +215,8 @@ export function useWindow(invoke: ActionInvoke, has: boolean, run: string | unde
 }
 
 export const WINDOWBAR_STYLE = sheet(`
-.hv-win { padding:var(--space-2) var(--space-4) var(--space-3); display:grid; gap:3px; min-width:0; border-top:1px solid var(--line); }
+.hv-win { padding:var(--space-2) var(--space-4) var(--space-3); display:grid; gap:3px; min-width:0; border-top:1px solid var(--line); box-sizing:border-box; min-height:26px; align-content:start; }
+.hv-win.open { min-height:128px; }
 .hv-win .t { display:flex; gap:var(--space-3); align-items:baseline; white-space:nowrap; color:var(--dim); font-size:var(--text-s); min-width:0; overflow:hidden; }
 .hv-win .hv-whead { font:inherit; background:none; border:0; color:inherit; padding:0; cursor:pointer; }
 .hv-win .hv-whead:hover { color:var(--fg); }
@@ -327,7 +328,8 @@ function windowOpen(): boolean {
 
 export const WindowBar = ({ w, filter, hues, picked, onPick }: { w?: WindowRead; filter?: KeyFilter; hues?: Map<string, string>; picked?: string; onPick?(id: string): void }) => {
   const [open, setOpen] = useState(windowOpen);
-  if (!w) return "";
+  // Before the window is read, its room is kept, open or folded as it will be: the tree above never moves for it.
+  if (!w) return html`<div class=${`hv-win${open ? " open" : ""}`} aria-hidden="true"></div>`;
   const { sources, channels } = sharesOf(w);
   const full = pct(w.total.tokens, w.limit.tokens);
   const limitTip = w.limit.from === "model" ? `the window of ${w.model ?? "the model"}` : w.limit.from === "seen" ? "the long window: more than 200k was seen in it" : "the usual window; the model doesn't say";
@@ -339,7 +341,7 @@ export const WindowBar = ({ w, filter, hues, picked, onPick }: { w?: WindowRead;
       localStorage.setItem(WINDOW_OPEN, open ? "0" : "1");
     } catch {}
   };
-  return html`<div class="hv-win" onPointerDown=${(e: Event) => e.stopPropagation()}>
+  return html`<div class=${`hv-win${open ? " open" : ""}`} onPointerDown=${(e: Event) => e.stopPropagation()}>
     <div class="t">
       <button class="hv-whead" title=${open ? "Fold the window to one line" : "Open the window: its share by source, by channel, and the map's own"} onClick=${toggle}>window ${open ? "▾" : "▸"}</button>
       <span title=${totalTip}>${w.total.from === "estimate" ? "≈ " : ""}<b>${tok(w.total.tokens)}</b> of <span title=${limitTip}>${tok(w.limit.tokens)}</span> · ${full.toFixed(full < 10 ? 1 : 0)}%</span>

@@ -168,6 +168,8 @@ export interface TreesProps {
   /** The window of the agent in focus, live, and each node's place in it (windowbar.ts). */
   win?: WindowRead;
   winMarks?: ReadonlyMap<string, WindowMark>;
+  /** The window will be read (the context pack is here): its bar keeps its room before it is. */
+  winSoon?: boolean;
   /** The focused agent's context filter's mark as the Landscape draws it: its root is drawn so. */
   rootMark?: RootMark;
   /** How long the pointer rests on a node before its words show (the `tip_ms` dial). */
@@ -207,7 +209,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
   const mine = useMemo(() => p.events.filter((e) => e.run === a.run.run), [p.events, a.run.run]);
   const state = useMemo(() => stateAt(mine, mine.length - 1), [mine]);
   const title = runName(a.run);
-  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}${big && p.win ? " win" : ""}`} style=${`--hv-vt:${transitionName(a.slot)}`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
+  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}${big && (p.win || p.winSoon) ? " win" : ""}`} style=${`--hv-vt:${transitionName(a.slot)}`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
     <div class="hd">
       <span class="d" style=${`color:${a.colour}`}>●</span>
       <span class="who" title=${big ? `${title}\nLook at it alone` : `${title}\nBring it into focus`} onClick=${big ? () => p.onOpen(a.run.run) : undefined}>${title}</span>
@@ -215,7 +217,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
       <span class="n" title=${`The nodes it hears, of all${extra?.length ? `; and ${extra.length} the harness gave it` : ""}`}>${a.hears ? (big ? `${heard.length} / ${p.nodes.length}` : heard.length) : ""}${extra?.length ? ` + ${extra.length}` : ""}</span>
     </div>
     <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} root=${a.placement ? (a.placement.kind === "none" ? "no context filter" : a.placement.title) : undefined} rootMark=${big ? p.rootMark : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} quietPx=${p.quietPx} giveWay=${p.giveWay} sparkS=${p.sparkS} sparkX=${p.sparkX} fitMs=${p.fitMs} settleMs=${p.settleMs} wheelMs=${p.wheelMs} />
-    ${big && p.win && html`<${WindowBar} w=${p.win} filter=${p.keyFilter} hues=${p.hues} picked=${p.picked} onPick=${p.onPick} />`}
+    ${big && (p.win || p.winSoon) && html`<${WindowBar} w=${p.win} filter=${p.keyFilter} hues=${p.hues} picked=${p.picked} onPick=${p.onPick} />`}
   </div>`;
 };
 
