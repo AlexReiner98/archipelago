@@ -29,7 +29,7 @@ A domain pack injects `checks.domain` and registers, as its own effect:
 |---|---|
 | `subject` | The type, or types, of item its tests check |
 | `fns` | Or: the rule functions it judges, whatever the subject (looked at before `subject`) |
-| `judge({ subject, other?, subjects, fn, params, read? })` | Answers `{ passed, findings }`; throwing is an `error` result |
+| `judge({ subject, other?, subjects, fn, params, test, version, read? })` | Answers `{ passed, findings }`; throwing is an `error` result. `test` is the id of the test it solves and `version` the version it solves it at (with recorded reads, the one its old reads give; the result can land at another once the new reads are known) |
 | `stamp` | Only for a judge that can't read the graph: the subject's field that is its stamp (a hash of a file) |
 | `limits()` | Optional: per rule `fn`, which param is its limit and which side fails (`below` or `above`) |
 | `finding(f)` | Optional: a finding's identity (the face it is on, the field it names), or undefined. See below |

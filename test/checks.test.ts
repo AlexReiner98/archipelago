@@ -628,3 +628,14 @@ test("the pack: checks.decide keeps the findings' identities when the domain nam
     await s.stop();
   }
 });
+
+test("a judge is told the test it solves and the version it solves it at, either way of stamping", async () => {
+  const seen: [string, string][] = [];
+  const spy = (stamp?: string): Judging => ({ ...(stamp ? { stamp } : {}), judge: async (c) => (seen.push([c.test, c.version]), { passed: true, findings: [] }) });
+  for (const s of ["rev", undefined]) {
+    seen.length = 0;
+    const { g, writes, apply } = live([item("p", "part", { rev: "r1" }), item("r", "rule", { fn: "min" }), item("t", "test")], [["checks", "t", "p"], ["applies", "t", "r"]]);
+    await solve(["t"], g, () => spy(s), apply);
+    assert.deepEqual(seen, [["t", writes[0]!.version]]);
+  }
+});

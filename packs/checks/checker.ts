@@ -76,6 +76,9 @@ export interface JudgeCall {
   subjects: Item[];
   fn: string;
   params: Json;
+  /** The test being solved, and the version it is solved at (for recorded reads, the version its old reads give now; the result may land at another once the new reads are known). */
+  test: string;
+  version: string;
   /** The tracked reader; absent for a domain with a declared stamp. */
   read?: Reader;
 }
@@ -482,7 +485,7 @@ async function solveDeclared(id: string, test: Item, shape: Shape, needs: [strin
   } else {
     try {
       const subjects = [first!, ...(more as Item[]), ...(other ? [other] : [])];
-      const r = await domain!.judge({ subject: first!, ...(other ? { other } : {}), subjects, fn: rule!.fields.fn as string, params: rule!.fields.params ?? {} });
+      const r = await domain!.judge({ subject: first!, ...(other ? { other } : {}), subjects, fn: rule!.fields.fn as string, params: rule!.fields.params ?? {}, test: id, version });
       result = r.passed ? "pass" : "fail";
       findings = r.findings;
     } catch (err) {
@@ -519,7 +522,7 @@ async function solveTraced(id: string, test: Item, shape: Shape, needs: [string,
     try {
       const got = await t.reader.get(subjects.slice(0, LIMIT_MAX));
       const items = got.filter((x): x is Item => !!x);
-      const r = await domain!.judge({ subject: items[0]!, ...(against.length && got[checks.length] ? { other: got[checks.length]! } : {}), subjects: items, fn: fn as string, params: params ?? {}, read: t.reader });
+      const r = await domain!.judge({ subject: items[0]!, ...(against.length && got[checks.length] ? { other: got[checks.length]! } : {}), subjects: items, fn: fn as string, params: params ?? {}, read: t.reader, test: id, version: now });
       result = r.passed ? "pass" : "fail";
       findings = r.findings;
     } catch (err) {

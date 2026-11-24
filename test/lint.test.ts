@@ -30,7 +30,7 @@ const fn = (name: string) => FNS.find((f) => f.name === name)!;
 async function judge(name: string, params: Json, items: Item[], links: [string, string, string][] = [], today = "2026-11-24") {
   const t = tracker(graph(items, links), () => today);
   const [subject] = await t.reader.get([items[0]!.id]);
-  const v = await fn(name).judge({ subject: subject!, subjects: [subject!], fn: name, params, read: t.reader });
+  const v = await fn(name).judge({ subject: subject!, subjects: [subject!], fn: name, params, read: t.reader, test: "t", version: "v" });
   return { ...v, reads: t.reads() };
 }
 
