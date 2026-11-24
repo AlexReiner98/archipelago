@@ -88,6 +88,33 @@ The checker is in [checker.ts](checker.ts), apart from the runtime.
 
 The reading is in [rejections.ts](rejections.ts).
 
+## The Checks view
+
+Page side, [view.ts](view.ts): a view in `center`, `checks/results`
+("Checks"), off in [app/boot.ts](../../app/boot.ts) until a server runs this
+pack (`page.set { pack: "checks", on: true }`). Tests grouped by rule or by
+subject, each with its result mark, its first finding (all of them on a
+click), and accept and reject (`checks.decide`, as the person at the page).
+Under a rule, `try` previews other params (`checks.preview`, at most 50
+judge calls) and lists what would flip. It knows no domain: lint and any
+other show the same way.
+
+What it shows is page keys, so a view item composes it as data:
+
+| Key | What |
+|---|---|
+| `checks.query` | Which tests, in find's query; default `type:test` (`type:test in:<id>` for one hub's) |
+| `checks.group` | `rule` (default) or `subject` |
+| `checks.show` | The results to show, such as `["fail", "error"]`; absent, all |
+
+For example, a view item with `center: "checks/results"` and `here:
+{ "checks.group": "subject", "checks.show": ["fail"] }` is "what fails,
+item by item". The bar's chips set the same keys. It reads the map through
+find's index and writes only through actions.
+
+Injects (page) `find.index`, `here.declare`, `here.read`, `here.set`,
+`slot.fill`, `action.invoke`.
+
 ## Decisions per finding
 
 Without a `finding` hook, a decision is cleared whenever the test's
