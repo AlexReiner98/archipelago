@@ -44,7 +44,10 @@ as `schema.quarantined` or `action.input`) is a node too, made through
 `words.add` the first time the code is seen: kind `schema_check` for the
 schema's, `rule` for the rest, at `tool_result:mcp__archipelago__*` with
 `when` `Refused (<code>)`. The tool still answers with the refusal's own
-message; the adapter reaches the tool's result with it, where the node says
+message. For `action.input` it adds the shape the action takes and, on a
+line of its own, `fix: ` and the refusal's `InputRefusal` as JSON (edition
+11, [spec](../../spec/action.md)): each path, what it wants and an example,
+and the input to send instead. The adapter reaches the tool's result with it, where the node says
 its words. So each kind is said, judged by the verdicts, and reworded with
 `words.set` like any instruction.
 

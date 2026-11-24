@@ -14,8 +14,18 @@ only pack given it, and `graph.read`, to find an attestation's test.
 - What an action and the actions it `call`s write is one change set,
   committed when the outermost returns, or nothing. A refusal anywhere comes
   back as `{ ok: false, refused }`.
-- Input is checked only for its `required` keys; full schema checks are the
-  schema pack's.
+- An input is checked against the action's declared `input` before it
+  runs ([input.ts](input.ts)): `type`, `required`, `properties`,
+  `additionalProperties`, `items`, `enum` and `const`; anything else
+  (`anyOf`, `$ref`, bounds) passes here. One that doesn't fit is refused
+  `action.input`, its message each path and what it wants, its `detail`
+  an `InputRefusal` (edition 11): a fix per path (`path`, `expected`,
+  `example`) and the input with every fix applied. An example is what was
+  given turned into the wanted kind where that is plain (`"3"` to 3, one
+  value to a list of it), else the schema's `examples`, `default` or first
+  `enum`, else a `<name>` placeholder; a key the schema shuts out is
+  dropped. `fixLine` and `fixIn` write it after a refusal's words and read
+  it back, for the mcp pack and the harness.
 - `action.attest` runs an action on a test's word: the actor is
   `test:<id>` and the authority's basis `test <id> at <version>`. It is
   refused (`action.attest`) when the test isn't on the graph or the
