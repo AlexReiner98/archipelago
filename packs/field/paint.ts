@@ -90,6 +90,8 @@ export class Light {
   shine = new Float32Array(0);
   shining = new Set<number>();
   focus = -1;
+  /** A particle a view has picked (Field.pick): ringed in the accent whatever else is lit, -1 for none. */
+  picked = -1;
   /** Each link name's fade, by link: names fade in and out, never pop (wires.ts). */
   wires = new Map<number, WireFade>();
   /** True while a link name is still fading: the view keeps painting. */
@@ -354,6 +356,18 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
       outline(c, S.shapes ? g.shape[i]! : CIRCLE, g.x[i]!, g.y[i]!, rr + lw / 2);
       c.stroke();
     }
+  }
+  // The particle a view picked: an accent ring, as the one pointed at has, so it is found without fading the rest.
+  const p = light.picked;
+  if (p >= 0 && p < g.n && S.hover_ring! > 0 && inView(p, g.r[p]!)) {
+    const rr = grown.get(p) ?? g.r[p]!, lw = Math.min(S.hover_ring! / cam.k, rr / 2), gap = 2 / cam.k;
+    c.globalAlpha = 1;
+    c.strokeStyle = ink.accent;
+    c.lineWidth = lw;
+    c.lineJoin = "round";
+    c.beginPath();
+    outline(c, S.shapes && !g.types[g.typeIx[p]!]?.icon ? g.shape[p]! : CIRCLE, g.x[p]!, g.y[p]!, rr + gap + lw / 2);
+    c.stroke();
   }
 
   // Words, in screen space (labels.ts places them): the lit first, then what the find line finds, then what was
