@@ -2,7 +2,8 @@
  * The action pack: the one way anyone changes anything. Provides
  * action.register, action.list, action.invoke and action.attest (edition
  * 11: a change on a test's word) (spec/action.md), and is the only pack
- * given graph.commit.
+ * given graph.commit. An input that doesn't fit its action's schema is
+ * refused with how to fix it (input.ts, edition 11).
  *
  * Who is calling is read from the calling context: the actor and run that
  * interception set, else the calling pack itself. Everything an action
@@ -14,6 +15,7 @@ import type { Fact } from "../../spec/changeset.ts";
 import type { Actor, Authority, Caller, Dispose, Json, Refusal } from "../../spec/common.ts";
 import { Refused } from "../../spec/common.ts";
 import { UNDO } from "../../spec/action.ts";
+import { check, message } from "./input.ts";
 import type { GraphCommit, GraphRead } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 
@@ -27,14 +29,6 @@ function refusalOf(err: unknown, action: string): Refusal {
   const r = (err as { refusal?: Refusal })?.refusal;
   if (r?.code) return r;
   return { code: "action.failed", message: `${action} failed: ${(err as Error)?.message ?? String(err)}`, by: { pack: "action" } };
-}
-
-/** Required properties of an object input schema, checked shallowly; the schema pack checks the rest. */
-function missing(schema: Record<string, Json>, input: Json): string[] {
-  const required = Array.isArray(schema.required) ? (schema.required as string[]) : [];
-  if (!required.length) return [];
-  if (!input || typeof input !== "object" || Array.isArray(input)) return required;
-  return required.filter((k) => !(k in input));
 }
 
 const action: Pack = {
@@ -105,8 +99,9 @@ const action: Pack = {
         const run = async (name: string, input: Json): Promise<Json> => {
           const r = actions.get(name);
           if (!r) throw new Refused({ code: "action.unknown", message: `No action ${name} is registered now.`, by: { pack: "action" } });
-          const lack = missing(r.def.input, input);
-          if (lack.length) throw new Refused({ code: "action.input", message: `${name} needs ${lack.join(", ")}.`, by: { pack: "action" } });
+          // An input that doesn't fit the declared schema: what to fix, and the input fixed (edition 11).
+          const wrong = check(r.def.input, input);
+          if (wrong) throw new Refused({ code: "action.input", message: message(name, wrong), by: { pack: "action" }, detail: wrong as unknown as Json });
           const actx: ActionContext = {
             caller,
             authority: call.authority,

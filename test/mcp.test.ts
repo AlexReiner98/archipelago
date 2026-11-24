@@ -27,6 +27,7 @@ import types from "../packs/types/index.ts";
 import words from "../packs/words/index.ts";
 import interchange from "../packs/interchange/index.ts";
 import work from "../packs/work/index.ts";
+import { fixIn } from "../packs/action/input.ts";
 
 const BASE = "mem:/packs/";
 const RUN = "run-1";
@@ -145,7 +146,10 @@ test("act writes through declared actions, shows what one takes, and undo takes 
     assert.equal(refused.isError, true);
     assert.match(refused.text, /todo, doing, done, dropped/);
     const flat = await s.call("act", { action: "items.set", input: { id, status: "doing" } });
-    assert.match(flat.text, /needs fields\. It takes: \{"id":.*"fields":/, "a misshapen input is told the shape");
+    assert.match(flat.text, /\/fields wants an object: it is required\. It takes: \{"id":.*"fields":/, "a misshapen input is told the shape");
+    const fix = fixIn(flat.text)!;
+    assert.deepEqual(fix.fix, [{ path: "/fields", expected: "an object: it is required", example: {} }], "and how to fix it, on its own line");
+    assert.deepEqual(fix.input, { id, status: "doing", fields: {} });
     const undone = await s.call("act", { action: "history.undo", input: { change: made.json.change }, reason: "test" });
     assert.ok(!undone.isError, undone.text);
     assert.deepEqual(await s.graph().get([id]), [null]);
@@ -178,7 +182,7 @@ test("each kind of refusal is a node, said at the tool's result when the result 
     const at = (input: string) => s.agent().reach({ run: RUN, places: ["tool_result:mcp__archipelago__act"], time: new Date().toISOString(), input });
     const said = await at(flat.text);
     assert.deepEqual(said.said.map((x) => x.node), [nodes.find((n) => n.title === "Refused: action.input")!.id]);
-    assert.match(said.said[0]!.text, /needs fields it wasn't given/);
+    assert.match(said.said[0]!.text, /fix line names each path/);
     assert.deepEqual((await at('{"output":{"id":"x"}}')).said, []);
 
     const input = nodes.find((n) => n.title === "Refused: action.input")!;

@@ -222,7 +222,8 @@ test("words.say listed: one line at session_start, the whole words at its other 
   assert.ok(out.ok && out.committed);
   if (out.ok) assert.deepEqual(out.committed!.facts, [["+", node!.source, "say", "listed"]]);
   const bad = await p.invoke.invoke({ action: "words.say", input: { node: node!.source!, say: "loud" }, authority: owner, reason: "x" });
-  assert.ok(!bad.ok && bad.refused.code === "words.say");
+  assert.ok(!bad.ok && bad.refused.code === "action.input", "the declared enum refuses it first");
+  assert.deepEqual((bad.refused.detail as { fix: unknown }).fix, [{ path: "/say", expected: "one of whole, listed", example: "whole" }]);
 
   const line = await p.run.reach({ run: "r2", places: ["session_start"], time: T });
   assert.deepEqual(line.said.map((s) => s.text), [`Ask first: said in full at file:spec/**; its words from the words tool, node ${node!.source}.`]);

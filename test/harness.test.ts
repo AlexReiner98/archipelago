@@ -901,3 +901,13 @@ test("calls: a parent's calls, newest first; a call's mark from its verdicts; th
   const nodes = [{ id: "w/style", at: ["check:*"] }, { id: "w/finding", at: ["finding"] }, { id: "w/bash", at: ["tool:Bash"] }, { id: "w/end", at: ["reply_end"] }];
   assert.deepEqual(requestNodes(nodes, runs[1]!).map((n) => n.id), ["w/style", "w/finding"]);
 });
+
+test("an act refused with a fix shows each fix and the input to send instead, under the refusal's words", () => {
+  const text = 'Refused (action.input): items.set: /fields wants an object: it is required.\nfix: {"fix":[{"path":"/fields","expected":"an object: it is required","example":{}}],"input":{"id":"i_1","fields":{}}}';
+  const parts = expand({ ...base, direction: "from_agent", kind: "act", place: "tool:mcp__archipelago__act", act: { kind: "tool", by: "agent", ok: false, input: { action: "items.set" }, output: text } });
+  const by = new Map(parts.map((p) => [p.label, p.text]));
+  assert.equal(by.get("output"), "Refused (action.input): items.set: /fields wants an object: it is required.", "the fix line comes out of the words");
+  assert.equal(by.get("fix /fields"), "wants an object: it is required\ne.g. {}");
+  assert.equal(by.get("send instead"), '{\n  "id": "i_1",\n  "fields": {}\n}');
+  assert.deepEqual(parts.map((p) => p.label).slice(-4), ["output", "fix /fields", "send instead", "at"]);
+});

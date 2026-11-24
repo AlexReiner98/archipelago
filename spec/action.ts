@@ -59,6 +59,28 @@ export type Outcome<O extends Json = Json> =
   | { ok: true; output: O; change?: ChangeSetId; committed?: Committed }
   | { ok: false; refused: Refusal };
 
+/**
+ * Edition 11: how to fix an input that doesn't fit an action's declared
+ * `input`. A refusal with code `action.input` carries an `InputRefusal` as
+ * its `detail`, one fix per place that failed, so the caller can correct
+ * its next call without guessing.
+ */
+export interface InputFix {
+  /** Where, as a JSON Pointer into the input: `""` the input itself, `/title`, `/links/0/to`. */
+  path: string;
+  /** What the schema wants there, in words: `a string`, `one of todo, done`, `not here`. */
+  expected: string;
+  /** A value that would pass there; null for a key that should go. */
+  example: Json;
+}
+
+/** The `detail` of an `action.input` refusal (edition 11). */
+export interface InputRefusal {
+  fix: InputFix[];
+  /** The input that was given, with every fix applied: what to send instead. */
+  input: Json;
+}
+
 /** What the registry tells callers about an action. */
 export interface ActionInfo {
   name: string;

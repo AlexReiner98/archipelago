@@ -276,7 +276,10 @@ run, "agent got": the whole block the hook handed the agent at that moment,
 each node's words under its tag and in the adapter's order, rebuilt with
 the adapter's own formatting ([got.ts](got.ts), packs/claude-code/context.ts);
 for the agent to the map,
-the act's input and output field by field, each label over its value.
+the act's input and output field by field, each label over its value. A
+refusal that says how to fix its input (edition 11) shows, under its words,
+a `fix <path>` part for each place (what it wants, and an example) and
+"send instead": the input with every fix applied.
 Each part folds past a dozen lines. A red edge: the event failed the node picked.
 A say is led by "re-said ·" when it came again after a compaction, and by
 "reworded ·" when its node said other words earlier in the context (the
