@@ -911,3 +911,11 @@ test("harness: the key's turned-off marks are read back from what the browser st
   assert.deepEqual([...offOf('{"harness":true}')], []);
   assert.deepEqual([...offOf('["harness", 3]')], ["harness"]);
 });
+
+test("harness: a fit lands at once first and while the tree finds its size (fit_settle_ms); later fits glide", async () => {
+  const { snapsFit } = await import("../packs/harness/camera.ts");
+  assert.equal(snapsFit(true, 0, 800, 600), true, "the first");
+  assert.equal(snapsFit(false, 300, 800, 600), true, "settling: a view that just appeared is not seen to zoom into place");
+  assert.equal(snapsFit(false, 900, 800, 600), false, "after: it glides");
+  assert.equal(snapsFit(false, 900, 800, 0), true, "fit_ms 0: always at once");
+});

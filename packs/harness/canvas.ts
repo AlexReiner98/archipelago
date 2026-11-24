@@ -35,7 +35,7 @@ import htm from "htm";
 import type { NodeInfo } from "../../spec/agent.ts";
 import { onStyle, sheet } from "../../spec/style.ts";
 import { crowdedNames, boxQuad, nameQuad, type Quad } from "./labels.ts";
-import { HIT_PX, nearest, outgrown, SETTLE_MS, shouldFit, fitKey, easeView } from "./camera.ts";
+import { HIT_PX, nearest, outgrown, SETTLE_MS, shouldFit, snapsFit, fitKey, easeView } from "./camera.ts";
 export { easeView, fitKey, HIT_PX, nearest, shouldFit } from "./camera.ts";
 import { dotsBox, STYLE, type Placed, type Tree } from "./layout.ts";
 import type { Verdict } from "./hooks.ts";
@@ -122,6 +122,8 @@ export interface CanvasProps {
   sparkX?: number;
   /** How long a fit glides from where the camera is to where it fits, in ms (the `fit_ms` dial); 0, at once. The first fit is always at once. */
   fitMs?: number;
+  /** For how long after its first fit a fit still lands at once, while the tree finds its size (the fit_settle_ms dial). */
+  settleMs?: number;
   /** How long the camera eases to where the wheel sends it, in ms (the `wheel_ms` dial); 0, at once. */
   wheelMs?: number;
 }
@@ -159,7 +161,7 @@ function crowdedAt(scene: Scene, k: number, ink: Ink, widths: Widths, waiting: R
   return crowdedNames(names, others);
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, tipMs = 600, nameSteps = 4, quietPx = 0, giveWay = false, sparkS = 0, sparkX = 1, fitMs = 0, wheelMs = 0 }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, tipMs = 600, nameSteps = 4, quietPx = 0, giveWay = false, sparkS = 0, sparkX = 1, fitMs = 0, wheelMs = 0, settleMs = 0 }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   const tipEl = useRef<HTMLDivElement>(null);
@@ -273,6 +275,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   // the map changing under it never moves it.
   const manual = useRef(false);
   const fitted = useRef(false);
+  const firstFit = useRef(0);
   const ask = useRef(false);
   const gliding = useRef(0);
   const shape = fitKey(tree.order.length, bounds);
@@ -284,11 +287,12 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     ask.current = false;
     const first = !fitted.current;
     fitted.current = true;
+    if (first) firstFit.current = performance.now();
     const k = Math.min(3, Math.max(0.1, Math.min(W / bounds.width, H / bounds.height)));
     const goal = { k, x: bounds.x - (W / k - bounds.width) / 2, y: bounds.y - (H / k - bounds.height) / 2 };
     cancelAnimationFrame(gliding.current);
     wheelGoal.current = undefined;
-    if (first || !fitMs) return setView(goal);
+    if (snapsFit(first, performance.now() - firstFit.current, settleMs, fitMs)) return setView(goal);
     // A fit after the first glides there, so the tree is seen to settle rather than jump.
     const from = viewRef.current, t0 = performance.now();
     const step = (t: number) => {

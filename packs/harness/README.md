@@ -175,7 +175,8 @@ title is in its words, shown beside it when the pointer rests on it. Names run a
 every name is in sight; a preview fits its dots. Every tree fits when
 first laid out, again when it outgrows the view (a profile that hears
 more, Claude Code's nodes shown again, a smaller window), and on a
-double-click; a fit after the first glides there over `fit_ms` (eased, the
+double-click; a fit lands at once while the tree is still finding its size
+(the first, and any within `fit_settle_ms`, 800, `snapsFit`), and a later one glides there over `fit_ms` (eased, the
 zoom in proportion, `easeView`), so the tree is seen to settle, and the
 wheel's zoom eases to where it sends the camera over `wheel_ms`, so its notches glide; once moved by hand it stays where it is put, and the map
 changing under it never moves it otherwise (`shouldFit`, `outgrown`).

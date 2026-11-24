@@ -41,6 +41,15 @@ export function nearest(points: { id: string; x: number; y: number }[], p: { x: 
 
 /** How long after the last wheel or move the picture is drawn again for its zoom. */
 export const SETTLE_MS = 140;
+
+/**
+ * Whether a fit lands at once rather than glides: the first one, and any while the tree is still finding
+ * its size, `since` ms after the first (within `settleMs`), so a view that has just appeared is not seen
+ * to zoom into place; later fits glide, so the tree is seen to settle rather than jump.
+ */
+export function snapsFit(first: boolean, since: number, settleMs: number, fitMs: number): boolean {
+  return first || !fitMs || since < settleMs;
+}
 /** The camera as the picture's transform. */
 export const cameraOf = (v: { x: number; y: number; k: number }) => `scale(${v.k}) translate(${-v.x} ${-v.y})`;
 
