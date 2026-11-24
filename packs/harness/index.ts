@@ -54,6 +54,7 @@ import { day } from "./clock.ts";
 import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
 import { useWindow, WINDOW, WindowBar, WINDOWBAR_STYLE, windowMarks } from "./windowbar.ts";
 import { NODE as NODE_WINDOW, TREND_STYLE } from "./trend.ts";
+import { CallStrip, CALLS_STYLE, callsOf, isCall, parentOf, requestNodes } from "./calls.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -115,7 +116,7 @@ const STYLE = sheet(`
 .hv-prof { display:flex; gap:var(--space-4); padding:var(--space-1) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; overflow:hidden; }
 .hv-prof .part { color:var(--dim); }
 .hv-miss { margin:var(--space-1) var(--space-4) var(--space-3); padding:var(--space-2) var(--space-3); border-left:3px solid var(--failed); white-space:pre-wrap; color:var(--dim); max-height:8em; overflow:auto; }
-.hv-view { display:grid; grid-template-rows:auto 1fr auto; height:100%; min-height:0; }
+.hv-view { display:grid; grid-template-rows:auto auto 1fr auto; height:100%; min-height:0; }
 .hv-bar { display:flex; gap:var(--space-3); align-items:center; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; position:relative; z-index:2; }
 .hv-bar .live { color:var(--say); flex:none; }
 .hv-n { font-variant-numeric:tabular-nums; flex:none; }
@@ -128,6 +129,7 @@ ${CANVAS_STYLE}
 ${TIMELINE_STYLE}
 ${WINDOWBAR_STYLE}
 ${TREND_STYLE}
+${CALLS_STYLE}
 .hv-onerun { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; min-width:0; }
 .hv-onerun > .rx-canvas { grid-row:2; }`);
 
@@ -209,7 +211,7 @@ const harness: Pack = {
 
     const Center = () => {
       const nodes = hk.useNodes();
-      const { runs, run, pinned, all, live, lives, current, info } = hk.useRun();
+      const { runs, calls, run, pinned, all, live, lives, current, info } = hk.useRun();
       const colour = useLiveColours(lives);
       const liveEvents = hk.useLiveEvents(lives.map((r) => r.run), live);
       const fires = useRef<Fire | undefined>(undefined);
@@ -291,10 +293,13 @@ const harness: Pack = {
       const shownGiven = (live ? given.get(focusOf(lives.map((r) => r.run), focusNow) ?? "") : run ? given.get(run) : undefined) ?? [];
       const kept = useMemo(() => nodes.filter((n) => shows(n, off)), [nodes, off]);
       const keptGiven = useMemo(() => new Map([...given].map(([r, list]) => [r, list.filter((n) => shows(n, off))])), [given, off]);
+      // A call looked at alone: its one-request tree, the nodes listening where it reached.
+      const call = !live && info && isCall(info) ? info : undefined;
       const treeNodes = useMemo(() => {
+        if (call) return requestNodes(kept, call);
         const mine = !live && run ? (keptGiven.get(run) ?? []) : [];
         return mine.length ? [...kept, ...mine] : kept;
-      }, [live, run, kept, keptGiven]);
+      }, [live, run, kept, keptGiven, call]);
       const keyFilter = { off, onToggle: toggle, set: setOff };
       // The window of the agent in focus, or of the run looked at, at the playhead (windowbar.ts, packs/context).
       const hasWindow = hk.useHas(WINDOW);
@@ -395,6 +400,17 @@ const harness: Pack = {
       }, [playing, run]);
       useEffect(() => setPlaying(false), [run]);
 
+      // The calls under the run looked at, or the agent in focus; looking at a call, its parent's, with a way back.
+      const stripParent = call ? parentOf(call) : live ? focusOf(lives.map((r) => r.run), focus) : run;
+      const strip = hk.useCallMarks(useMemo(() => callsOf(calls, stripParent), [calls, stripParent]));
+      const [callsOpen, setCallsOpen] = useState(false);
+      const parentInfo = stripParent ? (runs.find((r) => r.run === stripParent) ?? lives.find((r) => r.run === stripParent)) : undefined;
+      const openRun = (r: string) => {
+        set.set(KEYS.event, undefined);
+        set.set(KEYS.node, undefined);
+        set.set(KEYS.run, r);
+      };
+
       const pick = (id: string | undefined) => set.set(KEYS.node, id);
       const sum = { held: 0, failed: 0, quiet: 0 };
       if (all) for (const r of records) (sum.held += r.held), (sum.failed += r.failed), (sum.quiet += r.quiet);
@@ -427,6 +443,7 @@ const harness: Pack = {
             }}
             more=${html`<${DialsPane} here=${here} set=${set} />`}
           />
+          <${CallStrip} parent=${parentInfo} calls=${strip} open=${callsOpen || !!call} at=${call?.run} onOpen=${setCallsOpen} onPick=${openRun} onBack=${call && stripParent ? () => openRun(stripParent) : undefined} />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
               ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} nameMost=${dials.name_most} peekPx=${dials.peek_px} />`

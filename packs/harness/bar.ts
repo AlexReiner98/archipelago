@@ -4,6 +4,7 @@
  * profile looked at, how the tree hangs, nodes never said, Claude Code's given nodes, and the
  * view's dials) in one ⋯ menu.
  */
+import { isCall } from "./calls.ts";
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
@@ -78,6 +79,7 @@ export const Bar = (p: BarProps) => {
         <option value="*">all runs</option>
         <option value="">last active${p.runs[0] ? ` · ${short(runName(p.runs[0]), 40)}` : ""}</option>
         ${options}
+        ${p.info && p.pinned === p.info.run && !p.runs.some((r) => r.run === p.info!.run) && html`<option value=${p.info.run}>${isCall(p.info) ? "call · " : ""}${short(runName(p.info), 40)} · ${day(p.info.started)}</option>`}
       </select>
       ${p.info && p.current.some((x) => x.run === p.info!.run) && html`<span class="live" title="The run is live">●</span>`}
       ${!p.live && html`<span class="hv-n" title=${p.all ? "Every run's verdicts, node by run: held, failed, quiet" : "This run's verdicts: held, failed, quiet"}><span class="m-held">${token(verdictGlyph("held"))} ${p.sum.held}</span> <span class="m-failed">${token(verdictGlyph("failed"))} ${p.sum.failed}</span> <span class="m-quiet">${token(verdictGlyph("quiet"))} ${p.sum.quiet}</span></span>`}

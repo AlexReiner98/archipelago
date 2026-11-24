@@ -9,10 +9,12 @@ import type { AgentTree, NodeInfo, RunInfo } from "../../spec/agent.ts";
 import type { Json } from "../../spec/common.ts";
 import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
+import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { HereRead } from "../../spec/here.ts";
 import type { Hearing, ProfileInfo, ProfileRead } from "../../spec/profile.ts";
 import { DIALS_KEY, dialsOf, remembered } from "./dials.ts";
 import { keepLast, LIVE_MOST, liveRuns } from "./live.ts";
+import { CALLS_SHOWN, isCall, outcomeOf, type StripCall } from "./calls.ts";
 
 /** What `verdict.read` answers (the verdict pack's own key). */
 export type Verdict = "held" | "failed" | "quiet";
@@ -113,13 +115,23 @@ export function hooks(c: Caps) {
     return nodes;
   };
 
-  const useRuns = (): RunInfo[] => {
-    const [runs, setRuns] = useState<RunInfo[]>([]);
+  /**
+   * The runs, last active first: the 50 newest that aren't calls, and apart
+   * from them the calls among the newest LIMIT_MAX (calls.ts), which hang
+   * under the runs that made them.
+   */
+  const useRuns = (): { runs: RunInfo[]; calls: RunInfo[] } => {
+    const [runs, setRuns] = useState<{ runs: RunInfo[]; calls: RunInfo[] }>({ runs: [], calls: [] });
     useEffect(() => {
       // Runs come last active first, so any event may move one up: read again, at most every so often.
       let timer: ReturnType<typeof setTimeout> | undefined;
       let gone = false;
-      const load = () => void c.read.runs({ limit: 50 }).then((p) => !gone && setRuns(p.items));
+      const load = () =>
+        void c.read.runs({ limit: LIMIT_MAX }).then((p) => {
+          if (gone) return;
+          const calls = p.items.filter(isCall);
+          setRuns({ runs: p.items.filter((r) => !isCall(r)).slice(0, 50), calls });
+        });
       load();
       const stop = c.live.watch({}, (e) => {
         if (timer) return;
@@ -141,7 +153,7 @@ export function hooks(c: Caps) {
    * the view lands on them.
    */
   const useRun = () => {
-    const runs = useRuns();
+    const { runs, calls } = useRuns();
     const pinned = useHere<string>("here.run");
     const said = useHere<boolean>(LIVE);
     const every = useHere<boolean>(ALL) === true;
@@ -156,7 +168,21 @@ export function hooks(c: Caps) {
     const live = landsLive(said, pinned, every, current.length > 0);
     const all = !live && every;
     const run = all || live ? undefined : (pinned ?? runs[0]?.run);
-    return { runs, run, pinned, all, live, lives: live ? current : [], current, info: runs.find((r) => r.run === run) };
+    return { runs, calls, run, pinned, all, live, lives: live ? current : [], current, info: runs.find((r) => r.run === run) ?? calls.find((r) => r.run === run) };
+  };
+
+  /** The calls given, each with its mark and how many nodes were said to it (its verdicts), kept live. */
+  const useCallMarks = (calls: RunInfo[]): StripCall[] => {
+    const shown = calls.slice(0, CALLS_SHOWN);
+    const key = shown.map((r) => r.run).join(",");
+    const got = useVerdictData(() => Promise.all(shown.map(async (r) => ({ run: r, verdicts: await c.verdicts.run(r.run) }))), [key]) ?? [];
+    return useMemo(() => {
+      const by = new Map(got.map((x) => [x.run.run, x.verdicts]));
+      return calls.map((r) => {
+        const v = by.get(r.run) ?? [];
+        return { run: r, outcome: outcomeOf(v), said: v.length };
+      });
+    }, [got, calls]);
   };
 
   /** The runs a profile has in it (`profile.read.of`), from those given; undefined while it reads. */
@@ -417,7 +443,7 @@ export function hooks(c: Caps) {
     return hearing;
   };
 
-  return { useHere, useNodes, useRun, useRunsIn, useLiveEvents, useEvents, useVerdictData, useVerdictsOfRun, useRecords, useItem, useStatuses, useHas, useProfileList, useRunProfiles, usePlacements, useHears, useHearing };
+  return { useHere, useNodes, useRun, useCallMarks, useRunsIn, useLiveEvents, useEvents, useVerdictData, useVerdictsOfRun, useRecords, useItem, useStatuses, useHas, useProfileList, useRunProfiles, usePlacements, useHears, useHearing };
 }
 
 export type Hooks = ReturnType<typeof hooks>;
