@@ -144,16 +144,15 @@ test("the flavour view: an agent makes a view with items.create", async () => {
   assert.equal(page.items[0]!.fields.center, "map/map");
 });
 
-test("views: a picked view fades in through the starter after its layout wait; with none, or switch_ms 0, at once", async () => {
+test("views: a picked view fades through the page's ground: cover in, the view changes and lays out, cover out; with none, or switch_ms 0, at once", async () => {
   const { faded } = await import("../packs/views/fade.ts");
   const seen: string[] = [];
-  let run: (() => Promise<void>) | undefined;
-  const start = (cb: () => Promise<void>) => (run = cb);
+  const cover = { show: (ms: number) => seen.push(`show ${ms}`), hide: (ms: number) => seen.push(`hide ${ms}`), done: () => seen.push("done") };
   const wait = async (ms: number) => void seen.push(`wait ${ms}`);
   assert.equal(faded(() => seen.push("now"), {}, undefined, wait), false);
-  assert.equal(faded(() => seen.push("off"), { switch_ms: 0 }, start, wait), false);
-  assert.equal(run, undefined, "no transition started");
-  assert.equal(faded(() => seen.push("faded"), { switch_wait_ms: 120 }, start, wait), true);
-  await run!();
-  assert.deepEqual(seen, ["now", "off", "faded", "wait 120"]);
+  assert.equal(faded(() => seen.push("off"), { switch_ms: 0 }, cover, wait), false);
+  assert.deepEqual(seen.splice(0), ["now", "done", "off"], "no fade: the cover goes, the view changes at once");
+  assert.equal(faded(() => seen.push("view"), { switch_ms: 400, switch_wait_ms: 120 }, cover, wait), true);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(seen, ["show 200", "wait 200", "view", "wait 120", "hide 200", "wait 200", "done"], "never the old view and the new drawn together");
 });

@@ -1,57 +1,64 @@
 /**
- * A view picked fades into the one shown: the page as it was (the list over
- * it too) fades out over the first half of `switch_ms` and the new view in
- * over the second, never both at once (two layouts over each other read as
- * a double image), once the new view has had `switch_wait_ms` to lay itself
- * out, so its first, unsettled frames are never seen. Without View Transitions in the browser, with
- * reduced motion asked for, or with `switch_ms` 0, the view changes at once.
+ * A view picked fades into the one shown through the page's own ground: a
+ * cover of the background colour fades in over half of `switch_ms`, the view
+ * changes under it and has `switch_wait_ms` to lay itself out, and the cover
+ * fades away over the other half. The old view and the new are never drawn
+ * over each other, and the new one's first, unsettled frames are never seen.
+ * With reduced motion asked for, or `switch_ms` 0, the view changes at once.
  */
 export interface Fade {
-  /** How long the crossfade lasts, in ms; 0: none. */
+  /** How long the fade out and back in lasts, in ms; 0: none. */
   switch_ms?: number;
-  /** How long the new view lays out under the old picture first, in ms. */
+  /** How long the new view lays out under the cover, in ms. */
   switch_wait_ms?: number;
 }
 
-export const FADE_DEFAULTS: Required<Fade> = { switch_ms: 450, switch_wait_ms: 300 };
+export const FADE_DEFAULTS: Required<Fade> = { switch_ms: 450, switch_wait_ms: 200 };
 
-/** What starts a view transition: `document.startViewTransition`, bound. */
-export type Start = (update: () => Promise<void>) => unknown;
-
-/** The page's own starter, or none where the browser has none or reduced motion is asked for. */
-export function pageStart(): Start | undefined {
-  if (typeof document === "undefined") return undefined;
-  const d = document as Document & { startViewTransition?: (cb: () => Promise<void>) => unknown };
-  if (!d.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
-  return (cb) => d.startViewTransition!(cb);
+/** What hides the page while a view changes: shown and hidden over `ms`, then done with. */
+export interface Cover {
+  show(ms: number): void;
+  hide(ms: number): void;
+  done(): void;
 }
 
-/** Runs `update` faded as `fade` says, through `start`; at once without one. True when it faded. */
-export function faded(update: () => void, fade: Fade = {}, start: Start | undefined = pageStart(), wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))): boolean {
+/** A cover of the page's background over everything; none where reduced motion is asked for. */
+export function pageCover(): Cover | undefined {
+  if (typeof document === "undefined" || matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+  const el = document.createElement("div");
+  el.className = "vw-cover";
+  document.body.append(el);
+  const to = (opacity: number, ms: number) => {
+    // Its start drawn first, so the change is seen as a fade.
+    void el.getBoundingClientRect();
+    el.style.transitionDuration = `${ms}ms`;
+    el.style.opacity = String(opacity);
+  };
+  return { show: (ms) => to(1, ms), hide: (ms) => to(0, ms), done: () => el.remove() };
+}
+
+/** Runs `update` under a fade as `fade` says; at once without a cover. True when it fades. */
+export function faded(update: () => void, fade: Fade = {}, cover: Cover | undefined = pageCover(), wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))): boolean {
   const ms = fade.switch_ms ?? FADE_DEFAULTS.switch_ms;
-  if (!start || ms <= 0) {
+  if (!cover || ms <= 0) {
+    cover?.done();
     update();
     return false;
   }
-  const root = typeof document !== "undefined" ? document.documentElement : undefined;
-  root?.style.setProperty("--vw-switch", `${ms}ms`);
-  // While it runs, every part of the page (a view's own named parts too) fades out, then in.
-  root?.classList.add("vw-switch");
-  const t = start(async () => {
+  const half = ms / 2;
+  void (async () => {
+    cover.show(half);
+    await wait(half);
     update();
     await wait(fade.switch_wait_ms ?? FADE_DEFAULTS.switch_wait_ms);
-  }) as { finished?: Promise<unknown> } | undefined;
-  const done = () => root?.classList.remove("vw-switch");
-  if (t?.finished) t.finished.then(done, done);
-  else done();
+    cover.hide(half);
+    await wait(half);
+    cover.done();
+  })();
   return true;
 }
 
-/** The crossfade's timing, for the page's style sheet. */
+/** The cover's look, for the page's style sheet. */
 export const FADE_STYLE = `
-html.vw-switch::view-transition-group(*) { animation-duration:var(--vw-switch, .45s); }
-html.vw-switch::view-transition-old(*) { animation:vw-old var(--vw-switch, .45s) ease-in both; }
-html.vw-switch::view-transition-new(*) { animation:vw-new var(--vw-switch, .45s) ease-out both; }
-@keyframes vw-old { 0% { opacity:1; } 50%, 100% { opacity:0; } }
-@keyframes vw-new { 0%, 45% { opacity:0; } 100% { opacity:1; } }
+.vw-cover { position:fixed; inset:0; z-index:2147483000; pointer-events:none; background:var(--bg); opacity:0; transition-property:opacity; transition-timing-function:ease-in-out; }
 `;
