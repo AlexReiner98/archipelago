@@ -32,6 +32,8 @@ export interface Arrangement {
   ghosts: { at: Spot; text: string; label?: Label }[];
   /** The size the names were placed for, in the tree's units. */
   nameText?: number;
+  /** Each item's name as the context view places it, drawn by the tree once the item lands. */
+  names?: Record<Id, { text: string; label: Label }>;
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -51,7 +53,7 @@ export function contextTerm(line: string): string | undefined {
 export function arrange(profile: string, heard: NodeInfo[], item: (source: Id) => Id | undefined, nameMost = 28): Arrangement {
   const tree = treeOf(heard, { by: "place" });
   const placed = radial(tree, { nameMost });
-  const out: Arrangement = { profile, items: {}, wires: [], branches: [], boughs: [], ghosts: [], nameText: STYLE.nameText };
+  const out: Arrangement = { profile, items: {}, wires: [], branches: [], boughs: [], ghosts: [], nameText: STYLE.nameText, names: {} };
   for (const t of tree.order) {
     if (!t.parent) continue;
     const at = placed.xy.get(t.id);
@@ -66,7 +68,10 @@ export function arrange(profile: string, heard: NodeInfo[], item: (source: Id) =
     if (t.kids.length) out.boughs.push(named(nameOf(t.title)));
     else {
       const id = t.node?.source ? item(t.node.source) : undefined;
-      if (id && !out.items[id]) out.items[id] = spot(at);
+      if (id && !out.items[id]) {
+        out.items[id] = spot(at);
+        if (label) out.names![id] = { text: label.text, label };
+      }
       else out.ghosts.push(named(nameOf(t.title)));
     }
   }

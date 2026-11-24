@@ -244,7 +244,7 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
  * FOUND, NEAR, FAINT), or null when it has none; FAINT is drawn at `query_fade`,
  * and only FOUND is always named.
  */
-export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, light: Light, ink: Ink, grid: Grid, size: { width: number; height: number; dpr: number }, match: Uint8Array | null = null, clear: [number, number, number, number][] = []): void {
+export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, light: Light, ink: Ink, grid: Grid, size: { width: number; height: number; dpr: number }, match: Uint8Array | null = null, clear: [number, number, number, number][] = [], quiet: ReadonlySet<number> | null = null): void {
   const { width, height, dpr } = size;
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
   c.globalAlpha = 1;
@@ -383,7 +383,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     (i === focus ? 64 : 0) + (shine[i]! > 0 ? 32 : 0) + (match?.[i] === FOUND ? 16 : 0) + (hub[i] ? 8 : 0) + (light.named.has(g.id[i]!) ? 4 : 0) + (g.closed[i] ? 0 : 2);
   const wants: number[] = [];
   for (let i = 0; i < g.n; i++) {
-    if (!inView(i, 0)) continue;
+    if (!inView(i, 0) || quiet?.has(i)) continue;
     // While one is pointed at, only it and its neighbours are named; while the find line has words, what it finds,
     // then what is near it as room allows, never the faint edge.
     if (lit ? !(shine[i]! > 0.5) : match ? !(match[i] === FOUND || (full(i) && (g.r[i]! * cam.k >= S.label_px! || hub[i]))) : !(g.r[i]! * cam.k >= S.label_px! || hub[i])) continue;

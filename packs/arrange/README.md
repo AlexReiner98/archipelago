@@ -17,6 +17,7 @@ lays them out as the Context interface does (`treeOf` and `radial` from
 | `boughs` | Each bough (a place, a channel, a folder) and its name, with its placement as the context view places it (`label`: turn, along, across, anchor) |
 | `ghosts` | Nodes no item on the map holds, and their names, placed the same way |
 | `nameText` | The size the names were placed for, in the tree's units |
+| `names` | Each item's name as the context view places it, for the tree to draw as the item lands |
 
 The Landscape ([field](../field/README.md)) keeps only those items, pulls
 each to its place with its `tree` behaviour, and draws the branches and

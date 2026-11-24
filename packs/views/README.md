@@ -69,7 +69,7 @@ own.
 - **A picked view fades in** ([fade.ts](fade.ts)) through the page's own
   ground: a cover of the background colour fades in over half of
   `switch_ms` (450), the view changes under it and lays itself out for
-  `switch_wait_ms` (200), and the cover fades away over the other half. The
+  `switch_wait_ms` (100), and the cover fades away over the other half. The
   old view and the new are never drawn over each other, and the new one's
   first unsettled frames are never seen. Both are the pack's config;
   `switch_ms: 0` or reduced motion changes it at once. The list itself fades

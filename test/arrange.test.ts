@@ -54,3 +54,12 @@ test("arrange: each tree name comes placed as the context view places it, so the
     assert.ok(n.label!.turn > -90 - 1e-6 && n.label!.turn <= 90 + 1e-6, "it reads left to right");
   }
 });
+
+test("arrange: an item the tree holds gets its name as the context view places it, for the tree to draw as it lands", () => {
+  const nodes = [node("words/a", "Check before you stop", ["reply_end"], "e_a"), node("words/b", "Semantic HTML", ["file:*.html"], "e_b")];
+  const a = arrange("Copy", nodes, (id) => (id === "e_a" ? id : undefined));
+  assert.ok(a.items.e_a);
+  assert.equal(a.names!.e_a!.text, "Check before you stop");
+  assert.ok(a.names!.e_a!.label.anchor === "start" || a.names!.e_a!.label.anchor === "end");
+  assert.equal(a.names!.e_b, undefined, "a node no item holds is a ghost, named by the tree as before");
+});

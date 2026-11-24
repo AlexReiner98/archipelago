@@ -29,6 +29,15 @@ export interface Arranged {
   ghosts: { at: Spot; text: string; label?: Placed }[];
   /** The size the names were placed for, in the tree's units. */
   nameText?: number;
+  /** Each item's name as the context view places it: the tree draws it, with the item, as it lands. */
+  names?: Record<string, { text: string; label: Placed }>;
+}
+
+/** The four corners of a name placed at (x, y) as `l` says, in the tree's units, its width guessed from its length. */
+export function nameCorners(x: number, y: number, text: string, l: Placed, size: number): [number, number][] {
+  const w = text.length * size * 0.55, t = (l.turn * Math.PI) / 180, c = Math.cos(t), s = Math.sin(t);
+  const u0 = l.anchor === "end" ? l.dx - w : l.dx, v0 = l.dy - size * 0.7, v1 = l.dy + size * 0.7;
+  return [[u0, v0], [u0 + w, v0], [u0, v1], [u0 + w, v1]].map(([u, v]) => [x + u! * c - v! * s, y + u! * s + v! * c]);
 }
 
 /** Sets each particle's place from the arrangement, at `scale`; none, no targets. */
@@ -116,7 +125,16 @@ export function treeBox(a: Arranged, scale: number, S: Settings): [number, numbe
   const size = S.tree_text ?? 11;
   for (const w of a.wires) for (const [x, y] of w) take(x, y);
   for (const [x, y] of Object.values(a.items)) take(x, y, size * 8, size);
-  for (const g of [...a.ghosts, ...a.boughs]) take(g.at[0], g.at[1], g.text.length * size * 0.3, size * 2.5);
+  // Names placed along their rays count where they reach, so the fit keeps every one in view.
+  const nt = a.nameText ?? 11;
+  for (const g of [...a.ghosts, ...a.boughs]) {
+    if (g.label) for (const [x, y] of nameCorners(g.at[0], g.at[1], g.text, g.label, nt)) take(x, y);
+    else take(g.at[0], g.at[1], g.text.length * size * 0.3, size * 2.5);
+  }
+  for (const [id, n] of Object.entries(a.names ?? {})) {
+    const at = a.items[id];
+    if (at) for (const [x, y] of nameCorners(at[0], at[1], n.text, n.label, nt)) take(x, y);
+  }
   return x0 < Infinity ? [x0, y0, x1, y1] : [0, 0, 1, 1];
 }
 
@@ -157,7 +175,7 @@ export function treeNameBoxes(a: Arranged, cam: Cam, scale: number, S: Settings,
 }
 
 /** Paints the tree: branches, then the ghosts' dots and every name, at strength `alpha`. */
-export function paintTree(c: CanvasRenderingContext2D, a: Arranged, cam: Cam, dpr: number, scale: number, alpha: number, ink: Ink, S: Settings): void {
+export function paintTree(c: CanvasRenderingContext2D, a: Arranged, cam: Cam, dpr: number, scale: number, alpha: number, ink: Ink, S: Settings, itemAt?: (id: string) => [number, number, number] | undefined): void {
   if (alpha <= 0.01) return;
   c.save();
   c.setTransform(dpr * cam.k, 0, 0, dpr * cam.k, dpr * cam.tx, dpr * cam.ty);
@@ -201,7 +219,7 @@ export function paintTree(c: CanvasRenderingContext2D, a: Arranged, cam: Cam, dp
   // A node no item holds is named smaller than a bough, so neighbours' names don't run together.
   const ghost = (S.tree_ghost_text ?? 7) * scale;
   // A name placed as the context view places it: turned along its ray, from its start or its end.
-  const placedWord = (x: number, y: number, text: string, l: Placed, fill: string, weight: string) => {
+  const placedWord = (x: number, y: number, text: string, l: Placed, fill: string, weight: string, strength = 1) => {
     const px = (a.nameText ?? 11) * scale;
     c.save();
     c.translate(x * scale, y * scale);
@@ -209,7 +227,7 @@ export function paintTree(c: CanvasRenderingContext2D, a: Arranged, cam: Cam, dp
     c.font = `${weight} ${px}px ui-sans-serif, system-ui, sans-serif`;
     c.textAlign = l.anchor === "end" ? "right" : "left";
     c.textBaseline = "middle";
-    c.globalAlpha = alpha;
+    c.globalAlpha = alpha * strength;
     c.strokeStyle = ink.sea;
     c.lineWidth = px / 3;
     c.strokeText(text, l.dx * scale, l.dy * scale);
@@ -229,6 +247,11 @@ export function paintTree(c: CanvasRenderingContext2D, a: Arranged, cam: Cam, dp
   for (const b of a.boughs) {
     if (b.label) placedWord(b.at[0], b.at[1], b.text, b.label, ink.text, "600");
     else word(b.at[0] * scale, b.at[1] * scale, b.text, ink.text, -size * 0.9, size);
+  }
+  // Each item's name, where the item is (in the tree's units), as strong as it is near its place: it lands with it.
+  if (itemAt) for (const [id, n] of Object.entries(a.names ?? {})) {
+    const p = itemAt(id);
+    if (p && p[2] > 0.01) placedWord(p[0] / scale, p[1] / scale, n.text, n.label, ink.text, "500", p[2]);
   }
   c.restore();
 }

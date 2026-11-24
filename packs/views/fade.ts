@@ -13,7 +13,7 @@ export interface Fade {
   switch_wait_ms?: number;
 }
 
-export const FADE_DEFAULTS: Required<Fade> = { switch_ms: 450, switch_wait_ms: 200 };
+export const FADE_DEFAULTS: Required<Fade> = { switch_ms: 450, switch_wait_ms: 100 };
 
 /** What hides the page while a view changes: shown and hidden over `ms`, then done with. */
 export interface Cover {

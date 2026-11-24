@@ -488,3 +488,15 @@ test("after a jump the camera eases in from rest over find_follow_ms, then close
   assert.equal(followShare(16, 1000), 1 - Math.exp(-16 / 1000), "a settle with no jump: as before");
   assert.equal(followShare(16, 0, 0), 1, "0: it snaps");
 });
+
+test("a placed name's corners reach along its turned line, so the arranged tree's fit keeps it in view", async () => {
+  const { nameCorners } = await import("../packs/field/treeover.ts");
+  const flat = nameCorners(10, 20, "abcd", { turn: 0, dx: 5, dy: 0, anchor: "start" }, 10);
+  const xs = flat.map((p) => p[0]), ys = flat.map((p) => p[1]);
+  assert.deepEqual([Math.min(...xs), Math.max(...xs)], [15, 15 + 4 * 10 * 0.55]);
+  assert.deepEqual([Math.min(...ys), Math.max(...ys)], [13, 27]);
+  const down = nameCorners(0, 0, "abcd", { turn: 90, dx: 5, dy: 0, anchor: "start" }, 10);
+  assert.ok(Math.max(...down.map((p) => p[1])) > 25, "turned down its ray, it reaches below");
+  const back = nameCorners(0, 0, "abcd", { turn: 0, dx: -5, dy: 0, anchor: "end" }, 10);
+  assert.ok(Math.max(...back.map((p) => p[0])) <= -5 + 1e-9, "anchored at its end, it runs back from the dot");
+});

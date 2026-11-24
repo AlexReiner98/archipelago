@@ -209,11 +209,20 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
         c.font = "500 10px ui-sans-serif, system-ui, sans-serif";
         clear.push(...treeNameBoxes(tree, cam, scale(), S, (t, px) => (c.measureText(t).width * px) / 10));
       }
-      paint(c, g, cam, S, light, colours, pick, s, match, clear);
+      // Arranged, the tree names its items itself, as they land: the map's own titles for them stay quiet.
+      const quiet = tree?.names ? new Set(Object.keys(tree.names).map((id) => g.idIx.get(id)).filter((i): i is number => i !== undefined)) : null;
+      paint(c, g, cam, S, light, colours, pick, s, match, clear, quiet);
       drawn = { g, match };
       // Arranged into a profile: its tree comes in under the items as they reach their places.
       // It comes in as the items arrive, and at least as fast as what left fades out (gone_ms), so the two crossfade.
-      if (tree) paintTree(c, tree, cam, s.dpr, scale(), strength, colours, S);
+      if (tree) paintTree(c, tree, cam, s.dpr, scale(), strength, colours, S, (id) => {
+        const i = g.idIx.get(id), t = g.target;
+        if (i === undefined || !t?.on[i]) return undefined;
+        // How near it is to its place, where the flight ends: 1 there, 0 sixty units out.
+        const px = flight && flight.px.length === t.x.length ? flight.px[i]! : t.x[i]!, py = flight && flight.py.length === t.y.length ? flight.py[i]! : t.y[i]!;
+        const near = Math.max(0, 1 - Math.hypot(g.x[i]! - px, g.y[i]! - py) / (60 * scale()));
+        return [g.x[i]!, g.y[i]!, near * near];
+      });
       const fading = paintGone(c, ghosts, cam, s.dpr, performance.now(), S, goneLinks, colours, goneNames, S.link_names ? wireSize(S.link_name_size!, cam.k, S.link_name_least_px!, S.link_name_most_px!) : 0) || performance.now() < coming;
       // A link name or a ghost still fading keeps the view painting.
       dirty = easing || following || light.wiresMoving || light.labelsMoving || fading || resizing;
