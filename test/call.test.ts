@@ -153,18 +153,21 @@ test("a person's decision on the item a call follows becomes the verdict of the 
   const out = await ask.ask({ title: "line_length", places: ["check:line_length", "finding"], parent: "checker", follow: { item: "t1", version: "v1" } }, async () => ({ text: "long line" }));
   assert.deepEqual((await verdicts.run(out.run)).map((v) => [v.node, v.verdict]), [["nodes/style", "quiet"], ["nodes/finding", "quiet"]]);
 
+  const startedAt = (await read.runs()).items.find((r) => r.run === out.run)!.started;
   await act("seed.raw", { facts: [["+", "t1", "decision", "rejected"], ["+", "t1", "decided_version", "v1"]] });
   await rt.settle();
   await until(async () => {
-    const r = (await read.runs()).items.find((x) => x.run === out.run);
-    return (await read.events(out.run)).items.some((e) => e.kind === "act" && e.act?.kind === "decision") && !!r?.ended && r.started < r.ended;
+    const evs = (await read.events(out.run)).items;
+    const at = evs.findIndex((e) => e.kind === "act" && e.act?.kind === "decision");
+    return at >= 0 && evs.slice(at).some((e) => e.kind === "end");
   });
   const evs = (await read.events(out.run)).items;
   const d = evs.find((e) => e.kind === "act" && e.act?.kind === "decision")!;
   assert.deepEqual([d.place, d.act!.by, d.act!.ok], ["reply_end", "person", false]);
   assert.deepEqual((await verdicts.run(out.run)).map((v) => v.verdict), ["failed", "failed"]);
   const run = (await read.runs()).items.find((r) => r.run === out.run)!;
-  assert.ok(run.ended && run.started < run.ended, "begun again for the decision, then ended; its start kept");
+  // Times are to the millisecond: on a fast runner the ask and the decision may share one, so the start is compared, not ordered.
+  assert.ok(run.ended && run.started === startedAt && run.started <= run.ended, "begun again for the decision, then ended; its start kept");
 
   // A change of mind: accepted at the same version.
   await act("seed.raw", { facts: [["-", "t1", "decision", "rejected"], ["+", "t1", "decision", "accepted"]] });
