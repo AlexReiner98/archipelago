@@ -10,6 +10,14 @@ import type { Cam, Ink } from "./paint.ts";
 
 type Spot = [number, number];
 
+/** A name placed as the context view places it: turned (degrees), moved along its line and across, from its start or end. */
+export interface Placed {
+  turn: number;
+  dx: number;
+  dy: number;
+  anchor: "start" | "end";
+}
+
 /** What packs/arrange sets on the page (`arrange.tree`), as the Landscape reads it. */
 export interface Arranged {
   profile: string;
@@ -17,8 +25,10 @@ export interface Arranged {
   wires: Spot[][];
   /** The branches as the context view draws them (curve, width, strength); without them, the wires as lines. */
   branches?: { d: string; width: number; ink: number }[];
-  boughs: { at: Spot; text: string }[];
-  ghosts: { at: Spot; text: string }[];
+  boughs: { at: Spot; text: string; label?: Placed }[];
+  ghosts: { at: Spot; text: string; label?: Placed }[];
+  /** The size the names were placed for, in the tree's units. */
+  nameText?: number;
 }
 
 /** Sets each particle's place from the arrangement, at `scale`; none, no targets. */
@@ -133,7 +143,17 @@ export function treeNameBoxes(a: Arranged, cam: Cam, scale: number, S: Settings,
     const sx = x * scale * cam.k + cam.tx, sy = y * scale * cam.k + cam.ty + dy, w = measure(text, px) / 2 + 2;
     return [sx - w, sy - px * 0.7, sx + w, sy + px * 0.7];
   };
-  return [...a.ghosts.map((g) => box(g.at[0], g.at[1], g.text, ghost, ghost * 1.3)), ...a.boughs.map((b) => box(b.at[0], b.at[1], b.text, size, -size * 0.9))];
+  const turned = (x: number, y: number, text: string, l: Placed): Box => {
+    const k = scale * cam.k, px = (a.nameText ?? 11) * k, w = measure(text, px), t = (l.turn * Math.PI) / 180;
+    const x0 = l.anchor === "end" ? l.dx * k - w : l.dx * k, y0 = l.dy * k - px * 0.7, y1 = l.dy * k + px * 0.7;
+    const cx = x * k + cam.tx, cy = y * k + cam.ty, c = Math.cos(t), s = Math.sin(t);
+    const pts = [[x0, y0], [x0 + w, y0], [x0, y1], [x0 + w, y1]].map(([u, v]) => [cx + u! * c - v! * s, cy + u! * s + v! * c]);
+    return [Math.min(...pts.map((p) => p[0]!)) - 2, Math.min(...pts.map((p) => p[1]!)), Math.max(...pts.map((p) => p[0]!)) + 2, Math.max(...pts.map((p) => p[1]!))];
+  };
+  return [
+    ...a.ghosts.map((g) => (g.label ? turned(g.at[0], g.at[1], g.text, g.label) : box(g.at[0], g.at[1], g.text, ghost, ghost * 1.3))),
+    ...a.boughs.map((b) => (b.label ? turned(b.at[0], b.at[1], b.text, b.label) : box(b.at[0], b.at[1], b.text, size, -size * 0.9))),
+  ];
 }
 
 /** Paints the tree: branches, then the ghosts' dots and every name, at strength `alpha`. */
@@ -180,14 +200,35 @@ export function paintTree(c: CanvasRenderingContext2D, a: Arranged, cam: Cam, dp
   };
   // A node no item holds is named smaller than a bough, so neighbours' names don't run together.
   const ghost = (S.tree_ghost_text ?? 7) * scale;
+  // A name placed as the context view places it: turned along its ray, from its start or its end.
+  const placedWord = (x: number, y: number, text: string, l: Placed, fill: string, weight: string) => {
+    const px = (a.nameText ?? 11) * scale;
+    c.save();
+    c.translate(x * scale, y * scale);
+    if (l.turn) c.rotate((l.turn * Math.PI) / 180);
+    c.font = `${weight} ${px}px ui-sans-serif, system-ui, sans-serif`;
+    c.textAlign = l.anchor === "end" ? "right" : "left";
+    c.textBaseline = "middle";
+    c.globalAlpha = alpha;
+    c.strokeStyle = ink.sea;
+    c.lineWidth = px / 3;
+    c.strokeText(text, l.dx * scale, l.dy * scale);
+    c.fillStyle = fill;
+    c.fillText(text, l.dx * scale, l.dy * scale);
+    c.restore();
+  };
   for (const g of a.ghosts) {
     c.globalAlpha = alpha * 0.6;
     c.fillStyle = ink.muted;
     c.beginPath();
     c.arc(g.at[0] * scale, g.at[1] * scale, 3 * scale, 0, Math.PI * 2);
     c.fill();
-    word(g.at[0] * scale, g.at[1] * scale, g.text, ink.muted, ghost * 1.3, ghost);
+    if (g.label) placedWord(g.at[0], g.at[1], g.text, g.label, ink.muted, "400");
+    else word(g.at[0] * scale, g.at[1] * scale, g.text, ink.muted, ghost * 1.3, ghost);
   }
-  for (const b of a.boughs) word(b.at[0] * scale, b.at[1] * scale, b.text, ink.text, -size * 0.9, size);
+  for (const b of a.boughs) {
+    if (b.label) placedWord(b.at[0], b.at[1], b.text, b.label, ink.text, "600");
+    else word(b.at[0] * scale, b.at[1] * scale, b.text, ink.text, -size * 0.9, size);
+  }
   c.restore();
 }

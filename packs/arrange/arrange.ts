@@ -10,7 +10,7 @@
  */
 import type { NodeInfo } from "../../spec/agent.ts";
 import type { Id } from "../../spec/common.ts";
-import { branchAt, nameOf, radial, treeOf } from "../harness/layout.ts";
+import { branchAt, nameOf, radial, STYLE, treeOf, type Label } from "../harness/layout.ts";
 
 export const ARRANGE = "arrange.tree";
 
@@ -26,10 +26,12 @@ export interface Arrangement {
   wires: Spot[][];
   /** Every branch as the context view draws it: its curve (SVG path, the tree's units), stroke width and strength by depth. */
   branches: { d: string; width: number; ink: number }[];
-  /** Each bough (a place, a channel, a folder) and its name. */
-  boughs: { at: Spot; text: string }[];
-  /** Nodes in the tree that no item on the map holds, and their names. */
-  ghosts: { at: Spot; text: string }[];
+  /** Each bough (a place, a channel, a folder) and its name, placed as the context view places it. */
+  boughs: { at: Spot; text: string; label?: Label }[];
+  /** Nodes in the tree that no item on the map holds, and their names, placed as the context view places them. */
+  ghosts: { at: Spot; text: string; label?: Label }[];
+  /** The size the names were placed for, in the tree's units. */
+  nameText?: number;
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -49,7 +51,7 @@ export function contextTerm(line: string): string | undefined {
 export function arrange(profile: string, heard: NodeInfo[], item: (source: Id) => Id | undefined, nameMost = 28): Arrangement {
   const tree = treeOf(heard, { by: "place" });
   const placed = radial(tree, { nameMost });
-  const out: Arrangement = { profile, items: {}, wires: [], branches: [], boughs: [], ghosts: [] };
+  const out: Arrangement = { profile, items: {}, wires: [], branches: [], boughs: [], ghosts: [], nameText: STYLE.nameText };
   for (const t of tree.order) {
     if (!t.parent) continue;
     const at = placed.xy.get(t.id);
@@ -58,11 +60,14 @@ export function arrange(profile: string, heard: NodeInfo[], item: (source: Id) =
     if (along) out.wires.push(along.map(([x, y]) => [r1(x), r1(y)] as Spot));
     const d = placed.branch.get(t.id);
     if (d) out.branches.push({ d, ...branchAt(t.depth) });
-    if (t.kids.length) out.boughs.push({ at: spot(at), text: nameOf(t.title) });
+    // Each name where the context view puts it (along its ray, the root's boughs level), so the two read alike.
+    const label = placed.labels.get(t.id);
+    const named = (text: string) => ({ at: spot(at), text: label?.text ?? text, ...(label ? { label } : {}) });
+    if (t.kids.length) out.boughs.push(named(nameOf(t.title)));
     else {
       const id = t.node?.source ? item(t.node.source) : undefined;
       if (id && !out.items[id]) out.items[id] = spot(at);
-      else out.ghosts.push({ at: spot(at), text: nameOf(t.title) });
+      else out.ghosts.push(named(nameOf(t.title)));
     }
   }
   return out;

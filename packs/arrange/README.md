@@ -14,8 +14,9 @@ lays them out as the Context interface does (`treeOf` and `radial` from
 | `profile` | The context filter's title |
 | `items` | Each item on the map the tree holds (a node's `source`, or the item its context filter link brings), and its place |
 | `wires` | Every branch, root first, as points |
-| `boughs` | Each bough (a place, a channel, a folder) and its name |
-| `ghosts` | Nodes no item on the map holds, and their names |
+| `boughs` | Each bough (a place, a channel, a folder) and its name, with its placement as the context view places it (`label`: turn, along, across, anchor) |
+| `ghosts` | Nodes no item on the map holds, and their names, placed the same way |
+| `nameText` | The size the names were placed for, in the tree's units |
 
 The Landscape ([field](../field/README.md)) keeps only those items, pulls
 each to its place with its `tree` behaviour, and draws the branches and

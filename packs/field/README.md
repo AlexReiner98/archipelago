@@ -42,7 +42,8 @@ find line has words, only what it finds and what lies near it.
   of its items flies from where it stood to its place in that context filter's
   tree over `tree_ms`, eased, however fast the run steps; only those items
   are laid out, the camera keeps the whole tree in view, and the tree's
-  branches and names ([treeover.ts](treeover.ts)) come in under them as
+  branches and names ([treeover.ts](treeover.ts)), each name along its ray as the context view
+  places it, come in under them as
   they arrive, once what left the map has faded for `tree_in_ms` (600, as long as `gone_ms`) so
   the two are never drawn over each other, and then at least as fast as
   `gone_ms`; the

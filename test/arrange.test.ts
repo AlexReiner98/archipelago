@@ -43,3 +43,14 @@ test("arrange: a node said through a context filter link flies the item the link
   assert.deepEqual(Object.keys(a.items), ["r_rule"]);
   assert.deepEqual(a.ghosts, []);
 });
+
+test("arrange: each tree name comes placed as the context view places it, so the Landscape names the tree alike", () => {
+  const nodes = [node("words/a", "Check before you stop", ["reply_end"], "e_a"), node("words/b", "Semantic HTML", ["file:*.html"], "e_b"), node("words/c", "Small commits", ["tool:Bash"], "e_c")];
+  const a = arrange("Copy", nodes, () => undefined);
+  assert.equal(a.nameText, 11);
+  for (const n of [...a.boughs, ...a.ghosts]) {
+    assert.ok(n.label, `${n.text} has its placement`);
+    assert.ok(n.label!.anchor === "start" || n.label!.anchor === "end");
+    assert.ok(n.label!.turn > -90 - 1e-6 && n.label!.turn <= 90 + 1e-6, "it reads left to right");
+  }
+});
