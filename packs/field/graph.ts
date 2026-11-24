@@ -93,7 +93,7 @@ export function build(input: FieldIn, last: G | null, pal: string[] = []): G {
   const items = input.items;
   const n = items.length;
   const at = new Map(items.map((it, i) => [it.id, i]));
-  const types = typeColours(input.types ?? items.map((it) => it.type), pal);
+  const types = inputColours(input, pal);
   const typeNames = types.map((t) => t.name);
   const typeIx = new Map(typeNames.map((t, k) => [t, k]));
   const links = input.links.filter((l) => at.has(l.from) && at.has(l.to) && l.from !== l.to);
@@ -243,8 +243,20 @@ export function neighbours(g: G, i: number): Set<number> {
 }
 
 /** The types among these, sorted, each with its colour (from `pal`, the style's hues, then its own): what the particles and the legend use. */
-export function typeColours(names: string[], pal: string[] = []): { name: string; colour: string }[] {
-  return [...new Set(names)].sort().map((name, k) => ({ name, colour: pal[k] ?? hue(k) }));
+export function typeColours(names: string[], pal: string[] = [], after: string[] = []): { name: string; colour: string }[] {
+  const first = [...new Set(names)].sort();
+  const rest = [...new Set(after)].filter((n) => !first.includes(n)).sort();
+  return [...first, ...rest].map((name, k) => ({ name, colour: pal[k] ?? hue(k) }));
+}
+
+/**
+ * Each type's colour for an input: its listed types in order, then any an item has that the list lacks (a live
+ * session on the Landscape), after them, so a type coming or going there never shifts the listed ones' colours.
+ */
+export function inputColours(input: FieldIn, pal: string[] = []): { name: string; colour: string }[] {
+  const listed = input.types ?? input.items.map((it) => it.type);
+  const known = new Set(listed);
+  return typeColours(listed, pal, input.items.map((it) => it.type).filter((t) => !known.has(t)));
 }
 
 /** Type colours: evenly round the hue wheel, lightness alternating so neighbours in the list differ. */

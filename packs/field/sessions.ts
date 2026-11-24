@@ -29,7 +29,8 @@ export function withSessions(input: FieldIn, live: Live[], on: boolean): FieldIn
     items.push({ id, title: s.title, type: "session", status: "live", closed: false, kind: "", base: "session", shape: MARK_SHAPES.indexOf("pentagon"), side: 0 });
     for (const f of s.filters) if (ids.has(f)) links.push({ id: `${id}>${f}`, type: "runs_in", from: id, to: f });
   }
-  return { ...input, items, links, types: input.types ? [...new Set([...input.types, "session"])] : undefined };
+  // The map's own types stay as listed: a session's colour comes after theirs (graph.ts inputColours).
+  return { ...input, items, links };
 }
 
 /** What the find line found, with each session in a filter it found: a session comes with its filter. */

@@ -52,3 +52,12 @@ test("withFoundSessions: a session comes with a filter the find line found", () 
   assert.equal(withFoundSessions(null, live, true), null);
   assert.deepEqual([...withFoundSessions(new Set(["f1"]), live, false)!], ["f1"]);
 });
+
+test("a session coming leaves every type's colour on the map as it was", async () => {
+  const { inputColours } = await import("../packs/field/graph.ts");
+  const typed = { ...map, types: ["record", "umwelt"] } as unknown as FieldIn;
+  const before = new Map(inputColours(typed).map((t) => [t.name, t.colour]));
+  const after = new Map(inputColours(withSessions(typed, [{ run: "r1", title: "a", filters: ["f1"] }], true)).map((t) => [t.name, t.colour]));
+  for (const [name, colour] of before) assert.equal(after.get(name), colour, name);
+  assert.ok(after.has("session"), "the session has a colour of its own, after theirs");
+});

@@ -9,7 +9,7 @@
 import type { Id } from "../../spec/common.ts";
 import { SIDES } from "../../spec/style.ts";
 import type { Dial } from "./behaviour.ts";
-import { typeColours, type FieldIn } from "./graph.ts";
+import { inputColours, type FieldIn } from "./graph.ts";
 
 export interface Hide {
   types?: string[];
@@ -122,7 +122,7 @@ export function facets(input: FieldIn, hide: Hide, pal: string[] = []): Facets {
   const linkCounts = new Map<string, Count>();
   for (const l of input.links) count(linkCounts, l.type, l.type, links.has(l.id));
   // Colours by the whole map's order of types (input.types), so they match the particles whatever is hidden.
-  const colour = new Map(typeColours(input.types ?? input.items.map((it) => it.type), pal).map((t) => [t.name, t.colour]));
+  const colour = new Map(inputColours(input, pal).map((t) => [t.name, t.colour]));
   const colours = [...types.keys()].sort().map((name) => ({ name, colour: colour.get(name) ?? "" }));
   const byN = (a: Count, b: Count) => b.n - a.n || (a.name < b.name ? -1 : 1);
   const bases = new Map<string, BaseFacet>();

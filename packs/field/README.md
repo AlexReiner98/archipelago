@@ -94,6 +94,9 @@ find line has words, only what it finds and what lies near it.
   and fades in and out over `link_name_fade_ms` as it gains or loses its
   room, never popping.
 - **Live sessions are drawn beside the map** ([sessions.ts](sessions.ts)).
+  Their colour comes after the map's own types' (`inputColours` in
+  [graph.ts](graph.ts)), so a session coming or going never recolours
+  the map.
   The agent sessions live now (the page key `sessions.live`, set by
   [packs/sessions](../sessions/README.md)) are each a pentagon of the type
   `session`, linked `runs_in` to each of their context filters on the map.
