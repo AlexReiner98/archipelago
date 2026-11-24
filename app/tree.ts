@@ -6,6 +6,7 @@
 import { join } from "node:path";
 import type { Entry } from "../runtime/loader.ts";
 import { localOrigins } from "../runtime/guard.ts";
+import type { OtelConfig } from "../packs/otel/index.ts";
 
 /**
  * What a fresh map says before anyone has written a node: only what fits
@@ -41,6 +42,30 @@ export interface TreeOptions {
   origins?: string[];
   /** More Host values they answer (a proxy in front that keeps its own). */
   hosts?: string[];
+  /** Where the otel pack sends the exchange as spans (packs/otel). Absent: it sends nothing. */
+  otel?: OtelConfig;
+}
+
+/**
+ * The otel pack's config from the environment: the standard
+ * `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT`, its
+ * `OTEL_EXPORTER_OTLP_HEADERS` (`k=v,k=v`) and `OTEL_SERVICE_NAME`; the words
+ * go only with `ARCHIPELAGO_OTEL_CONTENT=1`.
+ */
+export function otelFromEnv(env: Record<string, string | undefined>): OtelConfig {
+  const endpoint = env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  if (!endpoint) return {};
+  const headers: Record<string, string> = {};
+  for (const part of (env.OTEL_EXPORTER_OTLP_HEADERS ?? "").split(",")) {
+    const i = part.indexOf("=");
+    if (i > 0) headers[decodeURIComponent(part.slice(0, i).trim())] = decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return {
+    endpoint,
+    ...(Object.keys(headers).length ? { headers } : {}),
+    ...(env.OTEL_SERVICE_NAME ? { service: env.OTEL_SERVICE_NAME } : {}),
+    include_content: env.ARCHIPELAGO_OTEL_CONTENT === "1",
+  };
 }
 
 /** What the page server is given, so that it answers the same as the adapter and the bridge. */
@@ -52,7 +77,7 @@ export function pageAccess({ port: PAGE, origins = [], hosts = [] }: Pick<TreeOp
  * The server's config tree. A host that runs the server its own way (more
  * packs, another front) starts from this tree and adds to it.
  */
-export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }: TreeOptions): Entry[] {
+export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], otel = {} }: TreeOptions): Entry[] {
   // The app's own origin is the page's: the adapter and the bridge answer it, and a host's in front.
   const access = pageAccess({ port: PAGE, origins, hosts });
   return [
@@ -94,6 +119,8 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }
     { id: "scripted", pack: "packs/scripted/index.ts" },
     { id: "replay", pack: "packs/replay/index.ts" },
     { id: "since", pack: "packs/since/index.ts" },
+    // The exchange as OpenTelemetry spans to a collector: off until `otel.endpoint` names one (otelFromEnv).
+    { id: "otel", pack: "packs/otel/index.ts", config: otel },
     {
       id: "claude-code",
       pack: "packs/claude-code/index.ts",
