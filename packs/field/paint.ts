@@ -23,6 +23,7 @@ export const DRAW: Dial[] = [
   { key: "closed_fade", label: "closed fade", min: 0, max: 1, step: 0.01, value: 0.28, then: "paint", doc: "How faint a closed item (done, dropped, decided) is drawn." },
   { key: "gone_ms", label: "gone fades", min: 0, max: 2000, step: 50, value: 600, then: "paint", doc: "How long an item that leaves the map (a filter turned off, a find that keeps fewer) takes to fade out where it stood, in ms (0: it vanishes at once)." },
   { key: "resize_ms", label: "size eases", min: 0, max: 2000, step: 50, value: 600, then: "paint", doc: "How long an item that stays on the map but takes a new size (fewer links shown, a find that keeps a part) takes to grow or shrink to it, in ms (0: at once)." },
+  { key: "sessions", label: "live sessions", min: 0, max: 1, step: 1, value: 1, choices: ["no", "yes"], then: "paint", doc: "Whether the agent sessions live now are drawn on the map, each linked to the context filters it is in (packs/sessions); they are not items, and come and go with the sessions." },
   { key: "come_ms", label: "new fades in", min: 0, max: 2000, step: 50, value: 600, then: "paint", doc: "How long an item that comes onto the map (a filter turned on, a find that keeps more) takes to fade in where it lands, in ms (0: it shows at once)." },
   { key: "link_alpha", label: "link strength", min: 0, max: 1, step: 0.01, value: 0.18, then: "paint", doc: "How strong a link's line is." },
   { key: "link_width", label: "link width", min: 0.1, max: 4, step: 0.1, value: 0.6, then: "paint", doc: "A link's width, in screen px." },

@@ -37,6 +37,7 @@ import { Panel, PANEL_STYLE, type Section } from "./panel.ts";
 import { BEHAVIOURS, RUN, defaults, step } from "./step.ts";
 import { build, seed } from "./graph.ts";
 import { descends, type Verdict } from "./descends.ts";
+import { withFoundSessions, withSessions, type Live } from "./sessions.ts";
 import type { Arranged } from "./treeover.ts";
 
 export { BEHAVIOURS, step } from "./step.ts";
@@ -65,6 +66,8 @@ const DIALS = "field.dials";
 /** The slot under the empty state, on a map with no items. */
 const EMPTY = "field.empty";
 const QUERY = "find.query";
+/** The live agent sessions and the context filters each is in, set by packs/sessions: read by name, a key not an import. */
+const SESSIONS = "sessions.live";
 /** A context filter's tree to arrange the map into, set by packs/arrange (`context:<title>` on the find line). */
 const ARRANGE = "arrange.tree";
 const REMEMBER = "archipelago.field.dials";
@@ -220,9 +223,12 @@ const fieldPack: Pack = {
 
       // Worked out again only when the map or the limit changes, never on a hover or a query.
       const result = useMemo(() => whole(S.field_limit!), [version, S.field_limit]);
-      const found = useMemo(() => (q.trim() ? new Set(index.run(q, S.field_limit).items.map((r) => r.id)) : null), [version, q, S.field_limit]);
+      // The live agent sessions (packs/sessions, a page key by name): drawn beside the map, each linked to its context filters.
+      const live = (useHere<Json>(SESSIONS) ?? []) as unknown as Live[];
+      const liveKey = JSON.stringify(live);
+      const found = useMemo(() => withFoundSessions(q.trim() ? new Set(index.run(q, S.field_limit).items.map((r) => r.id)) : null, live, !!S.sessions), [version, q, S.field_limit, liveKey, S.sessions]);
       const shape = useMemo(() => JSON.stringify([result.items.map((r) => [r.id, r.fields.title, r.fields.status]), result.links.map((l) => l.id)]), [result]);
-      const input = useMemo<FieldIn>(() => inputOf(result), [shape]);
+      const input = useMemo<FieldIn>(() => withSessions(inputOf(result), live, !!S.sessions), [shape, liveKey, S.sessions]);
 
       // What the legend hides is left out of the layout: a change to it settles the graph again with what is left.
       const hide = (useHere<Json>(HIDE) ?? HIDE_START) as Hide;

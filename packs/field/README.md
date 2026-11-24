@@ -93,6 +93,13 @@ find line has words, only what it finds and what lies near it.
   times the zoom, between `link_name_least_px` and `link_name_most_px`),
   and fades in and out over `link_name_fade_ms` as it gains or loses its
   room, never popping.
+- **Live sessions are drawn beside the map** ([sessions.ts](sessions.ts)).
+  The agent sessions live now (the page key `sessions.live`, set by
+  [packs/sessions](../sessions/README.md)) are each a pentagon of the type
+  `session`, linked `runs_in` to each of their context filters on the map.
+  They are not items and nothing is written: they come and go with the
+  sessions. A find that finds a filter finds its sessions too. The
+  `sessions` dial turns them off.
 - **The legend is the filter, and holds the dials** ([legend.ts](legend.ts),
   [panel.ts](panel.ts)). Closed, one line: the count and two tabs.
   `filter` opens each type (its mark in its colour and shape), each of a
