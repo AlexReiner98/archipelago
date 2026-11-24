@@ -171,7 +171,7 @@ reading, 23 Nov 2026), the whole title in its words, and never show a path: a pa
 whose it is, after a dot (`nameOf`, `placeName`): its project's folder,
 and the file when it isn't the usual CLAUDE.md or MEMORY.md, so
 "project memory · archipelago-next", "auto memory · Aperture". The whole
-title is in its words, shown beside it when the pointer rests on it. The big tree's camera fits its names too (the layout's measured box), so
+title is in its words, shown beside it when the pointer rests on it. Names run along their rays (a leaf's outward, a bough's inward), but a bough straight off the root is named level over its dot, as the Landscape names it, so the root's boughs' names never meet at the root. The big tree's camera fits its names too (the layout's measured box), so
 every name is in sight; a preview fits its dots. Every tree fits when
 first laid out, again when it outgrows the view (a profile that hears
 more, Claude Code's nodes shown again, a smaller window), and on a

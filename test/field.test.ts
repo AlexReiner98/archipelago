@@ -452,7 +452,7 @@ test("an arranged tree's names are boxes on screen that the items' titles give w
   const S = { ...settings(), tree_text: 10, tree_ghost_text: 5 };
   const boxes = treeNameBoxes(a, { k: 2, tx: 100, ty: 50 }, 1, S, (t, px) => t.length * px * 0.5);
   assert.equal(boxes.length, 2);
-  const [g, b] = boxes as [number[], number[]];
+  const g = boxes[0]!, b = boxes[1]!;
   assert.ok(g[0]! < 100 && g[2]! > 100, "the ghost's name is centred on its spot");
   assert.ok(g[1]! > 50, "and sits below it");
   assert.ok(b[3]! < 50 && b[0]! < 120 && b[2]! > 120, "a bough's name sits above its spot, centred");

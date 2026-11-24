@@ -403,7 +403,9 @@ export function radial(tree: Tree, options: RadialOptions = {}): Placed {
     }));
   }
 
-  // Names along their rays: a leaf's outward from its dot, a bough's inward, lifted off its branch.
+  // Names along their rays: a leaf's outward from its dot, a bough's inward, lifted off its branch. A bough
+  // straight off the root is named level, centred over its dot (as the Landscape names it): inward, the
+  // root's boughs' names would all meet at the root.
   const labels = new Map<string, Label>();
   const ends: [number, number][] = [...xy.values()].map((p) => [p.x, p.y]);
   for (const t of tree.order) {
@@ -414,6 +416,12 @@ export function radial(tree: Tree, options: RadialOptions = {}): Placed {
     const right = ux >= -1e-9;
     const text = cut(nameOf(t.title), o.nameMost);
     const wide = o.measure(text, o.nameText);
+    if (t.parent === tree.root && t.kids.length) {
+      const up = -o.nameText * (0.5 + o.nameLift);
+      labels.set(t.id, { text, turn: 0, dx: -wide / 2, dy: up, anchor: "start" });
+      for (const x of [-wide / 2, wide / 2]) for (const y of [up - o.nameText / 2, up + o.nameText / 2]) ends.push([here.x + x, here.y + y]);
+      continue;
+    }
     const out = t.kids.length ? -1 : 1;
     const lift = out > 0 ? 0 : -o.nameText * o.nameLift;
     // Text reads left to right: on the left half it turns half round, and runs the other way.

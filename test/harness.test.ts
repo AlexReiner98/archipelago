@@ -233,19 +233,29 @@ test("radial: the ring grows until leaves' names clear each other", () => {
   assert.equal(radial(huge).ring, STYLE.ringMost);
 });
 
-test("radial: names read left to right and point away from their dot", () => {
+test("radial: names read left to right and point away from their dot; the root's boughs are named level, over their dot", () => {
   const t = treeOf(NODES);
   const p = radial(t);
+  let level = 0;
   for (const n of t.order) {
     if (!n.parent) continue;
     const l = p.labels.get(n.id)!;
     assert.ok(l.turn > -90 - 1e-6 && l.turn <= 90 + 1e-6, `${n.id} turned ${l.turn}`);
+    if (n.parent === t.root && n.kids.length) {
+      // Level, centred on its dot, above it: the root's boughs' names never meet at the root.
+      assert.equal(l.turn, 0, n.id);
+      assert.equal(l.anchor, "start");
+      assert.ok(l.dx < 0 && l.dy < 0, n.id);
+      level++;
+      continue;
+    }
     const out = n.kids.length ? -1 : 1;
     const x = p.xy.get(n.id)!.x;
     // A leaf's name runs outward: away from the middle on its side.
     const outward = (l.anchor === "start") === (x >= -1e-6);
     assert.equal(outward, out > 0, n.id);
   }
+  assert.ok(level > 0, "the fixture has boughs off the root");
 });
 
 test("route: from the root through each bough to the node", () => {
