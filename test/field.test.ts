@@ -457,3 +457,15 @@ test("an arranged tree's names are boxes on screen that the items' titles give w
   assert.ok(g[1]! > 50, "and sits below it");
   assert.ok(b[3]! < 50 && b[0]! < 120 && b[2]! > 120, "a bough's name sits above its spot, centred");
 });
+
+test("an arranged tree waits tree_in_ms while the old map fades out, then comes in at least as fast as gone_ms", async () => {
+  const { treeStrength } = await import("../packs/field/treeover.ts");
+  const S = { ...settings(), tree_in_ms: 450, gone_ms: 600 };
+  assert.equal(treeStrength(1, 0, S), 0, "not yet, however far the items have come");
+  assert.equal(treeStrength(1, 449, S), 0);
+  assert.equal(treeStrength(0, 450, S), 0, "then it starts from nothing");
+  assert.ok(treeStrength(0, 750, S) > 0.4 && treeStrength(0, 750, S) < 0.6, "eased in over gone_ms");
+  assert.equal(treeStrength(0, 1050, S), 1);
+  assert.equal(treeStrength(0.8, 500, S), 0.8, "or as far as the items have arrived, once it may show");
+  assert.equal(treeStrength(0, 0, { ...S, tree_in_ms: 0, gone_ms: 0 }), 1, "0 and 0: at once");
+});

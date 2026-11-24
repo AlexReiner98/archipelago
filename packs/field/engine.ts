@@ -20,7 +20,7 @@ import { onStyle } from "../../spec/style.ts";
 import { ink, Light, paint, palette, type Cam, type Ink } from "./paint.ts";
 import { step, warm } from "./step.ts";
 import { FAINT, FOUND } from "./filter.ts";
-import { arrived, fly, paintTree, takeOff, targetsOf, treeBox, treeNameBoxes, type Arranged, type Flight } from "./treeover.ts";
+import { arrived, fly, paintTree, takeOff, targetsOf, treeBox, treeNameBoxes, treeStrength, type Arranged, type Flight } from "./treeover.ts";
 
 export interface Stats {
   n: number;
@@ -210,7 +210,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       drawn = { g, match };
       // Arranged into a profile: its tree comes in under the items as they reach their places.
       // It comes in as the items arrive, and at least as fast as what left fades out (gone_ms), so the two crossfade.
-      if (tree) paintTree(c, tree, cam, s.dpr, scale(), Math.max(arrived(g, scale(), flight), flight ? comeFade(performance.now() - flight.at, S.gone_ms ?? 0) : 0), colours, S);
+      if (tree) paintTree(c, tree, cam, s.dpr, scale(), flight ? treeStrength(arrived(g, scale(), flight), performance.now() - flight.at, S) : arrived(g, scale(), flight), colours, S);
       const fading = paintGone(c, ghosts, cam, s.dpr, performance.now(), S, goneLinks, colours, goneNames, S.link_names ? wireSize(S.link_name_size!, cam.k, S.link_name_least_px!, S.link_name_most_px!) : 0) || performance.now() < coming;
       // A link name or a ghost still fading keeps the view painting.
       dirty = easing || following || light.wiresMoving || fading || resizing;

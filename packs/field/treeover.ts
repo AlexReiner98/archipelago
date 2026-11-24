@@ -81,6 +81,19 @@ export function arrived(g: G, scale: number, f?: Flight | null): number {
   return Math.max(0, Math.min(1, 1 - d / n / (60 * scale)));
 }
 
+/**
+ * How strong the tree is drawn `since` ms after the map was arranged into it: nothing for `tree_in_ms`,
+ * while what left the map fades out (so the two are never drawn over each other), then in as the items
+ * arrive (`arrived`), and at least as fast as `gone_ms`.
+ */
+export function treeStrength(arrivedNow: number, since: number, S: Settings): number {
+  const wait = S.tree_in_ms ?? 0;
+  if (since < wait) return 0;
+  const life = S.gone_ms ?? 0;
+  const k = life > 0 ? Math.min(1, (since - wait) / life) : 1;
+  return Math.max(arrivedNow, k * k * (3 - 2 * k));
+}
+
 /** The box the tree takes, at `scale`, its names' width guessed from their length: what the camera fits while arranged. */
 export function treeBox(a: Arranged, scale: number, S: Settings): [number, number, number, number] {
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
