@@ -21,10 +21,12 @@ import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import type { TypesAcyclic, TypesDefine } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { readsOf, ReadsIndex, seeds, solve, STAMP_KEYS, utcToday, type Judging, type Read, type Write } from "./checker.ts";
+import { preview } from "./preview.ts";
 import { decidedOf, read as readRejections, type Decided, type RuleLimit, type RuleReading } from "./rejections.ts";
 import { APPLIES, DECISIONS, FLAVOURS, LINKS, NEEDS, RULE, TEST, TEST_LINKS, type Decision } from "./types.ts";
 
 export type { JudgeCall, Judging, LinkPage, Reader, Verdict } from "./checker.ts";
+export type { Preview, Previewed } from "./preview.ts";
 export type { RuleLimit, RuleReading } from "./rejections.ts";
 export { AGAINST, APPLIES, CHECKS, DECISIONS, NEEDS, RESULTS, RULE, TEST } from "./types.ts";
 
@@ -181,6 +183,28 @@ const checks: Pack = {
           .filter((r) => !input.rule || r.id === input.rule)
           .map((r) => ({ id: r.id, title: String(r.fields.title ?? r.id), fn: r.fields.fn as string | undefined, params: r.fields.params }));
         return readRejections(rules, limits, decided) as RuleReading[] as unknown as Json;
+      },
+    });
+
+    register.register({
+      name: "checks.preview",
+      title: "Preview a rule change",
+      doc: "Solves the tests a rule reaches, and what needs them, against proposed params, in memory: which tests would flip, with their findings. Writes nothing. It calls a judge for each test whose stamp would move, up to `judge` of them (default all), so a preview costs judge calls: with a paid judge, pass a small `judge`, or 0 to see only which tests would be judged.",
+      input: {
+        type: "object",
+        properties: {
+          rule: { type: "string" },
+          params: { description: "The params to try in place of the rule's." },
+          judge: { type: "integer", minimum: 0, description: "The most judge calls to make; the rest are left pending." },
+        },
+        required: ["rule", "params"],
+      },
+      async run(input: { rule: string; params: Json; judge?: number }) {
+        try {
+          return (await preview(input.rule, input.params, read, domainOf, input.judge === undefined ? {} : { judge: input.judge })) as unknown as Json;
+        } catch (err) {
+          throw refuse("preview", (err as Error).message);
+        }
       },
     });
 

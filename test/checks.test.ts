@@ -14,6 +14,7 @@ import { order, readsOf, ReadsIndex, seeds, solve, stamp, type Judging, type Rea
 import { LIMIT_MAX } from "../spec/graph.ts";
 import { decidedOf, read as reading, type Decided, type RuleLimit } from "../packs/checks/rejections.ts";
 import checks, { type CheckDomain, type ChecksDomain } from "../packs/checks/index.ts";
+import { preview } from "../packs/checks/preview.ts";
 
 /** A graph as data: items by id, and links as [type, from, to]. */
 function graph(items: Item[], links: [string, string, string][]): Read & { items: Map<string, Item> } {
@@ -457,6 +458,79 @@ test("the pack: a domain that judges by function reads the graph, and a change t
     assert.throws(() => s.register({ fns: ["owned"], ...readingJudge() }), /fn_taken|already judged/);
     assert.throws(() => s.register({ fns: ["other"], stamp: "rev", ...readingJudge() }), /declares no stamp/);
     assert.deepEqual(s.errors, []);
+  } finally {
+    await s.stop();
+  }
+});
+
+// ---- Preview ----
+
+test("preview: which tests a rule change would flip, judged only where the stamp moves, nothing written", async () => {
+  const { g, writes, apply } = live(
+    [
+      item("a", "part", { rev: "ra" }),
+      item("b", "part", { rev: "rb" }),
+      item("c", "part", { rev: "rc" }),
+      item("walls", "rule", { fn: "min", params: { min: 2 } }),
+      item("other", "rule", { fn: "min", params: { min: 0 } }),
+      item("ta", "test", { title: "A walls" }),
+      item("tb", "test", { title: "B walls" }),
+      item("tc", "test", { title: "C other" }),
+      item("ready", "test", { title: "A ready" }),
+    ],
+    [
+      ["checks", "ta", "a"], ["applies", "ta", "walls"],
+      ["checks", "tb", "b"], ["applies", "tb", "walls"],
+      ["checks", "tc", "c"], ["applies", "tc", "other"],
+      ["checks", "ready", "a"], ["applies", "ready", "other"], ["needs", "ready", "ta"],
+    ],
+  );
+  const calls: string[] = [];
+  const dom = () => judging({ ra: 1.5, rb: 3, rc: 1 }, calls);
+  await solve(["ta", "tb", "tc", "ready"], g, dom, apply);
+  assert.deepEqual(["ta", "tb", "tc", "ready"].map((id) => g.items.get(id)!.fields.result), ["fail", "pass", "pass", "blocked"]);
+  const snapshot = JSON.stringify([...g.items]);
+  writes.length = 0;
+  calls.length = 0;
+
+  const p = await preview("walls", { min: 1 }, g, dom);
+  assert.equal(writes.length, 0);
+  assert.equal(JSON.stringify([...g.items]), snapshot);
+  // Both walls tests move (their params did), and `ready` with them; `tc` doesn't.
+  assert.deepEqual(p.tests.map((t) => [t.test, t.before.result, t.after.result, t.flips]), [
+    ["ta", "fail", "pass", true],
+    ["tb", "pass", "pass", false],
+    ["ready", "blocked", "pass", true],
+  ]);
+  assert.deepEqual(calls.sort(), ["ra:min", "ra:min", "rb:min"]);
+  assert.deepEqual([p.flips, p.judged, p.held_back], [2, 3, 0]);
+
+  // judge: 0 judges nothing, and says what would be judged.
+  calls.length = 0;
+  const q = await preview("walls", { min: 1 }, g, dom, { judge: 0 });
+  assert.deepEqual(calls, []);
+  assert.deepEqual(q.tests.map((t) => [t.test, t.after.result, t.judged]), [["ta", "pending", false], ["tb", "pending", false], ["ready", "pending", false]]);
+  assert.equal(q.held_back, 3);
+  await assert.rejects(preview("ta", {}, g, dom), /not a rule/);
+});
+
+test("the pack: checks.preview writes nothing to the map", async () => {
+  const s = await setup(new Map([["r1", 1]]));
+  try {
+    const p = await s.make("part", "Bracket", { rev: "r1" });
+    const r = await s.make("rule", "At least 2", { fn: "min", params: { min: 2 } });
+    const t = await s.make("test", "Bracket walls");
+    await s.link("checks", t, p);
+    await s.link("applies", t, r);
+    await s.settled([t]);
+    await s.quiet();
+    const before = (await s.history({ limit: 500 })).items.length;
+    const out = await s.act("checks.preview", { rule: r, params: { min: 0.5 } });
+    assert.deepEqual(out.tests.map((x: any) => [x.test, x.before.result, x.after.result, x.flips]), [[t, "fail", "pass", true]]);
+    await s.quiet();
+    assert.equal((await s.history({ limit: 500 })).items.length, before);
+    assert.equal((await s.get(t)).fields.result, "fail");
+    assert.deepEqual((await s.get(r)).fields.params, { min: 2 });
   } finally {
     await s.stop();
   }

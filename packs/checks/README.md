@@ -82,6 +82,18 @@ The checker is in [checker.ts](checker.ts), apart from the runtime.
 |---|---|
 | `checks.decide` `{ test, decision }` | A person's `accepted` or `rejected` at the test's version; refused until it has a result. Cleared when the version moves |
 | `checks.rejections` `{ rule? }` | Per rule with decided tests: the findings rejected and accepted (a finding counts by its number `measured`), and the limit that would spare every rejection and still catch every acceptance (`proposal`, null when none does). Writes nothing |
+| `checks.preview` `{ rule, params, judge? }` | Solves the tests the rule reaches, and what needs them, against `params`, in memory: each moved test's result before and after, whether it `flips`, and its findings. Writes nothing |
 | `checks.result` | The checker's own write, called through `action.attest` |
 
 The reading is in [rejections.ts](rejections.ts).
+
+## Previews cost judge calls
+
+A preview is a solve over an overlay of the graph kept in memory
+([preview.ts](preview.ts)): the proposed params stand in for the rule's,
+and every result goes to the overlay, never the map. Like a live solve, it
+judges only the tests whose stamp would move; unlike one, the results are
+thrown away, so the same preview twice judges twice. With a judge that
+costs (a paid service, a slow one), pass `judge`: at most that many calls,
+the rest left `pending` and counted in `held_back` (and what needs them
+with them). `judge: 0` judges nothing and says which tests would be.
