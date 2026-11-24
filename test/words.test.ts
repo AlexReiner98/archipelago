@@ -334,3 +334,17 @@ test("the words tool: a node's whole words by id or title, the listed ones witho
   assert.deepEqual(errors, []);
   await loader.apply([]);
 });
+
+test("a node heard while the change node was reading (said at the same moment) is not told as retired", async () => {
+  const { changes } = await import("../packs/words/heard.ts");
+  const heard = new Map([
+    ["n_a", { text: "Old words.", title: "A", listed: false }],
+    ["n_b", { text: "Just said.", title: "B", listed: false }],
+  ]);
+  // The change node read only n_a; n_b was heard after (another node at the same prompt).
+  const now = new Map([["n_a", { id: "n_a", type: "node", fields: { title: "A", words: "Old words." } }]]);
+  assert.deepEqual(changes(heard, now as never, "TRIAL"), [], "nothing changed, nothing retired");
+  assert.ok(heard.has("n_b"), "and it stays heard, to be checked next time");
+  const gone = new Map([["n_a", null], ["n_b", null]]);
+  assert.deepEqual(changes(heard, gone as never, "TRIAL"), ['"A" no longer applies: it was retired on the map.', '"B" no longer applies: it was retired on the map.'], "read and gone: retired");
+});

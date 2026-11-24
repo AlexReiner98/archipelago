@@ -59,7 +59,7 @@ again at its place in that context. Reached at its place before the
 prompt, a reworded node says its new words itself, and the agent pack
 records that say `reworded`. A node item moved to an ordinary type, said
 now by its context filter link, is compared with what that link says: the move
-itself isn't told as a retirement. At most 200 runs are held.
+itself isn't told as a retirement. A node heard at the same moment the change node reads (said at that same prompt) is checked next time, never told as retired. At most 200 runs are held.
 
 A node whose item has `held` (a reason) is held as written: `words.set`,
 `words.title` and `words.retire` refuse it, with the reason (`words.held`). The

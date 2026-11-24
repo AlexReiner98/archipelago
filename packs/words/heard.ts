@@ -88,6 +88,8 @@ export function listing(item: Item): string {
 export function changes(heard: Map<Id, Heard>, now: Map<Id, Item | null>, trialMark: string): string[] {
   const lines: string[] = [];
   for (const [id, h] of [...heard]) {
+    // Heard after `now` was read (another node said at this same moment): nothing has changed since; told next time if so.
+    if (!now.has(id)) continue;
     const item = now.get(id) ?? null;
     if (!item || item.fields.status === "retired") {
       lines.push(`"${h.title}" no longer applies: it was retired on the map.`);
