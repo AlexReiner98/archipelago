@@ -52,7 +52,8 @@ export function copy(g: G, most = g.n): G {
 /** Whether `b` keeps the rule on graph `g` (copied first) under settings `S`; `gather` keeps the picture bounded. */
 export function descends(b: Behaviour, g0: G, S: Settings, gather: Behaviour, at = CHECK, most = g0.n): Verdict {
   const g = copy(g0, most);
-  const only = { ...S, [`w_${b.name}`]: S[`w_${b.name}`] ?? 1 };
+  // The behaviour on whatever the settings say (one off by default is checked too), at its weight.
+  const only = { ...S, [`on_${b.name}`]: 1, [`w_${b.name}`]: S[`w_${b.name}`] ?? 1 };
   // Slope: the push at a few particles against the energy's measured slope.
   let slope = 0;
   push(g, only, [b]);

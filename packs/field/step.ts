@@ -23,12 +23,13 @@ import type { G, Settings } from "./graph.ts";
 import collide from "./behaviours/collide.ts";
 import tree from "./behaviours/tree.ts";
 import flow from "./behaviours/flow.ts";
+import aspect from "./behaviours/aspect.ts";
 import gather from "./behaviours/gather.ts";
 import repel from "./behaviours/repel.ts";
 import springs from "./behaviours/springs.ts";
 
 /** The behaviours, in the order they run. */
-export const BEHAVIOURS: Behaviour[] = [gather, repel, springs, flow, collide, tree];
+export const BEHAVIOURS: Behaviour[] = [gather, aspect, repel, springs, flow, collide, tree];
 
 /** Whether a behaviour runs: its `on_<name>` dial, else its own default. */
 export const isOn = (b: Behaviour, S: Settings) => (S[`on_${b.name}`] ?? (b.on ? 1 : 0)) > 0 && (S[`w_${b.name}`] ?? 1) > 0;

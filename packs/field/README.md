@@ -31,7 +31,9 @@ find line has words, only what it finds and what lies near it.
   field's test runs it on every behaviour, and on one made to break it.
   Field's own page in the Packs view (the slot `docs.page`) runs the same
   check on the map in view, so what the page says is what the code does.
-- **The behaviours** ([behaviours/](behaviours)): `gather`, `repel`
+- **The behaviours** ([behaviours/](behaviours)): `gather`, `aspect`
+  (a pull toward the middle, weaker along the panel's long side, so the
+  picture settles into the panel's shape; off unless a view turns it on, and its ratio dial fixes one), `repel`
   (Barnes-Hut on an [octree](octree.ts); its push fades to nothing at its
   reach, so gather keeps clusters together), `springs` (length and
   stiffness per link type), `flow` (order links put a plan in columns:

@@ -17,6 +17,12 @@ export interface FieldIn {
    * type keeps its colour whatever a filter leaves out. Absent, the items'.
    */
   types?: string[];
+  /**
+   * A colour for some types, by name, in place of the style's hue: for a
+   * view that draws what an item is by its shape and spends colour on
+   * something else (a review's pass and fail). Absent: every type its hue.
+   */
+  colours?: Record<string, string>;
   links: { id: Id; type: string; from: Id; to: Id }[];
 }
 
@@ -78,6 +84,8 @@ export interface G {
    * one that has a place, at (`x[i]`, `y[i]`). Absent: none has.
    */
   target?: { on: Uint8Array; x: Float32Array; y: Float32Array };
+  /** The panel it is drawn in: its width over its height (the aspect behaviour). Absent: round. */
+  view?: { aspect: number };
   sim: Sim;
   /** Scratch, kept so each step does not allocate. */
   force: { x: Float32Array; y: Float32Array; z: Float32Array };
@@ -88,7 +96,7 @@ export function build(input: FieldIn, last: G | null, pal: string[] = []): G {
   const items = input.items;
   const n = items.length;
   const at = new Map(items.map((it, i) => [it.id, i]));
-  const types = typeColours(input.types ?? items.map((it) => it.type), pal);
+  const types = typeColours(input.types ?? items.map((it) => it.type), pal, input.colours);
   const typeNames = types.map((t) => t.name);
   const typeIx = new Map(typeNames.map((t, k) => [t, k]));
   const links = input.links.filter((l) => at.has(l.from) && at.has(l.to) && l.from !== l.to);
@@ -237,8 +245,8 @@ export function neighbours(g: G, i: number): Set<number> {
 }
 
 /** The types among these, sorted, each with its colour (from `pal`, the style's hues, then its own): what the particles and the legend use. */
-export function typeColours(names: string[], pal: string[] = []): { name: string; colour: string }[] {
-  return [...new Set(names)].sort().map((name, k) => ({ name, colour: pal[k] ?? hue(k) }));
+export function typeColours(names: string[], pal: string[] = [], colours: Record<string, string> = {}): { name: string; colour: string }[] {
+  return [...new Set(names)].sort().map((name, k) => ({ name, colour: colours[name] ?? pal[k] ?? hue(k) }));
 }
 
 /** Type colours: evenly round the hue wheel, lightness alternating so neighbours in the list differ. */

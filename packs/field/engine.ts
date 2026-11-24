@@ -68,6 +68,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   const light = new Light();
   let colours: Ink = ink(canvas);
   let pal = palette(canvas);
+  /** The colours the input gave its types, kept over a new theme (FieldIn.colours). */
+  let given: Record<string, string> = {};
   let hover = -1, dirty = true, awake = false, stopped = false;
   let levels: Map<Id, number> | null = null, match: Uint8Array | null = null;
   let tree: Arranged | null = null;
@@ -78,6 +80,11 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   };
   let stepMs = 0, runStart = { steps: 0, at: 0 }, settledIn: Stats["settledIn"];
   const size = () => ({ width: canvas.clientWidth, height: canvas.clientHeight, dpr: devicePixelRatio || 1 });
+  /** The panel's shape, for the aspect behaviour: its width over its height. */
+  const view = () => {
+    const { width, height } = size();
+    return { aspect: width > 0 && height > 0 ? width / height : 1 };
+  };
 
   /** The camera that fits the picture now: while the find line has words, what it finds (what is near may run past the edges). */
   const fitted = (): Cam => {
@@ -121,6 +128,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     if (stopped || !awake) return;
     const t0 = performance.now();
     let steps = 0, energy = 0;
+    g.view = view();
     do {
       energy = step(g, S);
       steps++;
@@ -259,6 +267,9 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   const resize = new ResizeObserver(() => {
     if (!cam.moved) fit();
     dirty = true;
+    // A panel that changed its shape settles the picture again into it (the aspect behaviour).
+    const was = g.view?.aspect, now = view().aspect;
+    if (was && Math.abs(Math.log(now / was)) > 0.05) (g.view = view()), warm(g, S), wake();
   });
   resize.observe(canvas);
   // The legend opening or closing over the canvas moves where titles may go: paint again.
@@ -269,7 +280,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   const recolour = () => {
     colours = ink(canvas);
     pal = palette(canvas);
-    g.types.forEach((t, k) => (t.colour = pal[k] ?? t.colour));
+    g.types.forEach((t, k) => (t.colour = given[t.name] ?? pal[k] ?? t.colour));
     dirty = true;
   };
   scheme.addEventListener("change", recolour);
@@ -285,6 +296,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   return {
     input(next, warmTo, refit) {
       const first = !g.n;
+      given = next.colours ?? {};
       g = build(next, g.n ? g : null, pal);
       g.target = targetsOf(g, tree, scale());
       seed(g, S);
