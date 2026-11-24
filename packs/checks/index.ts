@@ -20,10 +20,10 @@ import type { Fact } from "../../spec/changeset.ts";
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import type { TypesAcyclic, TypesDefine } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { readsOf, ReadsIndex, seeds, solve, STAMP_KEYS, utcToday, type Judging, type Read, type Write } from "./checker.ts";
+import { identities, readsOf, ReadsIndex, seeds, solve, STAMP_KEYS, utcToday, type Judging, type Read, type Write } from "./checker.ts";
 import { preview } from "./preview.ts";
 import { decidedOf, read as readRejections, type Decided, type RuleLimit, type RuleReading } from "./rejections.ts";
-import { APPLIES, DECISIONS, FLAVOURS, LINKS, NEEDS, RULE, TEST, TEST_LINKS, type Decision } from "./types.ts";
+import { APPLIES, CHECKS, DECISIONS, FLAVOURS, LINKS, NEEDS, RULE, TEST, TEST_LINKS, type Decision } from "./types.ts";
 
 export type { JudgeCall, Judging, LinkPage, Reader, Verdict } from "./checker.ts";
 export type { Preview, Previewed } from "./preview.ts";
@@ -141,7 +141,7 @@ const checks: Pack = {
     register.register({
       name: "checks.decide",
       title: "Accept or reject a test's result",
-      doc: "A person's call on a test's result at its version. Kept while the version holds; the checker clears it when the inputs move.",
+      doc: "A person's call on a test's result at its version. Kept while the version holds; the checker clears it when the inputs move, unless the test's domain names findings and the same result still has every finding decided on.",
       input: { type: "object", properties: { test: { type: "string" }, decision: { enum: [...DECISIONS] } }, required: ["test", "decision"] },
       async run(input: { test: string; decision: Decision }, call) {
         const [t] = await graph.get([input.test]);
@@ -149,13 +149,21 @@ const checks: Pack = {
         if (!DECISIONS.includes(input.decision)) throw refuse("decision", `A decision is ${DECISIONS.join(" or ")}.`);
         const r = t.fields.result;
         if (r !== "pass" && r !== "fail") throw refuse("not_solved", `${t.id} is ${String(r ?? "unsolved")}: decide once it has a result.`);
+        // With a domain that names findings, the decision is on them: it is carried while they are all still found.
+        const fn = (await graph.get([(await read.links(t.id, APPLIES, "out"))[0]?.to ?? ""]))[0]?.fields.fn;
+        const first = (await read.links(t.id, CHECKS, "out"))[0]?.to;
+        const domain = domainOf(first ? ((await graph.get([first]))[0]?.type ?? "") : "", typeof fn === "string" ? fn : undefined);
+        const named = domain?.finding ? identities(t.fields.findings ?? null, domain.finding) : undefined;
+        if (named?.some((x) => x === undefined)) throw refuse("finding", `A finding of ${t.id} has no identity its domain can name.`);
+        const fields: [string, Json][] = [["decision", input.decision], ["decided_version", t.fields.version ?? null]];
+        if (named) fields.push(["decided_findings", named as string[]]);
         const facts: Fact[] = [];
-        for (const [k, v] of [["decision", input.decision], ["decided_version", t.fields.version ?? null]] as [string, Json][]) {
+        for (const [k, v] of fields) {
           if (t.fields[k] !== undefined) facts.push(["-", t.id, k, t.fields[k]!]);
           if (v !== null) facts.push(["+", t.id, k, v]);
         }
         call.write(facts);
-        return { test: t.id, decision: input.decision, version: t.fields.version ?? null };
+        return { test: t.id, decision: input.decision, version: t.fields.version ?? null, ...(named ? { findings: named as string[] } : {}) };
       },
     });
 

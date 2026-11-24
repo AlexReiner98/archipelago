@@ -85,6 +85,13 @@ export interface Judging {
   /** The subject's field a judge that can't read the graph is stamped by. Absent: reads are recorded. */
   stamp?: string;
   judge(call: JudgeCall): Promise<Verdict>;
+  /**
+   * Optional: a finding's identity (the face it is on, the field it names),
+   * or undefined for one that has none. With it, a decision outlives a moved
+   * version while the result is the same and every finding decided on is
+   * still found; without it, a decision is cleared whenever the version moves.
+   */
+  finding?(finding: Json): string | undefined;
 }
 
 /** A write on a test's word at a version: the fields to set (null clears). */
@@ -411,7 +418,34 @@ function waiting(shape: Shape): string | null {
   return failed.length ? `Waits on ${failed.map((n) => n.id).join(", ")}, which didn't pass.` : null;
 }
 
-const clearing = (f: Record<string, Json>, version: string): Record<string, Json> => (f.decision && f.decided_version !== version ? { decision: null, decided_version: null } : {});
+/** What a pending write does to a decision: cleared when the version moves, unless the domain can carry it by finding (then the result decides). */
+const clearing = (f: Record<string, Json>, version: string, domain: Judging | undefined): Record<string, Json> =>
+  !f.decision || f.decided_version === version ? {} : domain?.finding && Array.isArray(f.decided_findings) ? {} : { decision: null, decided_version: null, decided_findings: null };
+
+/** A finding's identities, by the domain's hook: undefined for one it can't name. */
+export function identities(findings: Json, finding: (f: Json) => string | undefined): (string | undefined)[] {
+  return (Array.isArray(findings) ? findings : []).map((x) => {
+    try {
+      return finding(x);
+    } catch {
+      return undefined;
+    }
+  });
+}
+
+/**
+ * What a result write does to a decision carried past a moved version: kept
+ * (at the new version) when the result is the one decided on and every
+ * finding decided on is still found by identity; else cleared.
+ */
+export function carried(was: Record<string, Json>, result: ResultKind, findings: Json, version: string, domain: Judging | undefined): Record<string, Json> {
+  if (!was.decision || was.decided_version === version) return {};
+  const decided = was.decided_findings;
+  if (!domain?.finding || !Array.isArray(decided)) return {}; // cleared at pending already
+  const now = new Set(identities(findings, domain.finding).filter((x): x is string => x !== undefined));
+  const keep = (result === "pass" || result === "fail") && result === was.result && decided.every((x) => typeof x === "string" && now.has(x));
+  return keep ? { decided_version: version } : { decision: null, decided_version: null, decided_findings: null };
+}
 
 async function solveDeclared(id: string, test: Item, shape: Shape, needs: [string, Json, Json][], read: Read, put: (w: Write) => Promise<void>, opts: SolveOptions) {
   const { rule, first, domain, against, checks } = shape;
@@ -429,7 +463,7 @@ async function solveDeclared(id: string, test: Item, shape: Shape, needs: [strin
   });
   const f = test.fields;
   if (f.version === version && f.result && f.result !== "pending") return;
-  await put({ test: id, version, fields: { result: "pending", findings: null, version, ...clearing(f, version) }, reason: "Its inputs changed: pending until solved" });
+  await put({ test: id, version, fields: { result: "pending", findings: null, version, ...clearing(f, version, domain) }, reason: "Its inputs changed: pending until solved" });
   if (opts.may && !opts.may(id)) return;
 
   let result: ResultKind;
@@ -456,7 +490,7 @@ async function solveDeclared(id: string, test: Item, shape: Shape, needs: [strin
       findings = [{ message: (err as Error).message }];
     }
   }
-  await put({ test: id, version, fields: { result, findings }, reason: `Solved: ${result}` });
+  await put({ test: id, version, fields: { result, findings, ...carried(f, result, findings, version, domain) }, reason: `Solved: ${result}` });
 }
 
 async function solveTraced(id: string, test: Item, shape: Shape, needs: [string, Json, Json][], read: Read, put: (w: Write) => Promise<void>, today: () => string, opts: SolveOptions) {
@@ -468,7 +502,7 @@ async function solveTraced(id: string, test: Item, shape: Shape, needs: [string,
   const before = readsOf(f.reads);
   const now = traced({ fn, params, subjects, values: values(before, await replay(before, read, today)), needs });
   if (f.version === now && f.result && f.result !== "pending") return;
-  await put({ test: id, version: now, fields: { result: "pending", findings: null, version: now, ...clearing(f, now) }, reason: "Its inputs changed: pending until solved" });
+  await put({ test: id, version: now, fields: { result: "pending", findings: null, version: now, ...clearing(f, now, domain) }, reason: "Its inputs changed: pending until solved" });
   if (opts.may && !opts.may(id)) return;
 
   const blocked = incomplete(shape) ?? waiting(shape);
@@ -497,7 +531,7 @@ async function solveTraced(id: string, test: Item, shape: Shape, needs: [string,
   }
   const keep: Json = reads.items.length || reads.links.length || reads.today ? (reads as unknown as Json) : null;
   opts.index?.set(id, keep ? reads : null);
-  const fields: Record<string, Json> = { result, findings, reads: keep };
+  const fields: Record<string, Json> = { result, findings, reads: keep, ...carried(f, result, findings, version, domain) };
   if (version !== now) fields.version = version;
   await put({ test: id, version, fields, reason: `Solved: ${result}` });
 }

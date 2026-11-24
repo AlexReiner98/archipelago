@@ -15,7 +15,7 @@ Injects `types.define`, `types.acyclic`, `action.register`,
 | Type | Fields |
 |---|---|
 | `rule` | `fn` (a function a domain knows by name), `params` |
-| `test` | `result`, `findings`, `version`, `decision`, `decided_version`, `reads` |
+| `test` | `result`, `findings`, `version`, `decision`, `decided_version`, `decided_findings`, `reads` |
 
 A test `checks` one or more subjects (items of any base), `applies` a
 rule, and may `needs` other tests (held acyclic, so the tests form a DAG).
@@ -32,6 +32,7 @@ A domain pack injects `checks.domain` and registers, as its own effect:
 | `judge({ subject, other?, subjects, fn, params, read? })` | Answers `{ passed, findings }`; throwing is an `error` result |
 | `stamp` | Only for a judge that can't read the graph: the subject's field that is its stamp (a hash of a file) |
 | `limits()` | Optional: per rule `fn`, which param is its limit and which side fails (`below` or `above`) |
+| `finding(f)` | Optional: a finding's identity (the face it is on, the field it names), or undefined. See below |
 
 One domain per subject type and per function. A test no domain judges is
 left as it is until one does.
@@ -80,12 +81,23 @@ The checker is in [checker.ts](checker.ts), apart from the runtime.
 
 | Action | Does |
 |---|---|
-| `checks.decide` `{ test, decision }` | A person's `accepted` or `rejected` at the test's version; refused until it has a result. Cleared when the version moves |
+| `checks.decide` `{ test, decision }` | A person's `accepted` or `rejected` at the test's version; refused until it has a result. Cleared when the version moves, unless carried by finding (below) |
 | `checks.rejections` `{ rule? }` | Per rule with decided tests: the findings rejected and accepted (a finding counts by its number `measured`), and the limit that would spare every rejection and still catch every acceptance (`proposal`, null when none does). Writes nothing |
 | `checks.preview` `{ rule, params, judge? }` | Solves the tests the rule reaches, and what needs them, against `params`, in memory: each moved test's result before and after, whether it `flips`, and its findings. Writes nothing |
 | `checks.result` | The checker's own write, called through `action.attest` |
 
 The reading is in [rejections.ts](rejections.ts).
+
+## Decisions per finding
+
+Without a `finding` hook, a decision is cleared whenever the test's
+version moves. With one, `checks.decide` also keeps the identities of the
+findings decided on (`decided_findings`; refused if one has none), and
+when the version moves the decision is kept, at the new version, while
+the result is the same (`pass` or `fail`) and every finding decided on is
+still found by identity; new findings beside them don't clear it. Else it
+is cleared. A decision on a pass decides on no findings: it is carried
+while the test passes.
 
 ## Previews cost judge calls
 
