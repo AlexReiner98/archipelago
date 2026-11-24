@@ -995,3 +995,11 @@ test("stepScale: the map's own row grows on round steps from 250, so a session's
   assert.equal(stepScale(1200), 2500);
   assert.equal(stepScale(30_000), 50_000);
 });
+
+test("foldHeld: three or more held-back events in a row at one place fold into one line; the rest stay lines", async () => {
+  const { foldHeld } = await import("../packs/harness/events.ts");
+  const ev = (kind: string, place?: string) => ({ kind, place }) as never;
+  const events = [ev("begin"), ev("gated", "session_start"), ev("gated", "session_start"), ev("gated", "session_start"), ev("say", "session_start"), ev("gated", "tool:Bash"), ev("gated", "tool:Bash"), ev("act", "tool:Bash")];
+  assert.deepEqual(foldHeld(events), [{ ev: 0 }, { held: [1, 3], place: "session_start" }, { ev: 4 }, { ev: 5 }, { ev: 6 }, { ev: 7 }]);
+  assert.deepEqual(foldHeld([ev("gated", "prompt"), ev("gated", "tool:Edit"), ev("gated", "tool:Edit"), ev("gated", "tool:Edit")]), [{ ev: 0 }, { held: [1, 3], place: "tool:Edit" }], "only at one place");
+});

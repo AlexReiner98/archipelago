@@ -277,6 +277,11 @@ a step at a time, "● live" (or "■ end") follows the end again.
 
 ## The run ([events.ts](events.ts))
 
+Three or more held-back lines in a row at one place (what other context
+filters keep from this run) fold into one line, "63 held back, for other
+context filters ▸", which a click opens (`foldHeld`): a run in a map of
+many filters reads from its start.
+
 The line at the playhead is picked; those after it are faint. New lines
 keep the list at its foot only while it is at its foot (`atFoot`):
 scrolled up to read, it stays where it is. A click
