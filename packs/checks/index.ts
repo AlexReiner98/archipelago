@@ -3,13 +3,15 @@
  * keeps every test's result true to its inputs.
  *
  * It does not know what a subject is. A domain pack plugs in through
- * `checks.domain`: the type of item its tests check, the field of it that
- * goes into a test's stamp, a judge, and (for the rejections reading) each
- * rule function's limit. The checker solves a change's tests and what needs
- * them, through the subject's judge, each result written on the test's word
- * at its version (`action.attest`). A person accepts or rejects a result
- * with `checks.decide`; `checks.rejections` reads what those decisions say
- * about each rule.
+ * `checks.domain`: the types of item its tests check or the rule functions
+ * it judges, a judge, and (for the rejections reading) each rule function's
+ * limit. A judge reads the graph through a tracked reader and what it reads
+ * is the test's stamp; a judge that can't (a remote service) names the
+ * subject field it is stamped by instead. The checker solves a change's
+ * tests and what needs them, each result written on the test's word at its
+ * version (`action.attest`). A person accepts or rejects a result with
+ * `checks.decide`; `checks.rejections` reads what those decisions say about
+ * each rule.
  */
 import type { ActionAttest, ActionRegister } from "../../spec/action.ts";
 import type { Dispose, Json } from "../../spec/common.ts";
@@ -18,27 +20,35 @@ import type { Fact } from "../../spec/changeset.ts";
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import type { TypesAcyclic, TypesDefine } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { seeds, solve, STAMP_KEYS, type Judging, type Read, type Verdict, type Write } from "./checker.ts";
+import { readsOf, ReadsIndex, seeds, solve, STAMP_KEYS, utcToday, type Judging, type Read, type Write } from "./checker.ts";
 import { decidedOf, read as readRejections, type Decided, type RuleLimit, type RuleReading } from "./rejections.ts";
 import { APPLIES, DECISIONS, FLAVOURS, LINKS, NEEDS, RULE, TEST, TEST_LINKS, type Decision } from "./types.ts";
 
-export type { Judging, Verdict } from "./checker.ts";
+export type { JudgeCall, Judging, LinkPage, Reader, Verdict } from "./checker.ts";
 export type { RuleLimit, RuleReading } from "./rejections.ts";
 export { AGAINST, APPLIES, CHECKS, DECISIONS, NEEDS, RESULTS, RULE, TEST } from "./types.ts";
 
-/** A domain: what its tests check, and how. */
+/**
+ * A domain: what its tests check, and how. It judges the tests whose rule's
+ * function is in `fns` (looked at first), or whose first subject is of a
+ * type in `subject`. Without `stamp` its judge gets a tracked reader and
+ * what it reads is the stamp; with `stamp` (only with `subject`) it gets
+ * snapshots and is stamped by that field of each subject.
+ */
 export interface CheckDomain extends Judging {
-  /** The type of item its tests check (`checks`, and `against` for a two-subject test). */
-  subject: string;
-  /** The subject's field that goes into a test's stamp: when it moves, the subject's tests are solved again. */
-  stamp: string;
+  /** The type, or types, of item its tests check. */
+  subject?: string | string[];
+  /** The rule functions it judges, whatever the subject. */
+  fns?: string[];
+  /** For a judge that can't read the graph: the subject's field that goes into a test's stamp. */
+  stamp?: string;
   /** Each rule function's limit, for `checks.rejections`. */
   limits?(): Promise<RuleLimit[]>;
 }
 
 /** `checks.domain`: this pack's own key. */
 export interface ChecksDomain {
-  /** Plugs a domain in, as the calling pack's: one per subject type. */
+  /** Plugs a domain in, as the calling pack's: one per subject type, one per function. */
   register(domain: CheckDomain): Dispose;
 }
 
@@ -47,6 +57,9 @@ const PAGE = 500;
 const ATTESTED = "test:";
 
 const refuse = (code: string, message: string) => new Refused({ code: `checks.${code}`, message, by: { pack: "checks" } });
+
+/** A domain's subject types, as a list. */
+const typesOf = (d: CheckDomain) => (d.subject === undefined ? [] : Array.isArray(d.subject) ? d.subject : [d.subject]);
 
 /** Reads the graph for the checker: items by id, and every page of links of a kind at an item. */
 export function reader(graph: GraphRead): Read {
@@ -102,8 +115,11 @@ const checks: Pack = {
     const watch = ctx.get<GraphWatch>("graph.watch");
     const attest = ctx.get<ActionAttest>("action.attest");
     const read = reader(graph);
-    const domains = new Map<string, CheckDomain>();
-    const domainOf = (type: string) => domains.get(type);
+    const domains = new Set<CheckDomain>();
+    const byType = new Map<string, CheckDomain>();
+    const byFn = new Map<string, CheckDomain>();
+    const domainOf = (type: string, fn?: string) => (fn !== undefined ? byFn.get(fn) : undefined) ?? byType.get(type);
+    const index = new ReadsIndex();
 
     const register = ctx.get<ActionRegister>("action.register");
     // The checker writes through this action, on the test's word.
@@ -148,12 +164,12 @@ const checks: Pack = {
       input: { type: "object", properties: { rule: { type: "string", description: "One rule's id; absent, every rule." } } },
       async run(input: { rule?: string }) {
         const limits: RuleLimit[] = [];
-        for (const [, d] of domains) {
+        for (const d of domains) {
           if (!d.limits) continue;
           try {
             limits.push(...(await d.limits()));
           } catch (err) {
-            throw refuse("limits", `The ${d.subject} domain couldn't say its rules' limits: ${(err as Error).message}`);
+            throw refuse("limits", `The ${[...typesOf(d), ...(d.fns ?? [])].join(", ")} domain couldn't say its rules' limits: ${(err as Error).message}`);
           }
         }
         const decided: Decided[] = [];
@@ -180,32 +196,68 @@ const checks: Pack = {
       queue = queue
         .then(async () => {
           const seeded = typeof ids === "function" ? await ids() : ids;
-          if (seeded.length && !stopped) await solve(seeded, read, domainOf, write);
+          if (seeded.length && !stopped) await solve(seeded, read, domainOf, write, { index });
         })
         .catch((err) => ctx.runtime.report(ctx.fiber, err));
       return queue;
     };
     const typeOf = async (id: string) => (await graph.get([id]))[0]?.type;
-    const stampOf = (type: string) => domains.get(type)?.stamp;
+    const stampOf = (type: string) => byType.get(type)?.stamp;
     const heard = (change: { header: { actor: { id: string } }; facts: Fact[] }) => {
       if (change.header.actor.id.startsWith(ATTESTED)) return; // the checker's own results
       run(() => seeds(change.facts, read, typeOf, stampOf));
     };
     watch.watch({ types: [TEST, RULE, ...TEST_LINKS] }, heard);
+    // Recorded reads: every change is looked up in memory, and only the tests that read what it touched are replayed.
+    watch.watch({}, (change) => {
+      if (change.header.actor.id.startsWith(ATTESTED) || !index.size) return;
+      const hit = index.seeds(change.facts);
+      if (hit.length) run(hit);
+    });
+    // The day: tests whose judge read it are solved again when it turns.
+    ctx.effect(() => {
+      let day = utcToday();
+      const timer = setInterval(() => {
+        const now = utcToday();
+        if (now === day) return;
+        day = now;
+        const hit = index.today();
+        if (hit.length) run(hit);
+      }, 60_000);
+      (timer as { unref?: () => void }).unref?.();
+      return () => clearInterval(timer);
+    });
+    /** Every test, its reads indexed: a domain's catch-up. */
+    const catchUp = async () => {
+      const all = await every(graph, TEST);
+      for (const t of all) if (t.fields.reads) index.set(t.id, readsOf(t.fields.reads));
+      return all.map((t) => t.id);
+    };
 
     ctx.provide<ChecksDomain>("checks.domain", (_caller, from) => ({
       register(domain): Dispose {
-        if (!domain.subject || domain.subject === TEST || domain.subject === RULE) throw refuse("subject", `A domain's subject is a type of its own, not ${domain.subject || "nothing"}.`);
-        if (!domain.stamp || (STAMP_KEYS as readonly string[]).includes(domain.stamp)) throw refuse("stamp", `A domain stamps a field of its subject other than ${STAMP_KEYS.join(", ")}.`);
-        if (domains.has(domain.subject)) throw refuse("subject_taken", `${domain.subject} is already judged by another domain.`);
+        const types = typesOf(domain);
+        const fns = domain.fns ?? [];
+        if (!types.length && !fns.length) throw refuse("subject", "A domain names the types its tests check, or the rule functions it judges.");
+        for (const t of types) if (!t || t === TEST || t === RULE) throw refuse("subject", `A domain's subject is a type of its own, not ${t || "nothing"}.`);
+        if (domain.stamp !== undefined) {
+          if (!domain.stamp || (STAMP_KEYS as readonly string[]).includes(domain.stamp)) throw refuse("stamp", `A domain stamps a field of its subject other than ${STAMP_KEYS.join(", ")}.`);
+          if (fns.length) throw refuse("stamp", "A domain that judges by function reads the graph: it declares no stamp.");
+        }
+        for (const t of types) if (byType.has(t)) throw refuse("subject_taken", `${t} is already judged by another domain.`);
+        for (const f of fns) if (byFn.has(f)) throw refuse("fn_taken", `${f} is already judged by another domain.`);
         return from.effect(() => {
-          domains.set(domain.subject, domain);
-          const unwatch = watch.watch({ types: [domain.subject] }, heard);
-          // Catch up: every test whose stamp moved while nothing judged its subject.
-          run(async () => (await every(graph, TEST)).map((t) => t.id));
+          domains.add(domain);
+          for (const t of types) byType.set(t, domain);
+          for (const f of fns) byFn.set(f, domain);
+          const unwatch = domain.stamp !== undefined ? watch.watch({ types }, heard) : () => {};
+          // Catch up: every test whose stamp moved while nothing judged it.
+          run(catchUp);
           return () => {
             unwatch();
-            if (domains.get(domain.subject) === domain) domains.delete(domain.subject);
+            domains.delete(domain);
+            for (const t of types) if (byType.get(t) === domain) byType.delete(t);
+            for (const f of fns) if (byFn.get(f) === domain) byFn.delete(f);
           };
         });
       },
