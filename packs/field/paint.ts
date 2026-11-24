@@ -491,7 +491,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     if (!inView(a, 0) && !inView(b, 0)) continue;
     // Not lit: named only at the zoom where both ends' titles show, so the whole map is not buried in link names.
     if (!on && Math.min(g.r[a]!, g.r[b]!) * cam.k < S.label_px!) continue;
-    wires.push({ e, x1: sx(a), y1: sy(a), x2: sx(b), y2: sy(b), w: c.measureText(wireName(g.linkKinds[g.kind[e]!]!)).width + 4, h: namePx + 2, lit: on });
+    wires.push({ e, x1: sx(a), y1: sy(a), x2: sx(b), y2: sy(b), w: c.measureText(wireName(g.linkKinds[g.kind[e]!]!, g.places?.[e])).width + 4, h: namePx + 2, lit: on });
   }
   const taken = [...clear, ...placed.map((p) => p.box as [number, number, number, number])];
   // The particles' own room at each end, so a name sits clear of both.
@@ -507,7 +507,7 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     c.save();
     c.translate(w.x, w.y);
     c.rotate(w.angle);
-    const t = wireName(g.linkKinds[g.kind[e]!]!);
+    const t = wireName(g.linkKinds[g.kind[e]!]!, g.places?.[e]);
     if (S.label_halo! > 0) c.strokeText(t, 0, 0);
     c.fillText(t, 0, 0);
     c.restore();

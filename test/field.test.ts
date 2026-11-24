@@ -500,3 +500,11 @@ test("a placed name's corners reach along its turned line, so the arranged tree'
   const back = nameCorners(0, 0, "abcd", { turn: 0, dx: -5, dy: 0, anchor: "end" }, 10);
   assert.ok(Math.max(...back.map((p) => p[0])) <= -5 + 1e-9, "anchored at its end, it runs back from the dot");
 });
+
+test("a link with places is named with them, so the map shows where its item is said", async () => {
+  const { wireName } = await import("../packs/field/wires.ts");
+  assert.equal(wireName("in_context_filter"), "in context filter");
+  assert.equal(wireName("in_context_filter", ["tool:Edit", "file:*.html"]), "in context filter · tool:Edit, file:*.html");
+  const g = build({ items: [{ id: "a", title: "a", type: "record", status: "", closed: false }, { id: "b", title: "b", type: "context_filter", status: "", closed: false }], links: [{ id: "l", type: "in_context_filter", from: "a", to: "b", places: ["prompt"] }], types: ["record", "context_filter"] }, null);
+  assert.deepEqual(g.places?.[0], ["prompt"]);
+});

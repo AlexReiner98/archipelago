@@ -196,7 +196,11 @@ const fieldPack: Pack = {
       };
       return {
         items: result.items.map((r) => ({ id: r.id, title: String(r.fields.title ?? r.id), type: r.type, status: String(r.fields.status ?? ""), closed: index.closed(r), kind: typeof r.fields.kind === "string" ? r.fields.kind : "", ...mark(r) })),
-        links: result.links.map((l) => ({ id: l.id, type: l.type, from: l.from, to: l.to })),
+        // A link that says where its item is said (a context filter link's `at`) shows those places with its name.
+        links: result.links.map((l) => {
+          const at = Array.isArray(l.fields.at) ? l.fields.at.filter((p): p is string => typeof p === "string") : [];
+          return { id: l.id, type: l.type, from: l.from, to: l.to, ...(at.length ? { places: at } : {}) };
+        }),
         // Every type on the map, in one order: each keeps its colour whatever the legend hides.
         types: [...new Set(result.items.map((r) => r.type))].sort(),
       };

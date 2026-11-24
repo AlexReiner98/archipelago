@@ -38,8 +38,8 @@ the query, it opens Map.
 | words | titles holding every word |
 | `is:open` `is:closed` | the status's side in its base |
 | `status:x` `type:x` | a status; a type or its base |
-| `in:<id>` | the item and all that is part_of it |
-| `near:<id>` | the item and what it is linked to |
+| `in:<id>` | the item and all that is part_of it (an id, or a title, underscores for spaces) |
+| `near:<id>` | the item and what it is linked to (an id, or a title: `near:Frontend`) |
 | `id:<id>` | the item |
 
 An empty line is `is:open`. At most 150 items come back, and the links

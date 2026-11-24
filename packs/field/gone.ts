@@ -120,7 +120,7 @@ export function rekeyWires(last: G | null, next: G, wires: Map<number, WireFade>
     if (e >= last.m) continue;
     const to = at.get(linkKey(last, e));
     if (to !== undefined) kept.set(to, w);
-    else if (w.a > 0.02) gone.push({ x: (w.x - cam.tx) / cam.k, y: (w.y - cam.ty) / cam.k, angle: w.angle, text: wireName(last.linkKinds[last.kind[e]!]!), alpha: w.a * 0.9, at: now });
+    else if (w.a > 0.02) gone.push({ x: (w.x - cam.tx) / cam.k, y: (w.y - cam.ty) / cam.k, angle: w.angle, text: wireName(last.linkKinds[last.kind[e]!]!, last.places?.[e]), alpha: w.a * 0.9, at: now });
   }
   wires.clear();
   for (const [e, w] of kept) wires.set(e, w);

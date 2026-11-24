@@ -70,8 +70,18 @@ export function closed(t: TypeInfo | undefined, status: Json | undefined): boole
   return !!t && typeof status === "string" && t.statuses.closed.includes(status);
 }
 
+/** An item named by its id, or else by its title (underscores for spaces, any case): what `in:` and `near:` take. */
+export function itemRef(index: Index, ref: string): Id {
+  if (index.items.has(ref)) return ref;
+  const want = ref.replace(/_/g, " ").toLowerCase();
+  for (const r of index.items.values()) if (String(r.fields.title ?? "").toLowerCase() === want) return r.id;
+  return ref;
+}
+
 export function run(index: Index, q: string, limit = 150): Result {
   const p = parse(q);
+  if (p.in) p.in = itemRef(index, p.in);
+  if (p.near) p.near = itemRef(index, p.near);
   let pool: Iterable<Row> = index.items.values();
   if (p.id) pool = [index.items.get(p.id)].filter((x): x is Row => !!x);
   if (p.in) {

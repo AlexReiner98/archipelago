@@ -17,7 +17,8 @@ export interface FieldIn {
    * type keeps its colour whatever a filter leaves out. Absent, the items'.
    */
   types?: string[];
-  links: { id: Id; type: string; from: Id; to: Id }[];
+  /** `places`: where the link has its item said (a context filter link's `at`), shown with its name. */
+  links: { id: Id; type: string; from: Id; to: Id; places?: string[] }[];
 }
 
 /** The dials' values, by key. */
@@ -67,6 +68,8 @@ export interface G {
   a: Int32Array;
   b: Int32Array;
   kind: Int32Array;
+  /** Each link's places, when it has them (its name shows them). */
+  places?: (string[] | undefined)[];
   /** Each particle's neighbours, as compressed rows. */
   adjStart: Int32Array;
   adj: Int32Array;
@@ -150,6 +153,7 @@ export function build(input: FieldIn, last: G | null, pal: string[] = []): G {
     g.a[e] = a;
     g.b[e] = b;
     g.kind[e] = linkKinds.indexOf(l.type);
+    if (l.places?.length) (g.places ??= [])[e] = l.places;
     g.degree[a]!++;
     g.degree[b]!++;
     g.incident[a]!.push(e);
