@@ -123,11 +123,10 @@ the page never writes itself.
 
 ## The tree ([layout.ts](layout.ts), [canvas.ts](canvas.ts), [scene.ts](scene.ts), [paint.ts](paint.ts))
 
-The root is named with the context filter the run is in (or "no context
-filter"), bold on a plate under its dot at one screen size, so the tree
-reads as that item on the map: the same name the Landscape shows. When the
-Landscape has said how it draws that item's type (the page key
-`field.marks`), the root is drawn as that mark too, its shape in its
+The view is titled with the context filter the run is in (or "no context
+filter"), over the top of its tree with the filter's mark beside it. When
+the Landscape has said how it draws that item's type (the page key
+`field.marks`), the tree's root is drawn as that mark, its shape in its
 colour, so the filter looks the same in both views.
 
 Every node in `agent.tree` hangs under one root at its first place: tool,

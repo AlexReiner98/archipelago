@@ -136,26 +136,16 @@ export interface PaintState {
   rootMark?: RootMark;
 }
 
-/**
- * The context filter's name at the tree's root, at one screen size whatever the zoom: bold, on a plate of the page's
- * own colour so it reads over the wires, just under the root's dot.
- */
-function rootName(c: CanvasRenderingContext2D, name: string, k: number, ink: Ink, under = 0): void {
-  c.save();
-  c.scale(1 / k, 1 / k);
-  c.font = `${ink.bold} ${S.rootName}px ${ink.font}`;
-  c.textAlign = "center";
-  c.textBaseline = "middle";
-  const w = c.measureText(name).width, h = S.rootName * 1.5, y = Math.max(S.root * k, under) + 2 + h / 2;
-  c.globalAlpha = 0.95;
-  c.fillStyle = ink.color(INK.bg);
-  c.beginPath();
-  c.roundRect(-w / 2 - 6, y - h / 2, w + 12, h, h / 2);
-  c.fill();
-  c.globalAlpha = 1;
-  c.fillStyle = ink.color(INK.fg);
-  c.fillText(name, 0, y);
-  c.restore();
+
+/** A mark shape as an SVG path in a 0..24 box: the filter's mark beside the view's title. */
+export function markSvgPath(shape: string): string {
+  const p = SHAPES[shape];
+  if (!p) return "M22 12A10 10 0 1 1 2 12A10 10 0 1 1 22 12Z";
+  const pts = Array.from({ length: p[0] }, (_, i) => {
+    const a = p[1] + (i * 2 * Math.PI) / p[0];
+    return `${(12 + 11 * Math.cos(a)).toFixed(2)} ${(12 + 11 * Math.sin(a)).toFixed(2)}`;
+  });
+  return `M${pts.join("L")}Z`;
 }
 
 /** A context filter's mark, as the Landscape draws its type: a colour and a MARK_SHAPES name. */
@@ -393,7 +383,6 @@ export function paint(c: CanvasRenderingContext2D, scene: Scene, cam: Camera, vi
   c.fillStyle = ink.color(INK.fg);
   c.fill();
   if (state.rootMark && !state.small) rootShape(c, state.rootMark, cam.k, ink);
-  if (state.root && !state.small) rootName(c, state.root, cam.k, ink, state.rootMark ? S.rootMark : 0);
   after?.(c);
   c.globalAlpha = 1;
 }

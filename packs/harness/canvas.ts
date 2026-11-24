@@ -43,7 +43,7 @@ import type { Heard, Hold } from "./replay.ts";
 import { windowShown, type WindowMark } from "./windowbar.ts";
 import { Lights, type Fire } from "./lights.ts";
 export type { Fire } from "./lights.ts";
-import { dotExtent, dotOf, Ink, nameLayout, paint, Widths, type Camera, type RootMark } from "./paint.ts";
+import { dotExtent, dotOf, Ink, markSvgPath, nameLayout, paint, Widths, type Camera, type RootMark } from "./paint.ts";
 import { Atlas } from "./sprites.ts";
 import { nameInk, sceneOf, type Mark, type Scene, type Standing } from "./scene.ts";
 export type { Standing } from "./scene.ts";
@@ -59,6 +59,8 @@ const pad = (b: { x: number; y: number; width: number; height: number }, m: numb
 
 export const CANVAS_STYLE = sheet(`
 .rx-canvas { position:relative; overflow:hidden; cursor:grab; user-select:none; min-height:0; }
+.rx-title { position:absolute; top:var(--space-4); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:var(--space-3); font-size:var(--text-l); font-weight:var(--bold); color:var(--fg); pointer-events:none; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
+.rx-title svg { width:18px; height:18px; flex:none; }
 .rx-canvas.panning { cursor:grabbing; }
 .rx-canvas.on-node { cursor:pointer; }
 .rx-canvas > canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
@@ -454,6 +456,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
       <div class="rx-tip" ref=${tipEl} style="display:none"></div>
       ${tree.order.length === 1 && html`<div class="rx-empty">No nodes</div>`}
       ${showKey && html`<${Key} hues=${hues} filter=${keyFilter} open=${keyOpen ?? true} onOpen=${onKeyOpen} present=${present} />`}
+      ${root && !small && html`<div class="rx-title" title="The context filter this tree is of">${rootMark && html`<svg viewBox="0 0 24 24"><path d=${markSvgPath(rootMark.shape)} style=${`fill:${rootMark.colour}`} /></svg>`}<span>${root}</span></div>`}
     </div>
   `;
 };

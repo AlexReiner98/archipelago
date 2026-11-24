@@ -956,3 +956,10 @@ test("heardYet: an agent's tree waits for what it hears and where it is placed, 
   assert.equal(heardYet({ placement }), false, "what it hears not yet known");
   assert.equal(heardYet({ hears: new Set(), placement }), true);
 });
+
+test("markSvgPath: a filter's mark as a path beside the view's title, a hexagon six corners", async () => {
+  const { markSvgPath } = await import("../packs/harness/paint.ts");
+  assert.equal(markSvgPath("hexagon").split("L").length, 6);
+  assert.equal(markSvgPath("triangle").split("L").length, 3);
+  assert.ok(markSvgPath("circle").includes("A"), "a circle is arcs");
+});
