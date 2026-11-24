@@ -3,7 +3,9 @@
  * nothing in them. Top and bottom run across, left and right stand beside
  * the center, over floats above all. A region with no fills takes no room.
  * Center shows one fill at a time: the one `here.view` names, else the
- * first, and the frame sets `here.view` to what it shows. Left and right
+ * first, and the frame sets `here.view` to what it shows. With the config's
+ * `wait`, it shows nothing until `here.view` first names a fill that is
+ * there: a picker chooses the first view (center.ts). Left and right
  * stack their fills, sharing the height, each under its title when there
  * are two or more. Widths are style tokens. A side folds to a rail and
  * opens again (fold.ts): the folded fills are the page key `frame.folded`,
@@ -18,6 +20,7 @@ import type { Region, SlotFill, SlotRead } from "../../spec/slot.ts";
 import { REGIONS, fillKey } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet } from "../../spec/style.ts";
+import { centerShown } from "./center.ts";
 import { FOLDED, foldedOf, foldRegion, isRail } from "./fold.ts";
 
 // htm ships CommonJS types; in the page its module export is the function itself.
@@ -69,7 +72,9 @@ const frame: Pack = {
   id: "frame",
   about: "The page's layout: a top, a bottom, two sides, a center, and a layer over them.",
   inject: ["slot.fill", "slot.read", "here.read", "here.set", "here.declare"],
-  apply(ctx: Context, config: { folded?: string[] } = {}) {
+  apply(ctx: Context, config: { folded?: string[]; wait?: boolean } = {}) {
+    // Until a view is first picked, a waiting frame shows nothing in the center (center.ts).
+    let picked = false;
     const read = ctx.get<SlotRead>("slot.read");
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
@@ -115,7 +120,8 @@ const frame: Pack = {
       const [view, setView] = useState(here.get<string>(KEYS.view));
       useEffect(() => here.watch(KEYS.view, (c) => setView(c.value as string | undefined)) as () => void, []);
       const center = read.fills("center");
-      const shown = center.find((f) => fillKey(f) === view) ?? center[0];
+      if (center.some((f) => fillKey(f) === view)) picked = true;
+      const shown = centerShown(center, fillKey, view, !!config.wait && !picked);
       const key = shown && fillKey(shown);
       useEffect(() => {
         // Read the fills again: a pack reloading takes its fill away and puts it back, and a render made

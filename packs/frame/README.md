@@ -26,7 +26,11 @@ regions and nothing in them. Any pack that fills `root` can take its place.
   The frame sets `here.view` to what it shows, read again first: a pack
   reloading takes its fill away and puts it back, and a render made in
   between never stands another fill in for a view already back. The
-  [views](../views/README.md) pick it.
+  [views](../views/README.md) pick it. With the config's `wait` (on, as
+  shipped), the center shows nothing until `here.view` first names a fill
+  that is there ([center.ts](center.ts)): a page opened on a view (its URL)
+  never paints another view first, whichever pack's fill registered
+  first.
 - **Over:** a layer above the page. Only its fills take the pointer.
 
 Injects `slot.fill`, `slot.read`, `here.read`, `here.set` and
