@@ -46,7 +46,7 @@ find line has words, only what it finds and what lies near it.
   they arrive, once what left the map has faded for `tree_in_ms` (450) so
   the two are never drawn over each other, and then at least as fast as
   `gone_ms`; the
-  items' titles give way to its names).
+  items' titles give way to its names once it shows).
 - **Every number is a dial**, in the legend's dials tab: each behaviour's,
   then the start, find, the run and the drawing, in sections that start
   closed and say how many of their dials are changed; springs and flow are
@@ -66,7 +66,8 @@ find line has words, only what it finds and what lies near it.
   links shown) grows or shrinks to it over `resize_ms`. A ghost keeps the
   hollow or half shape it was drawn with. Its links (arrowheads and names too) and its title, where it was placed, leave with it,
   and a pointed-at item's light fades the other titles out over `dim_ms`
-  before they go.
+  before they go. A title that must take another side of its particle fades
+  out where it was and in where it goes over `label_move_ms` (220).
   What it finds is drawn whole, closed or not, and named first; the
   legend's open and closed switches do not apply while it has words, so a
   plan shows its done steps.

@@ -201,8 +201,9 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
         const r = el.getBoundingClientRect();
         return [r.left - at.left - 4, r.top - at.top - 4, r.right - at.left + 4, r.bottom - at.top + 4] as [number, number, number, number];
       });
-      // Arranged, the tree's own names are taken too: an item's title gives way to them.
-      if (tree) {
+      // Arranged, the tree's own names are taken too, once it shows: an item's title gives way to them.
+      const strength = tree ? (flight ? treeStrength(arrived(g, scale(), flight), performance.now() - flight.at, S) : arrived(g, scale(), flight)) : 0;
+      if (tree && strength > 0.02) {
         c.font = "500 10px ui-sans-serif, system-ui, sans-serif";
         clear.push(...treeNameBoxes(tree, cam, scale(), S, (t, px) => (c.measureText(t).width * px) / 10));
       }
@@ -210,10 +211,10 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       drawn = { g, match };
       // Arranged into a profile: its tree comes in under the items as they reach their places.
       // It comes in as the items arrive, and at least as fast as what left fades out (gone_ms), so the two crossfade.
-      if (tree) paintTree(c, tree, cam, s.dpr, scale(), flight ? treeStrength(arrived(g, scale(), flight), performance.now() - flight.at, S) : arrived(g, scale(), flight), colours, S);
+      if (tree) paintTree(c, tree, cam, s.dpr, scale(), strength, colours, S);
       const fading = paintGone(c, ghosts, cam, s.dpr, performance.now(), S, goneLinks, colours, goneNames, S.link_names ? wireSize(S.link_name_size!, cam.k, S.link_name_least_px!, S.link_name_most_px!) : 0) || performance.now() < coming;
       // A link name or a ghost still fading keeps the view painting.
-      dirty = easing || following || light.wiresMoving || fading || resizing;
+      dirty = easing || following || light.wiresMoving || light.labelsMoving || fading || resizing;
     }
     raf = requestAnimationFrame(tick);
   };

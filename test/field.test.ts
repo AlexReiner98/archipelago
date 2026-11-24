@@ -469,3 +469,10 @@ test("an arranged tree waits tree_in_ms while the old map fades out, then comes 
   assert.equal(treeStrength(0.8, 500, S), 0.8, "or as far as the items have arrived, once it may show");
   assert.equal(treeStrength(0, 0, { ...S, tree_in_ms: 0, gone_ms: 0 }), 1, "0 and 0: at once");
 });
+
+test("a title that takes another spot than last frame's has moved, and fades across; a new one or one kept in place has not", async () => {
+  const { movedTitles } = await import("../packs/field/paint.ts");
+  const was = new Map([["a", 0], ["b", 2], ["c", 1]]);
+  assert.deepEqual(movedTitles(was, [["a", 0], ["b", 3], ["d", 1], ["c", undefined]]), ["b", "c"]);
+  assert.deepEqual(movedTitles(new Map(), [["a", 0]]), [], "a first frame moves nothing");
+});

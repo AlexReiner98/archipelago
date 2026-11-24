@@ -49,6 +49,7 @@ export const DRAW: Dial[] = [
   { key: "label_chars", label: "title length", min: 8, max: 120, step: 1, value: 36, then: "paint", doc: "A title longer than this many letters is cut, with …; the whole of it shows on hover." },
   { key: "label_inside", label: "title inside from", min: 0, max: 200, step: 2, value: 40, then: "paint", doc: "A particle this many screen px across or more holds its title inside itself, cut to fit (0: never)." },
   { key: "label_cover_px", label: "titles avoid", min: 0, max: 20, step: 0.5, value: 2, then: "paint", doc: "A title never covers another particle this many screen px across or more (0: it covers none at all)." },
+  { key: "label_move_ms", label: "moved title fades", min: 0, max: 1000, step: 10, value: 220, then: "paint", doc: "A title that must take another side of its particle (room taken) fades out where it was and in where it goes over this long, rather than jump (0: it jumps)." },
   { key: "label_halo", label: "title halo", min: 0, max: 8, step: 0.5, value: 3, then: "paint", doc: "A ring of the sea round every letter, in screen px, so words read over particles and links." },
   { key: "label_fade", label: "title fade-in", min: 0.1, max: 20, step: 0.1, value: 3, then: "paint", doc: "A title fades in as its particle grows on screen from 'titles from' to this much more." },
   { key: "query_fade", label: "find fades rest to", min: 0, max: 1, step: 0.01, value: 0.12, then: "paint", doc: "While the find line has words, how faint the outer ring it keeps (find_faint) is drawn." },
@@ -77,6 +78,11 @@ export interface Ink {
 /** The page's colours, from the style tokens (their plain values when no style is loaded). */
 export function ink(el: Element): Ink {
   return { sea: read("bg", el), text: read("fg", el), muted: read("dim", el), line: read("dim", el), accent: read("pick", el), branch: read("say", el) };
+}
+
+/** The titles that took another spot than last frame's: one newly named, or kept where it was, has not moved. */
+export function movedTitles(was: ReadonlyMap<string, number>, now: [string, number | undefined][]): string[] {
+  return now.filter(([id, spot]) => was.has(id) && was.get(id) !== spot).map(([id]) => id);
 }
 
 /** The style's hues, for types in order; a type past the sixth gets its own (graph.ts hue). */
@@ -113,6 +119,12 @@ export class Light {
   labels = new Map<string, Label>();
   /** The spot each title took last frame (labels.ts), tried first so it keeps its side. */
   spots = new Map<string, number>();
+  /** When each title last took another spot (performance.now), so it fades in there. */
+  movedAt = new Map<string, number>();
+  /** Titles fading out from where they stood before they moved. */
+  leaving: { label: Label; at: number }[] = [];
+  /** True while a moved title still fades. */
+  labelsMoving = false;
   /** The hubs named at any zoom, by id: kept from graph to graph (labels.ts hubSet). */
   hubIds = new Set<string>();
   private hubOf: { g: G; key: string; mask: Uint8Array } | null = null;
@@ -398,16 +410,29 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   };
   const placed = place(want, { width, height, room: S.label_room!, most: S.label_most!, gap: S.label_gap!, covers, clear });
   light.named = new Set(placed.map((p) => g.id[p.i]!));
+  // A title that takes another spot fades out where it stood and in where it goes (label_move_ms).
+  const moveMs = S.label_move_ms ?? 0;
+  if (moveMs > 0) {
+    for (const id of movedTitles(light.spots, placed.map((p) => [g.id[p.i]!, p.spot]))) {
+      light.movedAt.set(id, at);
+      const old = light.labels.get(id);
+      if (old) light.leaving.push({ label: old, at });
+    }
+  }
   // Where each title stands, in world units, so one that leaves the map fades where it was read (gone.ts).
   light.labels = new Map(placed.map((p) => [g.id[p.i]!, { x: ((p.within ? (p.box[0] + p.box[2]) / 2 : p.box[0] + 2) - cam.tx) / cam.k, y: (p.box[1] - cam.ty) / cam.k, lines: texts.get(p.i)!, center: !!p.within }]));
   light.spots = new Map(placed.map((p) => [g.id[p.i]!, p.spot]));
+  const moved = (i: number) => {
+    const t = light.movedAt.get(g.id[i]!);
+    return t === undefined || !moveMs ? 1 : comeFade(at - t, moveMs);
+  };
   c.strokeStyle = ink.sea;
   for (const { i, box, within } of placed) {
     const rs = g.r[i]! * cam.k;
     const grow = shine[i]! > 0 || match?.[i] === FOUND || hub[i] ? 1 : Math.min(1, 0.6 + (0.4 * (rs - S.label_px!)) / Math.max(0.1, S.label_fade!));
     // A closed item's title is muted, like its particle.
     const shut = g.closed[i] && !(shine[i]! > 0) && !within && match?.[i] !== FOUND;
-    c.globalAlpha = grow * Math.max(faint * fade(i) * (shine[i]! > 0.5 ? 1 : rest), shine[i]!) * (shut ? 0.75 : 1) * come(i);
+    c.globalAlpha = grow * Math.max(faint * fade(i) * (shine[i]! > 0.5 ? 1 : rest), shine[i]!) * (shut ? 0.75 : 1) * come(i) * moved(i);
     c.fillStyle = shut ? ink.muted : ink.text;
     const lines = texts.get(i)!, mid = (box[0] + box[2]) / 2;
     c.textAlign = within ? "center" : "left";
@@ -417,6 +442,25 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
       c.fillText(line, x, y);
     });
   }
+  // The moved titles where they stood, fading out.
+  let still = 0;
+  for (const q of light.leaving) {
+    const f = moveMs ? 1 - comeFade(at - q.at, moveMs) : 0;
+    if (f <= 0) continue;
+    light.leaving[still++] = q;
+    c.globalAlpha = f * faint;
+    c.fillStyle = ink.text;
+    c.textAlign = q.label.center ? "center" : "left";
+    const x = q.label.x * cam.k + cam.tx, top = q.label.y * cam.k + cam.ty;
+    q.label.lines.forEach((line, k) => {
+      const y = top + LINE * (k + 0.5) + 0.5;
+      if (S.label_halo! > 0) (c.lineWidth = S.label_halo!), c.strokeText(line, x, y);
+      c.fillText(line, x, y);
+    });
+  }
+  light.leaving.length = still;
+  for (const [id, t] of light.movedAt) if (at - t >= moveMs) light.movedAt.delete(id);
+  light.labelsMoving = still > 0 || light.movedAt.size > 0;
   c.textAlign = "left";
 
   // Link names, along their middles, over nothing named: the lit first, then the longest on screen.
