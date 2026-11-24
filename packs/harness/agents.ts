@@ -22,6 +22,8 @@ export interface Placement {
   title: string;
   /** Every profile it is in, parts included. */
   ids: string[];
+  /** The first profile it matched: the context filter its tree is named for. */
+  id?: string;
 }
 
 /** An agent's placement: in a profile it matches; only in the fallback, unless it named it itself; or in none. */
@@ -29,7 +31,7 @@ export function placementOf(ps: ProfileInfo[], fallbacks: ReadonlySet<string>, s
   const matched = ps.filter((p) => p.by === "match");
   if (!matched.length) return { kind: "none", title: "", ids: [] };
   const fallback = matched.every((p) => fallbacks.has(p.id) && !said.includes(p.id));
-  return { kind: fallback ? "fallback" : "matched", title: matched.map((p) => p.title).join(", "), ids: ps.map((p) => p.id) };
+  return { kind: fallback ? "fallback" : "matched", title: matched.map((p) => p.title).join(", "), ids: ps.map((p) => p.id), id: matched[0]!.id };
 }
 
 export const PLACEMENT_MARK: Record<Placement["kind"], string> = { matched: "●", fallback: "○", none: "–" };

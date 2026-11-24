@@ -97,6 +97,10 @@ find line has words, only what it finds and what lies near it.
   Their colour comes after the map's own types' (`inputColours` in
   [graph.ts](graph.ts)), so a session coming or going never recolours
   the map.
+- **Each type's mark is a page key**, `field.marks` (`marksOf`): by type,
+  its colour and the shape its items are drawn in, so another view draws
+  an item as the Landscape does (the Context interface draws a tree's root
+  as its context filter).
   The agent sessions live now (the page key `sessions.live`, set by
   [packs/sessions](../sessions/README.md)) are each a pentagon of the type
   `session`, linked `runs_in` to each of their context filters on the map.

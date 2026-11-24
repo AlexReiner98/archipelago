@@ -486,7 +486,7 @@ test("each agent's own tree: the nodes it hears, all while that isn't known; the
 test("placementOf: matched, the fallback, or none; a run that named the fallback itself is matched", () => {
   const p = (id: string, by: "match" | "part" = "match") => ({ id, title: id[0]!.toUpperCase() + id.slice(1), by, holding: true });
   const fallbacks = new Set(["arch"]);
-  assert.deepEqual(placementOf([p("aperture"), p("everyone", "part")], fallbacks), { kind: "matched", title: "Aperture", ids: ["aperture", "everyone"] });
+  assert.deepEqual(placementOf([p("aperture"), p("everyone", "part")], fallbacks), { kind: "matched", title: "Aperture", ids: ["aperture", "everyone"], id: "aperture" }, "the first it matched names its tree");
   assert.equal(placementOf([p("arch"), p("everyone", "part")], fallbacks).kind, "fallback");
   assert.equal(placementOf([p("arch")], fallbacks, ["arch"]).kind, "matched");
   assert.deepEqual(placementOf([], fallbacks), { kind: "none", title: "", ids: [] });

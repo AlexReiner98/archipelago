@@ -61,3 +61,13 @@ test("a session coming leaves every type's colour on the map as it was", async (
   for (const [name, colour] of before) assert.equal(after.get(name), colour, name);
   assert.ok(after.has("session"), "the session has a colour of its own, after theirs");
 });
+
+test("marksOf: each type's colour and the shape its items are drawn in, for other views to draw an item the same", async () => {
+  const { marksOf } = await import("../packs/field/index.ts");
+  const { inputColours } = await import("../packs/field/graph.ts");
+  const shaped = { items: [{ id: "f1", title: "Frontend", type: "context_filter", status: "", closed: false, shape: 5 }, { id: "n1", title: "x", type: "record", status: "", closed: false }], links: [] } as unknown as FieldIn;
+  const marks = marksOf(shaped, []);
+  assert.equal(marks.context_filter!.shape, "hexagon");
+  assert.equal(marks.record!.shape, "circle");
+  assert.equal(marks.context_filter!.colour, inputColours(shaped).find((t) => t.name === "context_filter")!.colour, "the colour the particle is drawn in");
+});

@@ -35,7 +35,7 @@ import { Legend, LEGEND_STYLE } from "./legend.ts";
 import { DRAW, palette } from "./paint.ts";
 import { Panel, PANEL_STYLE, type Section } from "./panel.ts";
 import { BEHAVIOURS, RUN, defaults, step } from "./step.ts";
-import { build, seed } from "./graph.ts";
+import { build, inputColours, seed } from "./graph.ts";
 import { descends, type Verdict } from "./descends.ts";
 import { withFoundSessions, withSessions, type Live } from "./sessions.ts";
 import type { Arranged } from "./treeover.ts";
@@ -66,6 +66,14 @@ const DIALS = "field.dials";
 /** The slot under the empty state, on a map with no items. */
 const EMPTY = "field.empty";
 const QUERY = "find.query";
+/** Each type's mark as the Landscape draws it: read by other views by name. */
+export const MARKS = "field.marks";
+/** Each type's colour (as the particles are coloured) and the shape its items are drawn in. */
+export function marksOf(input: FieldIn, pal: string[]): Record<string, { colour: string; shape: string }> {
+  const shapes = new Map<string, string>();
+  for (const it of input.items) if (!shapes.has(it.type)) shapes.set(it.type, MARK_SHAPES[it.shape ?? MARK_SHAPES.indexOf("circle")] ?? "circle");
+  return Object.fromEntries(inputColours(input, pal).map((t) => [t.name, { colour: t.colour, shape: shapes.get(t.name) ?? "circle" }]));
+}
 /** The live agent sessions and the context filters each is in, set by packs/sessions: read by name, a key not an import. */
 const SESSIONS = "sessions.live";
 /** A context filter's tree to arrange the map into, set by packs/arrange (`context:<title>` on the find line). */
@@ -125,6 +133,7 @@ const fieldPack: Pack = {
     const set = ctx.get<HereSet>("here.set");
     const declare = ctx.get<HereDeclare>("here.declare");
     declare.declare({ key: DIALS, scope: "page", doc: "The field's dials that differ from where they start, by key." });
+    declare.declare({ key: MARKS, scope: "page", doc: "Each type's mark as the Landscape draws it, by type: { colour, shape } (a MARK_SHAPES name), so another view can draw an item the same way." });
     declare.declare({ key: HIDE, scope: "page", doc: "What the field's legend hides: types, type:status, type:kind, open, closed, links, lone. The layout is what is left. Absent: closed items ({ closed: true }); {} hides nothing." });
     for (const [key, kept] of [[DIALS, REMEMBER], [HIDE, REMEMBER_HIDE]] as const) {
       const v = here.get(key) === undefined ? recall(kept) : undefined;
@@ -239,6 +248,10 @@ const fieldPack: Pack = {
       const [styled, restyle] = useState(0);
       useEffect(() => onStyle(() => restyle((n) => n + 1)), []);
       const facets = useMemo(() => facetsOf(input, hide, palette()), [input, hideKey, styled]);
+      // Each type's mark, for other views to draw an item as here (the Context interface's root).
+      const marks = useMemo(() => marksOf(input, palette()), [input, styled]);
+      const marksKey = JSON.stringify(marks);
+      useEffect(() => void (JSON.stringify(here.get(MARKS) ?? null) !== marksKey && set.set(MARKS, marks as unknown as Json)), [marksKey]);
       // While the find line has words, open and closed are not switched: a plan shows its done steps beside the rest.
       const visible = useMemo<FieldIn>(() => {
         const { open: _open, closed: _closed, ...kept } = hide;

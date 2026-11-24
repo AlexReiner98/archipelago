@@ -132,19 +132,21 @@ export interface PaintState {
   quiet?: number;
   /** The context filter the tree is of, named at its root, so the tree reads as that item on the map. */
   root?: string;
+  /** That filter's mark as the Landscape draws it (its type's colour and shape, `field.marks`): the root is drawn so. */
+  rootMark?: RootMark;
 }
 
 /**
  * The context filter's name at the tree's root, at one screen size whatever the zoom: bold, on a plate of the page's
  * own colour so it reads over the wires, just under the root's dot.
  */
-function rootName(c: CanvasRenderingContext2D, name: string, k: number, ink: Ink): void {
+function rootName(c: CanvasRenderingContext2D, name: string, k: number, ink: Ink, under = 0): void {
   c.save();
   c.scale(1 / k, 1 / k);
   c.font = `${ink.bold} ${S.rootName}px ${ink.font}`;
   c.textAlign = "center";
   c.textBaseline = "middle";
-  const w = c.measureText(name).width, h = S.rootName * 1.5, y = S.root * k + 4 + h / 2;
+  const w = c.measureText(name).width, h = S.rootName * 1.5, y = Math.max(S.root * k, under) + 4 + h / 2;
   c.globalAlpha = 0.85;
   c.fillStyle = ink.color(INK.bg);
   c.beginPath();
@@ -153,6 +155,36 @@ function rootName(c: CanvasRenderingContext2D, name: string, k: number, ink: Ink
   c.globalAlpha = 1;
   c.fillStyle = ink.color(INK.fg);
   c.fillText(name, 0, y);
+  c.restore();
+}
+
+/** A context filter's mark, as the Landscape draws its type: a colour and a MARK_SHAPES name. */
+export interface RootMark {
+  colour: string;
+  shape: string;
+}
+
+/** Regular polygons by mark shape: sides and the first corner's angle (as packs/field/shapes.ts draws them). */
+const SHAPES: Record<string, [number, number]> = { square: [4, Math.PI / 4], diamond: [4, 0], triangle: [3, -Math.PI / 2], pentagon: [5, -Math.PI / 2], hexagon: [6, 0] };
+
+/** The root drawn as the filter's own mark, at one screen size (`rootMark` px across its middle), over the root's dot. */
+function rootShape(c: CanvasRenderingContext2D, mark: RootMark, k: number, ink: Ink): void {
+  const r = S.rootMark, p = SHAPES[mark.shape];
+  c.save();
+  c.scale(1 / k, 1 / k);
+  c.beginPath();
+  if (!p) c.arc(0, 0, r, 0, Math.PI * 2);
+  else for (let i = 0; i < p[0]; i++) {
+    const a = p[1] + (i * 2 * Math.PI) / p[0];
+    if (i) c.lineTo(r * Math.cos(a), r * Math.sin(a));
+    else c.moveTo(r * Math.cos(a), r * Math.sin(a));
+  }
+  c.closePath();
+  c.fillStyle = ink.color(mark.colour);
+  c.fill();
+  c.lineWidth = 2;
+  c.strokeStyle = ink.color(INK.bg);
+  c.stroke();
   c.restore();
 }
 
@@ -360,7 +392,8 @@ export function paint(c: CanvasRenderingContext2D, scene: Scene, cam: Camera, vi
   c.arc(0, 0, S.root, 0, Math.PI * 2);
   c.fillStyle = ink.color(INK.fg);
   c.fill();
-  if (state.root && !state.small) rootName(c, state.root, cam.k, ink);
+  if (state.rootMark && !state.small) rootShape(c, state.rootMark, cam.k, ink);
+  if (state.root && !state.small) rootName(c, state.root, cam.k, ink, state.rootMark ? S.rootMark : 0);
   after?.(c);
   c.globalAlpha = 1;
 }

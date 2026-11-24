@@ -32,6 +32,7 @@ import type { KeyFilter } from "./key.ts";
 import { radial, treeOf, type Grouping } from "./layout.ts";
 import { stateAt } from "./replay.ts";
 import { WindowBar, type WindowMark, type WindowRead } from "./windowbar.ts";
+import type { RootMark } from "./paint.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -166,6 +167,8 @@ export interface TreesProps {
   /** The window of the agent in focus, live, and each node's place in it (windowbar.ts). */
   win?: WindowRead;
   winMarks?: ReadonlyMap<string, WindowMark>;
+  /** The focused agent's context filter's mark as the Landscape draws it: its root is drawn so. */
+  rootMark?: RootMark;
   /** How long the pointer rests on a node before its words show (the `tip_ms` dial). */
   tipMs?: number;
   nameSteps?: number;
@@ -206,7 +209,7 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
       ${a.placement && html`<span class="prof" title=${`${placementTip(a.placement)}${big && p.canPlace ? "\nMove it to another profile" : ""}`} onClick=${big ? (e: MouseEvent) => p.canPlace && p.onProfile(a.run.run, e) : undefined}>${placementText(a.placement)}${big && p.canPlace ? " ▾" : ""}</span>`}
       <span class="n" title=${`The nodes it hears, of all${extra?.length ? `; and ${extra.length} the harness gave it` : ""}`}>${a.hears ? (big ? `${heard.length} / ${p.nodes.length}` : heard.length) : ""}${extra?.length ? ` + ${extra.length}` : ""}</span>
     </div>
-    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} root=${a.placement ? (a.placement.kind === "none" ? "no context filter" : a.placement.title) : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} quietPx=${p.quietPx} giveWay=${p.giveWay} sparkS=${p.sparkS} sparkX=${p.sparkX} fitMs=${p.fitMs} settleMs=${p.settleMs} wheelMs=${p.wheelMs} />
+    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} root=${a.placement ? (a.placement.kind === "none" ? "no context filter" : a.placement.title) : undefined} rootMark=${big ? p.rootMark : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} quietPx=${p.quietPx} giveWay=${p.giveWay} sparkS=${p.sparkS} sparkX=${p.sparkX} fitMs=${p.fitMs} settleMs=${p.settleMs} wheelMs=${p.wheelMs} />
     ${big && p.win && html`<${WindowBar} w=${p.win} filter=${p.keyFilter} hues=${p.hues} picked=${p.picked} onPick=${p.onPick} />`}
   </div>`;
 };

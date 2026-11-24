@@ -37,6 +37,10 @@ import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
+import type { RootMark } from "./paint.ts";
+import type { Json } from "../../spec/common.ts";
+/** Each type's mark as the Landscape draws it (packs/field), read by name: a key, not an import. */
+const FIELD_MARKS = "field.marks";
 import { Events, short } from "./events.ts";
 import { ALL, FOCUS, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
 import { colourOf, colours } from "./live.ts";
@@ -342,6 +346,12 @@ const harness: Pack = {
         [lives, colour, placements, fallbacks, acting, hears],
       );
       const agents = useMemo(() => everyAgent.filter((a) => split.trees.includes(a.run.run)), [everyAgent, split]);
+      // The root of the run looked at, drawn as its context filter is on the Landscape: its item's type's mark
+      // there (field.marks, a page key by name), so the tree reads as that item.
+      const rootFilter = windowRun && placements.has(windowRun) ? placementOf(placements.get(windowRun)!, fallbacks).id : undefined;
+      const rootItem = hk.useItem(rootFilter);
+      const fieldMarks = hk.useHere<Json>(FIELD_MARKS) as Record<string, RootMark> | undefined;
+      const rootMark = rootItem ? fieldMarks?.[rootItem.type] : undefined;
       const rows = useMemo(() => everyAgent.filter((a) => split.rows.includes(a.run.run)), [everyAgent, split]);
       const onProfile = (r: string, ev: MouseEvent) => {
         const box = stage.current?.getBoundingClientRect();
@@ -433,10 +443,10 @@ const harness: Pack = {
           />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} fitMs=${dials.fit_ms} settleMs=${dials.fit_settle_ms} wheelMs=${dials.wheel_ms} nameMost=${dials.name_most} peekPx=${dials.peek_px} openS=${dials.open_s} />`
+              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} rootMark=${rootMark} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} fitMs=${dials.fit_ms} settleMs=${dials.fit_settle_ms} wheelMs=${dials.wheel_ms} nameMost=${dials.name_most} peekPx=${dials.peek_px} openS=${dials.open_s} />`
               : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
                   <div class="hv-onerun">
-                    <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} window=${run ? marks : undefined} root=${run && placements.has(run) ? ((pl) => (pl.kind === "none" ? "no context filter" : pl.title))(placementOf(placements.get(run)!, fallbacks)) : undefined} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} fitMs=${dials.fit_ms} settleMs=${dials.fit_settle_ms} wheelMs=${dials.wheel_ms} />
+                    <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} window=${run ? marks : undefined} rootMark=${rootMark} root=${run && placements.has(run) ? ((pl) => (pl.kind === "none" ? "no context filter" : pl.title))(placementOf(placements.get(run)!, fallbacks)) : undefined} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} fitMs=${dials.fit_ms} settleMs=${dials.fit_settle_ms} wheelMs=${dials.wheel_ms} />
                     ${run ? html`<${WindowBar} w=${win} filter=${keyFilter} hues=${hues} picked=${picked} onPick=${pick} />` : html`<span></span>`}
                   </div>
                   ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} run=${windowRun} /></div>`}
