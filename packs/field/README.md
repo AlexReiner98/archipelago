@@ -144,8 +144,9 @@ find line has words, only what it finds and what lies near it.
   particle within `hover_px` of its edge. A change to the map (an item or a
   session coming) renumbers the particles, and the hover and the light stay
   on the same items, by id ([carry.ts](carry.ts)), so nothing pointed at
-  goes dark in one frame. A click sets `here.item`; the item
-  page opens in `right`. Drag a particle to move it (it settles again when
+  goes dark in one frame. A click sets `here.item`; the item, lit as if
+  pointed at while its page is open and the pointer is elsewhere, so going
+  to its page dims nothing. Its page opens in `right`. Drag a particle to move it (it settles again when
   let go), drag the sea to pan, wheel to zoom, double-click the sea to fit.
   While it settles the view eases after the picture (`follow_ms`).
   ([engine.ts](engine.ts))

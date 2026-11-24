@@ -45,6 +45,8 @@ export interface Field {
   input(next: FieldIn, warmTo?: number, refit?: boolean): void;
   /** How each item is drawn while the find line has words (filter.ts FOUND, NEAR, FAINT), or null for none. */
   found(levels: Map<Id, number> | null): void;
+  /** The item whose page is open: lit as if pointed at while nothing else is, so leaving it for its page dims nothing. */
+  opened(id: Id | null): void;
   /** A context profile's tree to arrange the items into (packs/arrange), or null for none. */
   arranged(a: Arranged | null): void;
   settings(S: Settings, then: Dial["then"] | "none"): void;
@@ -75,6 +77,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   let colours: Ink = ink(canvas);
   let pal = palette(canvas);
   let hover = -1, dirty = true, awake = false, stopped = false;
+  // The item whose page is open (here.item), kept lit by id while the pointer is elsewhere.
+  let openedId: Id | null = null;
   let levels: Map<Id, number> | null = null, match: Uint8Array | null = null;
   let tree: Arranged | null = null, flight: Flight | null = null, flying = false;
   const scale = () => S.tree_scale ?? 1.4;
@@ -203,7 +207,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
         canvas.width = Math.round(s.width * s.dpr);
         canvas.height = Math.round(s.height * s.dpr);
       }
-      const easing = light.ease(g, hover, S);
+      const easing = light.ease(g, hover >= 0 ? hover : g.idIx.get(openedId ?? "") ?? -1, S);
       // A kept particle that changes size grows or shrinks to it over resize_ms.
       const resizing = !!sizing && resizeAt(g, sizing, performance.now(), S.resize_ms ?? 0);
       if (!resizing) sizing = null;
@@ -367,6 +371,11 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       if (first && !cam.moved) fit();
       if (refit) (cam.moved = false), (jump = true), (jumpAt = performance.now());
       wake();
+    },
+    opened(id) {
+      if (id === openedId) return;
+      openedId = id;
+      dirty = true;
     },
     found(next) {
       levels = next;

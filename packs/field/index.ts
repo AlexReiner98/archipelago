@@ -235,6 +235,9 @@ const fieldPack: Pack = {
       // The live agent sessions (packs/sessions, a page key by name): drawn beside the map, each linked to its context filters.
       const live = (useHere<Json>(SESSIONS) ?? []) as unknown as Live[];
       const liveKey = JSON.stringify(live);
+      // The item whose page is open stays lit on the map while the pointer goes to its page.
+      const opened = useHere<string>(KEYS.item);
+      useEffect(() => engineNow?.opened(opened ?? null), [opened]);
       // What the find line found, and with it each session in a filter it found. A session coming or going is a
       // change to the map, not a new find: the view is not fitted again for it (findOf below).
       const queried = useMemo(() => (q.trim() ? new Set(index.run(q, S.field_limit).items.map((r) => r.id)) : null), [version, q, S.field_limit]);
