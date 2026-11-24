@@ -88,8 +88,8 @@ const STYLE = sheet(`
 .hv-bar button.on { color:var(--fg); text-decoration:underline; text-underline-offset:4px; }
 .hv-select { font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); max-width:220px; min-width:0; }
 .hv-select option { background:var(--panel); color:var(--fg); }
-.hv-ev { cursor:pointer; animation:hv-ev-in var(--hv-row, .26s) ease-out both; }
-@keyframes hv-ev-in { from { opacity:0; transform:translateY(4px); } }
+.hv-ev { cursor:pointer; animation:hv-ev-in var(--hv-row, .6s) ease-out both; }
+@keyframes hv-ev-in { from { background-color:color-mix(in srgb, var(--pick) 22%, transparent); } }
 .hv-line { display:flex; gap:var(--space-2); align-items:baseline; padding:1px var(--space-4) 1px var(--space-2); white-space:nowrap; min-width:0; }
 .hv-line .x { overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; }
 .hv-line .p { color:var(--dim); flex:none; max-width:35%; overflow:hidden; text-overflow:ellipsis; }

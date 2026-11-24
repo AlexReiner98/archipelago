@@ -92,7 +92,7 @@ export const PartRow = ({ p }: { p: Part }) => {
 export interface EventsProps {
   info?: RunInfo;
   events: ExchangeEvent[];
-  /** How long a new line takes to fade and slide in, in ms (the row_ms dial). */
+  /** How long a new line is lit as it lands, in ms (the row_ms dial). */
   rowMs?: number;
   /** The playhead. */
   index: number;
@@ -148,7 +148,7 @@ export const Events = ({ info, events, index, end, verdicts, titles, speakers, n
         ${profiles && !profiles.length && html`<span class="part" title="In no context filter: it hears every node">no context filter</span>`}
         ${(profiles ?? []).map((p) => html`<span class=${p.by === "part" ? "part" : ""} title=${`${p.holding ? "holds" : "shadow: only records"}${p.by === "part" ? ", as a part" : ""}`}>${p.holding ? "●" : "◌"} ${p.title}</span>`)}
       </div>`}
-      <div class="hv-body" style=${`--hv-row:${rowMs ?? 260}ms`} ref=${body} onScroll=${(ev: Event) => {
+      <div class="hv-body" style=${`--hv-row:${rowMs ?? 600}ms`} ref=${body} onScroll=${(ev: Event) => {
         const el = ev.currentTarget as HTMLElement;
         stick.current = atFoot(el.scrollHeight, el.scrollTop, el.clientHeight);
       }}>
