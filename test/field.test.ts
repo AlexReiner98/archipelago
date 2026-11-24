@@ -479,3 +479,12 @@ test("a title that takes another spot than last frame's has moved, and fades acr
   const at1 = new Map<string, [number, number]>([["b", [11, 10]], ["c", [80, 50]]]);
   assert.deepEqual(movedTitles(was, [["b", 3], ["c", 2]], at0, at1), ["b"], "c's particle is flying: its title goes with it, no fade");
 });
+
+test("after a jump the camera eases in from rest over find_follow_ms, then closes a share of the gap as before", async () => {
+  const { followShare } = await import("../packs/field/follow.ts");
+  assert.equal(followShare(16, 350, 0), 0, "the first frame of a jump does not move");
+  assert.ok(followShare(16, 350, 100) < followShare(16, 350, 300), "it gathers speed");
+  assert.equal(followShare(16, 350, 400), 1 - Math.exp(-16 / 350), "then as it always did");
+  assert.equal(followShare(16, 1000), 1 - Math.exp(-16 / 1000), "a settle with no jump: as before");
+  assert.equal(followShare(16, 0, 0), 1, "0: it snaps");
+});

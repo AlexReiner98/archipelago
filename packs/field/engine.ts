@@ -12,6 +12,7 @@
  * - The picture is fitted while it settles, until the reader moves it.
  */
 import { wireSize } from "./wires.ts";
+import { followShare } from "./follow.ts";
 import { bornOf, comeFade, goneLinksOf, goneOf, paintGone, rekeyWires, resizeAt, resizeOf, type Ghost, type GoneLink, type GoneName, type Resize } from "./gone.ts";
 import type { Id } from "../../spec/common.ts";
 import type { Dial } from "./behaviour.ts";
@@ -107,14 +108,15 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
    * a share of the gap each frame (`follow_ms`), zooming by ratio about the
    * picture's middle, so the picture never jumps. True while still moving.
    */
-  let lastFollow = 0, jump = false;
+  let lastFollow = 0, jump = false, jumpAt = 0;
   const follow = (): boolean => {
     const now = performance.now(), dt = lastFollow ? Math.min(100, now - lastFollow) : 16;
     lastFollow = now;
     const to = fitted();
     // After a jump to what the find line keeps, the camera eases faster (find_follow_ms) until it gets there.
     const ms = jump ? S.find_follow_ms! : S.follow_ms!;
-    const a = ms > 0 ? 1 - Math.exp(-dt / ms) : 1;
+    // A jump eases in from rest too (follow.ts), so the map never lurches on its first frame.
+    const a = followShare(dt, ms, jump ? now - jumpAt : undefined);
     const { width, height } = size();
     // Where the middle of the view looks, in the world, eased; then the zoom, eased by ratio.
     const mx = (width / 2 - cam.tx) / cam.k, my = (height / 2 - cam.ty) / cam.k;
@@ -341,7 +343,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       hover = -1;
       remark();
       if (first && !cam.moved) fit();
-      if (refit) (cam.moved = false), (jump = true);
+      if (refit) (cam.moved = false), (jump = true), (jumpAt = performance.now());
       wake();
     },
     found(next) {

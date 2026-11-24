@@ -59,7 +59,8 @@ find line has words, only what it finds and what lies near it.
   rest of the map leaves the layout and what is kept settles again
   (`alpha_filter`). The view goes to what it finds (`find_follow_ms`).
   The map follows the words once typing pauses (`find_wait_ms`, `Settle`),
-  not at every letter. Whatever leaves the map, by the find line or the
+  not at every letter. The camera eases to what it keeps from rest (`find_follow_ms`,
+  [follow.ts](follow.ts)), so the map never lurches on the first frame. Whatever leaves the map, by the find line or the
   legend, fades out where it stood over `gone_ms` ([gone.ts](gone.ts)),
   from as strong as it was drawn, and whatever comes onto it fades in where
   it lands over `come_ms`. What stays but takes a new size (fewer of its
