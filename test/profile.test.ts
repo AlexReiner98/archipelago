@@ -151,7 +151,8 @@ test("profiles on the map hold a node back from runs outside them; shadow record
   const apRepo = (await act("items.create", { type: "record", title: "Studio repo" })).id;
   const archRepo = (await act("items.create", { type: "record", title: "Archipelago repo" })).id;
   const studio = (await act("items.create", { type: "context_filter", title: "Studio" })).id;
-  const arch = (await act("items.create", { type: "context_filter", title: "Archipelago" })).id;
+  // Archipelago is open: its runs also hear what no filter holds. Studio is strict, as a saved filter is by default.
+  const arch = (await act("items.create", { type: "context_filter", title: "Archipelago", fields: { strict: false } })).id;
   await act("items.link", { type: "in_context_filter", from: rhino, to: studio });
   await act("items.link", { type: "uses", from: apRepo, to: studio });
   await act("items.link", { type: "uses", from: archRepo, to: arch });
@@ -172,7 +173,9 @@ test("profiles on the map hold a node back from runs outside them; shadow record
   assert.deepEqual(held.said.map((s) => s.text), ["Plain."]);
   const inAp = ctx("r3").get<AgentRun>("agent.run");
   await inAp.begin(start("r3", { repo: apRepo }));
-  assert.deepEqual((await inAp.reach({ run: "r3", places: ["tool:Bash"], time: T })).said.map((s) => s.text), ["Use RhinoCommon.", "Plain."]);
+  assert.deepEqual((await inAp.reach({ run: "r3", places: ["tool:Bash"], time: T })).said.map((s) => s.text), ["Use RhinoCommon."], "strict: only what Studio holds");
+  const strictHeld = (await ctx("r1").get<ExchangeRead>("exchange.read").events("r3")).items.filter((e) => e.kind === "gated");
+  assert.deepEqual(strictHeld.map((e) => [e.node, e.text]), [[`words/${plain}`, "Not held by Studio, which gives its runs only what it holds."]]);
 
   const events = (await ctx("r1").get<ExchangeRead>("exchange.read").events("r2")).items;
   const gated = events.filter((e) => e.kind === "gated");
@@ -303,4 +306,18 @@ test("a node a run heard, moved to a record said by its context filter link, isn
   const reworded = (await run.reach({ run: "m1", places: ["prompt"], time: T })).said.map((s) => s.text).join("\n");
   assert.match(reworded, /"Rule" now says: Keep it smaller\./, "a rewording after the move is told as one");
   assert.deepEqual(errors, []);
+});
+
+test("hearing: a strict profile gives its runs only what it holds of the map; the packs' own nodes still reach them", () => {
+  const m = modelOf(prof({ id: "front", title: "Front end", places: ["r_front"], holds: ["n_html"], strict: true }), prof({ id: "open", title: "Open", places: ["r_open"] }));
+  const html = node("words/n_html", ["file:*.html"], "n_html");
+  const merge = node("words/n_merge", ["session_start"], "n_merge");
+  const tools: NodeInfo = { id: "mcp/query", name: "query", kind: "instruction", title: "The query tool", at: ["session_start"], pack: "mcp" };
+  assert.deepEqual(hearing(m, { repo: "r_front" }, html), { hears: true });
+  assert.deepEqual(hearing(m, { repo: "r_front" }, merge), { hears: false, why: "Not held by Front end, which gives its runs only what it holds." });
+  assert.deepEqual(hearing(m, { repo: "r_front" }, tools), { hears: true }, "a pack's own node is no profile's to hold back");
+  assert.deepEqual(hearing(m, { repo: "r_open" }, merge), { hears: true }, "an open profile: what no profile holds is every run's");
+  assert.deepEqual(hearing(m, { repo: "r_none" }, merge), { hears: true }, "a run in no profile hears it");
+  const fall = modelOf(prof({ id: "home", title: "Home", fallback: true, strict: true, holds: ["n_html"] }));
+  assert.deepEqual(hearing(fall, { cwd: "C:/x" }, merge), { hears: false, why: "Not held by Home, which gives its runs only what it holds." }, "a strict fallback too");
 });

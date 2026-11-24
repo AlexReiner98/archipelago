@@ -28,6 +28,12 @@ export interface Profile {
   members?: string;
   /** A run that no profile matches is in this one (the workspace's default). */
   fallback?: boolean;
+  /**
+   * Its runs hear only what it holds of the map: a node of the map's (the words pack's) that no profile holds is
+   * held back from them. Nodes the packs make in code reach them still. Not set: open, a node no profile holds is
+   * heard by every run (the pack reads it as set unless the item says `strict: false`).
+   */
+  strict?: boolean;
   /** What it is part of. */
   parts: Id[];
   /** Items whose runs are in it (`uses`). */
@@ -112,21 +118,21 @@ export interface Model {
 }
 
 /** The profiles a run is in: those its facts put it in, then what each is part of. Off profiles and dropped ones aren't. */
-export function runProfiles(model: Model, facts: Facts): (ProfileInfo & { state: Profile["state"] })[] {
+export function runProfiles(model: Model, facts: Facts): (ProfileInfo & { state: Profile["state"]; strict?: boolean })[] {
   const said = new Set(Object.entries(facts).filter(([k]) => k !== "profiles_drop").flatMap(([, v]) => values(v)));
   const dropped = new Set(values(facts.profiles_drop));
   const live = (p: Profile | undefined): p is Profile => !!p && p.state !== "off" && !dropped.has(p.id);
-  const out = new Map<Id, ProfileInfo & { state: Profile["state"] }>();
+  const out = new Map<Id, ProfileInfo & { state: Profile["state"]; strict?: boolean }>();
   for (const p of model.profiles.values()) {
     if (!live(p)) continue;
     if (said.has(p.id) || p.places.some((x) => said.has(x)) || matchFacts(p.match, facts)) {
-      out.set(p.id, { id: p.id, title: p.title, by: "match", holding: p.state === "on", state: p.state });
+      out.set(p.id, { id: p.id, title: p.title, by: "match", holding: p.state === "on", state: p.state, ...(p.strict ? { strict: true } : {}) });
     }
   }
   // A run nothing places is in the workspace's fallback profiles, if it has any; else in none (fail open).
   if (!out.size) {
     for (const p of model.profiles.values()) {
-      if (live(p) && p.fallback) out.set(p.id, { id: p.id, title: p.title, by: "match", holding: p.state === "on", state: p.state });
+      if (live(p) && p.fallback) out.set(p.id, { id: p.id, title: p.title, by: "match", holding: p.state === "on", state: p.state, ...(p.strict ? { strict: true } : {}) });
     }
   }
   const queue = [...out.keys()];
@@ -135,7 +141,7 @@ export function runProfiles(model: Model, facts: Facts): (ProfileInfo & { state:
     for (const up of p.parts) {
       const q = model.profiles.get(up);
       if (!live(q) || out.has(q.id)) continue;
-      out.set(q.id, { id: q.id, title: q.title, by: "part", holding: q.state === "on", state: q.state });
+      out.set(q.id, { id: q.id, title: q.title, by: "part", holding: q.state === "on", state: q.state, ...(q.strict ? { strict: true } : {}) });
       queue.push(q.id);
     }
   }
@@ -169,12 +175,17 @@ export function nodeProfiles(model: Model, node: NodeInfo): { in: Profile[]; out
 const names = (ps: { title: string }[]) => ps.map((p) => p.title).join(", ");
 
 /** Why a run would not hear a node, counting only the profiles `counts` lets in; nothing: it hears it. */
-function why(run: (ProfileInfo & { state: Profile["state"] })[], node: { in: Profile[]; out: Profile[] }, counts: (s: Profile["state"]) => boolean): string | null {
+function why(run: (ProfileInfo & { state: Profile["state"]; strict?: boolean })[], node: { in: Profile[]; out: Profile[] }, counts: (s: Profile["state"]) => boolean, mapNode: boolean): string | null {
   const runIn = run.filter((p) => counts(p.state));
   const nodeIn = node.in.filter((p) => counts(p.state));
   const taken = node.out.filter((p) => counts(p.state) && runIn.some((r) => r.id === p.id));
   if (taken.length) return `Taken out of ${names(taken)}.`;
-  if (!nodeIn.length || !runIn.length) return null;
+  if (!runIn.length) return null;
+  if (!nodeIn.length) {
+    // In no profile: every run's, unless the run is in a strict one, which gives its runs only what it holds.
+    const strict = runIn.filter((p) => p.strict);
+    return mapNode && strict.length ? `Not held by ${names(strict)}, which gives its runs only what it holds.` : null;
+  }
   if (nodeIn.some((p) => runIn.some((r) => r.id === p.id))) return null;
   return `For ${names(nodeIn)}; this run is in ${names(runIn)}.`;
 }
@@ -183,8 +194,10 @@ function why(run: (ProfileInfo & { state: Profile["state"] })[], node: { in: Pro
 export function hearing(model: Model, facts: Facts, node: NodeInfo): Hearing {
   const run = runProfiles(model, facts);
   const held = nodeProfiles(model, node);
-  const now = why(run, held, (s) => s === "on");
+  // A node of the map's own (said by the words pack); one a pack makes in code is no profile's to hold back by strictness.
+  const mapNode = node.pack === "words";
+  const now = why(run, held, (s) => s === "on", mapNode);
   if (now) return { hears: false, why: now };
-  const would = why(run, held, (s) => s !== "off");
+  const would = why(run, held, (s) => s !== "off", mapNode);
   return would ? { hears: true, shadow: would } : { hears: true };
 }

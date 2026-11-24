@@ -17,7 +17,7 @@ This is **edition 10**. A capability that came after edition 1 shows the edition
 | [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | How large graphs are drawn. |
 | [here](here.md) | `here.declare` `here.read` `here.set` | What is being looked at, now. |
 | [types](types.md) | `types.define` `types.read` `types.mark` (10) | What kinds of item and link the map holds. |
-| [profile](profile.md) | `profile.read` (5) | Not every node fits every run. |
+| [profile](profile.md) | `profile.read` (6) | Not every node fits every run. |
 | [loader](loader.md) | `loader.tree` (7) | The config tree as a capability. |
 | [changeset](changeset.md) | (a format) | A change, written in full. |
 | [frame](frame.md) | (a format) | The page around the canvas. |

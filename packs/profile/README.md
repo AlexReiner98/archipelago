@@ -14,7 +14,7 @@ profile, as the harness pack kept its own.
 
 | | |
 |---|---|
-| `context_filter` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members`, `fallback`, `leave_out` (what Claude Code is to leave out of its runs: the [lean](../lean/README.md) pack's) |
+| `context_filter` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members`, `fallback`, `strict` (not set or true: its runs hear only what it holds of the map; `false`: open), `leave_out` (what Claude Code is to leave out of its runs: the [lean](../lean/README.md) pack's) |
 | `in_context_filter` | Any item → the context filter that holds it. With places, the link is said there itself (below) |
 | `out_of_context_filter` | An item → a context filter it is taken out of |
 | `uses` | An item → a context filter: runs with that item in their facts (a repo, a hub) are in it |
@@ -54,6 +54,15 @@ Decided (20 Nov 2026, all five):
   profile itself (the `run` tool's `profiles`). `profiles_drop` takes one out.
 - A node in no profile is heard by every run, and a run in no profile hears
   every node (fail open).
+- Changed 24 Nov 2026 (the owner): a saved profile is **strict** unless its
+  item says `strict: false`. A run in a strict profile hears only what its
+  profiles hold of the map: a node of the map's (the words pack's) that no
+  profile holds is held back from it, a `gated` event saying "Not held by
+  <profile>, which gives its runs only what it holds". The nodes the packs
+  make in code (the map tools, the learning loop's ask, what changed since
+  heard) still reach it. The fallback is strict too. An open profile
+  (`strict: false`) keeps the old rule: what no profile holds is every
+  run's.
 - A profile with `fallback: true` is the workspace's default: a run that no
   profile places is in it, and in what it is part of. A run something else
   places isn't, and dropping it (`profiles_drop`) leaves the run failing open.

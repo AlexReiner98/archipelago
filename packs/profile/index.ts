@@ -57,6 +57,7 @@ export const PROFILE: BaseDef = {
     match: { kind: "text", doc: "A find-line over a run's facts (remote:github.com/a/*): an extra way in, besides uses links." },
     members: { kind: "text", doc: "A find-line over nodes (at:file:packs/**, at:skill:rhino*, kind:, words): what it holds besides its links." },
     fallback: { kind: "boolean", doc: "A run no profile matches is in this one: the workspace's default." },
+    strict: { kind: "boolean", doc: "Not set or true: its runs hear only what it holds of the map (the packs' own nodes still reach them). false: open, its runs also hear every map node no context filter holds." },
     leave_out: { kind: "json", doc: "Given nodes Claude Code is to leave out of its runs (tool:<name>, mcp:<server>): the lean pack sets and writes them." },
   },
 };
@@ -156,6 +157,8 @@ const profile: Pack = {
           ...(typeof it.fields.match === "string" && it.fields.match ? { match: it.fields.match } : {}),
           ...(typeof it.fields.members === "string" && it.fields.members ? { members: it.fields.members } : {}),
           ...(it.fields.fallback === true ? { fallback: true } : {}),
+          // Strict unless the item says otherwise: a saved context filter gives its runs only what it holds.
+          ...(it.fields.strict !== false ? { strict: true } : {}),
           parts: parts.map((l) => l.to),
           places: places.map((l) => l.from),
           // A link with places is a node of its own (its source is the link), held by this context filter only.
