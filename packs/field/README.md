@@ -61,7 +61,7 @@ find line has words, only what it finds and what lies near it.
   from as strong as it was drawn, and whatever comes onto it fades in where
   it lands over `come_ms`. What stays but takes a new size (fewer of its
   links shown) grows or shrinks to it over `resize_ms`. A ghost keeps the
-  hollow or half shape it was drawn with. Its links and its title (if shown) leave with it,
+  hollow or half shape it was drawn with. Its links (arrowheads and names too) and its title, where it was placed, leave with it,
   and a pointed-at item's light fades the other titles out over `dim_ms`
   before they go.
   What it finds is drawn whole, closed or not, and named first; the

@@ -375,8 +375,23 @@ test("a link with an end that left fades out with it, and a ghost keeps the titl
   assert.deepEqual([gone[0]!.x1, gone[0]!.y1, gone[0]!.x2, gone[0]!.y2], [...at("b"), ...at("a")]);
   assert.equal(gone[0]!.alpha, 0.5 * 1.4, "part_of as strong as it is drawn");
   assert.deepEqual(goneLinksOf(all, less, 1000, { ...S, gone_ms: 0 }), []);
-  assert.deepEqual(goneOf(all, less, 1000, S, null, 4000, new Set(["b"])).map((q) => q.title), ["Item b"]);
-  assert.deepEqual(goneOf(all, less, 1000, S).map((q) => q.title), [undefined], "not shown, no title");
+  const label = { x: 3, y: 4, lines: ["Item b"], center: false };
+  assert.deepEqual(goneOf(all, less, 1000, S, null, 4000, new Map([["b", label]])).map((q) => q.label), [label], "its title where it was placed");
+  assert.deepEqual(goneOf(all, less, 1000, S).map((q) => q.label), [undefined], "not shown, no title");
+});
+
+test("link names follow their links into a rebuilt map; one whose link left fades where it stood", async () => {
+  const { rekeyWires } = await import("../packs/field/gone.ts");
+  const item = (id: string) => ({ id, title: id, type: "work", status: "", closed: false });
+  const links = [{ id: "l1", type: "part_of", from: "b", to: "a" }, { id: "l2", type: "depends_on", from: "c", to: "a" }];
+  const all = build({ items: [item("a"), item("b"), item("c")], links, types: ["work"] }, null);
+  const less = build({ items: [item("a"), item("c")], links: [links[1]!], types: ["work"] }, all);
+  const ix = (g: typeof all, from: string) => [...Array(g.m).keys()].find((e) => g.id[g.a[e]!] === from)!;
+  const wires = new Map([[ix(all, "b"), { a: 1, x: 120, y: 60, angle: 0.5 }], [ix(all, "c"), { a: 0.5, x: 10, y: 20, angle: 0 }]]);
+  const gone = rekeyWires(all, less, wires, { k: 2, tx: 100, ty: 40 }, 1000);
+  assert.deepEqual([...wires.keys()], [ix(less, "c")], "c's link kept its fade under its new index");
+  assert.equal(wires.get(ix(less, "c"))!.a, 0.5);
+  assert.deepEqual(gone.map((n) => [n.x, n.y, n.angle, n.text, n.at]), [[10, 10, 0.5, "part of", 1000]], "b's name, in world units where it stood");
 });
 
 test("an item that stays but takes a new size eases to it over resize_ms; a ghost leaves as hollow as it was drawn", async () => {

@@ -11,7 +11,8 @@
  *   about the pointer; a double-click on the sea fits the picture.
  * - The picture is fitted while it settles, until the reader moves it.
  */
-import { bornOf, comeFade, goneLinksOf, goneOf, paintGone, resizeAt, resizeOf, type Ghost, type GoneLink, type Resize } from "./gone.ts";
+import { wireSize } from "./wires.ts";
+import { bornOf, comeFade, goneLinksOf, goneOf, paintGone, rekeyWires, resizeAt, resizeOf, type Ghost, type GoneLink, type GoneName, type Resize } from "./gone.ts";
 import type { Id } from "../../spec/common.ts";
 import type { Dial } from "./behaviour.ts";
 import { bounds, build, grid, seed, sizes, type FieldIn, type G, type Grid, type Settings } from "./graph.ts";
@@ -175,6 +176,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   let raf = 0, following = false;
   const ghosts: Ghost[] = [];
   const goneLinks: GoneLink[] = [];
+  const goneNames: GoneName[] = [];
   let sizing: Resize | null = null;
   let coming = 0;
   // What was last painted, so what leaves fades from how it was drawn.
@@ -204,7 +206,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       // Arranged into a profile: its tree comes in under the items as they reach their places.
       // It comes in as the items arrive, and at least as fast as what left fades out (gone_ms), so the two crossfade.
       if (tree) paintTree(c, tree, cam, s.dpr, scale(), Math.max(arrived(g, scale(), flight), flight ? comeFade(performance.now() - flight.at, S.gone_ms ?? 0) : 0), colours, S);
-      const fading = paintGone(c, ghosts, cam, s.dpr, performance.now(), S, goneLinks, colours) || performance.now() < coming;
+      const fading = paintGone(c, ghosts, cam, s.dpr, performance.now(), S, goneLinks, colours, goneNames, S.link_names ? wireSize(S.link_name_size!, cam.k, S.link_name_least_px!, S.link_name_most_px!) : 0) || performance.now() < coming;
       // A link name or a ghost still fading keeps the view painting.
       dirty = easing || following || light.wiresMoving || fading || resizing;
     }
@@ -317,7 +319,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       // What left the map fades out where it stood.
       const now = performance.now();
       const was = drawn.g === last ? drawn.match : null;
-      ghosts.push(...goneOf(last, g, now, S, was, 4000, light.named));
+      ghosts.push(...goneOf(last, g, now, S, was, 4000, light.labels));
+      goneNames.push(...rekeyWires(last, g, light.wires, cam, now));
       goneLinks.push(...goneLinksOf(last, g, now, S, was));
       // What came onto the map fades in where it lands.
       g.born = bornOf(last, g, now);

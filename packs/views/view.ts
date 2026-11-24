@@ -42,7 +42,7 @@ const STYLE = sheet(`
 .vw-pick .c { color:var(--dim); }
 .vw-pick:hover .c { color:var(--fg); }
 .vw-pick kbd { font:var(--text-xs)/1 var(--mono); color:var(--dim); border:1px solid var(--line); border-radius:var(--radius); padding:1px 3px; margin-left:var(--space-2); }
-.vw-veil { animation:vw-in .12s ease-out both; position:fixed; inset:0; display:flex; justify-content:center; align-items:flex-start; padding-top:12vh; background:color-mix(in srgb, var(--bg) 40%, transparent); }
+.vw-veil { animation:vw-in .2s ease-out both; position:fixed; inset:0; display:flex; justify-content:center; align-items:flex-start; padding-top:12vh; background:color-mix(in srgb, var(--bg) 40%, transparent); }
 .vw-list { width:min(420px, calc(100vw - 32px)); max-height:60vh; display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 8px 28px rgba(0,0,0,.25); }
 .vw-list input { font:inherit; background:var(--control); color:var(--fg); border:0; border-bottom:1px solid var(--line); padding:var(--space-3) var(--space-4); outline:none; border-radius:var(--radius) var(--radius) 0 0; }
 .vw-rows { overflow:auto; padding:var(--space-2) 0; }

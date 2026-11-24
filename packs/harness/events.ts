@@ -92,6 +92,8 @@ export const PartRow = ({ p }: { p: Part }) => {
 export interface EventsProps {
   info?: RunInfo;
   events: ExchangeEvent[];
+  /** How long a new line takes to fade and slide in, in ms (the row_ms dial). */
+  rowMs?: number;
   /** The playhead. */
   index: number;
   /** The run is looked at to its end: it follows live. */
@@ -110,7 +112,7 @@ export function atFoot(scrollHeight: number, scrollTop: number, clientHeight: nu
   return scrollHeight - scrollTop - clientHeight <= slack;
 }
 
-export const Events = ({ info, events, index, end, verdicts, titles, speakers, node, profiles, onPick }: EventsProps) => {
+export const Events = ({ info, events, index, end, verdicts, titles, speakers, node, profiles, onPick, rowMs }: EventsProps) => {
   const body = useRef<HTMLDivElement>(null);
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const stick = useRef(true);
@@ -146,7 +148,7 @@ export const Events = ({ info, events, index, end, verdicts, titles, speakers, n
         ${profiles && !profiles.length && html`<span class="part" title="In no context filter: it hears every node">no context filter</span>`}
         ${(profiles ?? []).map((p) => html`<span class=${p.by === "part" ? "part" : ""} title=${`${p.holding ? "holds" : "shadow: only records"}${p.by === "part" ? ", as a part" : ""}`}>${p.holding ? "●" : "◌"} ${p.title}</span>`)}
       </div>`}
-      <div class="hv-body" ref=${body} onScroll=${(ev: Event) => {
+      <div class="hv-body" style=${`--hv-row:${rowMs ?? 260}ms`} ref=${body} onScroll=${(ev: Event) => {
         const el = ev.currentTarget as HTMLElement;
         stick.current = atFoot(el.scrollHeight, el.scrollTop, el.clientHeight);
       }}>
@@ -155,7 +157,7 @@ export const Events = ({ info, events, index, end, verdicts, titles, speakers, n
           const isOpen = opened.has(e.id);
           const cls = ["hv-ev", i === index && !end ? "hv-pick hv-lit" : "", node && e.node === node ? "hv-lit" : "", i > index ? "hv-later" : "", broke.has(e.seq) ? "broke" : ""].join(" ");
           return html`
-            <div data-ev=${e.id} class=${cls} onClick=${() => {
+            <div key=${e.id} data-ev=${e.id} class=${cls} onClick=${() => {
               setOpened((o) => {
                 const n = new Set(o);
                 if (n.has(e.id)) n.delete(e.id);

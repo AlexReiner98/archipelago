@@ -88,7 +88,8 @@ const STYLE = sheet(`
 .hv-bar button.on { color:var(--fg); text-decoration:underline; text-underline-offset:4px; }
 .hv-select { font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); max-width:220px; min-width:0; }
 .hv-select option { background:var(--panel); color:var(--fg); }
-.hv-ev { cursor:pointer; }
+.hv-ev { cursor:pointer; animation:hv-ev-in var(--hv-row, .26s) ease-out both; }
+@keyframes hv-ev-in { from { opacity:0; transform:translateY(4px); } }
 .hv-line { display:flex; gap:var(--space-2); align-items:baseline; padding:1px var(--space-4) 1px var(--space-2); white-space:nowrap; min-width:0; }
 .hv-line .x { overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; }
 .hv-line .p { color:var(--dim); flex:none; max-width:35%; overflow:hidden; text-overflow:ellipsis; }
@@ -465,6 +466,7 @@ const harness: Pack = {
 
     const RunFill = () => {
       const nodes = hk.useNodes();
+      const dials = useDials(here);
       const { run, info, runs, all, live, lives } = hk.useRun();
       const profile = hk.useHere<string>(PROFILE);
       const inProfile = hk.useRunsIn(runs, all ? profile : undefined);
@@ -483,7 +485,7 @@ const harness: Pack = {
       const speakers = useMemo(() => new Map(nodes.map((n) => [n.id, { title: n.title, kind: n.kind }])), [nodes]);
       const inProfiles = hk.useRunProfiles(shownInfo);
       if (all) return html`<${Runs} runs=${inProfile} of=${profile ? (profileTitle ?? profile) : undefined} />`;
-      return html`<${Events} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} speakers=${speakers} node=${picked} profiles=${inProfiles} onPick=${(e: ExchangeEvent) => {
+      return html`<${Events} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} speakers=${speakers} node=${picked} profiles=${inProfiles} rowMs=${dials.row_ms} onPick=${(e: ExchangeEvent) => {
         set.set(KEYS.event, e.id);
         // The node pane follows: the event's node, or for an act the node it failed or was told just before.
         set.set(KEYS.node, nodeOf(events, events.indexOf(e), verdictsOfRun));

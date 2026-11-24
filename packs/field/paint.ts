@@ -11,7 +11,7 @@ import { hubSet, place, type Want } from "./labels.ts";
 import { FAINT, FOUND } from "./filter.ts";
 import { CIRCLE, edge, fill, outline, reach } from "./shapes.ts";
 import { arrow, easeWires, placeWires, wireName, wireSize, type WireFade, type WireWant } from "./wires.ts";
-import { comeFade } from "./gone.ts";
+import { comeFade, type Label } from "./gone.ts";
 
 /** The drawing's own dials. */
 export const DRAW: Dial[] = [
@@ -109,6 +109,8 @@ export class Light {
   }
   /** The ids named last frame: they are placed first, so names hold still while the map settles. */
   named = new Set<string>();
+  /** Where each named title stood last frame, in world units (gone.ts Label). */
+  labels = new Map<string, Label>();
   /** The spot each title took last frame (labels.ts), tried first so it keeps its side. */
   spots = new Map<string, number>();
   /** The hubs named at any zoom, by id: kept from graph to graph (labels.ts hubSet). */
@@ -396,6 +398,8 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   };
   const placed = place(want, { width, height, room: S.label_room!, most: S.label_most!, gap: S.label_gap!, covers, clear });
   light.named = new Set(placed.map((p) => g.id[p.i]!));
+  // Where each title stands, in world units, so one that leaves the map fades where it was read (gone.ts).
+  light.labels = new Map(placed.map((p) => [g.id[p.i]!, { x: ((p.within ? (p.box[0] + p.box[2]) / 2 : p.box[0] + 2) - cam.tx) / cam.k, y: (p.box[1] - cam.ty) / cam.k, lines: texts.get(p.i)!, center: !!p.within }]));
   light.spots = new Map(placed.map((p) => [g.id[p.i]!, p.spot]));
   c.strokeStyle = ink.sea;
   for (const { i, box, within } of placed) {
