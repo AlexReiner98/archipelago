@@ -280,7 +280,10 @@ const fieldPack: Pack = {
       }, []);
       // A filter change warms the run to alpha_filter; a change to the map, to alpha_warm.
       // A new query (or new find dials) also fits the view to what is kept.
-      const findOf = [queried, treeLevels, S.find_steps, S.find_faint];
+      // By what it found, not by the set's identity: a map change that leaves the find's answer the same (an agent's
+      // session writing to the map) is not a new find either.
+      const queriedKey = queried ? [...queried].join(" ") : null;
+      const findOf = [queriedKey, treeLevels, S.find_steps, S.find_faint];
       const lastHide = useRef(hideKey), lastFind = useRef(findOf);
       useEffect(() => {
         const byFind = findOf.some((v, k) => v !== lastFind.current[k]);

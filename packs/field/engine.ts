@@ -133,7 +133,7 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   };
   // ─── The physics' own loop: a slice, then a message to itself, until settled ───
   const chan = new MessageChannel();
-  let queued = false;
+  let queued = false, shown = false;
   const slice = () => {
     queued = false;
     if (stopped || !awake) return;
@@ -141,23 +141,30 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     let steps = 0, energy = 0;
     // In flight the run moves for as long as the flight lasts, whatever its step count.
     if (flight && flying && (flying = fly(g, flight, t0, S.tree_ms ?? 0))) g.sim.from = g.sim.steps;
+    // Once the map has been shown settled, a run is paced to the screen: a few steps per painted frame, so what
+    // moves is seen moving. Before that (the first run), or in a tab no one sees, it steps as fast as frame_ms
+    // allows, slice after slice.
+    const paced = shown && !flying && !document.hidden;
+    const most = paced ? S.frame_steps ?? 2 : Infinity;
     do {
       energy = step(g, S);
       steps++;
-    } while (energy && performance.now() - t0 < S.frame_ms!);
+    } while (energy && steps < most && performance.now() - t0 < S.frame_ms!);
     const per = (performance.now() - t0) / steps;
     stepMs = stepMs ? stepMs * 0.8 + per * 0.2 : per;
     pick = grid(g);
     dirty = true;
     if (!energy && !press && !flying) {
       awake = false;
+      shown = true;
       settledIn = { steps: g.sim.steps - runStart.steps, ms: performance.now() - runStart.at };
       return;
     }
     // Held by a hand, a sleeping run waits for the next move instead of spinning.
     if (!energy && !flying) return;
     queued = true;
-    chan.port2.postMessage(0);
+    if (paced) requestAnimationFrame(() => slice());
+    else chan.port2.postMessage(0);
   };
   chan.port1.onmessage = slice;
   const wake = () => {
@@ -377,6 +384,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       dirty = true;
     },
     reseed() {
+      // A fresh layout steps fast again, until it has settled once.
+      shown = false;
       g.placed.fill(0);
       g.vx.fill(0);
       g.vy.fill(0);

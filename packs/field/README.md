@@ -140,8 +140,11 @@ find line has words, only what it finds and what lies near it.
   While it settles the view eases after the picture (`follow_ms`).
   ([engine.ts](engine.ts))
 - The physics runs on its own loop (a message channel), in slices of
-  `frame_ms`; animation frames only paint. A tab in the background settles
-  as fast.
+  `frame_ms`; animation frames only paint. Once the map has settled and
+  is shown, a run is paced to the screen instead: at most `frame_steps`
+  steps per painted frame, so a change (an item coming, a session, a drag)
+  is seen moving, never in its new place in one frame. The first run, and
+  a tab in the background, settle as fast as `frame_ms` allows.
 - **Empty.** A map with no items shows a mark and one line, and under it
   the slot `field.empty`, which other packs fill with what to do first
   (the [connect](../connect/README.md) pack: connect Claude Code). A map
