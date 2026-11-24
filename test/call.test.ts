@@ -147,6 +147,18 @@ async function until(ok: () => Promise<boolean>, ms = 2000) {
   while (!(await ok()) && Date.now() < end) await new Promise((r) => setTimeout(r, 10));
 }
 
+test("an answer may name the item it made: the run says so, and the item's decision judges the call", async () => {
+  const { rt, errors, ask, read, verdicts, act } = await setup();
+  const out = await ask.ask({ title: "made", places: ["check:line_length", "finding"], parent: "checker" }, async () => ({ text: "made t9", follow: { item: "t9", version: "v1" } }));
+  const run = (await read.runs()).items.find((r) => r.run === out.run)!;
+  assert.deepEqual([run.facts?.harness, run.facts?.item, run.facts?.version], ["call", "t9", "v1"]);
+  await act("seed.raw", { facts: [["+", "t9", "type", "test"], ["+", "t9", "decision", "accepted"], ["+", "t9", "decided_version", "v1"]] });
+  await rt.settle();
+  await until(async () => (await verdicts.run(out.run)).every((v) => v.verdict === "held"));
+  assert.deepEqual((await verdicts.run(out.run)).map((v) => v.verdict), ["held", "held"]);
+  assert.deepEqual(errors, []);
+});
+
 test("a person's decision on the item a call follows becomes the verdict of the nodes said to it", async () => {
   const { rt, errors, ask, read, verdicts, act } = await setup();
   await act("seed.raw", { facts: [["+", "t1", "type", "test"], ["+", "t1", "version", "v1"]] });

@@ -372,6 +372,25 @@ test("set fields reach the checks and the facts; follow reaches the call's run",
   assert.deepEqual(errors, []);
 });
 
+test("the caller's subject by its size, never the prompt's words; follow made: the one item the call made is followed", async () => {
+  const { errors, ask, read } = await setup();
+  const prompt = "PRIVATE-CONTEXT: the whole of a document the caller holds.";
+  const model = scripted([{ items: [{ ref: "a", title: "A", size: "x" }] }, { items: [{ ref: "a", title: "A" }] }]);
+  const out = await ask.ask({ type: "work", prompt, model, subject: { type: "document", tokens: 4200 }, follow: { made: true, version: "v3" } });
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.equal(model.asked[0]!.messages[0]!.content, prompt, "the model gets it");
+  const evs = (await read.events(out.run)).items;
+  assert.ok(!JSON.stringify(evs).includes("PRIVATE-CONTEXT"), "the exchange never does");
+  const answer = evs.find((e) => e.place === "reply_end")!;
+  assert.deepEqual(answer.act!.input, { subject: { type: "document", tokens: 4200 } });
+  const schema = model.asked[0]!.schema as any;
+  assert.deepEqual([schema.properties.items.minItems, schema.properties.items.maxItems], [1, 1], "follow made asks for one item");
+  const run = (await read.runs()).items.find((r) => r.run === out.run)!;
+  assert.deepEqual([run.facts?.item, run.facts?.version], [out.ids.a, "v3"]);
+  await assert.rejects(ask.ask({ type: "work", prompt: "x", model, follow: { version: "v1" } as never }), /follow is/);
+  assert.deepEqual(errors, []);
+});
+
 test("system and retry words", () => {
   assert.equal(systemOf(work, undefined, []), "You make items for a map. Each is a work. Reply with one JSON object that matches the schema you are given, and nothing else.");
   assert.equal(retryOf([{ code: "x", message: "One." }, { code: "y", message: "Two." }]), "That reply doesn't fit the map's types:\n- One.\n- Two.\nGive the whole reply again, fixed.");

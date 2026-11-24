@@ -33,6 +33,12 @@ the domain's own context never reaches the exchange. A throw is a failed
 reply (`ok: false`, the error's words) and is thrown on. The run always
 ends.
 
+An answer may name an item it made (`follow: {item, version}`), for a call
+whose item didn't exist when it began: the run begins again before it
+ends, its facts naming the item and version, and it is followed from then
+on, as a `start.follow` is (below). A call that follows an item from its
+start keeps that one.
+
 ## Decisions
 
 A call that follows an item is followed: when the item's `decision`

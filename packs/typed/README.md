@@ -29,7 +29,8 @@ and `agent.run` (to record attempts in the call's run).
 | `attach` | Links the caller adds to every item (`{type: "part_of", to: <hub>}`) |
 | `fields` | Only these of the type's fields go into the schema the model sees (title required only when offered); a field it gives that wasn't offered is a problem |
 | `set` | Fields the caller sets on every item, over the reply's, before any check: bookkeeping (a version stamp, the id it is about) the model is never offered |
-| `follow` | `{item, version}`, passed to `call.ask`: the item whose decision at this version judges the call |
+| `follow` | `{item, version}`, passed to `call.ask`: the item whose decision at this version judges the call. `{made: true, version}`: the item the call makes (it then asks for exactly one), followed once the reply fits, through the answer's `follow` |
+| `subject` | The caller's own context in the prompt, `{type, tokens}`: recorded on the answer by kind and size, so the context pack counts it (`subject:<type>`) |
 | `min`, `max` | How many items |
 | `retries` | How many times a misfit is sent back (default the config's, else 1) |
 | `model` | An adapter (below). Default the configured one |
@@ -94,6 +95,10 @@ other call in the Context interface, under the run that made it (or
 | `typed:attempt` | `reply` | Input: the attempt, the model, the schema (first) or the retry sent (later). Output: the reply (`json`, or its `text`), its `usage`. Ok: it fit |
 | `typed:check` | `tool` | Input: the facts. Output: `fits`, `problems`, and the `retry` sent back or why none (`failed`) |
 | `reply_end` | `reply` | The answer: how many fit, on which attempt; a misfit is a failed reply |
+
+The prompt's words are never recorded: the model gets them, the exchange
+gets the schema, the replies, the problems and the retries sent, and the
+caller's context only by its `subject`.
 
 Each act's input says what it is (`description`), so the run pane's line
 reads "attempt 2 · …, after a misfit sent back"; opened, every part shows.

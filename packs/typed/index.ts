@@ -65,8 +65,14 @@ export interface TypedStart {
   fields?: string[];
   /** Fields the caller sets on every item, over the reply's, before any check: bookkeeping the model is never offered. */
   set?: Record<string, Json>;
-  /** An item whose decision at this version judges the call (see call.ask). */
-  follow?: { item: Id; version: string };
+  /**
+   * An item whose decision at this version judges the call (see call.ask).
+   * `{ made: true, version }`: the item the call makes, followed once the
+   * reply fits; the call then asks for exactly one item.
+   */
+  follow?: { item: Id; version: string } | { made: true; version: string };
+  /** The caller's own context in the prompt, by its kind and size only (call.ask's `subject`): the context pack counts it as `subject:<type>`. */
+  subject?: { type: string; tokens: number };
   /** How many items, at least and at most. */
   min?: number;
   max?: number;
@@ -168,7 +174,14 @@ const typed: Pack<TypedConfig> = {
       if (!isType(t)) return refuse("type_unknown", `There is no type ${start.type} now: a base or a flavour of one.`);
       const model = start.model ?? configured;
       if (!model) return refuse("no_model", unconfigured ?? "No model is configured for typed calls: set the typed pack's `model`.");
-      const shape = { ...(start.links ? { links: start.links } : {}), ...(start.min !== undefined ? { min: start.min } : {}), ...(start.max !== undefined ? { max: start.max } : {}), ...(start.fields ? { fields: start.fields } : {}) };
+      const made1 = !!start.follow && "made" in start.follow && start.follow.made === true;
+      if (start.follow && !made1 && !("item" in start.follow && typeof start.follow.item === "string")) return refuse("follow", "follow is { item, version } or { made: true, version }.");
+      const followItem = start.follow && "item" in start.follow ? start.follow : undefined;
+      const shape = {
+        ...(start.links ? { links: start.links } : {}),
+        ...(made1 ? { min: 1, max: 1 } : { ...(start.min !== undefined ? { min: start.min } : {}), ...(start.max !== undefined ? { max: start.max } : {}) }),
+        ...(start.fields ? { fields: start.fields } : {}),
+      };
       const schema: JsonSchema = schemaOf(t, types.all().links, shape);
       const retries = Math.max(0, start.retries ?? config.retries ?? 1);
       let run = "";
@@ -183,7 +196,7 @@ const typed: Pack<TypedConfig> = {
             title: start.title ?? `${t.name} items`,
             places: start.places ?? [`typed:${t.name}`],
             ...(start.parent ? { parent: start.parent } : {}),
-            ...(start.follow ? { follow: start.follow } : {}),
+            ...(followItem ? { follow: followItem } : {}),
             facts: { ...(start.facts ?? {}), [TYPED]: t.name, model: model.id, caller: pack },
           },
           async ({ run: r, said }) => {
@@ -248,7 +261,13 @@ const typed: Pack<TypedConfig> = {
               if (fits) {
                 result = { facts, ids: made!.ids };
                 const count = Object.keys(made!.ids).length;
-                return { text: `${count} ${t.name} item${count === 1 ? "" : "s"} fit, on attempt ${n}.`, ...(reply.usage ? { usage: reply.usage } : {}) };
+                const one = Object.values(made!.ids);
+                return {
+                  text: `${count} ${t.name} item${count === 1 ? "" : "s"} fit, on attempt ${n}.`,
+                  ...(reply.usage ? { usage: reply.usage } : {}),
+                  ...(start.subject ? { subject: { type: start.subject.type, tokens: start.subject.tokens } } : {}),
+                  ...(made1 && one.length === 1 ? { follow: { item: one[0]!, version: (start.follow as { version: string }).version } } : {}),
+                };
               }
               if (!again) throw new Misfit(problems);
               messages.push({ role: "assistant", content: reply.text }, { role: "user", content: retry! });
@@ -287,7 +306,8 @@ const typed: Pack<TypedConfig> = {
           attach: { type: "array", items: { type: "object", properties: { type: { type: "string" }, to: { type: "string" } }, required: ["type", "to"] } },
           fields: { type: "array", items: { type: "string" }, description: "Only these of the type's fields are offered to the model" },
           set: { type: "object", description: "Fields set on every item by the caller, never offered to the model" },
-          follow: { type: "object", properties: { item: { type: "string" }, version: { type: "string" } }, required: ["item", "version"] },
+          follow: { type: "object", description: "{item, version}, or {made: true, version}: the item the call makes", properties: { item: { type: "string" }, made: { type: "boolean" }, version: { type: "string" } }, required: ["version"] },
+          subject: { type: "object", description: "The caller's context by kind and size only", properties: { type: { type: "string" }, tokens: { type: "number" } }, required: ["type", "tokens"] },
           min: { type: "number" },
           max: { type: "number" },
           retries: { type: "number" },
