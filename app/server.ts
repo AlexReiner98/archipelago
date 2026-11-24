@@ -35,7 +35,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { NodeHost } from "../runtime/node.ts";
 import { serve } from "../runtime/serve.ts";
-import { pageAccess, serverTree } from "./tree.ts";
+import { otelFromEnv, pageAccess, serverTree } from "./tree.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { values } = parseArgs({
@@ -49,7 +49,7 @@ const { values } = parseArgs({
 });
 const PAGE = Number(values.port);
 
-const tree = serverTree({ data: values.data, port: PAGE, write: values.write });
+const tree = serverTree({ data: values.data, port: PAGE, write: values.write, otel: otelFromEnv(process.env) });
 
 const host = new NodeHost({
   tree,

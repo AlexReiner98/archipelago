@@ -33,11 +33,11 @@ import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
 import type { ProfileRead } from "../../spec/profile.ts";
 import { KEYS } from "../../spec/here.ts";
-import type { SlotFill } from "../../spec/slot.ts";
+import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
-import { Events, short } from "./events.ts";
+import { Events, RUN_SLOT, runSlot, short } from "./events.ts";
 import { ALL, FOCUS, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
 import { colourOf, colours } from "./live.ts";
 import { AGENTS_STYLE, placementOf, ProfileMenu } from "./agents.ts";
@@ -139,7 +139,7 @@ const values = (v: string | string[] | undefined) => (v === undefined ? [] : Arr
 const harness: Pack = {
   id: "harness",
   about: "The Context interface: every run, live or replayed, on the tree of what the map tells agents; and every profile.",
-  inject: ["slot.fill", "here.read", "here.set", "here.declare", "agent.tree", "exchange.read", "exchange.watch", "verdict.read", "action.list", "action.invoke", "graph.read", "graph.watch", "profile.read"],
+  inject: ["slot.fill", "slot.declare", "slot.read", "here.read", "here.set", "here.declare", "agent.tree", "exchange.read", "exchange.watch", "verdict.read", "action.list", "action.invoke", "graph.read", "graph.watch", "profile.read"],
   apply(ctx: Context) {
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
@@ -154,6 +154,8 @@ const harness: Pack = {
     ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the context interface looks at every run, with all-time totals, not one run." }));
     ctx.effect(() => declare.declare({ key: DIALS_KEY, scope: "page", doc: "The Context interface's dials, those moved from where they start." }));
     ctx.effect(() => declare.declare({ key: FOCUS, scope: "page", doc: "Live: the run whose tree is big; the run pane shows its events." }));
+    ctx.get<SlotDeclare>("slot.declare").declare({ name: RUN_SLOT, merge: "many", props: { type: "object", properties: { run: { type: "object" } } }, doc: "On the run's line under its head: marks other packs put on the run shown (its RunInfo as `run`), such as where it was exported." });
+    const RunSlot = runSlot(ctx.get<SlotRead>("slot.read"));
     ctx.effect(() => declare.declare({ key: LIVE, scope: "page", doc: "True: the context interface looks at every live run at once, a colour each." }));
     // A run picked anywhere (here, the node's runs, Activity) is looked at alone, with its own profiles.
     ctx.effect(() =>
@@ -497,7 +499,7 @@ const harness: Pack = {
       const speakers = useMemo(() => new Map(nodes.map((n) => [n.id, { title: n.title, kind: n.kind }])), [nodes]);
       const inProfiles = hk.useRunProfiles(shownInfo);
       if (all) return html`<${Runs} runs=${inProfile} of=${profile ? (profileTitle ?? profile) : undefined} />`;
-      return html`<${Events} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} speakers=${speakers} node=${picked} profiles=${inProfiles} onPick=${(e: ExchangeEvent) => {
+      return html`<${Events} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} speakers=${speakers} node=${picked} profiles=${inProfiles} extra=${shownInfo && html`<${RunSlot} run=${shownInfo} />`} onPick=${(e: ExchangeEvent) => {
         set.set(KEYS.event, e.id);
         // The node pane follows: the event's node, or for an act the node it failed or was told just before.
         set.set(KEYS.node, nodeOf(events, events.indexOf(e), verdictsOfRun));

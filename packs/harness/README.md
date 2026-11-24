@@ -348,8 +348,14 @@ the previews (or, one run looked at, beside the tree), under a way back:
 "‹ Agents" (or "× Close", one run looked at). It gives way to them when
 none is picked: that, or a click on the tree's background.
 
-Injects `slot.fill`, `here.*`, `agent.tree`, `exchange.read`,
-`exchange.watch`, `verdict.read`, `action.list`, `action.invoke`,
-`graph.read`, `graph.watch`, `profile.read`. Unloading it removes the three
-fills, its page keys and its styles. The pure parts are tested in
+The Run pane's line under its head (the run's umwelts) ends with the
+`harness.run` slot: other packs' marks on the run shown, each fill given
+its `RunInfo` as `run`. The otel pack's view puts where the run was
+exported there ([otel](../otel/README.md)).
+
+Injects `slot.fill`, `slot.declare`, `slot.read`, `here.*`, `agent.tree`,
+`exchange.read`, `exchange.watch`, `verdict.read`, `action.list`,
+`action.invoke`, `graph.read`, `graph.watch`, `profile.read`. Unloading it
+removes the three fills, the `harness.run` slot, its page keys and its
+styles. The pure parts are tested in
 `test/harness.test.ts`.
