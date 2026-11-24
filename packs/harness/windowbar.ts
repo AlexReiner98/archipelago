@@ -1,5 +1,5 @@
 /**
- * The window bar: how full the agent's context window is, over the agent in
+ * The window bar: how full the agent's context window is, under the agent in
  * focus (or one run's tree), at the playhead or live, from the context
  * pack's `context.window` (packs/context). Two thin rows share one scale,
  * the window's limit: its share by source (the map's, Claude Code's, the
@@ -9,7 +9,7 @@
  *
  * A third row is what the map controls alone, node by node, on a scale of
  * its own (the map's whole share): each node it said, or listed, in its
- * pack's hue, biggest first; a click picks the node (`mapShares`).
+ * channel's hue (`CHANNEL_HUE`), biggest first; a click picks the node (`mapShares`).
  *
  * Also each node's state at the playhead (`windowMarks`): in the window,
  * only named in a listing, or dropped by a compaction, a mark of its own on
@@ -28,6 +28,19 @@ import { nameOf, type Tree } from "./layout.ts";
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
 export const WINDOW = "context.window";
+/**
+ * Each channel's hue, so the channel row's shares tell apart, and the map's own row says by what channel each of
+ * its nodes came in. The pack hues, minus the map's own purple; the agent's acts keep the exchange's write.
+ */
+export const CHANNEL_HUE: Record<WindowPart["channel"], string> = {
+  hook: v("hue-1"),
+  rule: v("hue-4"),
+  file: v("hue-2"),
+  context: v("hue-6"),
+  talk: v("hue-3"),
+  act: v("write"),
+};
+
 /** How long a live window is kept before it is read again. */
 const AGAIN_MS = 3000;
 /** The most pages of parts one read takes. */
@@ -139,10 +152,9 @@ export function sharesOf(w: WindowRead): { sources: Share[]; channels: Share[] }
       ? { filter: "talk" as Filter, key: "agent", title: "the conversation", tokens: w.sources.agent, fitted: fs?.agent ?? 0, colour: v("write"), tip: "The conversation since the start: your prompts, Claude's replies and thinking, tool calls and results, Claude Code's notes" }
       : { key: "agent", title: "the agent's", tokens: w.sources.agent, fitted: fs?.agent ?? 0, colour: v("write"), tip: "What the agent did: tool calls and results, replies, a person's prompts" },
   ];
-  const ink = [80, 60, 44, 30, 18];
   const channels: Share[] = [
-    ...CHANNELS.map((c, i) => ({ filter: c.channel as Filter, key: c.channel, title: `${GLYPH[shapeOf(c.channel)]} ${c.title}`, tokens: w.channels[c.channel], fitted: fc?.[c.channel] ?? 0, colour: `color-mix(in srgb, ${v("fg")} ${ink[i]}%, transparent)`, tip: `${c.title}: ${c.doc}` })),
-    { key: "act", title: "acts", tokens: w.channels.act, fitted: 0, colour: v("write"), tip: "The agent's own acts" },
+    ...CHANNELS.map((c, i) => ({ filter: c.channel as Filter, key: c.channel, title: `${GLYPH[shapeOf(c.channel)]} ${c.title}`, tokens: w.channels[c.channel], fitted: fc?.[c.channel] ?? 0, colour: CHANNEL_HUE[c.channel], tip: `${c.title}: ${c.doc}` })),
+    { key: "act", title: "acts", tokens: w.channels.act, fitted: 0, colour: CHANNEL_HUE.act, tip: "The agent's own acts" },
   ];
   return { sources: [...sources.filter((s) => s.tokens > 0), ...unseen], channels: [...channels.filter((s) => s.tokens > 0), ...unseen] };
 }
@@ -203,7 +215,7 @@ export function useWindow(invoke: ActionInvoke, has: boolean, run: string | unde
 }
 
 export const WINDOWBAR_STYLE = sheet(`
-.hv-win { padding:var(--space-1) var(--space-4) var(--space-2); display:grid; gap:3px; min-width:0; }
+.hv-win { padding:var(--space-2) var(--space-4) var(--space-3); display:grid; gap:3px; min-width:0; border-top:1px solid var(--line); }
 .hv-win .t { display:flex; gap:var(--space-3); align-items:baseline; white-space:nowrap; color:var(--dim); font-size:var(--text-s); min-width:0; overflow:hidden; }
 .hv-win .hv-whead { font:inherit; background:none; border:0; color:inherit; padding:0; cursor:pointer; }
 .hv-win .hv-whead:hover { color:var(--fg); }
@@ -253,11 +265,12 @@ const Row = ({ shares, limit, filter, label }: { shares: Share[]; limit: number;
 };
 
 /** The bar: how full, then the two rows. Nothing while the window isn't read. */
-/** One of the map's nodes in the window: its tokens, and its pack for its hue. */
+/** One of the map's nodes in the window: its tokens, its pack, and the channel it came in by (its hue). */
 export interface MapShare {
   id: string;
   title: string;
   pack: string;
+  channel: WindowPart["channel"];
   tokens: number;
   state: WindowState;
 }
@@ -266,7 +279,7 @@ export interface MapShare {
 export function mapShares(w: WindowRead): MapShare[] {
   return w.parts
     .filter((p) => p.source === "map" && p.state !== "dropped" && p.tokens > 0)
-    .map((p) => ({ id: p.id, title: nameOf(p.title), pack: p.id.includes("/") ? p.id.slice(0, p.id.indexOf("/")) : p.id, tokens: p.tokens, state: p.state }))
+    .map((p) => ({ id: p.id, title: nameOf(p.title), pack: p.id.includes("/") ? p.id.slice(0, p.id.indexOf("/")) : p.id, channel: p.channel, tokens: p.tokens, state: p.state }))
     .sort((a, b) => b.tokens - a.tokens || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
@@ -274,13 +287,16 @@ export function mapShares(w: WindowRead): MapShare[] {
 const NAMED = 4;
 
 /** The map's own row: its nodes on the scale of its whole share, each a click to pick it. */
-const MapRow = ({ w, hues, picked, onPick }: { w: WindowRead; hues?: Map<string, string>; picked?: string; onPick?(id: string): void }) => {
+const MapRow = ({ w, picked, onPick }: { w: WindowRead; hues?: Map<string, string>; picked?: string; onPick?(id: string): void }) => {
   const shares = mapShares(w);
   if (!shares.length) return "";
   const all = shares.reduce((n, s) => n + s.tokens, 0);
-  const hue = (s: MapShare) => hues?.get(s.pack) ?? v("owner");
+  // Each node in its channel's hue; one beside another of the same hue is a shade darker, so every node shows.
+  const shade: number[] = shares.map((s, i) => (i > 0 && shares[i - 1]!.channel === s.channel ? 1 : 0));
+  for (let i = 1; i < shares.length; i++) if (shade[i]) shade[i] = 1 - shade[i - 1]!;
+  const hue = (s: MapShare, i = -1) => (i >= 0 && shade[i] ? `color-mix(in srgb, ${CHANNEL_HUE[s.channel]} 65%, ${v("bg")})` : CHANNEL_HUE[s.channel]);
   const tip = (s: MapShare) =>
-    `${s.title}: ${sure(s.tokens).text} tokens, ${pct(s.tokens, all).toFixed(1)}% of what the map put in, ${pct(s.tokens, w.total.tokens).toFixed(2)}% of the window\n${s.state === "listed" ? "Only named in a listing" : "Said, in the window now"}\n${SURE.estimated.tip}${onPick ? "\nA click picks it" : ""}`;
+    `${s.title} (${s.channel}): ${sure(s.tokens).text} tokens, ${pct(s.tokens, all).toFixed(1)}% of what the map put in, ${pct(s.tokens, w.total.tokens).toFixed(2)}% of the window\n${s.state === "listed" ? "Only named in a listing" : "Said, in the window now"}\n${SURE.estimated.tip}${onPick ? "\nA click picks it" : ""}`;
   const click = (s: MapShare) => (e: Event) => {
     e.stopPropagation();
     onPick?.(s.id);
@@ -291,7 +307,7 @@ const MapRow = ({ w, hues, picked, onPick }: { w: WindowRead; hues?: Map<string,
       <span>the map's own</span><span><b>${sure(all).text}</b> · ${pct(all, w.total.tokens).toFixed(1)}% of the window · ${shares.length} node${shares.length === 1 ? "" : "s"}</span>
     </div>
     <div class="row" role="group" aria-label="the map's nodes">
-      ${shares.map((s) => html`<button key=${s.id} class=${`${onPick ? "" : "plain"}${s.state === "listed" ? " listed" : ""}${picked === s.id ? " on" : ""}`} style=${`width:${pct(s.tokens, all)}%;background:${hue(s)}`} title=${tip(s)} onClick=${click(s)}></button>`)}
+      ${shares.map((s, i) => html`<button key=${s.id} class=${`${onPick ? "" : "plain"}${s.state === "listed" ? " listed" : ""}${picked === s.id ? " on" : ""}`} style=${`width:${pct(s.tokens, all)}%;background:${hue(s, i)}`} title=${tip(s)} onClick=${click(s)}></button>`)}
     </div>
     <div class="lg">
       ${shares.slice(0, NAMED).map((s) => html`<button key=${s.id} class=${onPick ? "" : "plain"} title=${tip(s)} onClick=${click(s)}><i style=${`background:${hue(s)}`}></i>${s.title} ${sure(s.tokens).text}</button>`)}
@@ -299,13 +315,13 @@ const MapRow = ({ w, hues, picked, onPick }: { w: WindowRead; hues?: Map<string,
     </div>`;
 };
 
-/** The browser's memory of whether the window bar is open: folded to its one line until opened. */
+/** The browser's memory of whether the window bar is open: open until folded to its one line. */
 const WINDOW_OPEN = "harness.window-open";
 function windowOpen(): boolean {
   try {
-    return localStorage.getItem(WINDOW_OPEN) === "1";
+    return localStorage.getItem(WINDOW_OPEN) !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 

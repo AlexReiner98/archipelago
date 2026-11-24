@@ -210,16 +210,17 @@ nodes. The camera's pure parts are in [camera.ts](camera.ts).
 
 ## The window ([windowbar.ts](windowbar.ts))
 
-With the context pack ([context](../context/README.md)), a bar over the
-agent in focus, and over one run's tree, says how full its context window
+With the context pack ([context](../context/README.md)), a bar along the
+foot of the agent in focus, and of one run's tree, says how full its context window
 is at the playhead, or live (`context.window`): the tokens in it of the
 window's size and the share that is, "≈" when it is an estimate (no usage
-in the transcript yet), and how many compactions. It starts folded to that
-one line; its head ("window ▸") opens the rows below, and the browser
-remembers which (`harness.window-open`). Under it two thin rows
+in the transcript yet), and how many compactions. It starts open; its
+head ("window ▾") folds it to that one line, and the browser remembers
+which (`harness.window-open`). Under it two thin rows
 on the window's one scale: its share by source (the map's, Claude Code's,
 the conversation, and what the model counts beyond those), and by channel
-(hook, rule, file, context, talk). A share's tooltip says its tokens, its
+(hook, rule, file, context, talk), each channel in a hue of its own
+(`CHANNEL_HUE`). A share's tooltip says its tokens, its
 part of the window, and how sure: each number carries its mark (`~`
 fitted, `~≈` partly, `≈` estimated, none measured), and a share's bar is
 solid for what is fitted and faded for what is estimated. A click on a share filters the tree to
@@ -230,7 +231,8 @@ filter.
 
 A third row is what the map controls alone, node by node (`mapShares`):
 each of its nodes said, or only listed (faded), in the window at the
-playhead, in its pack's hue, biggest first, on a scale of its own (the
+playhead, in the hue of the channel it came in by (a node beside another of
+the same hue a shade darker, so each shows), biggest first, on a scale of its own (the
 map's whole share), headed by that share and its part of the window. The
 biggest four are named under it, named as the tree names them, never a
 path, and the rest counted; each a click to pick the node, outlined while

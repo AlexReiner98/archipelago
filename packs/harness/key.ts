@@ -153,7 +153,7 @@ export const Key = ({ hues, filter, open = true, onOpen, present }: { hues: Map<
   <div class=${`rx-key${filter || onOpen ? " filters" : ""}`}>
     ${head && html`<span class="rx-kfull">${head}</span>`}
     ${section("in this run", "What happened in the run looked at, as it lights the tree", said)}
-    ${section("in the window", "At the playhead, or live: what the agent has in its context window (the window bar over the tree)", inWindow)}
+    ${section("in the window", "At the playhead, or live: what the agent has in its context window (the window bar under the tree)", inWindow)}
     ${section("how sure", "How each number of the window is known: a mark before it", sureRows)}
     ${section("judged", "Each node's verdict once the run ends, and nodes still on trial", judged)}
     ${section("from", "Who supplies it: the map, or Claude Code itself. A click hides or shows", from.map(({ f, mark, text }) => FilterRow(f, mark, text, filter)))}

@@ -130,8 +130,8 @@ ${CANVAS_STYLE}
 ${TIMELINE_STYLE}
 ${WINDOWBAR_STYLE}
 ${TREND_STYLE}
-.hv-onerun { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; min-width:0; }
-.hv-onerun > .rx-canvas { grid-row:2; }`);
+.hv-onerun { display:grid; grid-template-rows:minmax(0,1fr) auto; min-height:0; min-width:0; }
+.hv-onerun > .rx-canvas { grid-row:1; }`);
 
 const values = (v: string | string[] | undefined) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
@@ -436,8 +436,8 @@ const harness: Pack = {
               ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} fitMs=${dials.fit_ms} settleMs=${dials.fit_settle_ms} wheelMs=${dials.wheel_ms} nameMost=${dials.name_most} peekPx=${dials.peek_px} openS=${dials.open_s} />`
               : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
                   <div class="hv-onerun">
-                    ${run ? html`<${WindowBar} w=${win} filter=${keyFilter} hues=${hues} picked=${picked} onPick=${pick} />` : html`<span></span>`}
                     <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} window=${run ? marks : undefined} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} fitMs=${dials.fit_ms} settleMs=${dials.fit_settle_ms} wheelMs=${dials.wheel_ms} />
+                    ${run ? html`<${WindowBar} w=${win} filter=${keyFilter} hues=${hues} picked=${picked} onPick=${pick} />` : html`<span></span>`}
                   </div>
                   ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} run=${windowRun} /></div>`}
                 </div>`}

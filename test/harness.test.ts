@@ -779,6 +779,13 @@ test("the map's own row: each node it controls in the window, biggest first, nam
   const shares = mapShares(w);
   assert.deepEqual(shares.map((s) => [s.id, s.pack, s.tokens, s.state]), [["loaded/mem", "loaded", 400, "said"], ["words/a", "words", 100, "said"], ["loaded/docs", "loaded", 3, "listed"]], "the map's alone, dropped left out");
   assert.ok(!shares[0]!.title.includes("Users"), "never a path");
+  assert.ok(shares.every((s) => s.channel === "hook"), "each node with the channel it came in by, for its hue");
+});
+
+test("the window bar's hues: each channel its own, so the rows tell apart", async () => {
+  const { CHANNEL_HUE } = await import("../packs/harness/windowbar.ts");
+  const hues = Object.values(CHANNEL_HUE);
+  assert.equal(new Set(hues).size, hues.length);
 });
 
 test("the wire names give way the same through the grid: a crowded name hides, the first of two overlapping keeps", async () => {
