@@ -27,8 +27,9 @@ adopt onto the map, so a change made there is what the next session loads;
 
 ## Connect Claude Code
 
-A map with no run opens on an empty canvas. Start one session against it,
-without touching your settings, and the first run shows as it begins:
+A map with no run opens on an empty canvas, with one line: the command that
+starts a session against it without touching your settings. Run it, and the
+first run shows as it begins:
 
 ```
 claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json

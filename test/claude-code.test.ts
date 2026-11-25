@@ -11,7 +11,7 @@ import action from "../plugins/action/index.ts";
 import agent from "../plugins/agent/index.ts";
 import graph from "../plugins/graph/index.ts";
 import exchange from "../plugins/exchange/index.ts";
-import claudeCode from "../plugins/claude-code/index.ts";
+import claudeCode, { HOOKLESS } from "../plugins/claude-code/index.ts";
 import { handle, lastAssistantText, promptTitle, relativePath, toolPlaces, transcriptPath, unseenFailures, type HookInput, type RunPort } from "../plugins/claude-code/mapping.ts";
 import { rpc } from "../plugins/claude-code/mcp.ts";
 import { withRemote } from "../plugins/claude-code/hook.ts";
@@ -632,15 +632,22 @@ test("an MCP client without hooks gets a session, and the session is its own rec
     // Claude Code opens no session: its calls are found through its hooks.
     const cc = await post({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", clientInfo: { name: "claude-code" } } });
     assert.equal(cc.session, null);
+    assert.equal(cc.json.result.instructions, undefined, "Claude Code has its hooks: nothing to tell it");
 
     const init = await post({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", clientInfo: { name: "Claude AI" } } });
     const session = init.session!;
     assert.ok(session, "a client without hooks gets a session");
+    assert.equal(init.json.result.instructions, HOOKLESS, "it is told only its tool calls are recorded, and how to get hooks");
     assert.equal((await post({ jsonrpc: "2.0", method: "notifications/initialized" }, session)).status, 202);
     const call = await post({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "hear", arguments: { place: "file:x.ts" } } }, session);
     const text: string = call.json.result.content[0].text;
     assert.match(text, /Hello from the map\./, "what is said at session_start comes with the first result");
     assert.match(text, /Heard it\./, "what is said at the tool's result comes with it");
+    assert.ok(text.includes(HOOKLESS), "and with the first answer, for a client that reads no instructions");
+    const again = await post({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "hear", arguments: { place: "file:y.ts" } } }, session);
+    assert.ok(!again.json.result.content[0].text.includes(HOOKLESS), "once");
+    const tell = await post({ jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "tell", arguments: { text: "Done." } } }, session);
+    assert.match(tell.json.result.content[0].text, /tell takes said.*not text/, "a wrong field is named, with the right one");
 
     assert.equal((await post({ jsonrpc: "2.0", id: 3, method: "tools/list" }, "not-a-session")).status, 404, "an unknown session starts again");
     const del = await fetch(`http://127.0.0.1:${port}/mcp`, { method: "DELETE", headers: { "mcp-session-id": session } });
@@ -658,9 +665,44 @@ test("an MCP client without hooks gets a session, and the session is its own rec
         ["say", "session_start", "nodes/hello"],
         ["act", "tool:mcp__archipelago__hear", "tool"],
         ["say", "tool_result:mcp__archipelago__hear", "nodes/heard"],
+        ["act", "tool:mcp__archipelago__hear", "tool"],
+        ["act", "tool:mcp__archipelago__tell", "tool"],
         ["end", "-", "-"],
       ],
     );
+  } finally {
+    await loader.apply([]);
+  }
+});
+
+test("a hook-less MCP session quiet past idleMinutes is ended: its run ends, and its id answers 404", async () => {
+  const probe: Plugin = { id: "probe", inject: ["exchange.read"], apply() {} };
+  const rt = new Runtime();
+  let port = 0;
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "cc.ts": claudeCode, "probe.ts": probe, "types.ts": types, "mcp.ts": mcpPlugin };
+  const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
+  await loader.apply([
+    { id: "graph", plugin: "graph.ts" },
+    { id: "action", plugin: "action.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "claude-code", plugin: "cc.ts", config: { port: 0, idleMinutes: 0.001, onListen: (p: number) => (port = p) } },
+    { id: "types", plugin: "types.ts" },
+    { id: "mcp", plugin: "mcp.ts" },
+    { id: "probe", plugin: "probe.ts" },
+  ]);
+  try {
+    const post = async (body: unknown, session?: string) => {
+      const r = await fetch(`http://127.0.0.1:${port}/mcp`, { method: "POST", headers: { "content-type": "application/json", ...(session ? { "mcp-session-id": session } : {}) }, body: JSON.stringify(body) });
+      return { status: r.status, session: r.headers.get("mcp-session-id") };
+    };
+    const session = (await post({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", clientInfo: { name: "a script" } } })).session!;
+    assert.equal((await post({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "hear", arguments: { place: "file:x.ts" } } }, session)).status, 200);
+    await new Promise((r) => setTimeout(r, 400));
+    assert.equal((await post({ jsonrpc: "2.0", id: 3, method: "tools/list" }, session)).status, 404, "a quiet session is gone: the client starts again");
+    const read = loader.fiber("probe")!.ctx.get<ExchangeRead>("exchange.read");
+    const events = (await read.events(`mcp-${session}`)).items;
+    assert.equal(events.at(-1)?.kind, "end", "and its run is over");
   } finally {
     await loader.apply([]);
   }
