@@ -95,7 +95,10 @@ page), else under "explain calls". Its facts say who asked (`asked_by`,
 (`explain.misfit`) with what a fix needs: the problems, where the raw replies
 are (`act typed.get { "run": … }`, also in `detail`), and the fixes there are
 (the typed check for a wrapper slip, words at `game:explain` or another model
-for the content). An agent that called it hears this in its own tool result,
+for the content). A model that fails rather than answers (a name not there,
+a network error) is refused the same way (`explain.model_error`): the error,
+the call's run, and the fixes for an error (another model, or its name or
+key). An agent that called it hears this in its own tool result,
 at once. When a person pressed Explain, the [since](../since/README.md)
 plugin tells it to the session they picked, before that agent's next tool
 call (or at its next prompt, when it is waiting). Its voice starts from `SYSTEM` in

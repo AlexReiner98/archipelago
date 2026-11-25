@@ -25,7 +25,7 @@ import type { GraphRead, Item } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { FlavourDef, TypesDefine } from "../../spec/types.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
-import type { TypedAsk } from "../typed/index.ts";
+import { CallFailed, type TypedAsk } from "../typed/index.ts";
 import { analyze, readGame, versionOf, type Analysis, type Game } from "./analysis.ts";
 
 export const EXPLANATION: FlavourDef = {
@@ -67,6 +67,15 @@ export function misfitText(run: string, model: string | undefined, attempts: num
     `The model's explanation didn't fit the map after ${attempts} attempt${attempts === 1 ? "" : "s"}${model ? ` (${model})` : ""}: ${problems.join("; ")}`,
     `Its raw replies: act typed.get { "run": "${run}" }.`,
     "Fixes: a reply right in content but wrong in wrapper is the typed check's to take (itemsOf in plugins/typed/shape.ts); a reply wrong in content wants other words at game:explain (a node there) or another model (explain.game's model).",
+  ].join("\n");
+}
+
+/** A model that failed rather than answered, said the same way: what failed, where the call is, and the fixes there are. */
+export function failedText(run: string, model: string, error: string): string {
+  return [
+    `The model (${model}) failed before it answered: ${error}`,
+    `The call: act typed.get { "run": "${run}" }.`,
+    "Fixes: another model (explain.game's model; typed.models lists those offered and whether each key is on the server), or the model's name or key as the error says.",
   ].join("\n");
 }
 
@@ -169,6 +178,10 @@ const explain: Plugin = {
           ...(parent ? { parent } : {}),
           // Who asked, so a person's failed call can be told to the agent they work with (plugins/since).
           facts: { asked_by: call.caller.actor?.id ?? call.caller.plugin, asked_kind: call.caller.actor?.kind ?? "plugin", about: item.id },
+        }).catch((e: unknown) => {
+          // The model failed rather than answered: refused like a misfit, with the call's run and the fixes for an error.
+          if (e instanceof CallFailed) return refuse("model_error", failedText(e.run, e.model, e.message), { run: e.run, model: e.model });
+          throw e;
         });
         if (!out.ok) return refuse("misfit", misfitText(out.run, chosen, out.attempts, out.problems.map((p) => p.message)), { run: out.run, attempts: out.attempts, problems: out.problems as unknown as Json, ...(chosen ? { model: chosen } : {}) });
         const facts: Fact[] = [...out.facts];

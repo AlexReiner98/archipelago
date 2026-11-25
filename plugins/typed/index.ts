@@ -129,6 +129,22 @@ export type TypedResult =
   | { ok: true; run: RunId; type: string; facts: Fact[]; ids: Record<string, Id>; attempts: number; usage: Usage }
   | { ok: false; run: RunId; type: string; problems: Problem[]; attempts: number; usage: Usage };
 
+/**
+ * A call whose model failed (threw: a model not there, a network error, a
+ * CLI that exits badly), rather than answered: the error as it was, with the
+ * call's run, which recorded it, and the model by the name it was asked by.
+ */
+export class CallFailed extends Error {
+  readonly run: RunId;
+  readonly model: string;
+  constructor(run: RunId, model: string, cause: unknown) {
+    super(String((cause as Error)?.message ?? cause), { cause });
+    this.run = run;
+    this.model = model;
+    this.name = "CallFailed";
+  }
+}
+
 /** `typed.ask`, this plugin's own key. */
 export interface TypedAsk {
   ask(start: TypedStart): Promise<TypedResult>;
@@ -212,6 +228,7 @@ const typed: Plugin<TypedConfig> = {
       };
       const schema: JsonSchema = schemaOf(t, types.all().links, shape);
       const retries = Math.max(0, start.retries ?? config.retries ?? 1);
+      const asked = typeof start.model === "string" && start.model.trim() ? start.model.trim() : start.model ? undefined : typeof config.model === "string" ? config.model : undefined;
       let run = "";
       let attempts = 0;
       let usage: Usage = { input: 0, output: 0 };
@@ -225,7 +242,8 @@ const typed: Plugin<TypedConfig> = {
             places: start.places ?? [`typed:${t.name}`],
             ...(start.parent ? { parent: start.parent } : {}),
             ...(followItem ? { follow: followItem } : {}),
-            facts: { ...(start.facts ?? {}), [TYPED]: t.name, model: model.id, caller: plugin },
+            // The model by the name it was asked by (a spec: `claude:<model>`), else the adapter's own id; the adapter's beside it when they differ.
+            facts: { ...(start.facts ?? {}), [TYPED]: t.name, model: asked ?? model.id, ...(asked && asked !== model.id ? { adapter: model.id } : {}), caller: plugin },
           },
           async ({ run: r, said }) => {
             run = r;
@@ -304,6 +322,8 @@ const typed: Plugin<TypedConfig> = {
         );
       } catch (e) {
         if (e instanceof Misfit) return { ok: false, run, type: t.name, problems: e.problems, attempts, usage };
+        // The model failed (an error, not an answer): thrown on with the call's run, so the caller can say where to look.
+        if (run && !(e instanceof Refused)) throw new CallFailed(run, asked ?? model.id, e);
         throw e;
       }
       return { ok: true, run, type: t.name, facts: result!.facts, ids: result!.ids, attempts, usage };

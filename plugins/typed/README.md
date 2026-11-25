@@ -39,7 +39,12 @@ and `agent.run` (to record attempts in the call's run).
 
 It answers `{ ok: true, run, facts, ids, attempts, usage }` (`ids`: each
 item's ref → its new id) or `{ ok: false, run, problems, attempts,
-usage }`. A model that throws is thrown on, recorded as a failed answer.
+usage }`. A model that throws (not there, a network error, a CLI that exits
+badly) is recorded as a failed answer and thrown on as a `CallFailed`: the
+error's message, the call's `run` and its `model`, so the caller can say
+where to look. The run's `model` fact is the model by the name it was asked
+by (a spec, `claude:<model>`, or the configured one), with the adapter's own
+id beside it as `adapter` when they differ.
 
 ## The schema ([shape.ts](shape.ts))
 

@@ -57,6 +57,9 @@ const short = (s: string, n = 80) => {
  */
 export const HEARD_WORDS = "Since you last heard, a person changed the map:\n{changes}";
 
+/** The heading a person's failed calls are told under, apart from their changes. */
+export const FAILED_WORDS = "Since you last heard, a call to a model a person asked failed:";
+
 /** Where it speaks: at each prompt, and before each tool call, so a working agent hears at its next step. */
 export const PLACES = ["prompt", "tool:*"];
 
@@ -78,7 +81,7 @@ export const forRun = (f: Failed, run: RunId) => !f.parent || f.parent === run |
 
 /** A failed call's line. */
 export const failedLine = (f: Failed) =>
-  `- asked a model ("${short(f.title, 60)}"${f.model ? `, ${f.model}` : ""}) and it failed: ${short(f.text, 160)}. Its replies: act typed.get { "run": "${f.run}" }`;
+  `- "${short(f.title, 60)}"${f.model ? ` (${f.model})` : ""}: ${short(f.text, 160)}. Its replies: act typed.get { "run": "${f.run}" }`;
 
 const fill = (template: string, vars: Record<string, string>) => template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? vars[k]! : m));
 
@@ -91,8 +94,10 @@ export function tell(sets: Committed[], titles: Map<Id, string>, max: number, wo
     return `- ${verbOf(c.header.action)} ${what}${why}`;
   });
   const more = sets.length > max ? `\n(and ${sets.length - max} earlier)` : "";
-  const calls = failed.slice(-max).map(failedLine);
-  return fill(words, { changes: [...lines, ...calls].join("\n") + more });
+  const changed = lines.length ? fill(words, { changes: `${lines.join("\n")}${more}` }) : "";
+  // A failed call is not a change: told under its own heading.
+  const calls = failed.length ? `${FAILED_WORDS}\n${failed.slice(-max).map(failedLine).join("\n")}` : "";
+  return [changed, calls].filter(Boolean).join("\n");
 }
 
 const since: Plugin<SinceConfig> = {

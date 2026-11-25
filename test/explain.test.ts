@@ -154,7 +154,18 @@ test("a call chooses its model by spec through typed.ask: used, recorded, refuse
   assert.equal(fallback.asked.length, 0);
   assert.equal((await m.item(out.output.id)).fields.model, "anthropic:claude-haiku-5-5");
   const run = (await m.exchange.runs()).items.find((r) => r.run === out.output.run)!;
-  assert.equal(run.facts?.model, "cheap", "the call's run names the model it asked");
+  assert.equal(run.facts?.model, "anthropic:claude-haiku-5-5", "the call's run names the model by the name it was asked by");
+  assert.equal(run.facts?.adapter, "cheap", "and the adapter that answered, beside it");
+
+  // A model that fails rather than answers: refused with the call's run and the fixes for an error.
+  const broken = await map(scripted([() => { throw new Error("There's an issue with the selected model (no-such-model)."); }], "command:claude"), { models: {} });
+  const g3 = (await broken.ok("game.create", STANDOFF)).output.id;
+  const err = await broken.call("explain.game", { game: g3 });
+  assert.equal(err.ok ? "" : err.refused.code, "explain.model_error");
+  const d = (err.ok ? {} : err.refused.detail) as { run: string; model: string };
+  assert.match(d.run, /^call:/);
+  assert.match(err.ok ? "" : err.refused.message, new RegExp(`^The model \\(default\\) failed before it answered: There's an issue with the selected model \\(no-such-model\\)\\.\\nThe call: act typed\\.get \\{ "run": "${d.run}" \\}\\.\\nFixes: another model`));
+  await broken.done();
 
   const bad = await m.call("explain.game", { game: g, model: "nope:x" });
   assert.equal(bad.ok ? "" : bad.refused.code, "typed.model");

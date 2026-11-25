@@ -121,7 +121,8 @@ test("before its next tool call, a working run hears a person's failed call to a
     await new Promise((r) => setTimeout(r, 20));
     const said = await step();
     assert.equal(said.length, 1);
-    assert.match(said[0]!, /- asked a model \("Explain Pricing standoff", anthropic:claude-haiku-5-5\) and it failed: 0 of 1 fit: the reply is an object with items\. Its replies: act typed\.get \{ "run": "call:a" \}$/);
+    assert.match(said[0]!, /^Since you last heard, a call to a model a person asked failed:\n- "Explain Pricing standoff" \(anthropic:claude-haiku-5-5\): 0 of 1 fit: the reply is an object with items\. Its replies: act typed\.get \{ "run": "call:a" \}$/);
+    assert.doesNotMatch(said[0]!, /changed the map/, "a failed call is not told as a change");
     assert.doesNotMatch(said[0]!, /call:b|call:c/);
     assert.deepEqual(await step(), [], "heard once");
 

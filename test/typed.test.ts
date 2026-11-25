@@ -15,7 +15,7 @@ import exchange from "../plugins/exchange/index.ts";
 import graph from "../plugins/graph/index.ts";
 import schema from "../plugins/schema/index.ts";
 import types from "../plugins/types/index.ts";
-import typed, { retryOf, systemOf, type TypedAsk, type TypedRecord } from "../plugins/typed/index.ts";
+import typed, { CallFailed, retryOf, systemOf, type TypedAsk, type TypedRecord } from "../plugins/typed/index.ts";
 import { factsOf, inReplyWords, itemsOf, schemaOf, strictSubset } from "../plugins/typed/shape.ts";
 import { jsonIn, modelOf, scripted, textPrompt } from "../plugins/typed/model.ts";
 
@@ -437,4 +437,21 @@ test("a reply's wrapper slips are taken as meant, its items still checked; anyth
   assert.equal(ok.attempts, 1);
   const bad = await ask.ask({ type: "chore", prompt: "Plan the hall.", retries: 0, model: scripted([{ chore: { items: [{ ref: "a", title: "Sweep", room: "garden" }] } }]) });
   assert.equal(bad.ok, false);
+});
+
+test("a call's run names the model as it was asked for, and a model that fails is thrown on with the call's run", async () => {
+  const fast = scripted([{ items: [{ ref: "a", title: "Sweep", room: "hall" }] }], "command:claude");
+  const down = scripted([() => { throw new Error("service down"); }], "command:claude");
+  const { ask, read } = await setup({ models: { claude: fast, "claude:gone": down }, env: {} });
+  const ok = await ask.ask({ type: "chore", prompt: "Plan the hall.", model: "claude" });
+  assert.ok(ok.ok);
+  const run = (await read.runs()).items.find((r) => r.run === ok.run)!;
+  assert.deepEqual([run.facts?.model, run.facts?.adapter], ["claude", "command:claude"]);
+
+  const failed = await ask.ask({ type: "chore", prompt: "Plan the hall.", model: "claude:gone" }).catch((e: unknown) => e);
+  assert.ok(failed instanceof CallFailed, String(failed));
+  assert.equal(failed.message, "service down");
+  assert.equal(failed.model, "claude:gone");
+  const last = (await read.events(failed.run)).items.at(-2)!;
+  assert.deepEqual([last.place, last.act?.kind, last.act?.ok], ["reply_end", "reply", false], "the call recorded the failure on its run");
 });
