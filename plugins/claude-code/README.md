@@ -155,7 +155,7 @@ defaults to `plugins/claude-code/.data/exchange.jsonl`.
 
 Point Claude Code at it with [settings.json](settings.json) (the hooks) and
 [mcp.json](mcp.json) (the MCP server). Both name 5281, the dev port, so
-they reach this host or the dev app server (`npm run serve`), never live:
+they reach this host or the dev app server (`npm run dev`, or `npm run serve`), never live:
 
 ```
 claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json

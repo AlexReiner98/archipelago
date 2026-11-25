@@ -9,7 +9,8 @@
   "scripts": {
     "check": "tsc -p .",
     "test": "node --test --test-timeout=20000 test/*.test.ts",
-    "serve": "node app/server.ts --port 5280 --no-write",
+    "serve": "node app/server.ts --port 5280",
+    "dev": "node app/server.ts --port 5280 --no-write",
     "dev:start": "node scripts/server.ts start --port 5280 --no-write",
     "dev:stop": "node scripts/server.ts stop --port 5280 --no-write",
     "dev:status": "node scripts/server.ts status --port 5280 --no-write",

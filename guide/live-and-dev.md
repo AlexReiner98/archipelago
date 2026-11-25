@@ -50,7 +50,7 @@ back. Each move is a line in `promotions.log` in live's data, which
 ```
 npm run dev:copy          # live's data into app/.data (dev stopped)
 npm run dev:start         # detached, also dev:stop, dev:status
-npm run serve             # or in this terminal
+npm run dev               # or in this terminal (serve without writing)
 ```
 
 Open http://127.0.0.1:5280/app/ and start Claude Code against it:

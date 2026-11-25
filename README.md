@@ -69,8 +69,12 @@ the lines to copy into `~/.claude/settings.json`;
 - Everything stays on your machine. The hooks post to your own server on
   `127.0.0.1`, and the server calls nothing outside it: no telemetry, no
   account.
-- `npm run serve` writes only to `app/.data/`. Delete that folder and the
-  map is gone.
+- The map is kept in `app/.data/`. Delete that folder and the map is gone.
+- A file outside it is written only once you put it on the map: a skill
+  or memory file adopted onto the map is written from its words from then
+  on (and goes back as it was when the plugin that writes it unloads), and
+  a context filter's `leave_out` goes into its runs'
+  `<folder>/.claude/settings.local.json`. `npm run dev` writes none of them.
 - Connecting every session adds Archipelago's hooks to
   `~/.claude/settings.json` and its MCP server to Claude Code's user config,
   and keeps everything else in them.
