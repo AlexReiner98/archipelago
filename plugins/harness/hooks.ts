@@ -11,7 +11,7 @@ import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exch
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { HereRead } from "../../spec/here.ts";
-import type { Hearing, ProfileInfo, ProfileRead } from "../../spec/profile.ts";
+import type { Hearing, ProfileHears, ProfileInfo, ProfileRead } from "../../spec/profile.ts";
 import { DIALS_KEY, dialsOf, remembered } from "./dials.ts";
 import { keepLast, LIVE_MOST, liveRuns } from "./live.ts";
 import { CALLS_SHOWN, isCall, outcomeOf, type StripCall } from "./calls.ts";
@@ -60,6 +60,8 @@ export interface Caps {
   graph: GraphRead;
   graphLive: GraphWatch;
   profiles: ProfileRead;
+  /** Whether a run hears a node, strict profiles counted (`profile.hears`). */
+  hearing: ProfileHears;
 }
 
 /** The page key that holds the profile looked at (the harness plugin's own). */
@@ -401,7 +403,7 @@ export function hooks(c: Caps) {
   };
 
   /**
-   * The nodes each of the runs given hears (`profile.read.hears`), by run,
+   * The nodes each of the runs given hears (`profile.hears`), by run,
    * kept live: each agent's own tree. Runs in the same profiles hear the
    * same nodes, so it is asked once per set of profiles, not once per run.
    */
@@ -421,7 +423,7 @@ export function hooks(c: Caps) {
       const load = () =>
         void Promise.all(
           [...groups.values()].map(async (rs) => {
-            const hs = await Promise.all(nodes.map(async (n) => [n.id, (await c.profiles.hears(rs[0]!, n)).hears] as const));
+            const hs = await Promise.all(nodes.map(async (n) => [n.id, (await c.hearing.hears(rs[0]!, n)).hears] as const));
             const heard = new Set(hs.filter(([, yes]) => yes).map(([id]) => id));
             return rs.map((r) => [r.run, heard] as const);
           }),
@@ -437,7 +439,7 @@ export function hooks(c: Caps) {
   };
 
   /**
-   * Whether a run in one profile hears each node (`profile.read.hears` for a
+   * Whether a run in one profile hears each node (`profile.hears` for a
    * run whose only fact is the profile), kept live. Nothing when none is picked.
    */
   const useHearing = (profile: string | undefined, nodes: NodeInfo[]): Map<string, Hearing> | undefined => {
@@ -449,7 +451,7 @@ export function hooks(c: Caps) {
       let gone = false;
       const as: RunInfo = { run: `profile:${profile}`, agent: { kind: "agent", id: "profile" } as RunInfo["agent"], harness: "", reaches: [], started: "", facts: { profiles: [profile] } };
       const load = () =>
-        void Promise.all(nodes.map(async (n) => [n.id, await c.profiles.hears(as, n)] as const)).then((all) => !gone && setHearing(new Map(all)));
+        void Promise.all(nodes.map(async (n) => [n.id, await c.hearing.hears(as, n)] as const)).then((all) => !gone && setHearing(new Map(all)));
       load();
       const stop = c.profiles.watch(load);
       return () => {

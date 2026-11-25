@@ -16,5 +16,5 @@ this plugin unloads.
 - Each copy is kept out of git through the repository's `info/exclude`,
   never a tracked file. This repository also ignores `.claude/skills/`.
 
-Injects `written.place`, `profile.read`, `exchange.read`, `exchange.watch`,
+Injects `written.place`, `profile.read`, `profile.hears`, `exchange.read`, `exchange.watch`,
 `agent.tree`. Server only.

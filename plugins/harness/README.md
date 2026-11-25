@@ -57,7 +57,7 @@ come.
   profile picked (`harness.profile`) is looked at this way, lists only the
   runs it has in it (`profile.read.of`, of the last 50), and shows over the
   tree what a run in only that profile would not hear
-  (`profile.read.hears`).
+  (`profile.hears`).
 - **Playhead:** `here.event`, in one run. Unset, the view follows the run's
   end live.
 
@@ -109,7 +109,7 @@ one line under the previews (its colour, name and profile), a click from
 focus, and its tree grows out of its coloured dot, so a run that stopped without ending costs a
 line, not a tree. The previews and lines scroll. Hearing is asked once per
 set of profiles (`groupsOf`), not once per agent. Its
-tree holds only the nodes it hears (`profile.read.hears`), hung as the big
+tree holds only the nodes it hears (`profile.hears`), hung as the big
 tree is, with how many of all it hears. Small, a tree fits its dots to fill its cell
 (`dotsBox`), and names only what is lit, what the agent was told, and
 what is picked. Faint until it does
@@ -408,7 +408,7 @@ exported there ([otel](../otel/README.md)).
 
 Injects `slot.fill`, `slot.declare`, `slot.read`, `here.*`, `agent.tree`,
 `exchange.read`, `exchange.watch`, `verdict.read`, `action.list`,
-`action.invoke`, `graph.read`, `graph.watch`, `profile.read`. Unloading it
+`action.invoke`, `graph.read`, `graph.watch`, `profile.read`, `profile.hears`. Unloading it
 removes the three fills, the `harness.run` slot, its page keys and its
 styles. The pure parts are tested in
 `test/harness.test.ts`.

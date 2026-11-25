@@ -190,12 +190,15 @@ function why(run: (ProfileInfo & { state: Profile["state"]; strict?: boolean })[
   return `For ${names(nodeIn)}; this run is in ${names(runIn)}.`;
 }
 
-/** Whether a run hears a node: held back only by profiles that hold; what shadows would hold back is said as `shadow`. */
-export function hearing(model: Model, facts: Facts, node: NodeInfo): Hearing {
+/**
+ * Whether a run hears a node: held back only by profiles that hold; what shadows would hold back is said as `shadow`.
+ * `strict` false leaves strict profiles out, as `profile.read`'s `hears` (edition 5); `profile.hears` counts them.
+ */
+export function hearing(model: Model, facts: Facts, node: NodeInfo, strict = true): Hearing {
   const run = runProfiles(model, facts);
   const held = nodeProfiles(model, node);
   // A node of the map's own (said by the words plugin); one a plugin makes in code is no profile's to hold back by strictness.
-  const mapNode = node.plugin === "words";
+  const mapNode = strict && node.plugin === "words";
   const now = why(run, held, (s) => s === "on", mapNode);
   if (now) return { hears: false, why: now };
   const would = why(run, held, (s) => s !== "off", mapNode);

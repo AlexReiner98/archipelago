@@ -31,7 +31,7 @@ import { runName, type AgentTree, type NodeInfo, type RunInfo } from "../../spec
 import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
-import type { ProfileRead } from "../../spec/profile.ts";
+import type { ProfileHears, ProfileRead } from "../../spec/profile.ts";
 import { KEYS } from "../../spec/here.ts";
 import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
@@ -149,7 +149,7 @@ const values = (v: string | string[] | undefined) => (v === undefined ? [] : Arr
 const harness: Plugin = {
   id: "harness",
   about: "The Context interface: every run, live or replayed, on the tree of what the map tells agents; and every profile.",
-  inject: ["slot.fill", "slot.declare", "slot.read", "here.read", "here.set", "here.declare", "agent.tree", "exchange.read", "exchange.watch", "verdict.read", "action.list", "action.invoke", "graph.read", "graph.watch", "profile.read"],
+  inject: ["slot.fill", "slot.declare", "slot.read", "here.read", "here.set", "here.declare", "agent.tree", "exchange.read", "exchange.watch", "verdict.read", "action.list", "action.invoke", "graph.read", "graph.watch", "profile.read", "profile.hears"],
   apply(ctx: Context) {
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
@@ -159,6 +159,7 @@ const harness: Plugin = {
     const invoke = ctx.get<ActionInvoke>("action.invoke");
     const graphLive = ctx.get<GraphWatch>("graph.watch");
     const profiles = ctx.get<ProfileRead>("profile.read");
+    const hearing = ctx.get<ProfileHears>("profile.hears");
     const declare = ctx.get<HereDeclare>("here.declare");
     ctx.effect(() => declare.declare({ key: PROFILE, scope: "page", doc: "The profile the context interface shows: its holds over the tree." }));
     ctx.effect(() => declare.declare({ key: ALL, scope: "page", doc: "True: the context interface looks at every run, with all-time totals, not one run." }));
@@ -186,6 +187,7 @@ const harness: Plugin = {
       graph: ctx.get<GraphRead>("graph.read"),
       graphLive,
       profiles,
+      hearing,
     });
     const kp = keepParts({
       actions,

@@ -17,7 +17,7 @@ This is **edition 11**. A capability that came after edition 1 shows the edition
 | [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | How large graphs are drawn. |
 | [here](here.md) | `here.declare` `here.read` `here.set` | What is being looked at, now. |
 | [types](types.md) | `types.define` `types.read` `types.mark` (10) `types.acyclic` (11) | What kinds of item and link the map holds. |
-| [profile](profile.md) | `profile.read` (5) | Not every node fits every run. |
+| [profile](profile.md) | `profile.read` (5) `profile.hears` (11) | Not every node fits every run. |
 | [loader](loader.md) | `loader.tree` (7) | The config tree as a capability. |
 | [changeset](changeset.md) | (a format) | A change, written in full. |
 | [frame](frame.md) | (a format) | The page around the canvas. |
@@ -42,8 +42,9 @@ change made on a test's word at the version of its inputs
 the input, a fix per path and the input fixed (`InputRefusal`,
 [action](action.md)), and a person's `decision` on a run's reply, at
 `reply_end`, with the facts `item` and `version` a call follows
-([agent](agent.md)), and a strict profile: `profile.read`'s `hears`
-holds back from its runs a node no profile holds ([profile](profile.md)).
+([agent](agent.md)), and `profile.hears`, whether a run hears a node
+when a strict profile gives its runs only what it holds; `profile.read`
+keeps its edition 5 meaning ([profile](profile.md)).
 Edition 11 also renames the word `pack` to `plugin` everywhere it is
 spelt (`PluginId`, `PluginRef`, and the field `plugin` of `Caller`, the
 change set `Header`, `Refusal`, `ActionInfo`, `NodeInfo`,
@@ -130,8 +131,9 @@ The spec has editions: 1, 2, 3… Plugins don't declare versions of anything.
   word, what it reads now and the edition. Every accepted entry is read
   with the rename applied, so the rename is recorded, never silent, and
   the frozen entries stay as they were accepted.
-- Editions 1 to 10 are accepted (edition 1 on 20 Nov 2026, up to 9 on
-  23 Nov 2026, the first public release, and 10 the same day): their capabilities' meanings are
+- Editions 1 to 11 are accepted (edition 1 on 20 Nov 2026, up to 9 on
+  23 Nov 2026, the first public release, 10 the same day, and 11 on
+  25 Nov 2026): their capabilities' meanings are
   fixed. `ACCEPTED` in common.ts says up to which edition.
 - A test holds it: `test/spec-frozen.test.ts` compares every accepted
   type, capability and term with `test/spec-frozen.json` and fails on any

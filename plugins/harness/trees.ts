@@ -1,6 +1,6 @@
 /**
  * Every live agent with a tree of its own: the nodes its profile lets it
- * hear (`profile.read.hears`), hung as the big tree is. One agent is in
+ * hear (`profile.hears`), hung as the big tree is. One agent is in
  * focus, its tree big with every name; the others are small previews in a
  * column to its left, and a click on one brings it into focus. Each is under
  * its agent's name in its colour and its profile. What an agent

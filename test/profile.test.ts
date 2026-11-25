@@ -6,7 +6,7 @@ import type { Json } from "../spec/common.ts";
 import type { AgentRun, AgentTree, NodeInfo } from "../spec/agent.ts";
 import type { ExchangeRead } from "../spec/exchange.ts";
 import type { GraphRead } from "../spec/graph.ts";
-import type { ProfileRead } from "../spec/profile.ts";
+import type { ProfileHears, ProfileRead } from "../spec/profile.ts";
 import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
 import action from "../plugins/action/index.ts";
@@ -105,7 +105,7 @@ test("placing a run in one profile names it and drops every other it matches, ea
 
 // --- On the map, through the agent ---
 
-const probe: Plugin = { id: "probe", inject: ["agent.run", "agent.tree", "action.invoke", "graph.read", "exchange.read", "profile.read"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["agent.run", "agent.tree", "action.invoke", "graph.read", "exchange.read", "profile.read", "profile.hears"], apply() {} };
 
 /** Writes facts as they are, before the profile plugin loads: what the map held before context filter. */
 const seeding = (facts: Fact[]): Plugin => ({
@@ -139,13 +139,13 @@ async function setup(seed?: Fact[]) {
     assert.ok(out.ok, JSON.stringify(out));
     return out.ok ? out.output : (undefined as never);
   };
-  return { rt, loader, errors, ctx, act, read: p.get<ProfileRead>("profile.read"), tree: p.get<AgentTree>("agent.tree"), graph: p.get<GraphRead>("graph.read") };
+  return { rt, loader, errors, ctx, act, read: p.get<ProfileRead>("profile.read"), hearsOf: p.get<ProfileHears>("profile.hears"), tree: p.get<AgentTree>("agent.tree"), graph: p.get<GraphRead>("graph.read") };
 }
 
 const start = (run: string, facts: Record<string, string>) => ({ run, agent: { id: "e_agent", kind: "agent" as const }, harness: "test", reaches: [], facts });
 
 test("profiles on the map hold a node back from runs outside them; shadow records, on holds; a miss where it listens is told", async () => {
-  const { rt, errors, ctx, act, read, tree, graph } = await setup();
+  const { rt, errors, ctx, act, read, hearsOf, tree, graph } = await setup();
   const rhino = (await act("words.add", { title: "RhinoCommon", kind: "skill", at: ["tool:Bash"], words: "Use RhinoCommon." })).node;
   const plain = (await act("words.add", { title: "Plain", at: ["tool:Bash"], words: "Plain." })).node;
   const apRepo = (await act("items.create", { type: "record", title: "Studio repo" })).id;
@@ -176,6 +176,11 @@ test("profiles on the map hold a node back from runs outside them; shadow record
   assert.deepEqual((await inAp.reach({ run: "r3", places: ["tool:Bash"], time: T })).said.map((s) => s.text), ["Use RhinoCommon."], "strict: only what Studio holds");
   const strictHeld = (await ctx("r1").get<ExchangeRead>("exchange.read").events("r3")).items.filter((e) => e.kind === "gated");
   assert.deepEqual(strictHeld.map((e) => [e.node, e.text]), [[`words/${plain}`, "Not held by Studio, which gives its runs only what it holds."]]);
+  // profile.hears counts strictness; profile.read's hears keeps edition 5: a node in no profile is every run's.
+  const r3info = { ...start("r3", { repo: apRepo }), started: T };
+  const plainNode = tree.nodes().find((n) => n.id === `words/${plain}`)!;
+  assert.deepEqual(await hearsOf.hears(r3info, plainNode), { hears: false, why: "Not held by Studio, which gives its runs only what it holds." });
+  assert.deepEqual(await read.hears(r3info, plainNode), { hears: true }, "profile.read leaves strictness out");
 
   const events = (await ctx("r1").get<ExchangeRead>("exchange.read").events("r2")).items;
   const gated = events.filter((e) => e.kind === "gated");
@@ -320,4 +325,5 @@ test("hearing: a strict profile gives its runs only what it holds of the map; th
   assert.deepEqual(hearing(m, { repo: "r_none" }, merge), { hears: true }, "a run in no profile hears it");
   const fall = modelOf(prof({ id: "home", title: "Home", fallback: true, strict: true, holds: ["n_html"] }));
   assert.deepEqual(hearing(fall, { cwd: "C:/x" }, merge), { hears: false, why: "Not held by Home, which gives its runs only what it holds." }, "a strict fallback too");
+  assert.deepEqual(hearing(m, { repo: "r_front" }, merge, false), { hears: true }, "strictness left out, as profile.read's hears");
 });

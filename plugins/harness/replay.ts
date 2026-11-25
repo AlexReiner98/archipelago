@@ -7,7 +7,7 @@
  *   how often it said each node, node by node; and whether that is its end.
  * - `tickOf`: an event's mark on the timeline.
  * - `nodeOf`: the node an event involves, for the node pane to follow.
- * - `holdsOf`: a profile's answer (`profile.read.hears`) as holds, for a
+ * - `holdsOf`: a profile's answer (`profile.hears`) as holds, for a
  *   profile looked at without a run.
  */
 import type { Hearing } from "../../spec/profile.ts";

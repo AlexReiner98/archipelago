@@ -17,7 +17,7 @@
  * - Each copy is kept out of git through the repository's own
  *   `info/exclude`, never its tracked .gitignore.
  *
- * Injects written.place, profile.read, exchange.read, exchange.watch and
+ * Injects written.place, profile.read, profile.hears, exchange.read, exchange.watch and
  * agent.tree. Server only.
  */
 import { execFile } from "node:child_process";
@@ -26,7 +26,7 @@ import { isAbsolute, join } from "node:path";
 import type { AgentTree, RunInfo } from "../../spec/agent.ts";
 import type { ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
-import type { ProfileRead } from "../../spec/profile.ts";
+import type { ProfileHears, ProfileRead } from "../../spec/profile.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import { KEY, fold, type WrittenPlace } from "../written/place.ts";
 
@@ -56,11 +56,12 @@ const exists = async (dir: string) => {
 const placed: Plugin<PlacedConfig> = {
   id: "placed",
   about: "Loads a profile's skills only where they apply.",
-  inject: ["written.place", "profile.read", "exchange.read", "exchange.watch", "agent.tree"],
+  inject: ["written.place", "profile.read", "profile.hears", "exchange.read", "exchange.watch", "agent.tree"],
   async apply(ctx: Context, config: PlacedConfig = {}) {
     const git = config.git ?? realGit;
     const place = ctx.get<WrittenPlace>(KEY);
     const profiles = ctx.get<ProfileRead>("profile.read");
+    const hearing = ctx.get<ProfileHears>("profile.hears");
     const tree = ctx.get<AgentTree>("agent.tree");
     /** Each folder's latest run, with its facts. */
     const folders = new Map<string, RunInfo>();
@@ -112,7 +113,7 @@ const placed: Plugin<PlacedConfig> = {
         const out: string[] = [];
         for (const run of folders.values()) {
           if (!(await exists(run.cwd!))) continue;
-          const h = await profiles.hears(run, node);
+          const h = await hearing.hears(run, node);
           if (!h.hears) {
             denied = true;
             continue;

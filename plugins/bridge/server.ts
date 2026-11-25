@@ -36,6 +36,7 @@ export const KEYS = [
   "types.read",
   "types.mark",
   "profile.read",
+  "profile.hears",
   "docs.read",
 ] as const;
 

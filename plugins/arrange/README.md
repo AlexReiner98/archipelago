@@ -4,7 +4,7 @@ The Landscape arranged into a context filter's tree: the map's own items are see
 making the tree a run in that context filter hears. Type `context:<title>` on the
 find line (underscores for spaces, `context:Map_habits`).
 
-This plugin asks `profile.read` which nodes a run in only that context filter hears,
+This plugin asks `profile.hears` which nodes a run in only that context filter hears,
 lays them out as the Context interface does (`treeOf` and `radial` from
 [plugins/harness/layout.ts](../harness/layout.ts)), and sets the page key
 `arrange.tree` ([arrange.ts](arrange.ts)):
@@ -31,4 +31,4 @@ bounded pages. Only items the Landscape shows can fly; the words plugin's
 `node` items (an undeclared type) stay ghosts.
 
 Injects `find.index`, `here.read`, `here.set`, `here.declare`,
-`agent.tree`, `profile.read` and `graph.read`.
+`agent.tree`, `profile.read`, `profile.hears` and `graph.read`.

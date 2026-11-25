@@ -2,7 +2,8 @@
 
 Which runs a node is for. Business rules, CAD skills and one repository's
 UI rules are kept, but said only in the runs they fit. Provides
-`profile.read` ([spec/profile.md](../../spec/profile.md)) and a gate
+`profile.read` and `profile.hears` (edition 11, strict profiles counted;
+[spec/profile.md](../../spec/profile.md)) and a gate
 ([spec/agent.md](../../spec/agent.md#gates)). The rules are in
 [model.ts](model.ts).
 
@@ -63,7 +64,8 @@ Decided (20 Nov 2026, all five):
   make in code (the map tools, the learning loop's ask, what changed since
   heard) still reach it. The fallback is strict too. An open profile
   (`strict: false`) keeps the old rule: what no profile holds is every
-  run's.
+  run's. The gate and `profile.hears` count strictness; `profile.read`'s
+  `hears` keeps the edition 5 rule and leaves it out.
 - A profile with `fallback: true` is the workspace's default: a run that no
   profile places is in it, and in what it is part of. A run something else
   places isn't, and dropping it (`profiles_drop`) leaves the run failing open.

@@ -10,8 +10,11 @@
  *   `out_of_context_filter` (takes one out), `uses` (an item whose runs are in
  *   it: a repo, a hub). A profile `part_of` another composes: a run in the
  *   part is in the whole too.
- * - Provides `profile.read`, and registers a gate (`agent.gate`) that holds
- *   back a node a run doesn't hear; a shadow's would-be hold is a trial.
+ * - Provides `profile.read` (its `hears` leaves strict profiles out, as
+ *   edition 5 says) and `profile.hears` (edition 11: a strict profile gives
+ *   its runs only what it holds), and registers a gate (`agent.gate`) that
+ *   holds back a node a run doesn't hear, strict profiles counted; a
+ *   shadow's would-be hold is a trial.
  * - A miss in a run where a held node listens is told on its profiles
  *   (`profile.missed`): a record about the profiles and the node, once per
  *   run and node, so a wrong cut shows on the map.
@@ -29,7 +32,7 @@ import { Refused } from "../../spec/common.ts";
 import type { ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch, Link } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
-import type { ProfileRead } from "../../spec/profile.ts";
+import type { ProfileHears, ProfileRead } from "../../spec/profile.ts";
 import type { BaseDef, LinkDef, TypesDefine, TypesMark } from "../../spec/types.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import { placeMatches } from "../agent/index.ts";
@@ -202,7 +205,7 @@ const profile: Plugin = {
         return runProfiles(await current(), factsOf(run)).map(({ state: _s, ...p }) => p);
       },
       async hears(run, node) {
-        return hearing(await current(), factsOf(run), node);
+        return hearing(await current(), factsOf(run), node, false);
       },
       async nodes(id) {
         const m = await current();
@@ -222,6 +225,11 @@ const profile: Plugin = {
     ctx.provide<ProfileRead>("profile.read", (_caller, from) => ({
       ...api,
       watch: (on) => from.effect(() => api.watch(on)),
+    }));
+    ctx.provide<ProfileHears>("profile.hears", () => ({
+      async hears(run, node) {
+        return hearing(await current(), factsOf(run), node);
+      },
     }));
 
     ctx.get<AgentGate>("agent.gate").gate({
