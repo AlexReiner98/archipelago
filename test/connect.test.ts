@@ -5,6 +5,7 @@ import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
 import action from "../plugins/action/index.ts";
 import graph from "../plugins/graph/index.ts";
+import types from "../plugins/types/index.ts";
 import connect, { folderSession, localCommand, MAKE_TOKEN, SETUP } from "../plugins/connect/index.ts";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { createServer } from "node:http";
@@ -27,10 +28,11 @@ const probe: Plugin = { id: "probe", inject: ["action.invoke"], apply() {} };
 
 async function setupTree(config: Record<string, unknown>) {
   const rt = new Runtime();
-  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "tokens.ts": tokens, "connect.ts": connect, "probe.ts": probe };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "types.ts": types, "tokens.ts": tokens, "connect.ts": connect, "probe.ts": probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const tree: Entry[] = [
     { id: "graph", plugin: "graph.ts" },
+    { id: "types", plugin: "types.ts" },
     { id: "action", plugin: "action.ts" },
     { id: "tokens", plugin: "tokens.ts" },
     { id: "connect", plugin: "connect.ts", config },
@@ -90,22 +92,25 @@ test("connect.setup answers what to copy, and with no token action there is no c
   assert.ok(s.hooks.includes("http://127.0.0.1:5281/hook"));
   const none = await call(person, MAKE_TOKEN);
   assert.equal(none.ok, false);
-  // The checkout's own files reach this adapter: a session from here comes first, changing no settings.
-  assert.equal(s.here, FOLDER);
+  // On this machine, from a checkout: its folder (the page connects it), and the terminal command that writes nothing.
+  assert.equal(s.session, FOLDER);
   assert.ok(s.folder);
 });
 
-test("a session from the checkout is offered only where its mcp.json reaches the server, with no token", async () => {
-  assert.equal(folderSession("http://127.0.0.1:5281/mcp")?.here, FOLDER, "the dev port, as the files name it");
-  assert.equal(folderSession("http://127.0.0.1:5181/mcp"), undefined, "another port: the files would miss it");
-  assert.equal(folderSession("http://127.0.0.1:5281/mcp", join(tmpdir(), "no-such-checkout")), undefined, "no files");
+test("the checkout's folder is named on any local port; the terminal command only where its mcp.json reaches", async () => {
+  const dev = folderSession("http://127.0.0.1:5281/mcp");
+  assert.ok(dev?.folder);
+  assert.equal(dev?.session, FOLDER, "the dev port, as the files name it");
+  const other = folderSession("http://127.0.0.1:5181/mcp");
+  assert.deepEqual([!!other?.folder, other?.session], [true, undefined], "another port: the files would miss it");
+  assert.equal(folderSession("https://map.example.test/mcp"), undefined, "an adapter elsewhere");
+  assert.equal(folderSession("http://127.0.0.1:5281/mcp", join(tmpdir(), "no-such-checkout")), undefined, "no checkout");
   const tokened = await setupTree({ hook: "http://127.0.0.1:5281/hook", mcp: "http://127.0.0.1:5281/mcp", token: "tokens.make" });
   const o = await call(tokened.person, SETUP);
   assert.ok(o.ok);
   const s = o.output as unknown as Setup;
-  assert.equal(s.here, undefined, "a server with tokens: the files carry none");
-  // The README and the files say the same command.
-  assert.ok(readFileSync(new URL("../README.md", import.meta.url), "utf8").includes(FOLDER));
+  assert.equal(s.folder, undefined, "a server with tokens: no folder of its own to connect");
+  assert.ok(readFileSync(new URL("../README.md", import.meta.url), "utf8").includes(FOLDER), "the README says the terminal command");
 });
 
 test("connect.token makes a token for a person, and refuses an agent", async () => {

@@ -5,8 +5,10 @@
  *   hook script (a hosted map), the next step: connect Claude Code. It fills
  *   Field's `field.empty` with the MCP line and the hooks for this server
  *   (`connect.setup`), each one line and copied whole with a click. A local
- *   map shows one line instead: the command that starts a session reporting
- *   here (`here`), when the checkout's mcp.json reaches this server. Where the
+ *   map shows one line instead: "Connect Claude Code in <folder>", which
+ *   connects the server's own checkout (`connect.here`, folders.ts), then "Connected" with a quiet "disconnect" (`connect.away`);
+ *   where the server writes no files, the terminal command that writes
+ *   nothing, when the checkout's mcp.json reaches this server. Where the
  *   server takes a token, "Make a token" asks for one (`connect.token`) and
  *   puts it in what is copied; the line on the page keeps it hidden.
  * - When the first run begins, a line in `over` says so, live, with the
@@ -16,7 +18,8 @@
  *   a quiet "sign in" beside it, for someone who has an account.
  *
  * Injects action.invoke, exchange.read, exchange.watch, here.set,
- * slot.fill. Nothing here writes to the map.
+ * slot.fill. What it writes to the map is through actions: connecting and
+ * disconnecting the folder, on the person's word.
  */
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
@@ -35,6 +38,10 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 
 const SETUP = "connect.setup";
 const MAKE_TOKEN = "connect.token";
+/** The folder actions (folders.ts; named here, the page imports no server code). */
+const HERE = "connect.here";
+const AWAY = "connect.away";
+const FOLDER_STATE = "connect.folder";
 /** Where a run opens: the harness view. */
 const HARNESS = "harness/view";
 
@@ -53,6 +60,9 @@ const STYLE = sheet(`
 .cn-wait { display:flex; gap:var(--space-4); align-items:baseline; color:var(--dim); white-space:nowrap; padding-top:var(--space-3); }
 .cn-wait .k { width:3.5em; flex:none; }
 .cn-here { max-width:calc(100vw - 2 * var(--space-5)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:var(--mono); font-size:var(--text-s); color:var(--dim); user-select:all; pointer-events:auto; }
+.cn-here-row { display:flex; gap:var(--space-4); align-items:baseline; white-space:nowrap; max-width:calc(100vw - 2 * var(--space-5)); pointer-events:auto; }
+.cn-here-row > * { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.cn-on { color:var(--dim); }
 .cn-mark::before { content:var(--glyph-circle-fresh); color:var(--mark-fresh); }
 .cn-err { color:var(--failed); font-size:var(--text-s); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cn-landed { position:fixed; left:50%; bottom:calc(var(--space-5) * 3); transform:translateX(-50%); max-width:calc(100vw - 2 * var(--space-5)); display:flex; gap:var(--space-4); align-items:baseline; white-space:nowrap;
@@ -135,6 +145,39 @@ const connectView: Plugin = {
       return html`<button class=${`cn-copy${done ? " done" : ""}`} disabled=${off} onClick=${copy} title=${off ? "Make a token first" : "Copy it whole"}>${done ? "copied" : "copy"}</button>`;
     };
 
+    /**
+     * A local map's one line: "connect this folder" (connect.here, an action: history shows it, undo takes it
+     * back), "connected" once it is, or, where the server writes no files, the terminal command that writes nothing.
+     */
+    const Here = ({ setup }: { setup: Setup }) => {
+      const [state, setState] = useState<{ connected: boolean; writes: boolean } | null | undefined>(undefined);
+      const [err, setErr] = useState<string | undefined>(undefined);
+      const name = setup.folder!.split(/[\\/]/).filter(Boolean).pop();
+      useEffect(() => {
+        invoke.invoke<{ connected: boolean; writes: boolean }>({ action: FOLDER_STATE, input: {}, authority: { of: "human", basis: "opened the map" }, reason: "Whether this folder is connected" }).then(
+          (o) => setState(o.ok ? o.output : null),
+          () => setState(null),
+        );
+      }, []);
+      const act = async (action: string, basis: string) => {
+        const o = await invoke.invoke({ action, input: {}, authority: { of: "human", basis }, reason: action === HERE ? `Connect Claude Code in ${name}` : `Disconnect Claude Code in ${name}` });
+        if (o.ok) setState({ connected: action === HERE, writes: true }), setErr(undefined);
+        else setErr(o.refused.message);
+      };
+      if (state === undefined) return null;
+      if (state?.writes) {
+        return html`<div class="cn-here-row">
+          ${state.connected
+            ? html`<span class="cn-on" title=${`Its new Claude Code sessions report here, from a terminal or the desktop app: the map's hooks and MCP server are in ${setup.folder}'s settings, kept out of git.`}>Connected: start a new Claude Code session in ${name}</span>
+                <button class="cn-copy" onClick=${() => act(AWAY, "clicked disconnect on the page")} title="Take the hooks and MCP server out of this folder's settings">disconnect</button>`
+            : html`<button class="cn-copy" onClick=${() => act(HERE, "clicked connect on the page")} title=${`Put the map's hooks and MCP server into ${setup.folder}'s settings, kept out of git, so its Claude Code sessions report here (the desktop app too). Undo takes it out.`}>Connect Claude Code in ${name}</button>`}
+          ${err && html`<span class="cn-err" title=${err}>${err}</span>`}
+        </div>`;
+      }
+      // The server writes no files (npm run dev): the one session that writes nothing.
+      return setup.session ? html`<div class="cn-here" title=${`Run in ${setup.folder}: a Claude Code session that reports here, your own settings untouched.`}>${setup.session}</div>` : null;
+    };
+
     /** The next step on a map with no run: the MCP line, the hooks, and the wait for the first run. */
     const Connect = () => {
       const { had, made: setup, failed } = useFirst();
@@ -142,12 +185,8 @@ const connectView: Plugin = {
       const [tokenErr, setErr] = useState<string | undefined>(undefined);
       const err = tokenErr ?? failed;
       if (had !== false || !setup) return null;
-      // A local map: the one command that starts a session reporting here, as a line of text.
-      if (!(setup.token || setup.install)) {
-        return setup.here
-          ? html`<div class="cn-here" title=${`Run in ${setup.folder}: a Claude Code session that reports here, your own settings untouched.`}>${setup.here}</div>`
-          : null;
-      }
+      // A local map: this checkout's own folder, connected from here (connect.here), or the terminal command.
+      if (!(setup.token || setup.install)) return setup.folder ? html`<${Here} setup=${setup} />` : null;
       const make = async () => {
         if (setup?.tokenAt) {
           // The host keeps tokens: ask it, on this origin, with this page's cookie.

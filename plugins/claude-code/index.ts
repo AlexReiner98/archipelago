@@ -77,9 +77,9 @@ export interface ClaudeCodeConfig extends LocalAccess {
  */
 export const HOOKLESS =
   "Only your calls to these tools are recorded on this map, not your prompts or your other tools. " +
-  "If you are a Claude Code session, ask the person to restart it with Archipelago's hooks " +
-  "(in a checkout of the repository: claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json), " +
-  "and keep asking until a session with them starts. A chat client that has no hooks can go on as it is. " +
+  "If you are a Claude Code session, get Archipelago's hooks: connect your folder with the act tool (action connect.here, folder: your working folder) " +
+  "and ask the person to start a new session there; or, in a terminal in a checkout of the repository, ask them to restart with " +
+  "claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json. Keep asking until a session with the hooks starts. A chat client that has no hooks can go on as it is. " +
   "Keep one MCP session open for the whole run: each new one is a run of its own, ended after a quiet while.";
 
 /** The transcript plugin's action for a page a hook sent (plugins/transcript). */

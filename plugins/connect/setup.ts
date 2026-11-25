@@ -52,11 +52,12 @@ export interface Setup {
   install?: string;
   /** Where the page asks for a token, when not through `connect.token`. */
   tokenAt?: string;
-  /** On a server run from a checkout: one session that reports here, run in `folder`, touching no settings (`FOLDER`). */
-  here?: string;
-  /** The checkout `here` is run in. */
+  /** On a server run from a checkout: the checkout's folder, which the page connects (`connect.here`). */
   folder?: string;
+  /** Where the checkout's own files reach this server: one session from a terminal that writes nothing (`FOLDER`). */
+  session?: string;
 }
+
 
 /** A session from this checkout that reports to its map, with nobody's settings changed (README, "Connect Claude Code"). */
 export const FOLDER = "claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json";

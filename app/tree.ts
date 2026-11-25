@@ -130,7 +130,15 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
     },
     { id: "mcp", plugin: "plugins/mcp/index.ts" },
     // What a person copies to connect Claude Code: the adapter as this machine reaches it. A host in front sets its own.
-    { id: "connect", plugin: "plugins/connect/index.ts", config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp` } },
+    // A folder's sessions are connected from the page, as an item; its files written only by a server that writes and
+    // has no host in front (a host never writes hooks into folders on its own machine).
+    { id: "connect", plugin: "plugins/connect/index.ts", config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp`, writes: write && !origins.length && !hosts.length } },
+    {
+      id: "connect-write",
+      plugin: "plugins/connect/write.ts",
+      config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp`, ledger: join(data, "connect.json") },
+      disabled: !write || !!origins.length || !!hosts.length,
+    },
     // A host's way in to its maps (plugins/gate): off until a host in front names where it answers (`at`).
     { id: "gate", plugin: "plugins/gate/index.ts" },
     { id: "docs", plugin: "plugins/docs/index.ts" },

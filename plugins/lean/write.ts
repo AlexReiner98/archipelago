@@ -22,9 +22,8 @@
  *   folder), so a crash is mended at the next load.
  * - `lean-write.status`: how many files and entries are written now. No paths.
  */
-import { mkdir, readFile, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, parse, relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import type { ActionRegister } from "../../spec/action.ts";
 import type { RunInfo } from "../../spec/agent.ts";
 import type { Id } from "../../spec/common.ts";
@@ -34,7 +33,11 @@ import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { ProfileRead } from "../../spec/profile.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import { setOf, TYPE } from "./index.ts";
-import { entriesOf, kept, reconcile, type Ours } from "./plan.ts";
+import { entriesOf, kept, leanEntries } from "./plan.ts";
+import type { Entry } from "../project-files/entries.ts";
+import { bringTo, loadLedger, safeFolder, saveLedger } from "../project-files/write.ts";
+
+export { safeFolder };
 
 export const STATUS = "lean-write.status";
 /** The newest runs whose folders are written. */
@@ -50,41 +53,13 @@ export interface LeanWriteConfig {
   home?: string;
 }
 
-type Entry = Ours & { dir?: boolean };
-
 const fold = (p: string) => (process.platform === "win32" ? resolve(p).toLowerCase() : resolve(p));
-const inside = (child: string, parent: string) => {
-  const r = relative(parent, child);
-  return r === "" || (!!r && !r.startsWith("..") && !isAbsolute(r));
-};
-
-/** Whether a run's folder may be written in: absolute, a folder, not the home folder, a drive's root, or under ~/.claude. */
-export async function safeFolder(folder: string, home: string): Promise<boolean> {
-  if (!isAbsolute(folder)) return false;
-  const f = resolve(folder);
-  if (fold(f) === fold(home) || parse(f).root === f || f === dirname(f)) return false;
-  if (inside(fold(f), fold(join(home, ".claude")))) return false;
-  if (inside(fold(home), fold(f))) return false;
-  try {
-    return (await stat(f)).isDirectory();
-  } catch {
-    return false;
-  }
-}
 
 const cwdOf = (r: RunInfo) => {
   const c = r.facts?.cwd ?? r.cwd;
   const v = Array.isArray(c) ? c[0] : c;
   return typeof v === "string" && v ? v : undefined;
 };
-
-async function readText(file: string): Promise<string | undefined> {
-  try {
-    return await readFile(file, "utf8");
-  } catch {
-    return undefined;
-  }
-}
 
 const leanWrite: Plugin<LeanWriteConfig> = {
   id: "lean-write",
@@ -96,19 +71,11 @@ const leanWrite: Plugin<LeanWriteConfig> = {
     const profiles = ctx.get<ProfileRead>("profile.read");
     const home = config.home ?? homedir();
     const report = (e: unknown) => ctx.runtime.report(ctx.fiber, e);
-    let ledger: Record<string, Entry> = {};
-    if (config.ledger) {
-      try {
-        ledger = (JSON.parse((await readText(config.ledger)) ?? "{}") as { files?: Record<string, Entry> }).files ?? {};
-      } catch {
-        ledger = {};
-      }
+    const ledger = await loadLedger(config.ledger);
+    // A ledger an older lean wrote ({ deny, servers }): said as the shared writer's entries.
+    for (const [file, o] of Object.entries(ledger) as [string, any][]) {
+      if (!Array.isArray(o.entries)) ledger[file] = { entries: leanEntries({ deny: o.deny ?? [], servers: o.servers ?? [] }), ...(o.created ? { created: true } : {}), ...(o.dir ? { dir: true } : {}) };
     }
-    const save = async () => {
-      if (!config.ledger) return;
-      await mkdir(dirname(config.ledger), { recursive: true });
-      await writeFile(config.ledger, JSON.stringify({ files: ledger }, null, 2) + "\n", "utf8");
-    };
 
     /** Per settings file, what is wanted of ours now. */
     const wanted = async (): Promise<Map<string, { folder: string; deny: string[]; servers: string[] }>> => {
@@ -145,38 +112,12 @@ const leanWrite: Plugin<LeanWriteConfig> = {
       return out;
     };
 
-    /** Brings every file to what is wanted (nothing, when `none`). */
+    /** Brings every file to what is wanted (nothing, when `none`): the shared writer (plugins/project-files). */
     const pass = async (none = false) => {
-      const want = none ? new Map() : await wanted();
-      const files = new Set([...want.keys(), ...Object.keys(ledger)]);
-      for (const file of files) {
-        const w = want.get(file) ?? { deny: [], servers: [] };
-        const had = ledger[file];
-        if (!had && !w.deny.length && !w.servers.length) continue;
-        const text = await readText(file);
-        const r = reconcile(text, had, w);
-        if ("error" in r) {
-          report(new Error(`lean: a project's settings.local.json is left as it is: ${r.error}.`));
-          continue;
-        }
-        if (!r.same) {
-          if (r.text === undefined) {
-            await rm(file, { force: true });
-            if (had?.dir) await rmdir(dirname(file)).catch(() => undefined);
-          } else {
-            let dir = had?.dir;
-            if (text === undefined) {
-              const made = await mkdir(dirname(file), { recursive: true });
-              if (made) dir = true;
-            }
-            await writeFile(file, r.text, "utf8");
-            if (dir) (r.ours as Entry).dir = true;
-          }
-        }
-        if (r.ours.deny.length || r.ours.servers.length) ledger[file] = { ...r.ours, ...(had?.dir || (r.ours as Entry).dir ? { dir: true } : {}) };
-        else delete ledger[file];
-      }
-      await save();
+      const want = new Map<string, Entry[]>();
+      if (!none) for (const [file, w] of await wanted()) want.set(file, leanEntries(w));
+      await bringTo(ledger, want, report, "lean");
+      await saveLedger(config.ledger, ledger);
     };
 
     let queue: Promise<unknown> = Promise.resolve();
@@ -208,7 +149,7 @@ const leanWrite: Plugin<LeanWriteConfig> = {
       async run() {
         await queue.catch(() => undefined);
         const all = Object.values(ledger);
-        return { files: all.length, entries: all.reduce((n, e) => n + e.deny.length + e.servers.length, 0) };
+        return { files: all.length, entries: all.reduce((n, e) => n + e.entries.length, 0) };
       },
     });
   },
