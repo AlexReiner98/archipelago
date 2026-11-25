@@ -4,6 +4,7 @@ import type { Dispose } from "../spec/common.ts";
 import { Runtime, type Context, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
 import client from "../plugins/bridge/client.ts";
+import server, { agentActor, KEYS } from "../plugins/bridge/server.ts";
 
 /** A stand-in for the browser's EventSource: the test opens, feeds and fails each one. */
 class FakeSource {
@@ -95,5 +96,41 @@ test("a stream the browser closes for good is opened again, and the watches made
     await loader.apply([]);
     g.EventSource = was.EventSource;
     g.fetch = was.fetch;
+  }
+});
+
+test("a caller through the bridge may say it is an agent, and acts as that agent; never as another person", async () => {
+  // Every key a stand-in; action.invoke answers with who called it.
+  const stub: Plugin = {
+    id: "stub",
+    apply(ctx: Context) {
+      for (const k of KEYS) ctx.provide(k, (caller) => (k === "action.invoke" ? { invoke: async () => ({ actor: caller.actor ?? null }) } : {}));
+    },
+  };
+  let port = 0;
+  const rt = new Runtime();
+  const loader = new Loader(rt, { base: "mem:/", import: async (u) => ({ default: u.endsWith("stub.ts") ? stub : (server as Plugin) }) });
+  await loader.apply([
+    { id: "stub", plugin: "stub.ts" },
+    { id: "bridge", plugin: "bridge.ts", config: { port: 0, actor: { id: "person:owner", kind: "person" }, onListen: (p: number) => (port = p) } },
+  ]);
+  const call = async (extra: Record<string, unknown>) => {
+    const r = await fetch(`http://127.0.0.1:${port}/call`, { method: "POST", body: JSON.stringify({ key: "action.invoke", method: "invoke", args: [{}], ...extra }) });
+    return (await r.json()) as { value?: { actor: unknown }; error?: string };
+  };
+  try {
+    assert.ok(port > 0);
+    // No actor named: the person at the page, as before.
+    assert.deepEqual((await call({})).value, { actor: { id: "person:owner", kind: "person" } });
+    // An agent named: that agent.
+    assert.deepEqual((await call({ actor: { id: "agent:script", kind: "agent" } })).value, { actor: { id: "agent:script", kind: "agent" } });
+    // A person, or an id that isn't one, is refused, and nothing is called.
+    assert.match((await call({ actor: { id: "person:someone", kind: "person" } })).error ?? "", /only an agent/);
+    assert.match((await call({ actor: { id: "bad id\n", kind: "agent" } })).error ?? "", /an id of/);
+    // The page's own calls are untouched by the one before.
+    assert.deepEqual((await call({})).value, { actor: { id: "person:owner", kind: "person" } });
+    assert.equal(agentActor(undefined), undefined);
+  } finally {
+    await loader.apply([]);
   }
 });

@@ -52,7 +52,8 @@ human or agent) when working in this repository. The
 - To see a change in the browser, `npm run dev` (it writes no skill or
   memory file, so it never competes with a live server) and open
   http://127.0.0.1:5280/app/. Node runs the TypeScript directly: there is no build.
-- When 5280 is taken (another checkout, a worktree), `npm run map -- serve`
+- When 5280 is taken (another checkout, a worktree), `npm run dev` says so
+  in one line, and `npm run map -- serve`
   serves a map named after the branch, copied from `live` when there is one,
   on any free port, and prints where; `npm run map -- ls` lists every server
   ([guide](guide/live-and-dev.md), "Maps by name").
@@ -64,14 +65,14 @@ keep, follow the README's "Set it up to keep":
 
 - Ask them where their map should live, before anything is cloned: it is
   their choice, and the map is kept in that folder for as long as they keep
-  it (the clone, the live worktree beside it, and the map's data in that
-  worktree). Offer a folder they already keep code in as an example; don't
+  it (the clone, and the live worktree beside it that serves map `live`,
+  whose data is in `~/.archipelago/maps/live`). Offer a folder they already keep code in as an example; don't
   choose for them. Never set a map up in a folder that goes away: the
   system's temp folder, a folder an app made for your session (a scratch
   workspace), or a session's own worktree (`.claude/worktrees/`). If your
   session started in one, say so when you ask.
-- `npm install`, `npm run live:setup`, `npm run live:start`; open
-  http://127.0.0.1:5180/app/.
+- `npm install`, `npm run live:setup`, `npm run live:start`; open the
+  address it prints (any free port; `npm run live:status` says it again).
 - Connect the clone, not the live worktree: `connect.here { folder: <the
   clone> }`, or the empty map's line. `connect.here` writes the folder's
   hooks and MCP server; to look first, `connect.folder` reads.

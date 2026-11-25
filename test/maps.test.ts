@@ -145,6 +145,33 @@ test("two servers for different maps run at once, on free ports nobody gave them
   assert.equal(entryOf("alpha", home)?.pid, a.served.pid);
 });
 
+test("a server on fixed ports that are taken says so in one line, and writes nothing", async () => {
+  // Something else holds the adapter's port.
+  const holder = createServer();
+  await new Promise<void>((ok) => holder.listen(0, "127.0.0.1", ok));
+  const taken = (holder.address() as { port: number }).port;
+  const data = join(home, "fixed-data");
+  try {
+    const { code, out } = await new Promise<{ code: number | null; out: string }>((ok) => {
+      let out = "";
+      const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", join(root, "app", "server.ts"), "--port", String(taken - 1), "--data", data, "--no-watch", "--no-write"], {
+        env: { ...process.env, ARCHIPELAGO_HOME: home, ARCHIPELAGO_MAP: "" },
+        windowsHide: true,
+      });
+      started.push(child);
+      child.stdout.on("data", (c) => (out += c));
+      child.stderr.on("data", (c) => (out += c));
+      child.on("exit", (code) => ok({ code, out }));
+    });
+    assert.equal(code, 1, out);
+    assert.match(out, new RegExp(`^refused: port ${taken} is already taken .*npm run map -- serve`, "m"));
+    assert.doesNotMatch(out, /EADDRINUSE|at .*\.ts:\d+/, "no stack trace");
+    assert.equal(existsSync(data), false, "no data folder made");
+  } finally {
+    holder.close();
+  }
+});
+
 test("the registry refuses a second claim on a running map and takes over one whose process is gone", () => {
   const map = "claimed";
   const mine = { ...entry(map, 0), pid: process.pid };

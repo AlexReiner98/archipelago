@@ -16,8 +16,9 @@
  * checkout; its server is in <home>/servers/<name>.json while it runs, and a
  * second server for it is refused (app/server.ts --map, scripts/maps.ts).
  *
- * `npm run serve`, `dev`, `dev:*` and `live:*` work as they did, on their
- * fixed ports.
+ * `live:*` serve map `live` through this command (scripts/live.ts).
+ * `npm run serve`, `dev` and `dev:*` stay on their fixed ports, and say in
+ * one line when those are taken.
  */
 import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync, rmSync } from "node:fs";

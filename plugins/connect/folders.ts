@@ -13,14 +13,19 @@
  * - `connect.away` ({ folder? }): its connection off. The writer takes out
  *   what it added.
  * - `connect.folder` ({ folder? }): whether it is connected, and whether this
- *   server writes. Read only.
+ *   server writes; `reports_to` when its files name another map. Read only.
+ * - A folder reports to one map: `connect.here` is refused for a folder
+ *   whose files name another map that is there (`reportsElsewhere`), naming
+ *   it, and the writer leaves such a folder alone.
  *
  * Config (connect's): `writes` (as the server: false under `--no-write` or
  * with a host in front), `home` (never written in). Uses types.define,
  * graph.read, action.register, which connect injects.
  */
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
+import { homeOf, MAP_NAME, mapDir } from "../claude-code/registry.ts";
 import type { ActionContext, ActionRegister } from "../../spec/action.ts";
 import type { Fact } from "../../spec/changeset.ts";
 import type { Id } from "../../spec/common.ts";
@@ -30,7 +35,7 @@ import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { TypesDefine } from "../../spec/types.ts";
 import type { Context } from "../../runtime/core.ts";
 import { safeFolder } from "../project-files/write.ts";
-import { CONNECTION, TYPE } from "./here.ts";
+import { CONNECTION, MCP, NAME, TYPE } from "./here.ts";
 import { FOLDER } from "./setup.ts";
 
 export const HERE = "connect.here";
@@ -41,6 +46,29 @@ export interface FoldersConfig {
   /** Whether the server writes files (a connection then reaches the folder's settings). Default true. */
   writes?: boolean;
   home?: string;
+  /** The map's name, when the server serves one by name. */
+  map?: string;
+  /** Where maps by name are kept (ARCHIPELAGO_HOME, default ~/.archipelago): to tell whether a folder reports to another one. */
+  maps?: string;
+}
+
+/**
+ * The other map a folder reports to, when its `.mcp.json` names one by name
+ * (plugins/claude-code/proxy.ts <name>) and that map is there: a folder
+ * reports to one map, and the one its files name keeps it. Files that name a
+ * port (an older server's), a map that is gone, or none are not another map's.
+ */
+export function reportsElsewhere(folder: string, map: string | undefined, maps: string): string | undefined {
+  let server: { args?: unknown } | undefined;
+  try {
+    server = (JSON.parse(readFileSync(join(folder, MCP), "utf8")) as { mcpServers?: Record<string, typeof server> }).mcpServers?.[NAME];
+  } catch {
+    return undefined;
+  }
+  const args: unknown[] = Array.isArray(server?.args) ? server.args : [];
+  const name = typeof args[0] === "string" && /proxy\.ts$/.test(args[0]) ? args[1] : undefined;
+  if (typeof name !== "string" || !MAP_NAME.test(name) || name === map) return undefined;
+  return existsSync(join(mapDir(name, maps), "graph.sqlite")) ? name : undefined;
 }
 
 const refuse = (code: string, message: string) => new Refused({ code, message, by: { plugin: "connect" } });
@@ -84,6 +112,8 @@ export function folders(ctx: Context, config: FoldersConfig, checkout: string): 
       async run(input: { folder?: string }, call: ActionContext) {
         if (!writes) throw refuse("connect.no_write", `This server writes no files (npm run dev), so a folder can't be connected from here. Start one session that writes nothing instead, in the checkout: ${FOLDER}`);
         const folder = await folderOf(input);
+        const other = reportsElsewhere(folder, config.map, config.maps ?? homeOf());
+        if (other) throw refuse("connect.elsewhere", `${folder} reports to map ${other}. A folder reports to one map: disconnect it there first (connect.away on ${other}'s page), then connect it here.`);
         const had = await find(folder);
         if (had) {
           status(call, had, "on");
@@ -123,7 +153,8 @@ export function folders(ctx: Context, config: FoldersConfig, checkout: string): 
       async run(input: { folder?: string }) {
         const folder = resolve(input.folder ?? checkout);
         const had = await find(folder);
-        return { folder, connected: had?.fields.status === "on", writes, ...(had ? { connection: had.id } : {}) };
+        const other = reportsElsewhere(folder, config.map, config.maps ?? homeOf());
+        return { folder, connected: had?.fields.status === "on" && !other, writes, ...(had ? { connection: had.id } : {}), ...(other ? { reports_to: other } : {}) };
       },
     });
   }
