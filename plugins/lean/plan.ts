@@ -4,6 +4,7 @@
  */
 import type { UseRow } from "../used/tally.ts";
 import { serverOf } from "../used/tally.ts";
+import { reconcileJson, type Entry, type Ours as Shared } from "../project-files/entries.ts";
 
 /** A profile needs this many runs before anything is left out: too few say nothing. */
 export const MIN_RUNS = 5;
@@ -60,7 +61,7 @@ export function entriesOf(name: string): { deny: string; server?: string } {
   return { deny: name.slice(5) };
 }
 
-/** What one settings file holds of ours. */
+/** What one settings file holds of ours, as lean says it. */
 export interface Ours {
   deny: string[];
   servers: string[];
@@ -68,50 +69,26 @@ export interface Ours {
   created?: boolean;
 }
 
-type Settings = Record<string, unknown> & { permissions?: Record<string, unknown> & { deny?: unknown }; disabledMcpjsonServers?: unknown };
+/** What is wanted, as entries of the shared writer (plugins/project-files): a deny rule, a server not started. */
+export function leanEntries(w: { deny: string[]; servers: string[] }): Entry[] {
+  return [...w.deny.map((item) => ({ at: ["permissions", "deny"], item })), ...w.servers.map((item) => ({ at: ["disabledMcpjsonServers"], item }))];
+}
 
-const list = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+/** Entries back as lean says them. */
+export function leanOurs(o: Shared): Ours {
+  const of = (path: string) => o.entries.flatMap((e) => ("item" in e && e.at.join(".") === path && typeof e.item === "string" ? [e.item] : []));
+  return { deny: of("permissions.deny"), servers: of("disabledMcpjsonServers"), ...(o.created ? { created: true } : {}) };
+}
 
 /**
  * A settings file brought to what is wanted of ours: entries in `want` and
  * not there are added (and become ours), ours not in `want` are taken out.
  * An entry the file had that isn't ours is never taken out. `text`
  * undefined: no file. Answers the new text (undefined: remove the file) and
- * what is ours now; `same` when nothing changes.
+ * what is ours now; `same` when nothing changes. The shared writer's rules
+ * (plugins/project-files/entries.ts), said in lean's words.
  */
 export function reconcile(text: string | undefined, had: Ours | undefined, want: { deny: string[]; servers: string[] }): { text?: string; ours: Ours; same: boolean } | { error: string } {
-  let s: Settings = {};
-  if (text !== undefined) {
-    try {
-      const v = JSON.parse(text) as unknown;
-      if (!v || typeof v !== "object" || Array.isArray(v)) return { error: "it is not a JSON object" };
-      s = v as Settings;
-    } catch {
-      return { error: "it is not JSON" };
-    }
-  }
-  const ours: Ours = { deny: [...(had?.deny ?? [])], servers: [...(had?.servers ?? [])], ...(had?.created || (text === undefined && !had) ? { created: true } : {}) };
-  let deny = list(s.permissions?.deny);
-  let servers = list(s.disabledMcpjsonServers);
-  const before = JSON.stringify([deny, servers]);
-  // Ours no longer wanted: out. Ours the person took out by hand: no longer ours.
-  ours.deny = ours.deny.filter((d) => deny.includes(d));
-  ours.servers = ours.servers.filter((d) => servers.includes(d));
-  deny = deny.filter((d) => want.deny.includes(d) || !ours.deny.includes(d));
-  servers = servers.filter((d) => want.servers.includes(d) || !ours.servers.includes(d));
-  ours.deny = ours.deny.filter((d) => want.deny.includes(d));
-  ours.servers = ours.servers.filter((d) => want.servers.includes(d));
-  for (const d of want.deny) if (!deny.includes(d)) deny.push(d), ours.deny.push(d);
-  for (const d of want.servers) if (!servers.includes(d)) servers.push(d), ours.servers.push(d);
-  if (JSON.stringify([deny, servers]) === before) return { ours, same: true, ...(text !== undefined ? { text } : {}) };
-  const next: Settings = { ...s };
-  const perms = { ...(s.permissions ?? {}) };
-  if (deny.length) perms.deny = deny;
-  else delete perms.deny;
-  if (Object.keys(perms).length) next.permissions = perms;
-  else delete next.permissions;
-  if (servers.length) next.disabledMcpjsonServers = servers;
-  else delete next.disabledMcpjsonServers;
-  if (ours.created && !Object.keys(next).length) return { ours: { deny: [], servers: [], created: true }, same: false };
-  return { text: JSON.stringify(next, null, 2) + "\n", ours, same: false };
+  const r = reconcileJson(text, had && { entries: leanEntries(had), ...(had.created ? { created: true } : {}) }, leanEntries(want));
+  return "error" in r ? r : { ...r, ours: leanOurs(r.ours) };
 }

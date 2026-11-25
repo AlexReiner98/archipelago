@@ -45,6 +45,9 @@ runs (the newest 50):
 - **Only its own.** An entry the file had is never taken out; a file it
   made goes when nothing else is in it. A file that isn't a JSON object is
   left alone and reported.
+- **Shared.** The rules above, and the ledger, are the shared writer's
+  ([project-files](../project-files/README.md)), which the connect writer
+  uses for the same file: each takes out only its own.
 - **Revertible.** Undoing the `lean.set`, or the profile going off, takes
   its entries out at the next pass; unloading takes them all out. What it
   added is kept in a ledger (config `ledger`, a file in the data

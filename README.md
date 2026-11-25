@@ -55,17 +55,13 @@ you there). The map is kept in `app/.data/`, which git ignores.
 
 ## Connect Claude Code
 
-In the same folder, connect its sessions to your map, then start a new
-Claude Code session there (in a terminal or the desktop app):
+The empty map has one line: **Connect Claude Code in archipelago**. Click
+it, then start a new Claude Code session in this folder, in a terminal or
+the desktop app. Connecting is an item on the map: the history shows it,
+undo takes it back, and **disconnect** beside it takes it out.
 
-```
-npm run connect:here
-```
-
-It writes the repository's hooks and MCP server into this folder's
-`.claude/settings.local.json` and `.mcp.json`, keeps both out of git, and
-touches nothing outside the folder. `npm run disconnect:here` takes them out
-again. In a terminal you can instead start one session that writes nothing:
+In a terminal you can instead start one session that writes nothing (the
+way under `npm run dev`, which writes no files):
 
 ```
 claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json
@@ -95,7 +91,11 @@ and the MCP server to your user config
   or memory file adopted onto the map is written from its words from then
   on (and goes back as it was when the plugin that writes it unloads), and
   a context filter's `leave_out` goes into its runs'
-  `<folder>/.claude/settings.local.json`. `npm run dev` writes none of them.
+  `<folder>/.claude/settings.local.json`, and a folder connected from the
+  page gets the map's hooks and MCP server in its `.claude/settings.local.json`
+  and `.mcp.json`, kept out of git. Each is taken out again, leaving what
+  was there, when it is undone or the server shuts down (Ctrl+C). `npm run dev` writes
+  none of them.
 - Connecting every session adds Archipelago's hooks to
   `~/.claude/settings.json` and its MCP server to Claude Code's user config,
   and keeps everything else in them.

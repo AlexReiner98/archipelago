@@ -159,7 +159,7 @@ test("a lean profile: planned always; set as a change set; written into its runs
     await ok("lean.set", { profile: pid, leave: ["tool:Artifact"] });
     await wait();
     assert.deepEqual((await disk()).permissions, { allow: ["Bash(ls)"], deny: ["Artifact"] });
-    assert.deepEqual(JSON.parse(await readFile(join(dir, "data", "lean.json"), "utf8")).files[settings].deny, ["Artifact"], "the ledger holds what it added");
+    assert.deepEqual(JSON.parse(await readFile(join(dir, "data", "lean.json"), "utf8")).files[settings].entries, [{ at: ["permissions", "deny"], item: "Artifact" }], "the ledger holds what it added");
     assert.deepEqual(errors, []);
   } finally {
     await loader.apply([]);

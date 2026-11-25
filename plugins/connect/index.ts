@@ -19,7 +19,10 @@
  * hooks are one command. `token` may be a path instead of an action: the
  * page then posts `{name}` to it on its own origin, with its cookie, and
  * gets `{name, token}` (a host's gateway that keeps the tokens).
- * Injects action.register.
+ * - `connect.here`, `connect.away`, `connect.folder`: a folder's Claude Code
+ *   sessions connected to this map, as a `connection` item (folders.ts);
+ *   the connect writer (write.ts) writes its files. Config `writes`, `home`.
+ * Injects action.register, types.define and graph.read.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -27,9 +30,10 @@ import { fileURLToPath } from "node:url";
 import type { ActionContext, ActionRegister } from "../../spec/action.ts";
 import { Refused } from "../../spec/common.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
-import { CONNECT, FOLDER, setup, type Setup } from "./setup.ts";
+import { FOLDER, setup, type Setup } from "./setup.ts";
+import { folders, type FoldersConfig } from "./folders.ts";
 
-export interface ConnectConfig {
+export interface ConnectConfig extends FoldersConfig {
   hook?: string;
   mcp?: string;
   command?: string;
@@ -43,16 +47,17 @@ export interface ConnectConfig {
 export const SETUP = "connect.setup";
 export const MAKE_TOKEN = "connect.token";
 
-const CHECKOUT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+/** The checkout this server runs from: the folder `connect.here` connects when none is named. */
+export const CHECKOUT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /**
- * How the checkout's own sessions reach the adapter at `mcp`, on this
- * machine: `npm run connect:here`, with `--port` off the dev port; and
- * where its plugins/claude-code/mcp.json names `mcp` (the dev port), the
- * terminal command that writes nothing. None for an adapter elsewhere, or
- * outside a checkout.
+ * The checkout's own sessions and the adapter at `mcp`, on this machine:
+ * its folder (connected from the page, `connect.here`), and where its
+ * plugins/claude-code/mcp.json names `mcp` (the dev port), the terminal
+ * command that writes nothing. None for an adapter elsewhere, or outside a
+ * checkout.
  */
-export function folderSession(mcp: string, root = CHECKOUT): { here: string; folder: string; session?: string } | undefined {
+export function folderSession(mcp: string, root = CHECKOUT): { folder: string; session?: string } | undefined {
   const m = /^http:\/\/127\.0\.0\.1:(\d+)\/mcp$/.exec(mcp);
   if (!m) return undefined;
   let reaches: boolean;
@@ -62,8 +67,7 @@ export function folderSession(mcp: string, root = CHECKOUT): { here: string; fol
   } catch {
     return undefined;
   }
-  const page = Number(m[1]) - 1;
-  return { here: reaches ? CONNECT : `${CONNECT} -- --port ${page}`, folder: root, ...(reaches ? { session: FOLDER } : {}) };
+  return { folder: root, ...(reaches ? { session: FOLDER } : {}) };
 }
 
 /** This checkout's hook script, as a hook command for `hook`. */
@@ -75,7 +79,7 @@ export function localCommand(hook: string): string {
 const connect: Plugin = {
   id: "connect",
   about: "How Claude Code reaches this map: the MCP line and the hooks, for a person to copy.",
-  inject: ["action.register"],
+  inject: ["action.register", "types.define", "graph.read"],
   apply(ctx: Context, config: ConnectConfig = {}) {
     const register = ctx.get<ActionRegister>("action.register");
     const hook = config.hook ?? "http://127.0.0.1:5181/hook";
@@ -83,7 +87,7 @@ const connect: Plugin = {
     // A token is made by an action (an action name), or by the host in front (a path the page posts to).
     const tokenAt = config.token?.startsWith("/") ? config.token : undefined;
     const made: Setup = setup({ hook, mcp, command: config.command ?? localCommand(hook), token: !!config.token, name: config.name, save: config.save, signin: config.signin, script: config.script, tokenAt });
-    // Run from this checkout, with no token: first, a session from here that changes nobody's settings.
+    // Run from this checkout, with no token: its folder, and a terminal session that changes nobody's settings.
     const here = !config.token && !config.script && !config.command ? folderSession(mcp) : undefined;
     if (here) Object.assign(made, here);
 
@@ -96,6 +100,9 @@ const connect: Plugin = {
         return made as unknown as Record<string, string>;
       },
     });
+
+    // A folder's sessions connected from the page, as an item on the map (folders.ts).
+    folders(ctx, config, CHECKOUT);
 
     const tokenAction = config.token;
     if (!tokenAction || tokenAt) return;
