@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { headings, ordered, outline, restates, sections, workLine, type Node, type Row, type Source, type Wire } from "../packs/document/outline.ts";
+import { headings, ordered, outline, restates, sections, workLine, type Node, type Row, type Source, type Wire } from "../plugins/document/outline.ts";
 
 /** A small map: rows by id, links, and which rows are closed. */
 function map(rows: [string, string, string, string?, boolean?][], links: [string, string, string][]): Source {

@@ -4,24 +4,24 @@ import type { ActionInvoke, ActionRegister } from "../spec/action.ts";
 import type { Fact } from "../spec/changeset.ts";
 import type { Json } from "../spec/common.ts";
 import type { ExchangeRead } from "../spec/exchange.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import grow from "../packs/grow/index.ts";
-import keep, { type Review } from "../packs/keep/index.ts";
-import replay from "../packs/replay/index.ts";
-import scripted, { playAs, type Script, type ScriptedPlay } from "../packs/scripted/index.ts";
-import verdict, { type VerdictRead } from "../packs/verdict/index.ts";
-import words from "../packs/words/index.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import grow from "../plugins/grow/index.ts";
+import keep, { type Review } from "../plugins/keep/index.ts";
+import replay from "../plugins/replay/index.ts";
+import scripted, { playAs, type Script, type ScriptedPlay } from "../plugins/scripted/index.ts";
+import verdict, { type VerdictRead } from "../plugins/verdict/index.ts";
+import words from "../plugins/words/index.ts";
 
 const CWD = "C:\\Users\\me\\repo";
 const MISS = "server answered 429 empty body";
 const T = (m: number) => `2026-11-24T10:${String(m).padStart(2, "0")}:00.000Z`;
 
-const probe: Pack = {
+const probe: Plugin = {
   id: "probe",
   inject: ["agent.run", "action.invoke", "action.register", "graph.read", "exchange.read", "verdict.read", "scripted.play"],
   apply(ctx) {
@@ -53,11 +53,11 @@ async function setup(config: Record<string, unknown> = {}, more: string[] = []) 
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack<any>> = { graph, action, exchange, agent, verdict, words, scripted, keep, replay, probe, grow };
-  const BASE = "mem:/packs/";
+  const modules: Record<string, Plugin<any>> = { graph, action, exchange, agent, verdict, words, scripted, keep, replay, probe, grow };
+  const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const ids = ["graph", "action", "exchange", "agent", "verdict", "words", "scripted", ...more, "probe", "keep", "replay"];
-  const tree: Entry[] = ids.map((id) => ({ id, pack: id, ...(id === "replay" ? { config } : id === "keep" ? { config: { apply: false } } : {}) }));
+  const tree: Entry[] = ids.map((id) => ({ id, plugin: id, ...(id === "replay" ? { config } : id === "keep" ? { config: { apply: false } } : {}) }));
   await loader.apply(tree);
   await rt.settle();
   assert.deepEqual(errors, []);
@@ -127,7 +127,7 @@ test("a trial node is replayed on past runs where its place came up, and judged 
   // A replay of a run it was said in live (made for another node, say) tells nothing new: keep leaves it out.
   await loader.fiber("probe")!.ctx.get<ScriptedPlay>("scripted.play").replay("r6");
   await settle(100);
-  assert.equal((await verdicts().replayed(node))?.runs, 4, "the verdict pack keeps every replay");
+  assert.equal((await verdicts().replayed(node))?.runs, 4, "the verdict plugin keeps every replay");
   const again = ((await invoke("keep.review", { node: id })).output as Review).nodes[0]!;
   assert.equal(again.replayed?.runs, 3);
   assert.deepEqual(errors, []);
@@ -162,11 +162,11 @@ test("grow asks nothing in a replay: its misses were asked about in the recorded
   assert.deepEqual(errors, []);
 });
 
-test("the pack unloads cleanly, a pass pending", async () => {
+test("the plugin unloads cleanly, a pass pending", async () => {
   const { loader, rt, errors, play, trial } = await setup();
   await play("r1", bash(1, MISS, false));
   await trial("r9");
-  await loader.apply(["graph", "action", "exchange", "agent", "verdict", "words", "scripted", "probe"].map((id) => ({ id, pack: id })));
+  await loader.apply(["graph", "action", "exchange", "agent", "verdict", "words", "scripted", "probe"].map((id) => ({ id, plugin: id })));
   await rt.settle();
   await new Promise((r) => setTimeout(r, 700));
   await loader.apply([]);

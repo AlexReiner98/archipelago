@@ -5,7 +5,7 @@
  * `graph.watch` carry, and it is fixed with them. A format that had to
  * change would come with new capabilities that carry it.
  */
-import type { Actor, Authority, Id, Json, PackId, Time } from "./common.ts";
+import type { Actor, Authority, Id, Json, PluginId, Time } from "./common.ts";
 
 /** `+` asserts a value, `-` retracts it. */
 export type Op = "+" | "-";
@@ -27,10 +27,10 @@ export interface Header {
   /** On whose say-so. */
   authority: Authority;
   /**
-   * The pack whose code wrote it, and the code's hash, for provenance: which
+   * The plugin whose code wrote it, and the code's hash, for provenance: which
    * code did this. Nothing depends on it; it is a record.
    */
-  pack: { id: PackId; hash?: string };
+  plugin: { id: PluginId; hash?: string };
   /** The action it was made through. */
   action: string;
   /** Why, in a sentence, as the actor gave it. */

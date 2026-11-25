@@ -1,5 +1,5 @@
 /**
- * The exchange pack's record (Log): runs come last active first, and a
+ * The exchange plugin's record (Log): runs come last active first, and a
  * run's end counts only after its last begin. Events in, runs out.
  */
 import { test } from "node:test";
@@ -7,12 +7,12 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import exchange, { Journal, Log } from "../packs/exchange/index.ts";
+import exchange, { Journal, Log } from "../plugins/exchange/index.ts";
 import type { ExchangeAppend, ExchangeEvent, ExchangeRead } from "../spec/exchange.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 
 const begin = (run: string, time: string, title?: string): Omit<ExchangeEvent, "id" | "seq"> => ({
   run,
@@ -56,14 +56,14 @@ test("a run says when it was last heard from: its latest event's time", () => {
   assert.equal(log.info("r")?.last, "2026-11-21T09:20:00Z");
 });
 
-test("exchange.read.runs is last active first, through the pack", async () => {
+test("exchange.read.runs is last active first, through the plugin", async () => {
   const rt = new Runtime();
-  const probe: Pack = { id: "probe", inject: ["exchange.append", "exchange.read"], apply() {} };
-  const modules: Record<string, Pack> = { "exchange.ts": exchange, "probe.ts": probe };
+  const probe: Plugin = { id: "probe", inject: ["exchange.append", "exchange.read"], apply() {} };
+  const modules: Record<string, Plugin> = { "exchange.ts": exchange, "probe.ts": probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)]! }) });
   await loader.apply([
-    { id: "exchange", pack: "exchange.ts" },
-    { id: "probe", pack: "probe.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "probe", plugin: "probe.ts" },
   ]);
   const ctx = loader.fiber("probe")!.ctx;
   const append = ctx.get<ExchangeAppend>("exchange.append");
@@ -87,15 +87,15 @@ const act = (run: string, time: string, output: string): Omit<ExchangeEvent, "id
   act: { kind: "tool", input: { q: "é" }, output } as unknown as ExchangeEvent["act"],
 });
 
-/** The pack over a journal file, as a fresh start reads it. */
-async function packOver(journal: string) {
+/** The plugin over a journal file, as a fresh start reads it. */
+async function pluginOver(journal: string) {
   const rt = new Runtime();
-  const probe: Pack = { id: "probe", inject: ["exchange.append", "exchange.read"], apply() {} };
-  const modules: Record<string, Pack> = { "exchange.ts": exchange, "probe.ts": probe };
+  const probe: Plugin = { id: "probe", inject: ["exchange.append", "exchange.read"], apply() {} };
+  const modules: Record<string, Plugin> = { "exchange.ts": exchange, "probe.ts": probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)]! }) });
   await loader.apply([
-    { id: "exchange", pack: "exchange.ts", config: { journal } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "exchange", plugin: "exchange.ts", config: { journal } },
+    { id: "probe", plugin: "probe.ts" },
   ]);
   const ctx = loader.fiber("probe")!.ctx;
   return { append: ctx.get<ExchangeAppend>("exchange.append"), read: ctx.get<ExchangeRead>("exchange.read") };
@@ -105,7 +105,7 @@ test("with a journal, an act's body stays in the file and a page reads it back w
   const dir = mkdtempSync(join(tmpdir(), "exchange-"));
   try {
     const file = join(dir, "exchange.jsonl");
-    const first = await packOver(file);
+    const first = await pluginOver(file);
     await first.append.append(begin("r", "2026-11-24T09:00:00Z", "R"));
     await first.append.append(act("r", "2026-11-24T09:01:00Z", "ü".repeat(70_000)));
     await first.append.append(say("r", "2026-11-24T09:02:00Z"));
@@ -113,7 +113,7 @@ test("with a journal, an act's body stays in the file and a page reads it back w
     const before = (await first.read.events("r")).items;
     assert.equal((before[1]!.act as { output: string }).output.length, 70_000);
     assert.equal((before[3]!.act as { output: string }).output, "second");
-    const again = await packOver(file);
+    const again = await pluginOver(file);
     const after = (await again.read.events("r")).items;
     assert.deepEqual(after, before);
     assert.equal((await again.read.events("r", { after: "3", limit: 1 })).items[0]!.act !== undefined, true);

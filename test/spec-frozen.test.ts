@@ -4,28 +4,35 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { ACCEPTED, EDITION } from "../spec/common.ts";
-import { readFrozen, surface } from "../scripts/spec-surface.ts";
+import { asNow, readFrozen, surface } from "../scripts/spec-surface.ts";
 
 const HOW =
   "An accepted meaning never changes (spec/README.md). Make the change a new capability with a new key, " +
   "or a new term, and retire the old one (`retired` on its entry); accept the edition with " +
   "`node scripts/spec-surface.ts --accept`, which adds entries and never rewrites one.";
 
-test("every accepted part of the spec is as it was accepted", () => {
-  const frozen = readFrozen();
+test("every accepted part of the spec is as it was accepted, a renamed word read renamed", async () => {
+  const frozen = await asNow(readFrozen());
   const now = surface();
-  const changed = Object.keys(frozen.entries).filter((k) => k in now && now[k] !== frozen.entries[k]);
-  const gone = Object.keys(frozen.entries).filter((k) => !(k in now));
-  for (const k of changed) assert.equal(now[k], frozen.entries[k], `${k} changed. ${HOW}`);
+  const changed = Object.keys(frozen).filter((k) => k in now && now[k] !== frozen[k]);
+  const gone = Object.keys(frozen).filter((k) => !(k in now));
+  for (const k of changed) assert.equal(now[k], frozen[k], `${k} changed. ${HOW}`);
   assert.deepEqual(gone, [], `gone from the spec: ${gone.join(", ")}. ${HOW}`);
 });
 
-test("the frozen surface is the accepted edition's, and nothing past it is accepted silently", () => {
+test("a rename reads an accepted entry with its word moved, case kept, and nothing else", async () => {
+  const { renamed } = await import("../spec/common.ts");
+  assert.equal(renamed("export type PackId = string; packs: PACKS; fieldPack"), "export type PluginId = string; plugins: PLUGINS; fieldPlugin");
+  assert.equal(renamed("package.json"), "package.json");
+});
+
+test("the frozen surface is the accepted edition's, and nothing past it is accepted silently", async () => {
   const frozen = readFrozen();
+  const read = await asNow(frozen);
   assert.equal(frozen.accepted, ACCEPTED, "spec/common.ts ACCEPTED and test/spec-frozen.json disagree: accept with the script");
   assert.ok(ACCEPTED <= EDITION);
   // Entries beyond the frozen ones are an edition not accepted yet: only allowed while EDITION is past ACCEPTED.
-  const fresh = Object.keys(surface()).filter((k) => !(k in frozen.entries));
+  const fresh = Object.keys(surface()).filter((k) => !(k in read));
   if (EDITION === ACCEPTED) assert.deepEqual(fresh, [], `new in the spec while edition ${EDITION} is accepted: raise EDITION for them (${fresh.join(", ")})`);
 });
 

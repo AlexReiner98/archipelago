@@ -58,27 +58,27 @@ export interface GraphWatch {
 /**
  * One stage of the write chain. It sees the proposed set and calls `next`
  * to pass it on. A check refuses by throwing `Refused` before calling
- * `next` (the schema pack). A record acts after `next` returns, so it only
- * sees what was applied (the history pack). No stage changes the facts: a
+ * `next` (the schema plugin). A record acts after `next` returns, so it only
+ * sees what was applied (the history plugin). No stage changes the facts: a
  * stage that wants a different change refuses and says what would pass.
  */
 export type Stage = (change: Proposed, next: (change: Proposed) => Promise<Committed>) => Promise<Committed>;
 
 /**
- * `graph.stage`. Stages chain in config-tree order of their packs
+ * `graph.stage`. Stages chain in config-tree order of their plugins
  * (`byPosition` in common.ts): the first is outermost, the store is last.
  */
 export interface GraphStage {
-  /** Adds a stage, as the calling pack's. */
+  /** Adds a stage, as the calling plugin's. */
   stage(run: Stage): Dispose;
 }
 
-/** `graph.commit`: the chain's entry. Only the action pack should be given it. */
+/** `graph.commit`: the chain's entry. Only the action plugin should be given it. */
 export interface GraphCommit {
   /**
-   * Sends a change set down the chain to the store. The action pack fills
+   * Sends a change set down the chain to the store. The action plugin fills
    * the header from contexts, not from what callers say: `actor` and `run`
-   * from the invoking context, `pack` from the context that registered the
+   * from the invoking context, `plugin` from the context that registered the
    * outermost action.
    */
   commit(change: Proposed): Promise<Committed>;

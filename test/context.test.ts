@@ -5,16 +5,16 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { ActionInvoke } from "../spec/action.ts";
 import type { AgentNode, NodeInfo } from "../spec/agent.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import claudeCode from "../packs/claude-code/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import transcript from "../packs/transcript/index.ts";
-import context, { sizeOf } from "../packs/context/index.ts";
-import { DEFAULT_LIMIT, LONG_LIMIT, limitOf, tokensOf, windowAt, type Ev, type GivenRow, type Window } from "../packs/context/window.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import claudeCode from "../plugins/claude-code/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import transcript from "../plugins/transcript/index.ts";
+import context, { sizeOf } from "../plugins/context/index.ts";
+import { DEFAULT_LIMIT, LONG_LIMIT, limitOf, tokensOf, windowAt, type Ev, type GivenRow, type Window } from "../plugins/context/window.ts";
 
 const T = (min: number) => new Date(Date.UTC(2026, 10, 1, 10, min)).toISOString();
 let seq = 0;
@@ -22,10 +22,10 @@ const ev = (min: number, kind: string, more: Partial<Ev> = {}): Ev => ({ seq: ++
 
 /** A small run: the map says two things, the agent works, a compaction, one said again. */
 const nodes: NodeInfo[] = [
-  { id: "words/branch", pack: "words", name: "branch", kind: "instruction", title: "Stay on the branch", at: ["session_start"] },
-  { id: "words/paths", pack: "words", name: "paths", kind: "instruction", title: "Quote paths", at: ["tool:Bash"] },
-  { id: "schema/check", pack: "schema", name: "check", kind: "rule", title: "Fits its type", at: ["tool:mcp__archipelago__act"] },
-  { id: "loaded/docs", pack: "loaded", name: "docs", kind: "skill", title: "docs", at: ["skill:docs"] },
+  { id: "words/branch", plugin: "words", name: "branch", kind: "instruction", title: "Stay on the branch", at: ["session_start"] },
+  { id: "words/paths", plugin: "words", name: "paths", kind: "instruction", title: "Quote paths", at: ["tool:Bash"] },
+  { id: "schema/check", plugin: "schema", name: "check", kind: "rule", title: "Fits its type", at: ["tool:mcp__archipelago__act"] },
+  { id: "loaded/docs", plugin: "loaded", name: "docs", kind: "skill", title: "docs", at: ["skill:docs"] },
 ];
 seq = 0;
 const events: Ev[] = [
@@ -116,34 +116,34 @@ test("the window's limit: from the model's name, or from more seen than the usua
   assert.equal(sizeOf({ id: "x", run: "r", seq: 1, time: T(0), direction: "to_agent", kind: "say", text: "hello" }), 5);
 });
 
-test("the pack: context.window from the run's events and its transcript, paged, nothing written", async () => {
+test("the plugin: context.window from the run's events and its transcript, paged, nothing written", async () => {
   const dir = await mkdtemp(join(tmpdir(), "context-"));
   const path = join(dir, "sess.jsonl");
   await writeFile(path, "");
-  const said: Pack = {
+  const said: Plugin = {
     id: "said",
     inject: ["agent.node"],
     apply(ctx) {
       ctx.get<AgentNode>("agent.node").node({ name: "hello", kind: "instruction", title: "Hello", at: ["session_start"], speak: () => ({ say: "Hello from the map, at the start of every run." }) });
     },
   };
-  const probe: Pack = { id: "probe", inject: ["action.invoke"], apply() {} };
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "transcript.ts": transcript, "context.ts": context, "cc.ts": claudeCode, "said.ts": said, "probe.ts": probe };
+  const probe: Plugin = { id: "probe", inject: ["action.invoke"], apply() {} };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "transcript.ts": transcript, "context.ts": context, "cc.ts": claudeCode, "said.ts": said, "probe.ts": probe };
   let port = 0;
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   await loader.apply([
-    { id: "graph", pack: "graph.ts", config: { db: join(dir, "graph.sqlite") } },
-    { id: "action", pack: "action.ts" },
-    { id: "exchange", pack: "exchange.ts", config: { journal: join(dir, "exchange.jsonl") } },
-    { id: "agent", pack: "agent.ts" },
-    { id: "said", pack: "said.ts" },
-    { id: "transcript", pack: "transcript.ts" },
-    { id: "context", pack: "context.ts" },
-    { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts", config: { db: join(dir, "graph.sqlite") } },
+    { id: "action", plugin: "action.ts" },
+    { id: "exchange", plugin: "exchange.ts", config: { journal: join(dir, "exchange.jsonl") } },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "said", plugin: "said.ts" },
+    { id: "transcript", plugin: "transcript.ts" },
+    { id: "context", plugin: "context.ts" },
+    { id: "claude-code", plugin: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "probe", plugin: "probe.ts" },
   ]);
   const hook = (event: string, more: object = {}) =>
     fetch(`http://127.0.0.1:${port}/hook`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hook_event_name: event, session_id: "sess-c", cwd: dir, transcript_path: path, ...more }) }).then((r) => r.json());
@@ -229,7 +229,7 @@ test("the window with the conversation: each node in the window or dropped by it
 });
 
 test("one node's share over time: said pieces pile up and a compaction drops them, a start node holds its latest size", async () => {
-  const { trendOf } = await import("../packs/context/trend.ts");
+  const { trendOf } = await import("../plugins/context/trend.ts");
   const said = trendOf({ pieces: [{ time: T(1), tokens: 10 }, { time: T(2), tokens: 30 }, { time: T(6), tokens: 5 }], compactions: [T(5)], stays: "said" });
   assert.deepEqual([said.now, said.peak, said.total, said.dropped, said.count, said.inWindow], [5, 40, 45, 40, 3, 1]);
   assert.deepEqual(said.points.map((p) => p.tokens), [10, 40, 0, 5], "each piece a step up, the compaction a drop");

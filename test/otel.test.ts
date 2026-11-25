@@ -5,15 +5,15 @@ import { test } from "node:test";
 import type { ActionInvoke, ActionRegister } from "../spec/action.ts";
 import type { AgentNode, AgentRun } from "../spec/agent.ts";
 import { LIMIT_MAX } from "../spec/graph.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import otel, { type OtelConfig } from "../packs/otel/index.ts";
-import { placeOf, traceOf, tracesUrl, shownUrl, type KeyValue, type Span } from "../packs/otel/spans.ts";
-import { markOf } from "../packs/otel/view.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import otel, { type OtelConfig } from "../plugins/otel/index.ts";
+import { placeOf, traceOf, tracesUrl, shownUrl, type KeyValue, type Span } from "../plugins/otel/spans.ts";
+import { markOf } from "../plugins/otel/view.ts";
 import { otelFromEnv } from "../app/tree.ts";
 
 const RUN = "5f0c2a9e-1b7d-4c3e-9a8f-0123456789ab";
@@ -42,8 +42,8 @@ async function receiver(fail = 0) {
   return { got, endpoint: `http://127.0.0.1:${port}`, close: () => new Promise<void>((r) => server.close(() => r())) };
 }
 
-/** Stands in for the transcript pack: the run's token use. */
-const fakeTranscript: Pack = {
+/** Stands in for the transcript plugin: the run's token use. */
+const fakeTranscript: Plugin = {
   id: "transcript",
   inject: ["action.register"],
   apply(ctx) {
@@ -65,7 +65,7 @@ const fakeTranscript: Pack = {
 };
 
 /** A node that speaks before every tool call. */
-const speaker: Pack = {
+const speaker: Plugin = {
   id: "speaker",
   inject: ["agent.node"],
   apply(ctx) {
@@ -73,16 +73,16 @@ const speaker: Pack = {
   },
 };
 
-const probe: Pack = { id: "probe", inject: ["agent.run", "action.invoke"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["agent.run", "action.invoke"], apply() {} };
 
 async function start(config: OtelConfig) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { graph, action, exchange, agent, speaker, transcript: fakeTranscript, otel, probe } as Record<string, Pack>;
-  const BASE = "mem:/packs/";
+  const modules: Record<string, Plugin> = { graph, action, exchange, agent, speaker, transcript: fakeTranscript, otel, probe } as Record<string, Plugin>;
+  const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
-  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, pack: id, ...(id === "otel" ? { config } : {}) }));
+  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, plugin: id, ...(id === "otel" ? { config } : {}) }));
   await loader.apply(tree);
   await rt.settle();
   const ctx = (run: string) => loader.fiber("probe")!.ctx.intercept({ actor: { id: "e_agent", kind: "agent" }, run });
@@ -229,7 +229,7 @@ test("otel: off without an endpoint; a failed send is tried once more, and its s
     assert.ok(st.ok);
     assert.equal((st.output as any).on, false);
     assert.equal(markOf(st.output as any, RUN), undefined, "nothing shows while off");
-    // Not a list: the action pack refuses it against the declared input, before otel sees it.
+    // Not a list: the action plugin refuses it against the declared input, before otel sees it.
     const bad = await off.invoke("otel.status", { runs: "x" });
     assert.ok(!bad.ok && bad.refused.code === "action.input");
     // A list past the read limit: otel's own refusal.

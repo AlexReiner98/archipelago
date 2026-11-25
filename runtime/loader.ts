@@ -2,8 +2,8 @@
  * The loader (Cordis §5.2): a config tree the orchestrator edits, realised
  * as fibers and kept in step with them.
  *
- * - An entry names a pack module, its config, whether it is disabled, and
- *   the interception metadata its context carries. An entry without a pack
+ * - An entry names a plugin module, its config, whether it is disabled, and
+ *   the interception metadata its context carries. An entry without a plugin
  *   is a group: its children inherit `disabled` and `intercept`.
  * - Applying a tree reconciles by id and changes each fiber the least it
  *   can: a new url rebuilds it, a new config reloads it, `disabled` unloads
@@ -14,16 +14,16 @@
  *   and swaps fibers only if every import succeeded.
  *
  * Isomorphic: the host gives it `import`. It provides `loader.tree`
- * (spec/loader.md) on the runtime's root, so a pack can edit the tree too.
+ * (spec/loader.md) on the runtime's root, so a plugin can edit the tree too.
  */
 import type { LoaderTree } from "../spec/loader.ts";
-import type { Context, Fiber, Meta, Pack, Runtime, State } from "./core.ts";
+import type { Context, Fiber, Meta, Plugin, Runtime, State } from "./core.ts";
 
 export interface Entry {
   /** Stable: the key the tree is reconciled by. */
   id: string;
-  /** The pack module's URL, relative to the loader's base. Absent: a group. */
-  pack?: string;
+  /** The plugin module's URL, relative to the loader's base. Absent: a group. */
+  plugin?: string;
   config?: unknown;
   disabled?: boolean;
   /** Interception metadata for its context (`actor`, `run`, …). */
@@ -35,13 +35,13 @@ export interface Entry {
 export interface LoaderOptions {
   /** What entry urls resolve against. */
   base: string;
-  /** Imports a pack module. The host decides how a changed module is fetched fresh. */
+  /** Imports a plugin module. The host decides how a changed module is fetched fresh. */
   import(url: string): Promise<unknown>;
 }
 
 export interface EntryStatus {
   id: string;
-  pack?: string;
+  plugin?: string;
   /**
    * `off`: disabled in the tree. `waiting`: on, but a capability it injects
    * isn't provided (see `missing`). `failed`: its import or apply threw.
@@ -72,14 +72,14 @@ interface Planned {
   meta: Meta;
 }
 
-/** The pack a module exports. */
-export function packOf(mod: unknown, url: string): Pack {
+/** The plugin a module exports. */
+export function pluginOf(mod: unknown, url: string): Plugin {
   const m = mod as { default?: unknown };
-  const pack = (m && typeof m === "object" && "default" in m ? m.default : mod) as Pack;
-  if (!pack || typeof pack.id !== "string" || typeof pack.apply !== "function") {
-    throw new Error(`${url} does not export a pack (an object with id and apply)`);
+  const plugin = (m && typeof m === "object" && "default" in m ? m.default : mod) as Plugin;
+  if (!plugin || typeof plugin.id !== "string" || typeof plugin.apply !== "function") {
+    throw new Error(`${url} does not export a plugin (an object with id and apply)`);
   }
-  return pack;
+  return plugin;
 }
 
 /** The tree's entries copied, configs shared: a config may hold functions, which can't be cloned. */
@@ -120,8 +120,8 @@ export class Loader {
     return next;
   }
 
-  url(pack: string): string {
-    return new URL(pack, this.options.base).href;
+  url(plugin: string): string {
+    return new URL(plugin, this.options.base).href;
   }
 
   private plan(tree: Entry[]): Map<string, Planned> {
@@ -130,7 +130,7 @@ export class Loader {
       entries.forEach((entry, i) => {
         if (out.has(entry.id)) throw new Error(`config tree: the id ${entry.id} is used twice`);
         const p = { entry, path: [...path, i], disabled: disabled || !!entry.disabled, meta: { ...meta, ...entry.intercept } };
-        out.set(entry.id, { ...p, url: entry.pack ? this.url(entry.pack) : undefined });
+        out.set(entry.id, { ...p, url: entry.plugin ? this.url(entry.plugin) : undefined });
         if (entry.children) walk(entry.children, p.path, p.disabled, p.meta);
       });
     };
@@ -160,7 +160,7 @@ export class Loader {
 
     const fresh = [...plan.values()].filter((p) => !this.nodes.has(p.entry.id));
     const imported = await Promise.allSettled(
-      fresh.map((p) => (p.url ? this.options.import(p.url).then((m) => packOf(m, p.url!)) : Promise.resolve(undefined))),
+      fresh.map((p) => (p.url ? this.options.import(p.url).then((m) => pluginOf(m, p.url!)) : Promise.resolve(undefined))),
     );
 
     const changes: Promise<void>[] = [];
@@ -209,9 +209,9 @@ export class Loader {
     }
   }
 
-  private instantiate(node: Node, pack: Pack): Fiber {
+  private instantiate(node: Node, plugin: Plugin): Fiber {
     const ctx: Context = this.runtime.root.intercept(node.meta);
-    const fiber = ctx.plugin(pack, node.entry.config, { position: () => node.path, disabled: node.disabled, source: node.url });
+    const fiber = ctx.plugin(plugin, node.entry.config, { position: () => node.path, disabled: node.disabled, source: node.url });
     return fiber;
   }
 
@@ -225,11 +225,11 @@ export class Loader {
     const set = new Set(urls);
     return this.serial(async () => {
       const stale = [...this.nodes.values()].filter((n) => n.url && set.has(n.url));
-      const packs = await Promise.all(stale.map((n) => this.options.import(n.url!).then((m) => packOf(m, n.url!))));
+      const plugins = await Promise.all(stale.map((n) => this.options.import(n.url!).then((m) => pluginOf(m, n.url!))));
       await Promise.all(stale.map((n) => n.fiber?.dispose()));
       stale.forEach((n, i) => {
         n.error = undefined;
-        n.fiber = this.instantiate(n, packs[i]!);
+        n.fiber = this.instantiate(n, plugins[i]!);
       });
       await this.runtime.settle();
       return stale.map((n) => n.entry.id);
@@ -271,7 +271,7 @@ export class Loader {
                 : f.state;
         return {
           id: n.entry.id,
-          pack: f?.pack.id,
+          plugin: f?.plugin.id,
           state,
           position: n.path,
           ...(missing.length ? { missing } : {}),

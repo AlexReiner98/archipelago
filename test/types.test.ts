@@ -3,23 +3,23 @@ import { test } from "node:test";
 import type { ActionInvoke } from "../spec/action.ts";
 import type { GraphRead } from "../spec/graph.ts";
 import type { LinkInfo, TypeInfo, TypesAcyclic, TypesDefine, TypesMark, TypesRead } from "../spec/types.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import actor from "../packs/actor/index.ts";
-import graph from "../packs/graph/index.ts";
-import items from "../packs/items/index.ts";
-import links from "../packs/links/index.ts";
-import question from "../packs/question/index.ts";
-import record from "../packs/record/index.ts";
-import types from "../packs/types/index.ts";
-import work from "../packs/work/index.ts";
+import action from "../plugins/action/index.ts";
+import actor from "../plugins/actor/index.ts";
+import graph from "../plugins/graph/index.ts";
+import items from "../plugins/items/index.ts";
+import links from "../plugins/links/index.ts";
+import question from "../plugins/question/index.ts";
+import record from "../plugins/record/index.ts";
+import types from "../plugins/types/index.ts";
+import work from "../plugins/work/index.ts";
 
-const BASE = "mem:/packs/";
-const probe: Pack = { id: "probe", inject: ["types.define", "types.read", "types.mark", "types.acyclic", "action.invoke", "graph.read"], apply() {} };
-const modules: Record<string, Pack> = { graph, action, types, work, question, record, actor, links, items, probe };
+const BASE = "mem:/plugins/";
+const probe: Plugin = { id: "probe", inject: ["types.define", "types.read", "types.mark", "types.acyclic", "action.invoke", "graph.read"], apply() {} };
+const modules: Record<string, Plugin> = { graph, action, types, work, question, record, actor, links, items, probe };
 
-const TREE: Entry[] = ["graph", "action", "types", "work", "question", "record", "actor", "links", "items", "probe"].map((id) => ({ id, pack: `${id}.ts` }));
+const TREE: Entry[] = ["graph", "action", "types", "work", "question", "record", "actor", "links", "items", "probe"].map((id) => ({ id, plugin: `${id}.ts` }));
 
 async function setup(tree = TREE) {
   const rt = new Runtime();
@@ -50,11 +50,11 @@ test("the four bases and five links are defined, each with its statuses and the 
   const w = p.read().get("work") as TypeInfo;
   assert.deepEqual(w.statuses, { open: ["todo", "doing"], closed: ["done", "dropped"] });
   assert.ok(w.fields.title && w.fields.note && w.fields.status && w.fields.priority);
-  assert.equal(w.pack, "work");
+  assert.equal(w.plugin, "work");
   assert.deepEqual((p.read().get("waits_on") as LinkInfo).to, ["actor"]);
 });
 
-test("each base is drawn in the shape its pack names; one none names takes the first shape left", async () => {
+test("each base is drawn in the shape its plugin names; one none names takes the first shape left", async () => {
   const { loader, rt, p } = await setup();
   assert.deepEqual(p.mark().marks(), { work: "square", question: "diamond", record: "circle", actor: "triangle" });
   let heard = 0;
@@ -72,7 +72,7 @@ test("each base is drawn in the shape its pack names; one none names takes the f
   assert.throws(() => p.mark().mark("other", "star" as never), /not a mark shape/);
   await drop();
   assert.equal(p.mark().marks().place, "pentagon");
-  // A base's pack unloading takes its shape back: the shape is free for the next base none names.
+  // A base's plugin unloading takes its shape back: the shape is free for the next base none names.
   await loader.edit((t) => (t.find((e) => e.id === "work")!.disabled = true, t));
   await rt.settle();
   assert.equal(p.mark().marks().work, undefined);
@@ -96,7 +96,7 @@ test("a flavour adds fields to its base and starts as a trial; it can't redefine
   assert.throws(() => d.base({ name: "work", statuses: { open: ["a"], closed: [] }, fields: {} }), /already defined by work/);
 });
 
-test("a base's pack unloading takes its type back, and its flavours with it until it returns", async () => {
+test("a base's plugin unloading takes its type back, and its flavours with it until it returns", async () => {
   const { loader, rt, p } = await setup();
   p.define().flavour({ name: "bug", base: "work", fields: {} });
   await loader.edit((t) => (t.find((e) => e.id === "work")!.disabled = true, t));
@@ -121,7 +121,7 @@ test("items.create makes an item at its base's first open status, part_of linked
   if (!step.ok) return;
   const facts = step.committed!.facts;
   assert.equal(step.committed!.header.action, "items.create");
-  assert.equal(step.committed!.header.pack.id, "items");
+  assert.equal(step.committed!.header.plugin.id, "items");
   assert.ok(facts.some(([, , f, v]) => f === "type" && v === "part_of"));
   assert.ok(facts.some(([, , f, v]) => f === "to" && v === hubId));
 });
@@ -181,7 +181,7 @@ test("items.link checks the ends' bases; items.unlink takes the link away whole"
   assert.ok(!notLink.ok && notLink.refused.code === "items.not_a_link");
 });
 
-test("a kind of link is held acyclic while any pack holds it", async () => {
+test("a kind of link is held acyclic while any plugin holds it", async () => {
   const { p } = await setup();
   let heard = 0;
   p.acyclic().watch(() => heard++);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { inline, parse, refs } from "../packs/item/note.ts";
-import { ago, brief, lines, marks, neighbours, others, shown } from "../packs/item/read.ts";
+import { inline, parse, refs } from "../plugins/item/note.ts";
+import { ago, brief, lines, marks, neighbours, others, shown } from "../plugins/item/read.ts";
 
 test("a note: the lead before the first heading, each heading a section to fold", () => {
   const n = parse(

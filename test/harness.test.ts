@@ -7,28 +7,28 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ExchangeEvent } from "../spec/exchange.ts";
-import { asText, expand, fold, pretty } from "../packs/harness/expand.ts";
+import { asText, expand, fold, pretty } from "../plugins/harness/expand.ts";
 import type { NodeInfo, RunInfo } from "../spec/agent.ts";
 import { HUES } from "../spec/style.ts";
-import { colourOf, colours, isLive, keepLast, liveRuns, LIVE_MOST } from "../packs/harness/live.ts";
-import { groupsOf } from "../packs/harness/hooks.ts";
-import { DECIDED, dotsBox, nameOf, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
-import { fitKey, HIT_PX, nearest, shouldFit } from "../packs/harness/canvas.ts";
-import { crowded, quadsOverlap, type Quad } from "../packs/harness/labels.ts";
-import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
-import { placementOf, placementText } from "../packs/harness/agents.ts";
-import { DIALS, dialsOf } from "../packs/harness/dials.ts";
-import { focusOf, heardBy, switchFocus, transitionName, treesAndRows } from "../packs/harness/trees.ts";
-import { landsLive } from "../packs/harness/hooks.ts";
-import { gotAt } from "../packs/harness/got.ts";
+import { colourOf, colours, isLive, keepLast, liveRuns, LIVE_MOST } from "../plugins/harness/live.ts";
+import { groupsOf } from "../plugins/harness/hooks.ts";
+import { DECIDED, dotsBox, nameOf, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, pluginHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../plugins/harness/layout.ts";
+import { easeView, fitKey, HIT_PX, nearest, shouldFit } from "../plugins/harness/canvas.ts";
+import { crowded, quadsOverlap, type Quad } from "../plugins/harness/labels.ts";
+import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../plugins/harness/replay.ts";
+import { placementOf, placementText } from "../plugins/harness/agents.ts";
+import { DIALS, dialsOf } from "../plugins/harness/dials.ts";
+import { focusOf, heardBy, switchFocus, transitionName, treesAndRows } from "../plugins/harness/trees.ts";
+import { landsLive } from "../plugins/harness/hooks.ts";
+import { gotAt } from "../plugins/harness/got.ts";
 
 const base = { id: "e1", run: "r", seq: 3, time: "2026-11-21T09:00:00Z" };
 const labels = (e: ExchangeEvent) => expand(e).map((p) => p.label);
 
-test("a say: its node, place, pack and the words whole", () => {
+test("a say: its node, place, plugin and the words whole", () => {
   const words = "One line per row.\nA row never wraps.";
-  const parts = expand({ ...base, direction: "to_agent", kind: "say", node: "words/one-line", place: "file:packs/x.ts", pack: "words", text: words });
-  assert.deepEqual(parts.map((p) => p.label), ["kind", "node", "place", "pack", "said", "at"]);
+  const parts = expand({ ...base, direction: "to_agent", kind: "say", node: "words/one-line", place: "file:plugins/x.ts", plugin: "words", text: words });
+  assert.deepEqual(parts.map((p) => p.label), ["kind", "node", "place", "plugin", "said", "at"]);
   assert.equal(parts.find((p) => p.label === "said")!.text, words);
 });
 
@@ -97,12 +97,12 @@ test("asText: strings as they are, values as indented JSON", () => {
 
 // ---------- the tree (layout.ts) ----------
 
-const node = (pack: string, name: string, at: string[], kind = "reflex", title = name): NodeInfo => ({ id: `${pack}/${name}`, pack, name, kind, title, at });
+const node = (plugin: string, name: string, at: string[], kind = "reflex", title = name): NodeInfo => ({ id: `${plugin}/${name}`, plugin, name, kind, title, at });
 
 const NODES: NodeInfo[] = [
   node("words", "start", ["session_start"], "instruction", "Says the run is recorded"),
   node("words", "spec", ["file:spec/**"], "reflex", "The spec is the owner's"),
-  node("words", "packs", ["file:packs/map/*.ts"]),
+  node("words", "plugins", ["file:plugins/map/*.ts"]),
   node("words", "change1", ["tool:mcp__pelago__change"]),
   node("words", "change2", ["tool:mcp__pelago__change"]),
   node("words", "report", ["tool:mcp__pelago__report"]),
@@ -119,10 +119,10 @@ test("boughsOf: a place's boughs, the general first", () => {
   assert.deepEqual(boughsOf("tool:mcp__pelago__change").map((b) => b.key), ["tool", "tool:mcp__pelago", "tool:mcp__pelago__change"]);
   assert.deepEqual(boughsOf("tool:mcp__pelago__change").map((b) => b.title), ["tool", "pelago", "change"]);
   // A file glob: its plain top folders, up to the file depth; never the globbed part.
-  assert.deepEqual(boughsOf("file:packs/map/x/*.ts").map((b) => b.key), ["file", "file:packs/", "file:packs/map/"]);
+  assert.deepEqual(boughsOf("file:plugins/map/x/*.ts").map((b) => b.key), ["file", "file:plugins/", "file:plugins/map/"]);
   assert.deepEqual(boughsOf("file:spec/**").map((b) => b.key), ["file", "file:spec/"]);
   assert.deepEqual(boughsOf("file:**").map((b) => b.key), ["file"]);
-  assert.deepEqual(boughsOf("file:packs/map/x/y.ts", 1).map((b) => b.key), ["file", "file:packs/"]);
+  assert.deepEqual(boughsOf("file:plugins/map/x/y.ts", 1).map((b) => b.key), ["file", "file:plugins/"]);
   // A memory's path is not a bough: only its scope.
   assert.deepEqual(boughsOf("memory:project/~/x/CLAUDE.md").map((b) => b.key), ["memory", "memory:project"]);
   assert.deepEqual(boughsOf("skill:anthropic-skills:docs").map((b) => b.title), ["skill", "anthropic-skills", "docs"]);
@@ -141,8 +141,8 @@ test("treeOf: every said node once, under its first place", () => {
   // A bough with one kid below the first level is folded into it.
   assert.equal(t.byId.get("words/bash")!.parent!.id, "~:tool");
   assert.equal(t.byId.get("~:tool:Bash"), undefined);
-  assert.equal(t.byId.get("words/packs")!.parent!.id, "~:file");
-  assert.equal(t.byId.get("words/packs")!.depth, 2);
+  assert.equal(t.byId.get("words/plugins")!.parent!.id, "~:file");
+  assert.equal(t.byId.get("words/plugins")!.depth, 2);
   assert.equal(t.byId.get("loaded/docs")!.parent!.id, "~:skill");
   assert.equal(t.byId.get("words/report")!.parent!.id, "~:tool:mcp__pelago");
   assert.equal(t.byId.get("~:session_start")!.kids.length, 1);
@@ -158,15 +158,15 @@ test("treeOf: every said node once, under its first place", () => {
   }
 });
 
-test("treeOf: never-said nodes on request, and by pack", () => {
+test("treeOf: never-said nodes on request, and by plugin", () => {
   const t = treeOf(NODES, { unsaid: true });
   assert.equal(t.hidden, 0);
   assert.equal(t.byId.get("words/kept")!.parent!.id, "~:never");
-  const p = treeOf(NODES, { by: "pack" });
+  const p = treeOf(NODES, { by: "plugin" });
   assert.equal(p.hidden, 0);
   assert.deepEqual(p.root.kids.map((k) => k.title), ["grow", "loaded", "words"]);
-  assert.equal(p.byId.get("loaded/mem")!.parent!.id, "~:pack:loaded");
-  assert.equal(p.byId.get("words/start")!.parent!.id, "~:pack:words:instruction");
+  assert.equal(p.byId.get("loaded/mem")!.parent!.id, "~:plugin:loaded");
+  assert.equal(p.byId.get("words/start")!.parent!.id, "~:plugin:words:instruction");
 });
 
 test("treeOf: the same nodes in any order make the same tree", () => {
@@ -235,19 +235,29 @@ test("radial: the ring grows until leaves' names clear each other", () => {
   assert.equal(radial(huge).ring, STYLE.ringMost);
 });
 
-test("radial: names read left to right and point away from their dot", () => {
+test("radial: names read left to right and point away from their dot; the root's boughs are named level, over their dot", () => {
   const t = treeOf(NODES);
   const p = radial(t);
+  let level = 0;
   for (const n of t.order) {
     if (!n.parent) continue;
     const l = p.labels.get(n.id)!;
     assert.ok(l.turn > -90 - 1e-6 && l.turn <= 90 + 1e-6, `${n.id} turned ${l.turn}`);
+    if (n.parent === t.root && n.kids.length) {
+      // Level, centred on its dot, above it: the root's boughs' names never meet at the root.
+      assert.equal(l.turn, 0, n.id);
+      assert.equal(l.anchor, "start");
+      assert.ok(l.dx < 0 && l.dy < 0, n.id);
+      level++;
+      continue;
+    }
     const out = n.kids.length ? -1 : 1;
     const x = p.xy.get(n.id)!.x;
     // A leaf's name runs outward: away from the middle on its side.
     const outward = (l.anchor === "start") === (x >= -1e-6);
     assert.equal(outward, out > 0, n.id);
   }
+  assert.ok(level > 0, "the fixture has boughs off the root");
 });
 
 test("route: from the root through each bough to the node", () => {
@@ -267,8 +277,8 @@ test("route: from the root through each bough to the node", () => {
   assert.deepEqual(pointAt([], 0.5), [0, 0]);
 });
 
-test("packHues, branchAt and cut", () => {
-  const h = packHues(["words", "loaded", "grow", "harness", "loaded"]);
+test("pluginHues, branchAt and cut", () => {
+  const h = pluginHues(["words", "loaded", "grow", "harness", "loaded"]);
   assert.equal(h.get("words"), STYLE.colors.owner);
   assert.equal(h.get("grow"), STYLE.colors.learned);
   assert.equal(h.get("harness"), STYLE.hues[0]);
@@ -296,7 +306,7 @@ test("lightOf: a say lights its node, a refusal in red, an act sparks on its pla
 test("treeOf: by profile, each node under the nearest profile it comes from", () => {
   const profiles = new Map([
     ["words/start", ["Everyone"]],
-    ["words/packs", ["Archipelago", "Everyone"]],
+    ["words/plugins", ["Archipelago", "Everyone"]],
   ]);
   const t = treeOf(NODES.filter((n) => profiles.has(n.id)), { by: "profile", profiles });
   assert.deepEqual(t.root.kids.map((k) => k.title).sort(), ["Archipelago", "Everyone"]);
@@ -305,7 +315,7 @@ test("treeOf: by profile, each node under the nearest profile it comes from", ()
     for (let n = t.byId.get(id)!.parent; n; n = n.parent) ids.push(n.id);
     return ids;
   };
-  assert.ok(up("words/packs").includes("~:profile:Archipelago"));
+  assert.ok(up("words/plugins").includes("~:profile:Archipelago"));
   assert.ok(up("words/start").includes("~:profile:Everyone"));
 });
 
@@ -478,12 +488,12 @@ test("each agent's own tree: the nodes it hears, all while that isn't known; the
 test("placementOf: matched, the fallback, or none; a run that named the fallback itself is matched", () => {
   const p = (id: string, by: "match" | "part" = "match") => ({ id, title: id[0]!.toUpperCase() + id.slice(1), by, holding: true });
   const fallbacks = new Set(["arch"]);
-  assert.deepEqual(placementOf([p("aperture"), p("everyone", "part")], fallbacks), { kind: "matched", title: "Aperture", ids: ["aperture", "everyone"] });
+  assert.deepEqual(placementOf([p("aperture"), p("everyone", "part")], fallbacks), { kind: "matched", title: "Aperture", ids: ["aperture", "everyone"], id: "aperture" }, "the first it matched names its tree");
   assert.equal(placementOf([p("arch"), p("everyone", "part")], fallbacks).kind, "fallback");
   assert.equal(placementOf([p("arch")], fallbacks, ["arch"]).kind, "matched");
   assert.deepEqual(placementOf([], fallbacks), { kind: "none", title: "", ids: [] });
   assert.equal(placementText(placementOf([p("arch")], fallbacks)), "○ Arch");
-  assert.equal(placementText(placementOf([], fallbacks)), "– no umwelt");
+  assert.equal(placementText(placementOf([], fallbacks)), "– no context filter");
 });
 
 test("landsLive: nothing picked watches every live run; a run, every run or live turned off doesn't", () => {
@@ -563,7 +573,7 @@ test("shouldFit: every tree fits once and then only when asked", () => {
 });
 
 test("outgrown: a box past any edge of the camera's view", async () => {
-  const { outgrown } = await import("../packs/harness/camera.ts");
+  const { outgrown } = await import("../plugins/harness/camera.ts");
   const v = { x: 0, y: 0, k: 2 };
   assert.equal(outgrown({ x: 10, y: 10, width: 100, height: 100 }, v, 400, 400), false, "inside the 200 by 200 seen");
   assert.equal(outgrown({ x: 10, y: 10, width: 300, height: 100 }, v, 400, 400), true, "past the right");
@@ -571,7 +581,7 @@ test("outgrown: a box past any edge of the camera's view", async () => {
 });
 
 test("atFoot: new lines keep the list at its foot only when it is already there", async () => {
-  const { atFoot } = await import("../packs/harness/events.ts");
+  const { atFoot } = await import("../plugins/harness/events.ts");
   assert.equal(atFoot(1000, 600, 400), true);
   assert.equal(atFoot(1000, 590, 400), true, "within a little slack");
   assert.equal(atFoot(1000, 300, 400), false, "scrolled up to read: it stays put");
@@ -586,19 +596,19 @@ test("nearest: a press picks the nearest node within reach of its dot; none furt
 });
 
 test("channels: how a node reaches the agent, as its dot's shape; hang by channel, then who", async () => {
-  const { channelOf, shapeOf, shapePath } = await import("../packs/harness/channels.ts");
-  const node = (o: Partial<NodeInfo>): NodeInfo => ({ id: `words/${o.name ?? "n"}`, name: "n", pack: "words", kind: "instruction", title: "t", at: ["prompt"], ...o });
+  const { channelOf, shapeOf, shapePath } = await import("../plugins/harness/channels.ts");
+  const node = (o: Partial<NodeInfo>): NodeInfo => ({ id: `words/${o.name ?? "n"}`, name: "n", plugin: "words", kind: "instruction", title: "t", at: ["prompt"], ...o });
   assert.equal(channelOf(node({})), "hook");
   assert.equal(channelOf(node({ kind: "rule" })), "rule");
-  assert.equal(channelOf(node({ kind: "schema_check", pack: "schema" })), "rule");
-  assert.equal(channelOf(node({ kind: "memory", pack: "loaded" })), "file");
+  assert.equal(channelOf(node({ kind: "schema_check", plugin: "schema" })), "rule");
+  assert.equal(channelOf(node({ kind: "memory", plugin: "loaded" })), "file");
   assert.equal(channelOf(node({ at: ["skill:docs"] })), "file", "the map's words written into a skill");
   assert.equal(channelOf(node({ kind: "tool_text" })), "context");
-  assert.equal(channelOf(node({ pack: "transcript", kind: "given", name: "r#system" })), "context");
-  assert.equal(channelOf(node({ pack: "transcript", kind: "given", name: "r#hook:tool:Bash:guard" })), "hook");
+  assert.equal(channelOf(node({ plugin: "transcript", kind: "given", name: "r#system" })), "context");
+  assert.equal(channelOf(node({ plugin: "transcript", kind: "given", name: "r#hook:tool:Bash:guard" })), "hook");
   assert.deepEqual(["hook", "rule", "file", "context"].map((c) => shapeOf(c as never)), ["circle", "diamond", "square", "triangle"]);
   assert.match(shapePath("diamond", 4), /^M0 -5L5 0L0 5L-5 0Z$/);
-  const given = (name: string) => ({ ...node({ pack: "transcript", kind: "given", name: `r#${name}`, at: ["session_start"] }), id: `transcript/r#${name}`, by: "Claude Code" }) as NodeInfo;
+  const given = (name: string) => ({ ...node({ plugin: "transcript", kind: "given", name: `r#${name}`, at: ["session_start"] }), id: `transcript/r#${name}`, by: "Claude Code" }) as NodeInfo;
   const tree = treeOf([node({ name: "a" }), node({ name: "b", kind: "rule" }), node({ name: "c", kind: "rule" }), given("system"), given("model")], { by: "channel" });
   const path = (id: string) => {
     const out: string[] = [];
@@ -610,11 +620,11 @@ test("channels: how a node reaches the agent, as its dot's shape; hang by channe
 });
 
 test("the key filters: a channel, the map's own, or the harness's", async () => {
-  const { shows } = await import("../packs/harness/channels.ts");
-  const map = { kind: "instruction", pack: "words", at: ["prompt"], name: "w" };
-  const rule = { kind: "rule", pack: "words", at: ["tool:*"], name: "r" };
-  const sys = { kind: "given", pack: "transcript", at: ["session_start"], name: "run#system" };
-  const hook = { kind: "given", pack: "transcript", at: ["tool:Bash"], name: "run#hook:tool:Bash:guard" };
+  const { shows } = await import("../plugins/harness/channels.ts");
+  const map = { kind: "instruction", plugin: "words", at: ["prompt"], name: "w" };
+  const rule = { kind: "rule", plugin: "words", at: ["tool:*"], name: "r" };
+  const sys = { kind: "given", plugin: "transcript", at: ["session_start"], name: "run#system" };
+  const hook = { kind: "given", plugin: "transcript", at: ["tool:Bash"], name: "run#hook:tool:Bash:guard" };
   const all = [map, rule, sys, hook];
   const left = (off: string[]) => all.filter((n) => shows(n, new Set(off))).map((n) => n.name);
   assert.deepEqual(left([]), ["w", "r", "run#system", "run#hook:tool:Bash:guard"]);
@@ -625,7 +635,7 @@ test("the key filters: a channel, the map's own, or the harness's", async () => 
 });
 
 test("a channel's shape is bigger than a dot, and keeps a size on screen when zoomed out", async () => {
-  const { shapeRadius, SHAPE_MOST } = await import("../packs/harness/key.ts");
+  const { shapeRadius, SHAPE_MOST } = await import("../plugins/harness/key.ts");
   assert.equal(shapeRadius(2.5, 1, false), 4, "1.6 times a plain leaf");
   assert.equal(shapeRadius(5, 1, false), SHAPE_MOST, "capped short of the name");
   assert.equal(shapeRadius(2.5, 0.25, false) * 0.25, 4, "4 px on screen at a quarter zoom");
@@ -633,20 +643,20 @@ test("a channel's shape is bigger than a dot, and keeps a size on screen when zo
 });
 
 test("the key lists only the marks the tree shows; a hidden filter stays so it can come back", async () => {
-  const { marksIn } = await import("../packs/harness/key.ts");
-  const node = (o: Partial<NodeInfo>): NodeInfo => ({ id: `words/${o.name ?? "n"}`, name: "n", pack: "words", kind: "instruction", title: "t", at: ["prompt"], ...o });
+  const { marksIn } = await import("../plugins/harness/key.ts");
+  const node = (o: Partial<NodeInfo>): NodeInfo => ({ id: `words/${o.name ?? "n"}`, name: "n", plugin: "words", kind: "instruction", title: "t", at: ["prompt"], ...o });
   const fresh = marksIn({ nodes: [node({})], heard: new Map(), held: new Map(), trial: () => false });
-  assert.deepEqual([...fresh].sort(), ["hook", "map", "pack:words"], "a new user's tree: who, how, which pack; no run marks yet");
+  assert.deepEqual([...fresh].sort(), ["hook", "map", "plugin:words"], "a new user's tree: who, how, which plugin; no run marks yet");
   const run = marksIn({
-    nodes: [node({ name: "a", source: "i_t" }), node({ name: "b", kind: "rule" }), { ...node({ name: "r#system", pack: "transcript", kind: "given" }), id: "transcript/r#system" }],
+    nodes: [node({ name: "a", source: "i_t" }), node({ name: "b", kind: "rule" }), { ...node({ name: "r#system", plugin: "transcript", kind: "given" }), id: "transcript/r#system" }],
     heard: new Map([["words/a", "said"]]),
     held: new Map([["words/b", "shadow"]]),
     rings: new Map([["words/a", "held"]]),
     trial: (n) => n.source === "i_t",
     off: new Set(["file"]),
   });
-  for (const m of ["said", "acted", "shadow", "v-held", "trial", "map", "harness", "hook", "rule", "context", "file", "pack:words"]) assert.ok(run.has(m), m);
-  for (const m of ["refused", "held", "v-failed", "v-quiet", "pack:transcript"]) assert.ok(!run.has(m), m);
+  for (const m of ["said", "acted", "shadow", "v-held", "trial", "map", "harness", "hook", "rule", "context", "file", "plugin:words"]) assert.ok(run.has(m), m);
+  for (const m of ["refused", "held", "v-failed", "v-quiet", "plugin:transcript"]) assert.ok(!run.has(m), m);
 });
 
 test("an opened say shows the whole block the agent got at its moment, tagged and in the adapter's order", () => {
@@ -672,12 +682,13 @@ test("an opened say shows the whole block the agent got at its moment, tagged an
   assert.equal(gotAt(events, 4, speakers), "[Rule a] Later.", "another moment is its own block");
   assert.equal(gotAt(events, 5, speakers), undefined, "a load's words aren't handed back");
   assert.equal(gotAt(events, 0, speakers), undefined, "not a say");
-  assert.deepEqual(expand(events[1]!, block).map((p) => p.label), ["kind", "node", "place", "said", "agent got", "at"]);
+  assert.deepEqual(expand(events[1]!, block).map((p) => p.label), ["kind", "node", "place", "agent got", "at"], "a say's words once: in the block the agent got");
+  assert.deepEqual(expand(events[1]!).map((p) => p.label), ["kind", "node", "place", "said", "at"], "with no block, the say's own words");
 });
 
 test("the window bar: each share on the window's scale, a click shows only that share, a mark per node at the playhead", async () => {
-  const { only, sharesOf, tok, windowMarks, windowShown } = await import("../packs/harness/windowbar.ts");
-  const { marksIn } = await import("../packs/harness/key.ts");
+  const { only, sharesOf, tok, windowMarks, windowShown } = await import("../plugins/harness/windowbar.ts");
+  const { marksIn } = await import("../plugins/harness/key.ts");
   const w = {
     total: { tokens: 50_000, from: "usage" as const },
     limit: { tokens: 200_000, from: "default" as const },
@@ -706,7 +717,7 @@ test("the window bar: each share on the window's scale, a click shows only that 
   assert.deepEqual([...marks], [["words/a", "in"], ["words/b", "dropped"], ["transcript/r#system", "in"], ["transcript/r#skills", "listed"]]);
   assert.equal(windowMarks(undefined).size, 0);
   // The key lists a window mark only when the tree in sight shows it.
-  const node = (id: string): NodeInfo => ({ id, pack: "words", name: id, kind: "instruction", title: id, at: ["session_start"] });
+  const node = (id: string): NodeInfo => ({ id, plugin: "words", name: id, kind: "instruction", title: id, at: ["session_start"] });
   const tree = treeOf([node("words/a")], {});
   const shown = windowShown(marks, tree);
   assert.deepEqual([...shown], [["words/a", "in"]]);
@@ -716,8 +727,8 @@ test("the window bar: each share on the window's scale, a click shows only that 
 });
 
 test("the conversation's nodes: the talk channel, a hexagon", async () => {
-  const { channelOf, shapeOf, shapePath, CHANNELS } = await import("../packs/harness/channels.ts");
-  const n = (name: string): NodeInfo => ({ id: `transcript/r#${name}`, pack: "transcript", name: `r#${name}`, kind: "given", title: name, at: ["prompt"] });
+  const { channelOf, shapeOf, shapePath, CHANNELS } = await import("../plugins/harness/channels.ts");
+  const n = (name: string): NodeInfo => ({ id: `transcript/r#${name}`, plugin: "transcript", name: `r#${name}`, kind: "given", title: name, at: ["prompt"] });
   assert.equal(channelOf(n("talk:prompt")), "talk");
   assert.equal(channelOf(n("hook:prompt:x")), "hook");
   assert.equal(shapeOf("talk"), "hexagon");
@@ -726,7 +737,7 @@ test("the conversation's nodes: the talk channel, a hexagon", async () => {
 });
 
 test("how sure each number is: fitted, estimated, measured, marked in the bar", async () => {
-  const { sharesOf, sure, sureOf } = await import("../packs/harness/windowbar.ts");
+  const { sharesOf, sure, sureOf } = await import("../plugins/harness/windowbar.ts");
   assert.equal(sureOf(100, 99.5), "fitted");
   assert.equal(sureOf(100, 95), "partly");
   assert.equal(sureOf(100, 0.5), "estimated");
@@ -751,7 +762,7 @@ test("how sure each number is: fitted, estimated, measured, marked in the bar", 
 });
 
 test("the map's own row: each node it controls in the window, biggest first, named without a path", async () => {
-  const { mapShares } = await import("../packs/harness/windowbar.ts");
+  const { mapShares } = await import("../plugins/harness/windowbar.ts");
   const part = (id: string, title: string, tokens: number, state: "said" | "listed" | "dropped" | "start", source: "map" | "harness" = "map") => ({ id, title, source, channel: "hook" as const, state, tokens, count: 1 });
   const w = {
     total: { tokens: 10_000, from: "usage" as const },
@@ -769,12 +780,19 @@ test("the map's own row: each node it controls in the window, biggest first, nam
     ],
   };
   const shares = mapShares(w);
-  assert.deepEqual(shares.map((s) => [s.id, s.pack, s.tokens, s.state]), [["loaded/mem", "loaded", 400, "said"], ["words/a", "words", 100, "said"], ["loaded/docs", "loaded", 3, "listed"]], "the map's alone, dropped left out");
+  assert.deepEqual(shares.map((s) => [s.id, s.plugin, s.tokens, s.state]), [["loaded/mem", "loaded", 400, "said"], ["words/a", "words", 100, "said"], ["loaded/docs", "loaded", 3, "listed"]], "the map's alone, dropped left out");
   assert.ok(!shares[0]!.title.includes("Users"), "never a path");
+  assert.ok(shares.every((s) => s.channel === "hook"), "each node with the channel it came in by, for its hue");
+});
+
+test("the window bar's hues: each channel its own, so the rows tell apart", async () => {
+  const { CHANNEL_HUE } = await import("../plugins/harness/windowbar.ts");
+  const hues = Object.values(CHANNEL_HUE);
+  assert.equal(new Set(hues).size, hues.length);
 });
 
 test("the wire names give way the same through the grid: a crowded name hides, the first of two overlapping keeps", async () => {
-  const { crowded } = await import("../packs/harness/labels.ts");
+  const { crowded } = await import("../plugins/harness/labels.ts");
   const sq = (x: number, y: number, w = 10, h = 10): [number, number][] => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
   // Far apart across many cells, one on a dot, two on each other, one spanning cells.
   const names = [sq(0, 0), sq(500, 500), sq(1000, 0), sq(1005, 5), sq(60, 200, 200, 10)];
@@ -784,11 +802,11 @@ test("the wire names give way the same through the grid: a crowded name hides, t
 });
 
 test("the scene: a branch and a mark for each node, the way to the picked node, a said node larger and its count", async () => {
-  const { sceneOf } = await import("../packs/harness/scene.ts");
+  const { sceneOf } = await import("../plugins/harness/scene.ts");
   const tree = treeOf(NODES);
   const placed = radial(tree);
   const none = new Map();
-  const scene = sceneOf({ tree, placed, hues: packHues(NODES.map((n) => n.pack)), statuses: none, heard: new Map([["words/bash", "said" as const]]), held: none, counts: new Map([["words/bash", 7]]), standing: new Map([["words/bash", "up" as const]]), picked: "words/bash", window: new Map([["words/bash", "in" as const]]), theirs: new Set() });
+  const scene = sceneOf({ tree, placed, hues: pluginHues(NODES.map((n) => n.plugin)), statuses: none, heard: new Map([["words/bash", "said" as const]]), held: none, counts: new Map([["words/bash", 7]]), standing: new Map([["words/bash", "up" as const]]), picked: "words/bash", window: new Map([["words/bash", "in" as const]]), theirs: new Set() });
   assert.equal(scene.wires.length, tree.order.length - 1);
   assert.equal(scene.marks.length, tree.order.length - 1);
   const bash = scene.marks.find((m) => m.node === "words/bash")!;
@@ -802,7 +820,7 @@ test("the scene: a branch and a mark for each node, the way to the picked node, 
 });
 
 test("a dot's ink: a trial is hollow in its hue, a given never used is faint, a pick is outlined, a light on its way holds back the said", async () => {
-  const { dotInk, INK } = await import("../packs/harness/scene.ts");
+  const { dotInk, INK } = await import("../plugins/harness/scene.ts");
   const m = { id: "x", node: "x", x: 0, y: 0, depth: 2, bough: false, r: 2.5, shape: "circle" as const, trial: false, theirs: false, given: false, unused: false, retired: false, picked: false, label: { text: "x", turn: 0, dx: 8, dy: 0, anchor: "start" as const }, tip: "" };
   assert.deepEqual(dotInk({ ...m, hue: "red" }, false), { fill: "red", fillAlpha: 0.85, strokeWidth: 1 });
   assert.deepEqual(dotInk({ ...m, hue: "red", trial: true }, false), { fillAlpha: 0.85, stroke: "red", strokeWidth: 1.2 });
@@ -815,7 +833,7 @@ test("a dot's ink: a trial is hollow in its hue, a given never used is faint, a 
 });
 
 test("a name's ink: said in blue, refused in red until the light arrives; lit in the run's colour; small names only what is lit, said or picked", async () => {
-  const { nameInk, nameRuns, INK } = await import("../packs/harness/scene.ts");
+  const { nameInk, nameRuns, INK } = await import("../plugins/harness/scene.ts");
   const m = { id: "x", node: "x", x: 0, y: 0, depth: 2, bough: false, r: 2.5, trial: false, theirs: false, given: false, unused: false, retired: false, picked: false, label: { text: "x", turn: 0, dx: 8, dy: 0, anchor: "start" as const }, tip: "" };
   const big = { waiting: false, small: false };
   assert.deepEqual(nameInk(m, big), { color: INK.fg, weight: "bold", alpha: 1, italic: false, struck: false });
@@ -833,7 +851,7 @@ test("a name's ink: said in blue, refused in red until the light arrives; lit in
 });
 
 test("the wire names give way by their turned outlines: a deeper name over a nearer one hides, one clear of all stays", async () => {
-  const { crowdedNames, nameQuad, boxQuad } = await import("../packs/harness/labels.ts");
+  const { crowdedNames, nameQuad, boxQuad } = await import("../plugins/harness/labels.ts");
   const at = (x: number, y: number, turn = 0) => nameQuad({ x, y, turn, from: 0, to: 40, dy: 0, h: 12 }, 1);
   const names = [
     { id: "deep", depth: 3, quad: at(10, 4) },
@@ -847,7 +865,7 @@ test("the wire names give way by their turned outlines: a deeper name over a nea
 });
 
 test("a time is written once per input, and nothing for none", async () => {
-  const { day, time } = await import("../packs/harness/clock.ts");
+  const { day, time } = await import("../plugins/harness/clock.ts");
   const t = "2026-11-21T09:05:07Z";
   assert.equal(day(t), new Date(t).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }));
   assert.equal(time(t), new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
@@ -857,19 +875,19 @@ test("a time is written once per input, and nothing for none", async () => {
 });
 
 test("seen whole, a node's name shows only if it matters: below quiet_px on screen it fades out over two px", async () => {
-  const { quietShown } = await import("../packs/harness/paint.ts");
+  const { quietShown } = await import("../plugins/harness/paint.ts");
   assert.equal(quietShown(5, 0), 1, "0: every name");
   assert.equal(quietShown(9, 9), 1, "whole from the dial's size");
   assert.equal(quietShown(8, 9), 0.5, "half a step below");
   assert.equal(quietShown(7, 9), 0, "gone two px below");
   assert.equal(dialsOf({}).quiet_px, 0, "the dial starts at 0: every name");
   assert.equal(dialsOf({}).name_most, 28, "names cut at 28 characters");
-  assert.equal(radial(treeOf([{ id: "words/a", title: "A name far longer than twenty-eight characters", at: ["prompt"], pack: "words", kind: "reflex" } as never]), { nameMost: 28 }).labels.get("words/a")?.text.length, 28, "cut with an ellipsis");
+  assert.equal(radial(treeOf([{ id: "words/a", title: "A name far longer than twenty-eight characters", at: ["prompt"], plugin: "words", kind: "reflex" } as never]), { nameMost: 28 }).labels.get("words/a")?.text.length, 28, "cut with an ellipsis");
 });
 
 test("while zooming, names come from an atlas: a zoom stepped to a few sizes per doubling, pictures placed shelf by shelf", async () => {
-  const { textZoom } = await import("../packs/harness/paint.ts");
-  const { Shelves } = await import("../packs/harness/sprites.ts");
+  const { textZoom } = await import("../plugins/harness/paint.ts");
+  const { Shelves } = await import("../plugins/harness/sprites.ts");
   assert.equal(textZoom(1.3, 0), 1.3, "no steps: the zoom itself");
   assert.equal(textZoom(1, 4), 1);
   assert.equal(textZoom(1.15, 4), 2 ** 0.25, "the nearest quarter of a doubling");
@@ -886,7 +904,7 @@ test("while zooming, names come from an atlas: a zoom stepped to a few sizes per
 
 // ---------- calls under their run (calls.ts) ----------
 
-import { callsOf, isCall, outcomeOf, requestNodes, tallyOf } from "../packs/harness/calls.ts";
+import { callsOf, isCall, outcomeOf, requestNodes, tallyOf } from "../plugins/harness/calls.ts";
 
 test("calls: a parent's calls, newest first; a call's mark from its verdicts; the strip's tally", () => {
   const run = (id: string, started: string, facts?: Record<string, string>) => ({ run: id, agent: { id: "a", kind: "agent" as const }, harness: facts?.harness ?? "claude-code", reaches: ["check:line_length", "finding", "reply_end"], started, ...(facts ? { facts } : {}) });
@@ -912,4 +930,116 @@ test("an act refused with a fix shows each fix and the input to send instead, un
   assert.equal(by.get("fix /fields"), "wants an object: it is required\ne.g. {}");
   assert.equal(by.get("send instead"), '{\n  "id": "i_1",\n  "fields": {}\n}');
   assert.deepEqual(parts.map((p) => p.label).slice(-4), ["output", "fix /fields", "send instead", "at"]);
+});
+
+test("easeView: a fit glides from where the camera is to where it fits, eased, the zoom in proportion", () => {
+  const a = { x: 0, y: 0, k: 1 }, b = { x: 100, y: 50, k: 4 };
+  assert.deepEqual(easeView(a, b, 0, 800, 600), a);
+  const end = easeView(a, b, 1, 800, 600);
+  assert.ok(Math.abs(end.x - 100) < 1e-9 && Math.abs(end.y - 50) < 1e-9 && Math.abs(end.k - 4) < 1e-9);
+  assert.ok(Math.abs(easeView(a, b, 0.5, 800, 600).k - 2) < 1e-9, "halfway, the zoom is halfway by its logarithm");
+  const c = (v: { x: number; y: number; k: number }) => v.x + 400 / v.k;
+  assert.ok(Math.abs(c(easeView(a, b, 0.5, 800, 600)) - (c(a) + c(b)) / 2) < 1e-9, "the centre goes in a straight line");
+  assert.ok(easeView(a, b, 0.1, 800, 600).k - 1 < (4 - 1) * 0.1, "it starts slowly");
+});
+
+test("harness: the key's turned-off marks are read back from what the browser stored, and nothing else", async () => {
+  const { offOf } = await import("../plugins/harness/keyoff.ts");
+  assert.deepEqual([...offOf('["harness","words"]')], ["harness", "words"]);
+  assert.deepEqual([...offOf(null)], []);
+  assert.deepEqual([...offOf("not json")], []);
+  assert.deepEqual([...offOf('{"harness":true}')], []);
+  assert.deepEqual([...offOf('["harness", 3]')], ["harness"]);
+});
+
+test("harness: a fit lands at once first and while the tree finds its size (fit_settle_ms); later fits glide", async () => {
+  const { snapsFit } = await import("../plugins/harness/camera.ts");
+  assert.equal(snapsFit(true, 0, 800, 600), true, "the first");
+  assert.equal(snapsFit(false, 300, 800, 600), true, "settling: a view that just appeared is not seen to zoom into place");
+  assert.equal(snapsFit(false, 900, 800, 600), false, "after: it glides");
+  assert.equal(snapsFit(false, 900, 800, 0), true, "fit_ms 0: always at once");
+});
+
+test("placeLabel: an MCP tool's place reads as its server and name; any other place as it is", async () => {
+  const { placeLabel } = await import("../plugins/harness/events.ts");
+  assert.equal(placeLabel("tool:mcp__archipelago__query"), "tool:archipelago.query");
+  assert.equal(placeLabel("tool:mcp__my_server__do_it"), "tool:my_server.do_it");
+  assert.equal(placeLabel("tool:Edit"), "tool:Edit");
+  assert.equal(placeLabel("file:index.html"), "file:index.html");
+});
+
+test("openFilter: a context filter's view, live on its session when one is live, else its own tree", async () => {
+  const { openFilter, VIEW } = await import("../plugins/harness/open.ts");
+  const live = new Map(openFilter("f1", ["r1", "r2"]));
+  assert.equal(live.get("harness.live"), true);
+  assert.equal(live.get("harness.focus"), "r1");
+  assert.equal(live.get("harness.profile"), undefined);
+  assert.equal(live.get("here.view"), VIEW);
+  const none = new Map(openFilter("f1", []));
+  assert.equal(none.get("harness.profile"), "f1");
+  assert.equal(none.get("harness.live"), undefined);
+  assert.equal(none.get("here.view"), VIEW);
+});
+
+test("the filter's button: its tip is the page's own, under the button, in the view's sheet", async () => {
+  const { OPEN_STYLE } = await import("../plugins/harness/open.ts");
+  const { STYLE } = await import("../plugins/harness/style.ts");
+  assert.match(OPEN_STYLE, /\.ho-tip \{[^}]*position:absolute; left:0; top:calc\(100% \+ 4px\)/);
+  assert.ok(STYLE.includes(".ho-open:hover .ho-tip"), "the view's sheet carries it");
+});
+
+test("heardYet: an agent's tree waits for what it hears and where it is placed, never every node first", async () => {
+  const { heardYet } = await import("../plugins/harness/agents.ts");
+  const placement = { kind: "matched" as const, title: "F", ids: ["f"], id: "f" };
+  assert.equal(heardYet({}), false);
+  assert.equal(heardYet({ hears: new Set(["a"]) }), false, "placed not yet known");
+  assert.equal(heardYet({ placement }), false, "what it hears not yet known");
+  assert.equal(heardYet({ hears: new Set(), placement }), true);
+});
+
+test("markSvgPath: a filter's mark as a path beside the view's title, a hexagon six corners", async () => {
+  const { markSvgPath } = await import("../plugins/harness/paint.ts");
+  assert.equal(markSvgPath("hexagon").split("L").length, 6);
+  assert.equal(markSvgPath("triangle").split("L").length, 3);
+  assert.ok(markSvgPath("circle").includes("A"), "a circle is arcs");
+});
+
+test("glide: a changed tree moves into its new shape, a new node growing out of its parent, the end exactly the new layout", async () => {
+  const { radial, treeOf } = await import("../plugins/harness/layout.ts");
+  const { glide } = await import("../plugins/harness/glide.ts");
+  const before = treeOf([node("words", "a", ["tool:Bash"]), node("words", "b", ["prompt"])]);
+  const after = treeOf([node("words", "a", ["tool:Bash"]), node("words", "b", ["prompt"]), node("words", "c", ["tool:Edit"])]);
+  const from = radial(before), to = radial(after);
+  assert.equal(glide(after, from, to, 1), to, "at the end, the new layout itself");
+  const start = glide(after, from, to, 0);
+  // At the start, what was there is where it was.
+  assert.deepEqual(start.polar.get("words/a"), from.polar.get("words/a"));
+  // A new node starts where its nearest old ancestor was, and every node has a branch to draw.
+  const c = after.byId.get("words/c")!;
+  let up = c.parent;
+  while (up && !from.polar.has(up.id)) up = up.parent;
+  assert.deepEqual(start.polar.get("words/c"), from.polar.get(up!.id));
+  for (const t of after.order) if (t.parent) assert.ok(start.branch.has(t.id) && start.along.has(t.id), t.id);
+  // Half way, a moved node is between its two places.
+  const mid = glide(after, from, to, 0.5).polar.get("words/a")!, a0 = from.polar.get("words/a")!, a1 = to.polar.get("words/a")!;
+  assert.ok(Math.abs(mid.r - (a0.r + a1.r) / 2) < 1e-6);
+});
+
+test("stepScale: the map's own row grows on round steps from 250, so a session's start is part full", async () => {
+  const { stepScale } = await import("../plugins/harness/windowbar.ts");
+  assert.equal(stepScale(0), 250);
+  assert.equal(stepScale(116), 250);
+  assert.equal(stepScale(250), 250);
+  assert.equal(stepScale(251), 500);
+  assert.equal(stepScale(900), 1000);
+  assert.equal(stepScale(1200), 2500);
+  assert.equal(stepScale(30_000), 50_000);
+});
+
+test("foldHeld: three or more held-back events in a row at one place fold into one line; the rest stay lines", async () => {
+  const { foldHeld } = await import("../plugins/harness/events.ts");
+  const ev = (kind: string, place?: string) => ({ kind, place }) as never;
+  const events = [ev("begin"), ev("gated", "session_start"), ev("gated", "session_start"), ev("gated", "session_start"), ev("say", "session_start"), ev("gated", "tool:Bash"), ev("gated", "tool:Bash"), ev("act", "tool:Bash")];
+  assert.deepEqual(foldHeld(events), [{ ev: 0 }, { held: [1, 3], place: "session_start" }, { ev: 4 }, { ev: 5 }, { ev: 6 }, { ev: 7 }]);
+  assert.deepEqual(foldHeld([ev("gated", "prompt"), ev("gated", "tool:Edit"), ev("gated", "tool:Edit"), ev("gated", "tool:Edit")]), [{ ev: 0 }, { held: [1, 3], place: "tool:Edit" }], "only at one place");
 });

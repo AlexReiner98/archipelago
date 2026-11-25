@@ -14,7 +14,7 @@ stripping) and in the browser (the dev server strips types).
 | [guard.ts](guard.ts) | What every local server checks first: its own Host, and no foreign Origin | |
 | [browser.ts](browser.ts) | Browser host | |
 
-## A pack
+## A plugin
 
 ```ts
 export default {
@@ -23,14 +23,14 @@ export default {
   inject: ["exchange.watch", "action.register"],   // stays inactive until each is provided
   apply(ctx, config) {
     const watch = ctx.get("exchange.watch");       // only keys it injected
-    watch.on(/* … */);                              // returns a Dispose: this pack's effect
+    watch.on(/* … */);                              // returns a Dispose: this plugin's effect
     ctx.effect(() => { /* change */ return () => { /* undo */ }; });
   },
 };
 ```
 
-Everything a pack registers goes when it unloads. A key nothing provides
-leaves the pack waiting; when the provider comes back, so does the pack.
+Everything a plugin registers goes when it unloads. A key nothing provides
+leaves the plugin waiting; when the provider comes back, so does the plugin.
 A provider can be removed at any time: its consumers tear down first, then
 it does. A teardown that hangs past `runtime.teardownLimit` (5 s) is
 reported and skipped, never waited on forever.
@@ -44,20 +44,20 @@ ctx.provide("action.register", (caller, from) => ({
 ```
 
 `serve(caller, from)` runs once per calling context. `caller` is who calls
-(`Caller` in spec/common.ts): the pack, the actor and run that interception
-set (`from.intercept({ actor, run })`), and the pack's position in the config
+(`Caller` in spec/common.ts): the plugin, the actor and run that interception
+set (`from.intercept({ actor, run })`), and the plugin's position in the config
 tree, all read live. Making a registration `from.effect(...)` makes it the
 caller's, so it goes when the caller unloads. Brokers order contributions with
-`byPosition(a.caller, b.caller)`. When several active packs provide a key, the
+`byPosition(a.caller, b.caller)`. When several active plugins provide a key, the
 first in the config tree is bound.
 
 ## The config tree
 
 ```ts
 await loader.apply([
-  { id: "graph", pack: "./packs/graph/index.ts" },
+  { id: "graph", plugin: "./plugins/graph/index.ts" },
   { id: "page", intercept: { actor }, children: [
-    { id: "panel", pack: "./packs/panel/index.ts", config: { … } },
+    { id: "panel", plugin: "./plugins/panel/index.ts", config: { … } },
   ] },
 ]);
 ```
@@ -71,6 +71,6 @@ A new url rebuilds an entry, a new config reloads it, `disabled` unloads it,
 
 - `npm test` runs the tests, `npm run check` typechecks.
 - `npm run serve` serves the repository on port 5280 (dev); open
-  `/test/browser/` for the fixture page, and edit `test/browser/packs/word.ts`
+  `/test/browser/` for the fixture page, and edit `test/browser/plugins/word.ts`
   to see a hot reload.
 - A change to `runtime/` itself is declined by HMR: restart.

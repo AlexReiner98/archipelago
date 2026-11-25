@@ -2,7 +2,7 @@
  * exchange: one event per say, refusal and act. See exchange.md.
  */
 import type { Act, Place, RunId, RunInfo } from "./agent.ts";
-import type { Capability, Dispose, Json, Page, PageRequest, PackId, Term, Time } from "./common.ts";
+import type { Capability, Dispose, Json, Page, PageRequest, PluginId, Term, Time } from "./common.ts";
 
 /** `to_agent`: the map spoke. `from_agent`: the agent (or the person at its prompt) did. */
 export type ExchangeDirection = "to_agent" | "from_agent";
@@ -31,8 +31,8 @@ export interface ExchangeEvent {
   kind: string;
   /** The node that spoke (say, refuse, miss). */
   node?: string;
-  /** The pack the node or the act's action belongs to. */
-  pack?: PackId;
+  /** The plugin the node or the act's action belongs to. */
+  plugin?: PluginId;
   /** What was said, or a refusal's words, or a miss's error. */
   text?: string;
   /** For `act`: what the agent did. */
@@ -43,7 +43,7 @@ export interface ExchangeEvent {
 export interface ExchangeFilter {
   run?: RunId;
   node?: string;
-  pack?: PackId;
+  plugin?: PluginId;
   kinds?: string[];
 }
 
@@ -78,5 +78,5 @@ export interface Capabilities {
 export const capabilities: Capability[] = [
   { key: "exchange.append", since: 1, doc: "Records an exchange event, numbering it within its run." },
   { key: "exchange.read", since: 1, doc: "Runs, a run's events, a node's events: bounded pages." },
-  { key: "exchange.watch", since: 1, doc: "Each event as it is appended, by run, node, pack or kind." },
+  { key: "exchange.watch", since: 1, doc: "Each event as it is appended, by run, node, plugin or kind." },
 ];

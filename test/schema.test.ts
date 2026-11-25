@@ -5,16 +5,16 @@ import type { Fact } from "../spec/changeset.ts";
 import type { Json, Page } from "../spec/common.ts";
 import type { GraphRead } from "../spec/graph.ts";
 import { COMMON, type LinkInfo, type TypeInfo, type TypesAcyclic, type TypesRead } from "../spec/types.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry as TreeEntry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import graph from "../packs/graph/index.ts";
-import history from "../packs/history/index.ts";
-import schema from "../packs/schema/index.ts";
-import type { Held } from "../packs/schema/quarantine.ts";
-import type { Entry } from "../packs/history/journal.ts";
+import action from "../plugins/action/index.ts";
+import graph from "../plugins/graph/index.ts";
+import history from "../plugins/history/index.ts";
+import schema from "../plugins/schema/index.ts";
+import type { Held } from "../plugins/schema/quarantine.ts";
+import type { Entry } from "../plugins/history/journal.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 
 const work: TypeInfo = {
   name: "work",
@@ -22,17 +22,17 @@ const work: TypeInfo = {
   statuses: { open: ["todo", "doing"], closed: ["done"] },
   fields: { ...COMMON, due: { kind: "date" }, owner: { kind: "id" } },
   trial: false,
-  pack: "types",
+  plugin: "types",
 };
 const bug: TypeInfo = { ...work, name: "bug", fields: { ...work.fields, severity: { kind: "choice", values: ["low", "high"] } }, trial: true };
 const question: TypeInfo = { ...work, name: "question", base: "question", statuses: { open: ["open"], closed: ["decided"] }, fields: { ...COMMON } };
-const dependsOn: LinkInfo = { name: "depends_on", from: ["work"], to: ["work"], pack: "types" };
+const dependsOn: LinkInfo = { name: "depends_on", from: ["work"], to: ["work"], plugin: "types" };
 
 /** Stands in for the types broker: what it holds can change while the test runs. */
 const defined = new Map<string, TypeInfo | LinkInfo>();
 /** Kinds of link held acyclic (types.acyclic), as the broker would answer. */
 const acyclic = new Set<string>();
-const types: Pack = {
+const types: Plugin = {
   id: "types",
   apply(ctx) {
     ctx.provide<TypesRead>("types.read", () => ({
@@ -48,7 +48,7 @@ const types: Pack = {
   },
 };
 
-const probe: Pack = {
+const probe: Plugin = {
   id: "probe",
   inject: ["action.invoke", "action.register", "graph.read"],
   apply(ctx) {
@@ -71,15 +71,15 @@ async function setup(strict = false) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "types.ts": types, "schema.ts": schema, "history.ts": history, "probe.ts": probe };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "types.ts": types, "schema.ts": schema, "history.ts": history, "probe.ts": probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const tree: TreeEntry[] = [
-    { id: "graph", pack: "graph.ts" },
-    { id: "action", pack: "action.ts" },
-    { id: "types", pack: "types.ts" },
-    { id: "schema", pack: "schema.ts", config: { strict } },
-    { id: "history", pack: "history.ts" },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts" },
+    { id: "action", plugin: "action.ts" },
+    { id: "types", plugin: "types.ts" },
+    { id: "schema", plugin: "schema.ts", config: { strict } },
+    { id: "history", plugin: "history.ts" },
+    { id: "probe", plugin: "probe.ts" },
   ];
   await loader.apply(tree);
   const ctx = loader.fiber("probe")!.ctx.intercept({ actor: { id: "agent:test", kind: "agent" }, run: "r1" });
@@ -178,7 +178,7 @@ test("types nobody defines pass, unless strict", async () => {
   s = await setup(true);
   try {
     const r = await s.refused(s.write(["+", "e1", "type", "event"]));
-    assert.match(r.message, /No pack defines the type event/);
+    assert.match(r.message, /No plugin defines the type event/);
   } finally {
     await s.stop();
   }
@@ -250,7 +250,7 @@ test("each type's record: what is made of it and the misses it causes, trial fla
   }
 });
 
-test("unloading the schema pack takes its stage: writes are no longer checked", async () => {
+test("unloading the schema plugin takes its stage: writes are no longer checked", async () => {
   const s = await setup();
   try {
     await s.refused(s.write(["+", "x", "type", "work"], ["+", "x", "colour", "red"]));
@@ -265,7 +265,7 @@ test("unloading the schema pack takes its stage: writes are no longer checked", 
 test("a link given a new type is checked with the ends it already had, which exist", async () => {
   const s = await setup();
   try {
-    defined.set("tie", { name: "tie", pack: "types" });
+    defined.set("tie", { name: "tie", plugin: "types" });
     await s.ok(s.write(["+", "n1", "type", "note"], ["+", "n1", "title", "Undeclared"], ...task("t1")));
     await s.ok(s.write(["+", "l1", "type", "old_tie"], ["+", "l1", "from", "n1"], ["+", "l1", "to", "t1"]));
     await s.ok(s.write(["-", "l1", "type", "old_tie"], ["+", "l1", "type", "tie"]));
@@ -303,7 +303,7 @@ test("a kind of link held acyclic refuses a set that would close a loop, whereve
     await s.ok(s.write(...task("d"), ...link("ad", "a", "d"), ...link("dc", "d", "c")));
     await s.ok(s.write(["-", "bc", "type", "depends_on"], ["-", "bc", "from", "b"], ["-", "bc", "to", "c"], ...link("cb", "c", "b")));
     // Another kind of link is not held.
-    defined.set("about", { name: "about", pack: "types" });
+    defined.set("about", { name: "about", plugin: "types" });
     await s.ok(s.write(...link("x", "c", "a", "about")));
   } finally {
     await s.stop();
@@ -311,7 +311,7 @@ test("a kind of link held acyclic refuses a set that would close a loop, whereve
 });
 
 test("past its limit the walk stops, and the set is refused as unchecked", async () => {
-  const { cycles } = await import("../packs/schema/cycle.ts");
+  const { cycles } = await import("../plugins/schema/cycle.ts");
   const chain = async (id: string) => (id.length < 30 ? [{ id: `l${id}`, from: id, to: `${id}n` }] : []);
   const after = new Map([["new", { type: "depends_on", from: "z", to: "a" }]]);
   const p = await cycles(after, new Set(["depends_on"]), chain, 5);

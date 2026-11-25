@@ -6,18 +6,18 @@ import type { Json } from "../spec/common.ts";
 import type { ExchangeRead } from "../spec/exchange.ts";
 import type { GraphRead } from "../spec/graph.ts";
 import { COMMON, type TypeInfo, type TypesDefine } from "../spec/types.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import call from "../packs/call/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import schema from "../packs/schema/index.ts";
-import types from "../packs/types/index.ts";
-import typed, { retryOf, systemOf, type TypedAsk, type TypedRecord } from "../packs/typed/index.ts";
-import { factsOf, inReplyWords, schemaOf, strictSubset } from "../packs/typed/shape.ts";
-import { jsonIn, modelOf, scripted, textPrompt } from "../packs/typed/model.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import call from "../plugins/call/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import schema from "../plugins/schema/index.ts";
+import types from "../plugins/types/index.ts";
+import typed, { retryOf, systemOf, type TypedAsk, type TypedRecord } from "../plugins/typed/index.ts";
+import { factsOf, inReplyWords, schemaOf, strictSubset } from "../plugins/typed/shape.ts";
+import { jsonIn, modelOf, scripted, textPrompt } from "../plugins/typed/model.ts";
 
 // ---------- apart from the runtime ----------
 
@@ -27,14 +27,14 @@ const work: TypeInfo = {
   statuses: { open: ["todo", "doing"], closed: ["done"] },
   fields: { ...COMMON, size: { kind: "number", doc: "Hours." } },
   trial: false,
-  pack: "fixture",
+  plugin: "fixture",
 };
 const chore: TypeInfo = { ...work, name: "chore", fields: { ...work.fields, room: { kind: "choice", values: ["kitchen", "hall"] } }, trial: true };
 const LINKS = [
-  { name: "depends_on", from: ["work"], to: ["work"], pack: "fixture" },
-  { name: "about", pack: "fixture" },
-  { name: "waits_on", from: ["work"], to: ["actor"], pack: "fixture" },
-  { name: "answers", from: ["question"], pack: "fixture" },
+  { name: "depends_on", from: ["work"], to: ["work"], plugin: "fixture" },
+  { name: "about", plugin: "fixture" },
+  { name: "waits_on", from: ["work"], to: ["actor"], plugin: "fixture" },
+  { name: "answers", from: ["question"], plugin: "fixture" },
 ];
 
 test("a schema from a base: its fields by kind, its statuses, the links allowed out of it", () => {
@@ -120,7 +120,7 @@ test("a text prompt carries the system, the schema and the turns; config names a
 });
 
 test("adapters: the schema as a forced tool (Anthropic), as response_format (OpenAI-compatible); usage read back", async () => {
-  const { anthropic, openai } = await import("../packs/typed/model.ts");
+  const { anthropic, openai } = await import("../plugins/typed/model.ts");
   const sent: any[] = [];
   const fake = (body: unknown) => (async (url: string, init: any) => {
     sent.push({ url, body: JSON.parse(init.body), headers: init.headers });
@@ -142,8 +142,8 @@ test("adapters: the schema as a forced tool (Anthropic), as response_format (Ope
 
 // ---------- through the runtime ----------
 
-/** The map's types, as a domain's packs would define them: a base, a flavour of it, kinds of link. */
-const defs: Pack = {
+/** The map's types, as a domain's plugins would define them: a base, a flavour of it, kinds of link. */
+const defs: Plugin = {
   id: "defs",
   inject: ["types.define"],
   apply(ctx) {
@@ -155,7 +155,7 @@ const defs: Pack = {
     d.link({ name: "bears_on", from: ["work"], to: ["question"] });
   },
 };
-const nodes: Pack = {
+const nodes: Plugin = {
   id: "nodes",
   inject: ["agent.node"],
   apply(ctx) {
@@ -163,16 +163,16 @@ const nodes: Pack = {
     ctx.get<AgentNode>("agent.node").node(def);
   },
 };
-const domain: Pack = { id: "domain", inject: ["typed.ask", "exchange.read", "action.invoke", "graph.read"], apply() {} };
+const domain: Plugin = { id: "domain", inject: ["typed.ask", "exchange.read", "action.invoke", "graph.read"], apply() {} };
 
 async function setup(config: Record<string, unknown> = {}) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { graph, action, types, defs, schema, exchange, agent, nodes, call, typed, domain };
-  const BASE = "mem:/packs/";
+  const modules: Record<string, Plugin> = { graph, action, types, defs, schema, exchange, agent, nodes, call, typed, domain };
+  const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)]! }) });
-  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, pack: id, ...(id === "typed" ? { config } : {}) }));
+  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, plugin: id, ...(id === "typed" ? { config } : {}) }));
   await loader.apply(tree);
   await rt.settle();
   const ctx = loader.fiber("domain")!.ctx;

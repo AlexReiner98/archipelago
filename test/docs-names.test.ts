@@ -1,7 +1,7 @@
 /**
  * Every name a doc gives exists. The prose docs (the READMEs, CLAUDE.md,
  * SECURITY.md, spec/*.md and the spec's comments) name files and paths,
- * packs, actions, capabilities, places, node kinds, exports, scripts and
+ * plugins, actions, capabilities, places, node kinds, exports, scripts and
  * config keys. Each name is read by its shape and looked for where it
  * would live: the tracked files, package.json's scripts, or the code's own
  * words (every identifier, dotted name and `term:` string outside test/).
@@ -44,7 +44,7 @@ const DIRS = new Set(FILES.flatMap((f) => f.split("/").slice(0, -1).map((_, i, a
 const BASENAMES = new Set(FILES.map((f) => basename(f)));
 const TOP = new Set(FILES.filter((f) => f.includes("/")).map((f) => f.split("/")[0]));
 const SCRIPTS = new Set(Object.keys(JSON.parse(read("package.json")).scripts));
-const PACKS = new Set(FILES.filter((f) => /^packs\/[^/]+\/README\.md$/.test(f)).map((f) => f.split("/")[1]));
+const PLUGINS = new Set(FILES.filter((f) => /^plugins\/[^/]+\/README\.md$/.test(f)).map((f) => f.split("/")[1]));
 
 /** The docs read, and the spec's code files whose comments are read. */
 const DOCS = FILES.filter((f) => f.endsWith(".md"));
@@ -157,9 +157,9 @@ function misses(doc: string): Miss[] {
       if (IGNORED.test(p) || p === ".") continue;
       if (!FILE_SET.has(p) && !DIRS.has(p)) out.push({ line: i + 1, name: target, kind: "link" });
     }
-    // A pack named as one: "the `keep` pack".
-    for (const [, pack = ""] of lineText.matchAll(/`([a-z][\w-]*)` packs?\b/g)) {
-      if (!PACKS.has(pack)) out.push({ line: i + 1, name: pack, kind: "pack" });
+    // A plugin named as one: "the `keep` plugin".
+    for (const [, plugin = ""] of lineText.matchAll(/`([a-z][\w-]*)` plugins?\b/g)) {
+      if (!PLUGINS.has(plugin)) out.push({ line: i + 1, name: plugin, kind: "plugin" });
     }
     // Scripts named in fenced blocks too.
     for (const [, script = ""] of lineText.matchAll(/npm run ([\w:-]+)/g)) {
@@ -178,5 +178,5 @@ for (const doc of [...DOCS, ...SPEC_CODE]) {
 
 test("CLAUDE.md stays short", () => {
   const lines = read("CLAUDE.md").split("\n").length;
-  assert.ok(lines <= 120, `CLAUDE.md is ${lines} lines; keep it to 120 and move the rest to the map or a pack's README`);
+  assert.ok(lines <= 120, `CLAUDE.md is ${lines} lines; keep it to 120 and move the rest to the map or a plugin's README`);
 });

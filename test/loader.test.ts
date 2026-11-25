@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Caller, Dispose } from "../spec/common.ts";
 import { byPosition } from "../spec/common.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, move, type Entry } from "../runtime/loader.ts";
 import type { LoaderTree } from "../spec/loader.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 
 /** A loader over modules held in memory, keyed by url. */
-function setup(modules: Record<string, Pack>) {
+function setup(modules: Record<string, Plugin>) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
@@ -29,8 +29,8 @@ interface Words {
   all(): string[];
 }
 
-/** A broker that orders what packs say by the config tree. */
-const words: Pack = {
+/** A broker that orders what plugins say by the config tree. */
+const words: Plugin = {
   id: "words",
   apply(ctx) {
     const said: { caller: Caller; seq: number; word: string }[] = [];
@@ -47,7 +47,7 @@ const words: Pack = {
   },
 };
 
-const speaker: Pack<{ words: string[] }> = {
+const speaker: Plugin<{ words: string[] }> = {
   id: "speaker",
   inject: ["demo.words"],
   apply(ctx, config) {
@@ -61,9 +61,9 @@ const all = (rt: Runtime) => rt.root.get<Words>("demo.words").all();
 test("the config tree loads, disables, reconfigures and unloads entries", async () => {
   const { rt, loader } = setup({ "words.ts": words, "speaker.ts": speaker });
   const tree: Entry[] = [
-    { id: "a", pack: "speaker.ts", config: { words: ["a"] } },
-    { id: "words", pack: "words.ts" },
-    { id: "b", pack: "speaker.ts", config: { words: ["b"] } },
+    { id: "a", plugin: "speaker.ts", config: { words: ["a"] } },
+    { id: "words", plugin: "words.ts" },
+    { id: "b", plugin: "speaker.ts", config: { words: ["b"] } },
   ];
   await loader.apply(tree);
   assert.deepEqual(all(rt), ["a", "b"]);
@@ -85,9 +85,9 @@ test("the config tree loads, disables, reconfigures and unloads entries", async 
 test("moving an entry reorders what it contributed, without reloading", async () => {
   const { rt, loader } = setup({ "words.ts": words, "speaker.ts": speaker });
   await loader.apply([
-    { id: "words", pack: "words.ts" },
-    { id: "a", pack: "speaker.ts", config: { words: ["a"] } },
-    { id: "g", children: [{ id: "b", pack: "speaker.ts", config: { words: ["b"] } }] },
+    { id: "words", plugin: "words.ts" },
+    { id: "a", plugin: "speaker.ts", config: { words: ["a"] } },
+    { id: "g", children: [{ id: "b", plugin: "speaker.ts", config: { words: ["b"] } }] },
   ]);
   assert.deepEqual(all(rt), ["a", "b"]);
   const fa = loader.fiber("a");
@@ -100,8 +100,8 @@ test("moving an entry reorders what it contributed, without reloading", async ()
 test("a disabled group turns off everything in it", async () => {
   const { rt, loader } = setup({ "words.ts": words, "speaker.ts": speaker });
   await loader.apply([
-    { id: "words", pack: "words.ts" },
-    { id: "g", disabled: true, children: [{ id: "a", pack: "speaker.ts", config: { words: ["a"] } }] },
+    { id: "words", plugin: "words.ts" },
+    { id: "g", disabled: true, children: [{ id: "a", plugin: "speaker.ts", config: { words: ["a"] } }] },
   ]);
   assert.deepEqual(all(rt), []);
   await loader.edit((t) => (delete t[1]!.disabled, t));
@@ -109,16 +109,16 @@ test("a disabled group turns off everything in it", async () => {
 });
 
 test("the first provider in the tree is the one bound; moving it switches", async () => {
-  const named = (name: string): Pack => ({
+  const named = (name: string): Plugin => ({
     id: name,
     apply: (ctx) => void ctx.provide("demo.name", () => name),
   });
-  const reader: Pack = { id: "reader", inject: ["demo.name"], apply() {} };
+  const reader: Plugin = { id: "reader", inject: ["demo.name"], apply() {} };
   const { rt, loader } = setup({ "one.ts": named("one"), "two.ts": named("two"), "reader.ts": reader });
   await loader.apply([
-    { id: "one", pack: "one.ts" },
-    { id: "two", pack: "two.ts" },
-    { id: "r", pack: "reader.ts" },
+    { id: "one", plugin: "one.ts" },
+    { id: "two", plugin: "two.ts" },
+    { id: "r", plugin: "reader.ts" },
   ]);
   assert.equal(loader.fiber("r")!.ctx.get("demo.name"), "one");
   await loader.edit((t) => move(t, "two", null, 0));
@@ -130,12 +130,12 @@ test("the first provider in the tree is the one bound; moving it switches", asyn
 
 test("an entry's intercept reaches providers as the actor and run, updated in place", async () => {
   const seen: Caller[] = [];
-  const who: Pack = {
+  const who: Plugin = {
     id: "who",
     apply: (ctx) => void ctx.provide("demo.who", (caller) => ({ ask: () => seen.push({ ...caller, position: caller.position }) })),
   };
   let applies = 0;
-  const asker: Pack = {
+  const asker: Plugin = {
     id: "asker",
     inject: ["demo.who"],
     apply(ctx) {
@@ -146,8 +146,8 @@ test("an entry's intercept reaches providers as the actor and run, updated in pl
   const { loader } = setup({ "who.ts": who, "asker.ts": asker });
   const actor = { id: "e_owner", kind: "person" };
   await loader.apply([
-    { id: "who", pack: "who.ts" },
-    { id: "page", intercept: { actor }, children: [{ id: "asker", pack: "asker.ts" }] },
+    { id: "who", plugin: "who.ts" },
+    { id: "page", intercept: { actor }, children: [{ id: "asker", plugin: "asker.ts" }] },
   ]);
   const ask = () => (globalThis as { ask?: () => void }).ask!();
   ask();
@@ -155,16 +155,16 @@ test("an entry's intercept reaches providers as the actor and run, updated in pl
   ask();
   assert.equal(applies, 1, "no reload for a new intercept");
   assert.deepEqual(seen, [
-    { pack: "asker", actor, run: undefined, position: [1, 0] },
-    { pack: "asker", actor, run: "e_run2", position: [1, 0] },
+    { plugin: "asker", actor, run: undefined, position: [1, 0] },
+    { plugin: "asker", actor, run: "e_run2", position: [1, 0] },
   ]);
 });
 
 test("a module that fails to import is reported and the rest still load", async () => {
   const { rt, loader, errors } = setup({ "words.ts": words });
   await loader.apply([
-    { id: "words", pack: "words.ts" },
-    { id: "gone", pack: "missing.ts" },
+    { id: "words", plugin: "words.ts" },
+    { id: "gone", plugin: "missing.ts" },
   ]);
   assert.equal(errors.length, 1);
   assert.deepEqual(
@@ -174,14 +174,14 @@ test("a module that fails to import is reported and the rest still load", async 
       ["gone", "failed"],
     ],
   );
-  assert.deepEqual(rt.keys(), ["loader.tree", "demo.words"], "the loader's own key, and the pack's");
+  assert.deepEqual(rt.keys(), ["loader.tree", "demo.words"], "the loader's own key, and the plugin's");
 });
 
-test("loader.tree: a pack reads the tree and the template, edits it, and hears each change", async () => {
+test("loader.tree: a plugin reads the tree and the template, edits it, and hears each change", async () => {
   const { rt, loader } = setup({ "words.ts": words, "speaker.ts": speaker });
   await loader.apply([
-    { id: "words", pack: "words.ts" },
-    { id: "a", pack: "speaker.ts", config: { words: ["a"] } },
+    { id: "words", plugin: "words.ts" },
+    { id: "a", plugin: "speaker.ts", config: { words: ["a"] } },
   ]);
   const lt = rt.root.get<LoaderTree>("loader.tree");
   let heard = 0;
@@ -196,15 +196,15 @@ test("loader.tree: a pack reads the tree and the template, edits it, and hears e
 test("status says off for a disabled entry, and waiting with what it misses", async () => {
   const { loader } = setup({ "words.ts": words, "speaker.ts": speaker });
   await loader.apply([
-    { id: "a", pack: "speaker.ts", config: { words: ["a"] } },
-    { id: "b", pack: "speaker.ts", config: { words: ["b"] }, disabled: true },
+    { id: "a", plugin: "speaker.ts", config: { words: ["a"] } },
+    { id: "b", plugin: "speaker.ts", config: { words: ["b"] }, disabled: true },
   ]);
   const state = () => loader.status().map(({ id, state, missing }) => ({ id, state, missing }));
   assert.deepEqual(state(), [
     { id: "a", state: "waiting", missing: ["demo.words"] },
     { id: "b", state: "off", missing: undefined },
   ]);
-  await loader.edit((t) => [{ id: "words", pack: "words.ts" }, ...t]);
+  await loader.edit((t) => [{ id: "words", plugin: "words.ts" }, ...t]);
   assert.deepEqual(state(), [
     { id: "words", state: "active", missing: undefined },
     { id: "a", state: "active", missing: undefined },

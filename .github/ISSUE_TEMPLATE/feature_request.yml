@@ -1,5 +1,5 @@
 name: Feature request
-description: An idea for a pack, a view or a change.
+description: An idea for a plugin, a view or a change.
 labels: [enhancement]
 body:
   - type: textarea
@@ -13,7 +13,7 @@ body:
     id: idea
     attributes:
       label: What you have in mind
-      description: How it could work. A new idea is usually a pack; say if it needs a change to an interface in spec/.
+      description: How it could work. A new idea is usually a plugin; say if it needs a change to an interface in spec/.
   - type: textarea
     id: else
     attributes:

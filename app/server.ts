@@ -1,7 +1,7 @@
 /**
  * The app, server side: `npm run serve`. One process runs
  * - the dev server for the page (runtime/serve.ts, port 5180), and
- * - a Node runtime with the server's packs, hot-reloaded: graph, action,
+ * - a Node runtime with the server's plugins, hot-reloaded: graph, action,
  *   types and the bases (work, question, record, actor, links, items) with
  *   the trial flavour branch, interchange (a moved map's change sets),
  *   exchange, agent, git and hub (a run's repository and hub as facts),
@@ -11,21 +11,21 @@
  *   context; its writer only with writing on), grow, since ("since
  *   you last heard", at each prompt), the Claude Code adapter (5181), the
  *   map's agent tools on its MCP server (mcp), the reference read from the
- *   running packs (docs, and its `packs` tool, docs-tool), the old maps kept read only
+ *   running plugins (docs, and its `plugins` tool, docs-tool), the old maps kept read only
  *   (archive, from <data>/archives), and
  *   the bridge (5182) the page reaches them through.
  *
  * --port moves all three (page, page + 1, page + 2); --no-watch turns hot
- * reload off, for the page and the packs. ARCHIPELAGO_PORT and
+ * reload off, for the page and the plugins. ARCHIPELAGO_PORT and
  * ARCHIPELAGO_WATCH=0 set the same, so scripts/live.ts can start any commit:
  * an older one ignores them and runs on the default ports.
  *
- * --no-write (ARCHIPELAGO_WRITE=0) leaves the written pack off, so the
+ * --no-write (ARCHIPELAGO_WRITE=0) leaves the written plugin off, so the
  * server writes no skill or memory file, and the lean writer, so it writes
  * no project settings. The dev server runs so: those files
  * are what real sessions load, and only live writes them.
  *
- * Point Claude Code at the adapter (packs/claude-code/README.md) and open
+ * Point Claude Code at the adapter (plugins/claude-code/README.md) and open
  * http://127.0.0.1:5180/app/.
  *
  *   node app/server.ts [--data dir] [--port 5180] [--no-watch] [--no-write]
@@ -54,10 +54,10 @@ const tree = serverTree({ data: values.data, port: PAGE, write: values.write, ot
 const host = new NodeHost({
   tree,
   base: pathToFileURL(root + "/").href,
-  watch: values.watch ? join(root, "packs") : undefined,
+  watch: values.watch ? join(root, "plugins") : undefined,
   onReload: (r) => r.reloaded.length && console.log(`reloaded ${r.reloaded.join(", ")}`),
 });
-host.runtime.onError = (fiber, error) => console.error(`[${fiber.pack.id}]`, error);
+host.runtime.onError = (fiber, error) => console.error(`[${fiber.plugin.id}]`, error);
 await host.start();
 await host.runtime.settle();
 for (const s of host.loader.status()) {

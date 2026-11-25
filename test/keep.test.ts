@@ -6,15 +6,15 @@ import type { Fact } from "../spec/changeset.ts";
 import type { Json } from "../spec/common.ts";
 import type { ExchangeRead } from "../spec/exchange.ts";
 import type { GraphRead } from "../spec/graph.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import keep, { DEFAULTS, overlap, standing, weigh, wordsProblems, type Review } from "../packs/keep/index.ts";
-import verdict from "../packs/verdict/index.ts";
-import words from "../packs/words/index.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import keep, { DEFAULTS, overlap, standing, weigh, wordsProblems, type Review } from "../plugins/keep/index.ts";
+import verdict from "../plugins/verdict/index.ts";
+import words from "../plugins/words/index.ts";
 
 const T = "2026-11-20T16:00:00.000Z";
 const rec = (runs: number, held: number, failed: number) => ({ said: runs * 3, runs, held, failed, quiet: runs - held - failed });
@@ -49,11 +49,11 @@ test("words checks: empty, too long, a home folder, a secret, the trial mark", (
 
 // --- Through the agent, on the map ---
 
-const probe: Pack = {
+const probe: Plugin = {
   id: "probe",
   inject: ["agent.run", "agent.tree", "action.invoke", "action.register", "graph.read", "exchange.read"],
   apply(ctx) {
-    // Stands in for grow.trial's fields, and for the schema pack's quarantine.
+    // Stands in for grow.trial's fields, and for the schema plugin's quarantine.
     ctx.get<ActionRegister>("action.register").register({
       name: "probe.write",
       title: "write facts",
@@ -66,15 +66,15 @@ const probe: Pack = {
   },
 };
 
-async function setup(config: Record<string, unknown> = {}, extra: Pack[] = []) {
+async function setup(config: Record<string, unknown> = {}, extra: Plugin[] = []) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { graph, action, exchange, agent, verdict, words: words as Pack, keep: keep as Pack, probe };
+  const modules: Record<string, Plugin> = { graph, action, exchange, agent, verdict, words: words as Plugin, keep: keep as Plugin, probe };
   for (const p of extra) modules[p.id] = p;
-  const BASE = "mem:/packs/";
+  const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
-  const tree: Entry[] = ["graph", "action", "exchange", "agent", "verdict", "words", ...extra.map((p) => p.id), "probe", "keep"].map((id) => ({ id, pack: id, ...(id === "keep" ? { config } : {}) }));
+  const tree: Entry[] = ["graph", "action", "exchange", "agent", "verdict", "words", ...extra.map((p) => p.id), "probe", "keep"].map((id) => ({ id, plugin: id, ...(id === "keep" ? { config } : {}) }));
   await loader.apply(tree);
   await rt.settle();
   assert.deepEqual(errors, []);
@@ -116,7 +116,7 @@ test("a trial whose miss keeps coming is retired by its record, with why; one th
   const b = await item(bad);
   assert.equal(b.fields.status, "retired");
   assert.equal((b.fields.decided as any).rule, "failing");
-  assert.equal((b.fields.decided as any).by, "pack:keep");
+  assert.equal((b.fields.decided as any).by, "plugin:keep");
   assert.equal((b.fields.decided as any).record.failed, 2);
   const g = await item(good);
   assert.equal(g.fields.status, undefined, "promoted: said as kept");
@@ -156,7 +156,7 @@ test("a run can't rewrite, promote or retire a node that failed in it; another r
 
 test("a quarantined node, or one whose words fail their check, never reaches a run; the gate says why", async () => {
   let heldId = "";
-  const schemaStub: Pack = {
+  const schemaStub: Plugin = {
     id: "schema",
     inject: ["action.register"],
     apply(ctx) {
@@ -188,14 +188,14 @@ test("a quarantined node, or one whose words fail their check, never reaches a r
   assert.equal((await item(fine)).fields.status, undefined);
 });
 
-test("the pack loads and unloads cleanly, with a decision pending; its gate, stage and actions go with it", async () => {
+test("the plugin loads and unloads cleanly, with a decision pending; its gate, stage and actions go with it", async () => {
   const { loader, rt, errors, invoke, trial, runOnce, tree } = await setup({ fail: 1 });
   const id = await trial("Retry the server call.", "server answered 429 empty body");
   await runOnce("u1", "server answered 429 empty body", false);
   // Without keep, then nothing: a watch may fire while it goes.
-  await loader.apply(["graph", "action", "exchange", "agent", "verdict", "words", "probe"].map((x) => ({ id: x, pack: x })));
+  await loader.apply(["graph", "action", "exchange", "agent", "verdict", "words", "probe"].map((x) => ({ id: x, plugin: x })));
   await rt.settle();
-  assert.equal((await invoke("keep.review", {})).ok, false, "keep.review goes with the pack");
+  assert.equal((await invoke("keep.review", {})).ok, false, "keep.review goes with the plugin");
   assert.ok((await invoke("words.set", { node: id, words: "Changed." }, "u1")).ok, "no self-edit stage once it is gone");
   await new Promise((r) => setTimeout(r, 700));
   await loader.apply([]);
@@ -204,8 +204,8 @@ test("the pack loads and unloads cleanly, with a decision pending; its gate, sta
   assert.equal(tree.nodes().length, 0);
 });
 
-test("a node written while the pack loads doesn't trip it", async () => {
-  const writer: Pack = {
+test("a node written while the plugin loads doesn't trip it", async () => {
+  const writer: Plugin = {
     id: "writer",
     inject: ["action.invoke"],
     async apply(ctx) {
@@ -215,13 +215,13 @@ test("a node written while the pack loads doesn't trip it", async () => {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { graph, action, exchange, agent, verdict, words: words as Pack, keep: keep as Pack, writer };
-  const BASE = "mem:/packs/";
+  const modules: Record<string, Plugin> = { graph, action, exchange, agent, verdict, words: words as Plugin, keep: keep as Plugin, writer };
+  const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const ids = ["graph", "action", "exchange", "agent", "verdict", "words", "keep", "writer"];
-  await loader.apply(ids.map((id) => ({ id, pack: id })));
+  await loader.apply(ids.map((id) => ({ id, plugin: id })));
   await rt.settle();
-  await loader.apply(ids.filter((x) => x !== "keep").map((id) => ({ id, pack: id })));
+  await loader.apply(ids.filter((x) => x !== "keep").map((id) => ({ id, plugin: id })));
   await rt.settle();
   await loader.apply([]);
   await rt.settle();

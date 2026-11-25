@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { TypeInfo } from "../spec/types.ts";
 import { COMMON } from "../spec/types.ts";
-import { parse, run, type Row, type Wire } from "../packs/find/query.ts";
-import { layout, order, SIZE } from "../packs/map/layout.ts";
-import { markToken, side } from "../packs/map/marks.ts";
-import { MARKS } from "../packs/style/tokens.ts";
+import { parse, run, type Row, type Wire } from "../plugins/find/query.ts";
+import { layout, order, SIZE } from "../plugins/map/layout.ts";
+import { markToken, side } from "../plugins/map/marks.ts";
+import { MARKS } from "../plugins/style/tokens.ts";
 
-const base = (name: string, open: string[], closed: string[]): TypeInfo => ({ name, base: name, statuses: { open, closed }, fields: COMMON, trial: false, pack: name });
+const base = (name: string, open: string[], closed: string[]): TypeInfo => ({ name, base: name, statuses: { open, closed }, fields: COMMON, trial: false, plugin: name });
 const TYPES = new Map([
   ["work", base("work", ["todo", "doing"], ["done", "dropped"])],
   ["question", base("question", ["open"], ["decided", "dropped"])],
@@ -147,7 +147,7 @@ test("marks come from the base and the status's side, never the type's name", ()
   assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => drawn(markToken(bases, w, s))), ['"□"', '"◧"', '"■"', '"■"'], "the style draws each side");
   assert.equal(markToken(bases, bug, "done"), markToken(bases, w, "done"), "a flavour is marked as its base");
   assert.equal(drawn(markToken(bases, TYPES.get("question")!, "open")), '"◇"');
-  // Edition 10: a base its pack draws as a hexagon has the hexagon's letters.
+  // Edition 10: a base its plugin draws as a hexagon has the hexagon's letters.
   assert.equal(markToken(bases, { ...w, name: "profile", base: "profile" }, "todo"), "glyph-hexagon-fresh");
   assert.equal(drawn("glyph-hexagon-fresh"), '"⬡"');
 });

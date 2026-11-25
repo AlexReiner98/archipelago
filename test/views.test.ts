@@ -4,32 +4,32 @@ import type { ActionInvoke } from "../spec/action.ts";
 import type { GraphRead } from "../spec/graph.ts";
 import type { HereDeclare, HereRead, HereSet } from "../spec/here.ts";
 import type { SlotArrange, SlotFill, SlotRead } from "../spec/slot.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import graph from "../packs/graph/index.ts";
-import types from "../packs/types/index.ts";
-import record from "../packs/record/index.ts";
-import items from "../packs/items/index.ts";
-import here from "../packs/here/index.ts";
-import renderer from "../packs/renderer/index.ts";
-import views from "../packs/views/index.ts";
-import { SHOWN, shower } from "../packs/views/apply.ts";
-import { byHash, firstView, search, sections, views as list, type Kind, type Row } from "../packs/views/pick.ts";
+import action from "../plugins/action/index.ts";
+import graph from "../plugins/graph/index.ts";
+import types from "../plugins/types/index.ts";
+import record from "../plugins/record/index.ts";
+import items from "../plugins/items/index.ts";
+import here from "../plugins/here/index.ts";
+import renderer from "../plugins/renderer/index.ts";
+import views from "../plugins/views/index.ts";
+import { SHOWN, shower } from "../plugins/views/apply.ts";
+import { byHash, firstView, search, sections, views as list, type Kind, type Row } from "../plugins/views/pick.ts";
 
 const KINDS: Kind[] = [
-  { pack: "harness", name: "view", title: "Context interface" },
-  { pack: "map", name: "map", title: "Map" },
-  { pack: "field", name: "field", title: "Landscape" },
-  { pack: "docs", name: "view", title: "Packs" },
-  { pack: "two", name: "a", title: "A" },
-  { pack: "two", name: "b", title: "B" },
+  { plugin: "harness", name: "view", title: "Context interface" },
+  { plugin: "map", name: "map", title: "Map" },
+  { plugin: "field", name: "field", title: "Landscape" },
+  { plugin: "docs", name: "view", title: "Plugins" },
+  { plugin: "two", name: "a", title: "A" },
+  { plugin: "two", name: "b", title: "B" },
 ];
 const view = (id: string, fields: Record<string, unknown>): Row => ({ id, type: "view", fields: { title: id, ...fields } as any });
 const hubs: Record<string, { id: string; title: string }> = { i_b: { id: "i_hub", title: "Release" } };
 const none = () => undefined;
 
-test("each kind of center fill is a view; a pack with two is named pack/name; home is the configured kind, first", () => {
+test("each kind of center fill is a view; a plugin with two is named plugin/name; home is the configured kind, first", () => {
   const all = list(KINDS, [], none, { home: "map", pinned: ["field"] });
   assert.deepEqual(
     all.map((v) => v.id),
@@ -77,9 +77,9 @@ test("the page opens on the hash's view once it is there; home stands in late an
   const all = list(KINDS, [], none);
   const without = all.filter((v) => v.id !== "harness");
   const at = { ready: true, waited: false };
-  // Its pack has loaded: open it.
+  // Its plugin has loaded: open it.
   assert.deepEqual(firstView(all, "#harness", at), { pick: all.find((v) => v.id === "harness"), chosen: true });
-  // Its pack hasn't loaded yet, though home has and the map is read: wait for it.
+  // Its plugin hasn't loaded yet, though home has and the map is read: wait for it.
   assert.equal(firstView(without, "#harness", at), undefined);
   // Still not there after the wait: home stands in, and the hash's view is held to come back to.
   const late = firstView(without, "#harness", { ready: true, waited: true })!;
@@ -91,7 +91,7 @@ test("the page opens on the hash's view once it is there; home stands in late an
   assert.deepEqual(firstView(all, "", at), { pick: all.find((v) => v.home), chosen: false });
 });
 
-const filler: Pack = {
+const filler: Plugin = {
   id: "item",
   inject: ["slot.fill", "here.declare"],
   apply(ctx) {
@@ -111,15 +111,15 @@ test("showing a view sets here.view and its settings, lays its arrange; the next
   const read = rt.root.get<SlotRead>("slot.read");
   const h = rt.root.get<HereRead>("here.read");
   const set = rt.root.get<HereSet>("here.set");
-  const declared: string[] = []; // the views pack declares views.view; here nobody does
+  const declared: string[] = []; // the views plugin declares views.view; here nobody does
   const s = shower(h, set, rt.root.get<SlotArrange>("slot.arrange"), (e) => declared.push(String(e)));
-  const [a] = list([{ pack: "item", name: "map" }], [view("i_a", { center: "item/map", here: { "item.q": "in:x" }, arrange: { "item/page": "left" } })], none).filter((v) => v.id === "i_a");
+  const [a] = list([{ plugin: "item", name: "map" }], [view("i_a", { center: "item/map", here: { "item.q": "in:x" }, arrange: { "item/page": "left" } })], none).filter((v) => v.id === "i_a");
   s.show(a!);
   assert.equal(h.get("here.view"), "item/map");
   assert.equal(h.get("item.q"), "in:x");
   assert.deepEqual(read.fills("left").map((f) => f.name), ["page"]);
   assert.deepEqual(read.fills("right"), []);
-  const [kind] = list([{ pack: "item", name: "map" }], [], none);
+  const [kind] = list([{ plugin: "item", name: "map" }], [], none);
   s.show(kind!);
   assert.equal(h.get("item.q"), undefined, "its settings cleared");
   assert.deepEqual(read.fills("right").map((f) => f.name), ["page"], "its arrange taken back");
@@ -128,9 +128,9 @@ test("showing a view sets here.view and its settings, lays its arrange; the next
 
 test("the flavour view: an agent makes a view with items.create", async () => {
   const rt = new Runtime();
-  const modules: Record<string, Pack> = { graph, action, types, record, items, views };
+  const modules: Record<string, Plugin> = { graph, action, types, record, items, views };
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5, -3)] }) });
-  await loader.apply(Object.keys(modules).map((id) => ({ id, pack: `${id}.ts` })));
+  await loader.apply(Object.keys(modules).map((id) => ({ id, plugin: `${id}.ts` })));
   const invoke = rt.root.get<ActionInvoke>("action.invoke");
   const out: any = await invoke.invoke({
     action: "items.create",
@@ -142,4 +142,17 @@ test("the flavour view: an agent makes a view with items.create", async () => {
   const page = await g.of("view", { limit: 5 });
   assert.equal(page.items.length, 1, JSON.stringify(out));
   assert.equal(page.items[0]!.fields.center, "map/map");
+});
+
+test("views: a picked view fades through the page's ground: cover in, the view changes and lays out, cover out; with none, or switch_ms 0, at once", async () => {
+  const { faded } = await import("../plugins/views/fade.ts");
+  const seen: string[] = [];
+  const cover = { show: (ms: number) => seen.push(`show ${ms}`), hide: (ms: number) => seen.push(`hide ${ms}`), done: () => seen.push("done") };
+  const wait = async (ms: number) => void seen.push(`wait ${ms}`);
+  assert.equal(faded(() => seen.push("now"), {}, undefined, wait), false);
+  assert.equal(faded(() => seen.push("off"), { switch_ms: 0 }, cover, wait), false);
+  assert.deepEqual(seen.splice(0), ["now", "done", "off"], "no fade: the cover goes, the view changes at once");
+  assert.equal(faded(() => seen.push("view"), { switch_ms: 400, switch_wait_ms: 120 }, cover, wait), true);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(seen, ["show 200", "wait 200", "view", "wait 120", "hide 200", "wait 200", "done"], "never the old view and the new drawn together");
 });

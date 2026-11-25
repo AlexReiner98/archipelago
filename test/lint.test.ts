@@ -1,18 +1,18 @@
 /**
- * The lint pack: its functions as the checker calls them (a graph as data
- * in, the verdict and what was read out), then the pack in a runtime with
- * the checks pack: a rule's tests made by `lint.cover`, solved, and solved
+ * The lint plugin: its functions as the checker calls them (a graph as data
+ * in, the verdict and what was read out), then the plugin in a runtime with
+ * the checks plugin: a rule's tests made by `lint.cover`, solved, and solved
  * again when what they read moves.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Json } from "../spec/common.ts";
 import type { Item } from "../spec/graph.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
-import { solve, tracker, type Read, type Write } from "../packs/checks/checker.ts";
-import checks from "../packs/checks/index.ts";
-import lint, { FNS, finding } from "../packs/lint/index.ts";
+import { solve, tracker, type Read, type Write } from "../plugins/checks/checker.ts";
+import checks from "../plugins/checks/index.ts";
+import lint, { FNS, finding } from "../plugins/lint/index.ts";
 
 const item = (id: string, type: string, fields: Record<string, Json> = {}): Item => ({ id, type, fields });
 
@@ -74,19 +74,19 @@ test("lint as a checks domain: solved by the checker, its reads the stamp", asyn
   assert.deepEqual(writes[1]!.fields.reads, { items: [["a", []]], links: [["a", "part_of", "out", 1, null]] });
 });
 
-// ---- The pack in a runtime ----
+// ---- The plugin in a runtime ----
 
 const BASES = ["graph", "action", "types", "work", "question", "record", "actor", "links", "items", "schema"];
 
-test("the pack: lint.cover makes a rule's tests, the checker solves them, and again when what they read moves", async () => {
-  const packs: Record<string, Pack> = {};
-  for (const id of BASES) packs[id] = (await import(`../packs/${id}/index.ts`)).default;
-  Object.assign(packs, { checks, lint, probe: { id: "probe", inject: ["action.invoke", "graph.read"], apply() {} } });
+test("the plugin: lint.cover makes a rule's tests, the checker solves them, and again when what they read moves", async () => {
+  const plugins: Record<string, Plugin> = {};
+  for (const id of BASES) plugins[id] = (await import(`../plugins/${id}/index.ts`)).default;
+  Object.assign(plugins, { checks, lint, probe: { id: "probe", inject: ["action.invoke", "graph.read"], apply() {} } });
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => void errors.push(e);
-  const loader = new Loader(rt, { base: "mem:/", import: async (u) => ({ default: packs[u.slice(5)]! }) });
-  await loader.apply([...BASES, "checks", "lint", "probe"].map((id) => ({ id, pack: id })));
+  const loader = new Loader(rt, { base: "mem:/", import: async (u) => ({ default: plugins[u.slice(5)]! }) });
+  await loader.apply([...BASES, "checks", "lint", "probe"].map((id) => ({ id, plugin: id })));
   await rt.settle();
   try {
     const ctx = loader.fiber("probe")!.ctx.intercept({ actor: { id: "person:owner", kind: "person" } });

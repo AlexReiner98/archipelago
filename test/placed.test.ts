@@ -5,23 +5,23 @@ import { dirname, join } from "node:path";
 import { test } from "node:test";
 import type { ActionInvoke } from "../spec/action.ts";
 import type { AgentRun } from "../spec/agent.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import types from "../packs/types/index.ts";
-import record from "../packs/record/index.ts";
-import links from "../packs/links/index.ts";
-import items from "../packs/items/index.ts";
-import words from "../packs/words/index.ts";
-import written from "../packs/written/index.ts";
-import profile from "../packs/profile/index.ts";
-import placed, { skillName } from "../packs/placed/index.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import types from "../plugins/types/index.ts";
+import record from "../plugins/record/index.ts";
+import links from "../plugins/links/index.ts";
+import items from "../plugins/items/index.ts";
+import words from "../plugins/words/index.ts";
+import written from "../plugins/written/index.ts";
+import profile from "../plugins/profile/index.ts";
+import placed, { skillName } from "../plugins/placed/index.ts";
 
-const BASE = "mem:/packs/";
-const probe: Pack = { id: "probe", inject: ["agent.run", "action.invoke"], apply() {} };
+const BASE = "mem:/plugins/";
+const probe: Plugin = { id: "probe", inject: ["agent.run", "action.invoke"], apply() {} };
 
 const text = (f: string) => readFile(f, "utf8").catch(() => undefined);
 async function until(check: () => Promise<boolean>, what: string) {
@@ -54,14 +54,14 @@ test("a profile's skill moves from home into the folders of the runs it holds it
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { graph, action, types, record, links, items, exchange, agent, words: words as Pack, written: written as Pack, profile, placed: placed as Pack, probe };
+  const modules: Record<string, Plugin> = { graph, action, types, record, links, items, exchange, agent, words: words as Plugin, written: written as Plugin, profile, placed: placed as Plugin, probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const tree = (withPlaced = true): Entry[] => [
-    ...["graph", "action", "types", "record", "links", "items", "exchange", "agent", "words"].map((id) => ({ id, pack: id })),
-    { id: "written", pack: "written", config: { home } },
-    { id: "profile", pack: "profile" },
-    ...(withPlaced ? [{ id: "placed", pack: "placed", config: { git } }] : []),
-    { id: "probe", pack: "probe" },
+    ...["graph", "action", "types", "record", "links", "items", "exchange", "agent", "words"].map((id) => ({ id, plugin: id })),
+    { id: "written", plugin: "written", config: { home } },
+    { id: "profile", plugin: "profile" },
+    ...(withPlaced ? [{ id: "placed", plugin: "placed", config: { git } }] : []),
+    { id: "probe", plugin: "probe" },
   ];
   try {
     await loader.apply(tree());
@@ -76,9 +76,9 @@ test("a profile's skill moves from home into the folders of the runs it holds it
     const node = adopted.adopted[0]!.node;
     const rA = String((await act("items.create", { type: "record", title: "Studio repo" })).id);
     const rB = String((await act("items.create", { type: "record", title: "Archipelago repo" })).id);
-    const pA = String((await act("items.create", { type: "umwelt", title: "Studio" })).id);
-    const pB = String((await act("items.create", { type: "umwelt", title: "Archipelago" })).id);
-    await act("items.link", { type: "in_umwelt", from: node, to: pA });
+    const pA = String((await act("items.create", { type: "context_filter", title: "Studio" })).id);
+    const pB = String((await act("items.create", { type: "context_filter", title: "Archipelago" })).id);
+    await act("items.link", { type: "in_context_filter", from: node, to: pA });
     await act("items.link", { type: "uses", from: rA, to: pA });
     await act("items.link", { type: "uses", from: rB, to: pB });
     const start = (run: string, cwd: string, repo: string) => ctx(run).get<AgentRun>("agent.run").begin({ run, agent: { id: "e_agent", kind: "agent" }, harness: "test", reaches: [], cwd, facts: { repo } });

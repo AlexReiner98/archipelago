@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Dispose } from "../spec/common.ts";
-import { Runtime, type Context, type Pack } from "../runtime/core.ts";
+import { Runtime, type Context, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
-import client from "../packs/bridge/client.ts";
+import client from "../plugins/bridge/client.ts";
 
 /** A stand-in for the browser's EventSource: the test opens, feeds and fails each one. */
 class FakeSource {
@@ -52,7 +52,7 @@ test("a stream the browser closes for good is opened again, and the watches made
     return { json: async () => value } as Response;
   };
   const heard: unknown[] = [];
-  const consumer: Pack = {
+  const consumer: Plugin = {
     id: "consumer",
     inject: ["graph.watch"],
     apply(ctx: Context) {
@@ -62,12 +62,12 @@ test("a stream the browser closes for good is opened again, and the watches made
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { bridge: client as Pack, consumer };
+  const modules: Record<string, Plugin> = { bridge: client as Plugin, consumer };
   const loader = new Loader(rt, { base: "mem:/", import: async (u) => ({ default: modules[u.slice("mem:/".length, -3)] }) });
   try {
     const applied = loader.apply([
-      { id: "bridge", pack: "bridge.ts", config: { url: "http://bridge/", retry: 5 } },
-      { id: "consumer", pack: "consumer.ts" },
+      { id: "bridge", plugin: "bridge.ts", config: { url: "http://bridge/", retry: 5 } },
+      { id: "consumer", plugin: "consumer.ts" },
     ]);
     await until(() => FakeSource.all.length === 1);
     FakeSource.all[0]!.send({ stream: "s1" });

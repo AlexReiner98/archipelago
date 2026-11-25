@@ -30,9 +30,9 @@ import { setTimeout as sleep } from "node:timers/promises";
 import type { ActionInvoke } from "../spec/action.ts";
 import type { Authority, Json } from "../spec/common.ts";
 import type { Fact } from "../spec/changeset.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import { Store } from "../packs/graph/store.ts";
+import { Store } from "../plugins/graph/store.ts";
 import { archiveHeader, archiveLand, landArchive, landFocus, LANDS, SAID, type Dump, type OldGet } from "./pelago-map.ts";
 
 const { positionals, values } = parseArgs({
@@ -159,29 +159,29 @@ async function read(out: string) {
   console.log({ items: dump.items.length, links: dump.links.length, by_owner: dump.by_owner!.length, gets: dump.gets ? Object.keys(dump.gets).length : 0 });
 }
 
-/** A runtime over a data folder with the packs a move goes through, and an invoke as the mover. */
+/** A runtime over a data folder with the plugins a move goes through, and an invoke as the mover. */
 async function runtime(data: string) {
   const rt = new Runtime();
-  rt.onError = (f, e) => console.error(`[${f.pack.id}]`, e);
-  const mover: Pack = { id: "mover", inject: ["action.invoke"], apply() {} };
+  rt.onError = (f, e) => console.error(`[${f.plugin.id}]`, e);
+  const mover: Plugin = { id: "mover", inject: ["action.invoke"], apply() {} };
   const loader = new Loader(rt, {
     base: pathToFileURL(root + "/").href,
     import: async (url: string) => (url.endsWith("/mover") ? { default: mover } : import(url)),
   });
   const tree: Entry[] = [
-    { id: "graph", pack: "packs/graph/index.ts", config: { db: join(data, "graph.sqlite") } },
-    { id: "action", pack: "packs/action/index.ts" },
-    { id: "types", pack: "packs/types/index.ts" },
-    { id: "work", pack: "packs/work/index.ts" },
-    { id: "question", pack: "packs/question/index.ts" },
-    { id: "record", pack: "packs/record/index.ts" },
-    { id: "actor", pack: "packs/actor/index.ts" },
-    { id: "links", pack: "packs/links/index.ts" },
-    { id: "branch", pack: "packs/branch/index.ts" },
-    { id: "schema", pack: "packs/schema/index.ts", config: { db: join(data, "schema.sqlite") } },
-    { id: "history", pack: "packs/history/index.ts", config: { db: join(data, "history.sqlite") } },
-    { id: "interchange", pack: "packs/interchange/index.ts" },
-    { id: "mover", pack: "mover" },
+    { id: "graph", plugin: "plugins/graph/index.ts", config: { db: join(data, "graph.sqlite") } },
+    { id: "action", plugin: "plugins/action/index.ts" },
+    { id: "types", plugin: "plugins/types/index.ts" },
+    { id: "work", plugin: "plugins/work/index.ts" },
+    { id: "question", plugin: "plugins/question/index.ts" },
+    { id: "record", plugin: "plugins/record/index.ts" },
+    { id: "actor", plugin: "plugins/actor/index.ts" },
+    { id: "links", plugin: "plugins/links/index.ts" },
+    { id: "branch", plugin: "plugins/branch/index.ts" },
+    { id: "schema", plugin: "plugins/schema/index.ts", config: { db: join(data, "schema.sqlite") } },
+    { id: "history", plugin: "plugins/history/index.ts", config: { db: join(data, "history.sqlite") } },
+    { id: "interchange", plugin: "plugins/interchange/index.ts" },
+    { id: "mover", plugin: "mover" },
   ];
   await loader.apply(tree);
   await rt.settle();

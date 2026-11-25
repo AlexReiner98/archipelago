@@ -5,16 +5,16 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { AgentTree } from "../spec/agent.ts";
 import type { ExchangeRead } from "../spec/exchange.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import claudeCode from "../packs/claude-code/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import loaded from "../packs/loaded/index.ts";
-import verdict, { type VerdictRead } from "../packs/verdict/index.ts";
-import { homePath, loadsIn } from "../packs/claude-code/mapping.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import claudeCode from "../plugins/claude-code/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import loaded from "../plugins/loaded/index.ts";
+import verdict, { type VerdictRead } from "../plugins/verdict/index.ts";
+import { homePath, loadsIn } from "../plugins/claude-code/mapping.ts";
 
 const line = (o: object) => JSON.stringify(o);
 const HOME = "C:\\Users\\me";
@@ -66,21 +66,21 @@ test("what Claude Code loads is said at skill: and memory: places by a node per 
   const claudeMd = join(homedir(), "proj-loaded-test", "CLAUDE.md");
   const MEMORY = "memory:project/~/proj-loaded-test/CLAUDE.md";
   await writeFile(transcriptPath, "");
-  const probe: Pack = { id: "probe", inject: ["exchange.read", "agent.tree", "verdict.read"], apply() {} };
-  const modules: Record<string, Pack> = {
+  const probe: Plugin = { id: "probe", inject: ["exchange.read", "agent.tree", "verdict.read"], apply() {} };
+  const modules: Record<string, Plugin> = {
     "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "verdict.ts": verdict,
     "loaded.ts": loaded, "cc.ts": claudeCode, "probe.ts": probe,
   };
   let port = 0;
   const tree = [
-    { id: "graph", pack: "graph.ts", config: { db: join(dir, "graph.sqlite") } },
-    { id: "action", pack: "action.ts" },
-    { id: "exchange", pack: "exchange.ts", config: { journal: join(dir, "exchange.jsonl") } },
-    { id: "agent", pack: "agent.ts" },
-    { id: "verdict", pack: "verdict.ts" },
-    { id: "loaded", pack: "loaded.ts" },
-    { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts", config: { db: join(dir, "graph.sqlite") } },
+    { id: "action", plugin: "action.ts" },
+    { id: "exchange", plugin: "exchange.ts", config: { journal: join(dir, "exchange.jsonl") } },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "verdict", plugin: "verdict.ts" },
+    { id: "loaded", plugin: "loaded.ts" },
+    { id: "claude-code", plugin: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "probe", plugin: "probe.ts" },
   ];
   const start = async () => {
     const rt = new Runtime();
@@ -111,7 +111,7 @@ test("what Claude Code loads is said at skill: and memory: places by a node per 
     await append(skillCall("s1", "review"), line({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "s1", content: "Launching skill: review" }] } }), skillText(join(dir, "skills", "review"), "# Review\nRead the diff first.", "s1"));
     await hook("PreToolUse", { tool_name: "Read", tool_input: { file_path: join(dir, "a.ts") }, tool_use_id: "r1" });
 
-    const nodes = loader.fiber("probe")!.ctx.get<AgentTree>("agent.tree").nodes().filter((n) => n.pack === "loaded");
+    const nodes = loader.fiber("probe")!.ctx.get<AgentTree>("agent.tree").nodes().filter((n) => n.plugin === "loaded");
     assert.deepEqual(nodes.map((n) => [n.kind, n.at, n.title]), [
       ["memory", [MEMORY], "project memory ~/proj-loaded-test/CLAUDE.md"],
       ["skill", ["skill:review"], "skill review"],
@@ -141,7 +141,7 @@ test("what Claude Code loads is said at skill: and memory: places by a node per 
     await hook("Stop", { last_assistant_message: "Done." });
     const again = (await events()).filter((e) => e.kind === "say");
     assert.deepEqual(again.map((e) => e.place), [MEMORY, "skill:review", MEMORY]);
-    const back = loader.fiber("probe")!.ctx.get<AgentTree>("agent.tree").nodes().filter((n) => n.pack === "loaded");
+    const back = loader.fiber("probe")!.ctx.get<AgentTree>("agent.tree").nodes().filter((n) => n.plugin === "loaded");
     assert.deepEqual(back.map((n) => n.id), nodes.map((n) => n.id));
     assert.deepEqual(errors, []);
   } finally {

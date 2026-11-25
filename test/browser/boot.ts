@@ -1,11 +1,11 @@
-/** Fixture page: boots the browser runtime on two packs and shows its state. */
+/** Fixture page: boots the browser runtime on two plugins and shows its state. */
 import { startBrowser } from "../../runtime/browser.ts";
 import { move } from "../../runtime/loader.ts";
 
 const host = await startBrowser({
   tree: [
-    { id: "provider", pack: "./packs/provider.ts" },
-    { id: "consumer", pack: "./packs/consumer.ts" },
+    { id: "provider", plugin: "./plugins/provider.ts" },
+    { id: "consumer", plugin: "./plugins/consumer.ts" },
   ],
 });
 

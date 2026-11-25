@@ -5,12 +5,12 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { AgentFacts, AgentGate, AgentNode, AgentRun, AgentTree, Moment, NodeDef } from "../spec/agent.ts";
 import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../spec/exchange.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import agent, { placeMatches, refusable } from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
+import agent, { placeMatches, refusable } from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 const T = "2026-11-20T14:00:00.000Z";
 
 /** A node as config: data, since the config tree is data. */
@@ -26,8 +26,8 @@ interface NodeSpec {
   echo?: boolean;
 }
 
-/** A pack that registers the nodes it is configured with. */
-const nodes: Pack<{ nodes: NodeSpec[] }> = {
+/** A plugin that registers the nodes it is configured with. */
+const nodes: Plugin<{ nodes: NodeSpec[] }> = {
   id: "nodes",
   inject: ["agent.node"],
   apply(ctx, config) {
@@ -50,18 +50,18 @@ const nodes: Pack<{ nodes: NodeSpec[] }> = {
   },
 };
 
-/** The test's own view: the adapter's side and the reads, from one pack. */
-const probe: Pack = {
+/** The test's own view: the adapter's side and the reads, from one plugin. */
+const probe: Plugin = {
   id: "probe",
   inject: ["agent.run", "agent.tree", "exchange.read", "exchange.watch"],
   apply() {},
 };
 
-function setup(extra: Record<string, Pack> = {}) {
+function setup(extra: Record<string, Plugin> = {}) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "probe.ts": probe, ...extra };
+  const modules: Record<string, Plugin> = { "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "probe.ts": probe, ...extra };
   const loader = new Loader(rt, {
     base: BASE,
     import: async (url) => {
@@ -89,10 +89,10 @@ const moment = (places: string[], input?: string): Moment => ({ run: "r1", place
 
 function tree(...groups: { id: string; nodes: NodeSpec[] }[]): Entry[] {
   return [
-    { id: "exchange", pack: "exchange.ts" },
-    { id: "agent", pack: "agent.ts" },
-    ...groups.map((g) => ({ id: g.id, pack: "nodes.ts", config: { nodes: g.nodes } })),
-    { id: "probe", pack: "probe.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "agent", plugin: "agent.ts" },
+    ...groups.map((g) => ({ id: g.id, plugin: "nodes.ts", config: { nodes: g.nodes } })),
+    { id: "probe", plugin: "probe.ts" },
   ];
 }
 
@@ -102,9 +102,9 @@ test("places match by family; * stays within a path segment, ** doesn't", () => 
   assert.ok(placeMatches("tool:*", "tool:Bash"));
   assert.ok(placeMatches("prompt", "prompt"));
   assert.ok(!placeMatches("tool:*", "tool_result:Bash"));
-  assert.ok(placeMatches("file:packs/*/page/*.js", "file:packs/surface/page/a.js"));
-  assert.ok(!placeMatches("file:packs/*.js", "file:packs/surface/page/a.js"));
-  assert.ok(placeMatches("file:packs/**", "file:packs/surface/page/a.js"));
+  assert.ok(placeMatches("file:plugins/*/page/*.js", "file:plugins/surface/page/a.js"));
+  assert.ok(!placeMatches("file:plugins/*.js", "file:plugins/surface/page/a.js"));
+  assert.ok(placeMatches("file:plugins/**", "file:plugins/surface/page/a.js"));
   assert.ok(refusable("tool:Edit") && refusable("prompt") && !refusable("session_start") && !refusable("tool_result:Edit"));
 });
 
@@ -112,7 +112,7 @@ test("reach asks the nodes at the places, in config-tree order, and records each
   const { loader, errors, as } = setup();
   await loader.apply(
     tree(
-      { id: "a", nodes: [say("brief", ["session_start"], "Read the brief."), say("trap", ["file:packs/*/page/*.js"], "Restart after adding a page.")] },
+      { id: "a", nodes: [say("brief", ["session_start"], "Read the brief."), say("trap", ["file:plugins/*/page/*.js"], "Restart after adding a page.")] },
       { id: "b", nodes: [say("hello", ["session_start"], "Hello.")] },
     ),
   );
@@ -123,7 +123,7 @@ test("reach asks the nodes at the places, in config-tree order, and records each
     { node: "nodes/brief", text: "Read the brief." },
     { node: "nodes/hello", text: "Hello." },
   ]);
-  const edit = await run.reach(moment(["tool:Edit", "file:packs/surface/page/x.js"]));
+  const edit = await run.reach(moment(["tool:Edit", "file:plugins/surface/page/x.js"]));
   assert.deepEqual(edit.said.map((s) => s.node), ["nodes/trap"]);
   await run.act({ run: "r1", place: "tool:Edit", time: T, kind: "tool", by: "agent", input: { file: "x.js" }, ok: true });
   await run.end("r1", T);
@@ -135,7 +135,7 @@ test("reach asks the nodes at the places, in config-tree order, and records each
       [1, "begin", "-", "from_agent"],
       [2, "say", "session_start", "to_agent"],
       [3, "say", "session_start", "to_agent"],
-      [4, "say", "file:packs/surface/page/x.js", "to_agent"],
+      [4, "say", "file:plugins/surface/page/x.js", "to_agent"],
       [5, "act", "tool:Edit", "from_agent"],
       [6, "end", "-", "from_agent"],
     ],
@@ -219,13 +219,13 @@ test("a node that throws is a miss; the others still speak", async () => {
   assert.equal(miss.text, "boom");
 });
 
-test("the tree follows the packs: nodes go when their pack unloads and come back with it", async () => {
+test("the tree follows the plugins: nodes go when their plugin unloads and come back with it", async () => {
   const { loader, as } = setup();
   await loader.apply(tree({ id: "a", nodes: [say("x", ["prompt"], "X.")] }, { id: "b", nodes: [say("y", ["prompt"], "Y.")] }));
   const { tree: t } = as();
   let changes = 0;
   t.watch(() => changes++);
-  assert.deepEqual(t.nodes().map((n) => [n.id, n.pack]), [["nodes/x", "nodes"], ["nodes/y", "nodes"]]);
+  assert.deepEqual(t.nodes().map((n) => [n.id, n.plugin]), [["nodes/x", "nodes"], ["nodes/y", "nodes"]]);
   await loader.edit((tr) => (tr[2]!.disabled = true, tr));
   assert.deepEqual(t.nodes().map((n) => n.id), ["nodes/y"]);
   await loader.edit((tr) => (delete tr[2]!.disabled, tr));
@@ -233,7 +233,7 @@ test("the tree follows the packs: nodes go when their pack unloads and come back
   assert.ok(changes >= 2);
 });
 
-test("a second node of the same name from one pack is refused", async () => {
+test("a second node of the same name from one plugin is refused", async () => {
   const { loader, errors } = setup();
   await loader.apply(tree({ id: "a", nodes: [say("x", ["prompt"], "1"), say("x", ["prompt"], "2")] }));
   assert.equal(loader.status().find((s) => s.id === "a")!.state, "failed");
@@ -264,7 +264,7 @@ test("without the exchange the agent waits, and comes back when it returns", asy
   assert.equal(state("agent"), "active");
 });
 
-test("a run in flight survives the agent pack reloading: taken up with a miss", async () => {
+test("a run in flight survives the agent plugin reloading: taken up with a miss", async () => {
   const { loader, as } = setup();
   await loader.apply(tree({ id: "a", nodes: [say("x", ["prompt"], "X.")] }));
   await as().run.begin(start);
@@ -300,8 +300,8 @@ test("the journal keeps the record across a restart", async () => {
   }
 });
 
-/** A pack that adds the facts and gates it is configured with: data, like the nodes. */
-const extras: Pack<{ name?: string; facts?: Record<string, string>; hold?: { node: string; why: string; trial?: boolean }[]; throws?: boolean }> = {
+/** A plugin that adds the facts and gates it is configured with: data, like the nodes. */
+const extras: Plugin<{ name?: string; facts?: Record<string, string>; hold?: { node: string; why: string; trial?: boolean }[]; throws?: boolean }> = {
   id: "extras",
   inject: ["agent.facts", "agent.gate"],
   apply(ctx, config) {
@@ -330,11 +330,11 @@ const extras: Pack<{ name?: string; facts?: Record<string, string>; hold?: { nod
 test("facts: the start's, then each source's in config-tree order; a key already set is kept; a later begin adds", async () => {
   const { loader, errors, as } = setup({ "extras.ts": extras });
   await loader.apply([
-    { id: "exchange", pack: "exchange.ts" },
-    { id: "agent", pack: "agent.ts" },
-    { id: "one", pack: "extras.ts", config: { facts: { remote: "github.com/a/b", harness: "not this" } } },
-    { id: "two", pack: "extras.ts", config: { name: "f2", facts: { remote: "later loses", branch: "main" } } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "one", plugin: "extras.ts", config: { facts: { remote: "github.com/a/b", harness: "not this" } } },
+    { id: "two", plugin: "extras.ts", config: { name: "f2", facts: { remote: "later loses", branch: "main" } } },
+    { id: "probe", plugin: "probe.ts" },
   ]);
   const { run, read } = as();
   const info = await run.begin({ ...start, cwd: "~/x", facts: { agent_type: "Explore" } });
@@ -350,10 +350,10 @@ test("facts: the start's, then each source's in config-tree order; a key already
 test("a fact source that throws is a miss; the run still begins", async () => {
   const { loader, as } = setup({ "extras.ts": extras });
   await loader.apply([
-    { id: "exchange", pack: "exchange.ts" },
-    { id: "agent", pack: "agent.ts" },
-    { id: "bad", pack: "extras.ts", config: { throws: true } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "bad", plugin: "extras.ts", config: { throws: true } },
+    { id: "probe", plugin: "probe.ts" },
   ]);
   const { run, read } = as();
   const info = await run.begin(start);
@@ -365,11 +365,11 @@ test("a fact source that throws is a miss; the run still begins", async () => {
 test("a gate holds a node back before it is asked, recorded once per run; a trial hold only records", async () => {
   const { loader, errors, as } = setup({ "extras.ts": extras });
   await loader.apply([
-    { id: "exchange", pack: "exchange.ts" },
-    { id: "agent", pack: "agent.ts" },
-    { id: "gate", pack: "extras.ts", config: { hold: [{ node: "nodes/studio", why: "For Studio runs." }, { node: "nodes/watched", why: "Would hold.", trial: true }] } },
-    { id: "a", pack: "nodes.ts", config: { nodes: [say("studio", ["tool:Bash"], "Rhino."), say("watched", ["tool:Bash"], "Watched."), say("plain", ["tool:Bash"], "Plain.")] } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "gate", plugin: "extras.ts", config: { hold: [{ node: "nodes/studio", why: "For Studio runs." }, { node: "nodes/watched", why: "Would hold.", trial: true }] } },
+    { id: "a", plugin: "nodes.ts", config: { nodes: [say("studio", ["tool:Bash"], "Rhino."), say("watched", ["tool:Bash"], "Watched."), say("plain", ["tool:Bash"], "Plain.")] } },
+    { id: "probe", plugin: "probe.ts" },
   ]);
   const { run, read } = as();
   await run.begin(start);
@@ -384,12 +384,12 @@ test("a gate holds a node back before it is asked, recorded once per run; a tria
       ["nodes/watched", "Would hold.", { gate: "extras/g", trial: true }],
     ],
   );
-  // Unloading the gate's pack takes the gate: the node speaks again.
+  // Unloading the gate's plugin takes the gate: the node speaks again.
   await loader.apply([
-    { id: "exchange", pack: "exchange.ts" },
-    { id: "agent", pack: "agent.ts" },
-    { id: "a", pack: "nodes.ts", config: { nodes: [say("studio", ["tool:Bash"], "Rhino.")] } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "a", plugin: "nodes.ts", config: { nodes: [say("studio", ["tool:Bash"], "Rhino.")] } },
+    { id: "probe", plugin: "probe.ts" },
   ]);
   const after = await as().run.reach({ ...moment(["tool:Bash"]), again: true });
   assert.deepEqual(after.said.map((s) => s.node), ["nodes/studio"]);

@@ -1,5 +1,5 @@
 /**
- * The browser host: the same runtime and loader, importing pack modules
+ * The browser host: the same runtime and loader, importing plugin modules
  * from the dev server and hot-reloading them when it says they changed.
  */
 import { Runtime } from "./core.ts";

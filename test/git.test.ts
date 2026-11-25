@@ -2,19 +2,19 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AgentRun } from "../spec/agent.ts";
 import type { GraphRead } from "../spec/graph.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import types from "../packs/types/index.ts";
-import record from "../packs/record/index.ts";
-import git, { givenRemote, normalRemote } from "../packs/git/index.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import types from "../plugins/types/index.ts";
+import record from "../plugins/record/index.ts";
+import git, { givenRemote, normalRemote } from "../plugins/git/index.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 
-const probe: Pack = { id: "probe", inject: ["agent.run", "graph.read"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["agent.run", "graph.read"], apply() {} };
 
 /** git as a table: folder → remote url and branch. */
 const fakeGit = (folders: Record<string, { url?: string; branch?: string }>) => async (cwd: string, args: string[]) => {
@@ -27,17 +27,17 @@ async function setup(folders: Record<string, { url?: string; branch?: string }>)
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "types.ts": types, "record.ts": record, "exchange.ts": exchange, "agent.ts": agent, "git.ts": git as Pack, "probe.ts": probe };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "types.ts": types, "record.ts": record, "exchange.ts": exchange, "agent.ts": agent, "git.ts": git as Plugin, "probe.ts": probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const tree: Entry[] = [
-    { id: "graph", pack: "graph.ts" },
-    { id: "action", pack: "action.ts" },
-    { id: "types", pack: "types.ts" },
-    { id: "record", pack: "record.ts" },
-    { id: "exchange", pack: "exchange.ts" },
-    { id: "agent", pack: "agent.ts" },
-    { id: "git", pack: "git.ts", config: { git: fakeGit(folders) } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts" },
+    { id: "action", plugin: "action.ts" },
+    { id: "types", plugin: "types.ts" },
+    { id: "record", plugin: "record.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "git", plugin: "git.ts", config: { git: fakeGit(folders) } },
+    { id: "probe", plugin: "probe.ts" },
   ];
   await loader.apply(tree);
   await rt.settle();

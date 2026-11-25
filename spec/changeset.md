@@ -1,14 +1,14 @@
 # changeset
 
 A change, written in full. The journal keeps them, undo inverts them, and
-they are what moves between two places (an export, a sync, a pack's seed
+they are what moves between two places (an export, a sync, a plugin's seed
 data). Types: [changeset.ts](changeset.ts).
 
 ## Shape
 
 ```ts
 {
-  header: { actor, authority, pack, action, reason, time, undoes?, run? },
+  header: { actor, authority, plugin, action, reason, time, undoes?, run? },
   facts: [
     ["+", "e_1", "type",   "task"],
     ["+", "e_1", "title",  "Write the contracts"],
@@ -27,7 +27,7 @@ data). Types: [changeset.ts](changeset.ts).
 - A retraction always names the value it removes. That's what makes the
   set complete: the inverse is the facts reversed with each op flipped
   (`inverse()` in the types), and needs nothing read from the graph.
-- `header.pack` and `header.action` are always set: no change is made
+- `header.plugin` and `header.action` are always set: no change is made
   outside an action (see [action](action.md)).
 
 ## Undo
@@ -44,5 +44,5 @@ change first, or a fresh change, resolves it. Nothing is merged silently.
 ## What it is not
 
 The graph is the truth. Change sets are a record of how it got there, kept
-by the history pack, and the journal can be trimmed. Nothing rebuilds the
+by the history plugin, and the journal can be trimmed. Nothing rebuilds the
 graph from them.

@@ -30,9 +30,9 @@ Edition 3 adds the person's side of a run:
 
 Edition 11 (24 Nov 2026) lets a `decision` stand at `reply_end` as well:
 a person accepted (`ok`) or rejected (`ok: false`) the run's reply, output
-`{decision}`. A call's run (the [call](../packs/call/README.md) pack's,
-`harness: "call"`: one request to a model, made by a pack) is one reply, so
-its decision judges everything said to it: the verdict pack fails or holds
+`{decision}`. A call's run (the [call](../plugins/call/README.md) plugin's,
+`harness: "call"`: one request to a model, made by a plugin) is one reply, so
+its decision judges everything said to it: the verdict plugin fails or holds
 every node said before it, and only the last decision counts. A call
 follows an item through the facts `item` and `version`.
 
@@ -70,7 +70,7 @@ modelled) adds one place:
 | `compact` | the harness is about to compact the run's context (input `{trigger}`) | no | PreCompact |
 
 What was said before a compaction is gone from the agent's context, so a
-node said again after it in the run is a **re-saying**: the agent pack
+node said again after it in the run is a **re-saying**: the agent plugin
 records that say with `detail.resaid: true`.
 
 Left out on purpose: a session's end (nothing can be said to the agent
@@ -79,20 +79,20 @@ it is a run whose `parent` is the run that started it, reaching
 `session_start` as it starts and `reply_end` as it stops.
 
 A reached place is concrete; a node's `at` may use `*` in the argument
-(`tool:*`, `file:packs/*/page/*.js`). The adapter decides which places it can
+(`tool:*`, `file:plugins/*/page/*.js`). The adapter decides which places it can
 reach (the Claude Code adapter maps them to its hooks); the vocabulary says
 what each one means, so a node written for one adapter works under another.
 The vocabulary is open: an edition can add a place, and a node may listen at
 a place no adapter reaches yet. It stays quiet, and the tree shows it as not
 reachable from the run's adapter (`RunStart.reaches`). A node that reads the
-map has its pack inject `graph.read`; `speak` is handed nothing but the
+map has its plugin inject `graph.read`; `speak` is handed nothing but the
 moment and the run.
 
 ## Said once per context
 
 Edition 4 (20 Nov 2026). Words already in the agent's context add
 nothing said again, and cost the same each time. So by default a node's
-**same words** are said once per context: the agent pack holds back a say
+**same words** are said once per context: the agent plugin holds back a say
 whose node and text it already said in the run since the last `compact`.
 After a compaction they are said again, marked re-said. A node whose words
 must be fresh every time sets `repeat: "every"`. A refusal is never held
@@ -104,12 +104,12 @@ everything, heard or not.
 
 A node is anything said at a place: an instruction, a reflex, a rule, a
 schema check, a skill, a memory, a tool's text. It has a stable id
-(`pack/name`), a kind, the places it listens at, the map item it came from
+(`plugin/name`), a kind, the places it listens at, the map item it came from
 if any, and `speak(moment)`, which returns words to say, a refusal, or
 nothing.
 
 - `node(def)` registers it and returns its disposer. It's a revertible
-  effect: when the pack unloads, its nodes leave the tree.
+  effect: when the plugin unloads, its nodes leave the tree.
 - `nodes()` is the registry, and the harness view draws it as the tree.
   Nothing else holds a list of what is said to agents.
 
@@ -127,13 +127,13 @@ begin(run) → reach({places: ["session_start"]}) → …
 ```
 
 At `reach`, every node listening at any of the places is asked. The answer
-lists what was said in the config-tree order of the nodes' packs, and the first
+lists what was said in the config-tree order of the nodes' plugins, and the first
 refusal, if any. The adapter hands the words to the agent and, on a
 refusal, stops the step and gives the agent the refusal's words.
 
 Every say, refusal, act and failed node becomes one event on the
 [exchange](exchange.md). A node that is asked and says nothing makes no
-event; the verdict pack can still tell it was quiet from the registry and
+event; the verdict plugin can still tell it was quiet from the registry and
 the places the run reached.
 
 A refusal from a node at a place that can't refuse isn't applied; it's
@@ -149,12 +149,12 @@ it, by name (`RunInfo.facts`). They are open-ended, so whatever reads them
 |---|---|
 | `agent.facts` | Add a fact source |
 
-At each `begin` the agent pack makes the facts again: the start's fields
+At each `begin` the agent plugin makes the facts again: the start's fields
 it has (`harness`, `cwd`, `parent`, `task`), then the start's own `facts`
 (a subagent's `agent_type`), then each source's, in config-tree order. A
 key already set is kept. A source is registered like a node, as a
 revertible effect. The vocabulary is open (`FACTS` lists the ones the
-spec's packs name):
+spec's plugins name):
 
 | Fact | What |
 |---|---|
@@ -181,4 +181,4 @@ node, so the node is told apart from a quiet one. A **trial** hold is
 only recorded (`detail.trial`): the node is still asked, so a gate can be
 watched before it holds anything. Gates compose: profiles
 are one ([profile](profile.md)), an experiment on what a subagent hears is
-another. A gate holds nodes back; it doesn't choose which packs are loaded.
+another. A gate holds nodes back; it doesn't choose which plugins are loaded.

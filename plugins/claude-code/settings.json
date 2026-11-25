@@ -1,0 +1,128 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/plugins/claude-code/hook.ts\" http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:5281/hook"
+          }
+        ]
+      }
+    ]
+  }
+}

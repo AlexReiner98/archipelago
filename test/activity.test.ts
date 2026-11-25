@@ -1,12 +1,12 @@
 /**
  * The activity view's model: runs and journal entries in, groups and lines
- * out (packs/activity/model.ts).
+ * out (plugins/activity/model.ts).
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { RunInfo } from "../spec/agent.ts";
 import type { Fact } from "../spec/changeset.ts";
-import { brief, group, liveness, standing, status, touches, type Change } from "../packs/activity/model.ts";
+import { brief, group, liveness, openAtFirst, standing, status, touches, type Change } from "../plugins/activity/model.ts";
 
 const agent = { id: "agent:claude", kind: "agent" as const };
 const owner = { id: "person:owner", kind: "person" as const };
@@ -31,7 +31,7 @@ const change = (o: { run?: string; actor?: typeof agent | typeof owner; at: stri
     header: {
       actor: o.actor ?? agent,
       authority: { of: "agent" },
-      pack: { id: "items" },
+      plugin: { id: "items" },
       action: "items.set",
       reason: "because",
       time: o.at,
@@ -82,6 +82,21 @@ test("changes outside a run group by actor while they follow one another", () =>
     ["run:r", ["c3"]],
     ["person:owner", ["c2", "c1"]],
   ]);
+});
+
+test("open at first: the newest group, live runs, and the run picked; the rest fold", () => {
+  seq = 0;
+  const runs = [run("live", "2026-11-21T07:00:00Z"), run("setup", "2026-11-20T09:00:00Z", "2026-11-20T09:30:00Z"), run("picked", "2026-11-19T09:00:00Z", "2026-11-19T09:30:00Z")];
+  const cs = [
+    change({ run: "setup", at: "2026-11-20T09:10:00Z" }),
+    change({ run: "picked", at: "2026-11-19T09:10:00Z" }),
+    change({ actor: owner, at: "2026-11-21T10:00:00Z" }),
+  ];
+  const g = group(runs, cs);
+  assert.equal(g[0]!.actor, "person:owner", "an undo outside any run is the newest");
+  const open = openAtFirst(g, (x) => x.run?.run === "live", "picked");
+  assert.deepEqual([...open].sort(), [g[0]!.key, "run:live", "run:picked"].sort());
+  assert.equal(open.has("run:setup"), false, "an ended run, not picked, folds");
 });
 
 test("touches: made, removed, and fields set, each once per item", () => {

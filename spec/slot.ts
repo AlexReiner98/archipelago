@@ -2,32 +2,32 @@
  * slot: UI composition. See slot.md.
  *
  * Panels are Preact function components (20 Nov 2026). The graph is
- * not drawn with components: it is one scene surface that packs fill with
+ * not drawn with components: it is one scene surface that plugins fill with
  * layers (scene.ts).
  */
 import type { JsonSchema } from "./action.ts";
 import type { FunctionComponent } from "preact";
-import type { Capability, Dispose, Json, PackId } from "./common.ts";
+import type { Capability, Dispose, Json, PluginId } from "./common.ts";
 
 /**
- * A component: what a pack puts in a slot. A Preact function component,
- * written with htm so no build step is needed. Every pack's components run
- * on the one copy of Preact the renderer pack provides. Unmounting is
+ * A component: what a plugin puts in a slot. A Preact function component,
+ * written with htm so no build step is needed. Every plugin's components run
+ * on the one copy of Preact the renderer plugin provides. Unmounting is
  * complete, and hook cleanups are where a component's disposers go.
  */
 export type View<P = Record<string, unknown>> = FunctionComponent<P>;
 
 /**
- * - `many`: every fill shows, in config-tree order of the filling packs
- *   (`byPosition` in common.ts), then the order each pack filled in.
- * - `one`: the first of those shows. To show another, move its pack's
+ * - `many`: every fill shows, in config-tree order of the filling plugins
+ *   (`byPosition` in common.ts), then the order each plugin filled in.
+ * - `one`: the first of those shows. To show another, move its plugin's
  *   entry in the config tree, or disable the one in front.
  */
 export type Merge = "many" | "one";
 
 export interface SlotDef {
   /**
-   * Dotted, starting with the declaring pack's id (`harness.node`); the
+   * Dotted, starting with the declaring plugin's id (`harness.node`); the
    * provider refuses a name outside the caller's own. `root` is reserved.
    */
   name: string;
@@ -38,9 +38,9 @@ export interface SlotDef {
 }
 
 export interface FillDef<P = Record<string, unknown>> {
-  /** A region (`REGIONS`) or a slot a pack declared. */
+  /** A region (`REGIONS`) or a slot a plugin declared. */
   slot: string;
-  /** Unique within the pack, stable across reloads. */
+  /** Unique within the plugin, stable across reloads. */
   name: string;
   /** What a frame shows for it: a tab, a heading. */
   title?: string;
@@ -53,8 +53,8 @@ export interface FillDef<P = Record<string, unknown>> {
 }
 
 export interface FillInfo extends Omit<FillDef, "view"> {
-  /** The pack that filled it, from its context. */
-  pack: PackId;
+  /** The plugin that filled it, from its context. */
+  plugin: PluginId;
 }
 
 /** The renderer mounts the fill of `root`: the frame. */
@@ -70,22 +70,22 @@ export type Region = (typeof REGIONS)[number];
 
 /**
  * Where fills show, as config of the broker (edition 7), keyed by
- * `pack/name`: a region or slot moves the fill there, `"off"` hides it.
+ * `plugin/name`: a region or slot moves the fill there, `"off"` hides it.
  */
 export type Arrange = Record<string, string>;
 
 /** A fill's key in `Arrange` and in `here.view`. */
-export const fillKey = (f: { pack: PackId; name: string }): string => `${f.pack}/${f.name}`;
+export const fillKey = (f: { plugin: PluginId; name: string }): string => `${f.plugin}/${f.name}`;
 
 /** `slot.declare`. */
 export interface SlotDeclare {
-  /** Declares a slot, as the calling pack's. A taken name is refused. */
+  /** Declares a slot, as the calling plugin's. A taken name is refused. */
   declare(def: SlotDef): Dispose;
 }
 
 /** `slot.fill`. */
 export interface SlotFill {
-  /** Fills a slot, as the calling pack's. A fill for a slot nobody has declared waits, shown nowhere, until one is. */
+  /** Fills a slot, as the calling plugin's. A fill for a slot nobody has declared waits, shown nowhere, until one is. */
   fill<P>(def: FillDef<P>): Dispose;
 }
 
@@ -98,11 +98,11 @@ export interface SlotRead {
   fills(slot: string): (FillDef & FillInfo)[];
   /**
    * Draws a slot's fills in order, and redraws when they change. The one
-   * every pack and frame uses for a hole in its own UI (edition 7).
+   * every plugin and frame uses for a hole in its own UI (edition 7).
    */
   Slot: View<{ name: string }>;
-  /** Every slot declared now, with the pack that declared it. */
-  slots(): (SlotDef & { pack: PackId })[];
+  /** Every slot declared now, with the plugin that declared it. */
+  slots(): (SlotDef & { plugin: PluginId })[];
   /** Calls `on` when a slot's fills change, `when` included. */
   watch(slot: string, on: () => void): Dispose;
 }
@@ -125,7 +125,7 @@ export interface Capabilities {
 }
 
 export const capabilities: Capability[] = [
-  { key: "slot.declare", since: 1, doc: "Declares a place in the UI that packs can fill." },
+  { key: "slot.declare", since: 1, doc: "Declares a place in the UI that plugins can fill." },
   { key: "slot.fill", since: 1, doc: "Puts a component in a slot." },
   { key: "slot.read", since: 1, doc: "What fills each slot now, in order, and when that changes; the shared Slot." },
   { key: "slot.arrange", since: 8, doc: "Lays an arrange over the broker's config while held: fills move without a reload." },

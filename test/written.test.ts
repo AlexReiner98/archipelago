@@ -8,21 +8,21 @@ import type { AgentRun, AgentTree } from "../spec/agent.ts";
 import type { Json } from "../spec/common.ts";
 import type { GraphRead } from "../spec/graph.ts";
 import { PLACES } from "../spec/agent.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import loaded from "../packs/loaded/index.ts";
-import words from "../packs/words/index.ts";
-import written from "../packs/written/index.ts";
-import { discover, placeOf, projectSlug } from "../packs/written/files.ts";
-import { REACHES } from "../packs/claude-code/mapping.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import loaded from "../plugins/loaded/index.ts";
+import words from "../plugins/words/index.ts";
+import written from "../plugins/written/index.ts";
+import { discover, placeOf, projectSlug } from "../plugins/written/files.ts";
+import { REACHES } from "../plugins/claude-code/mapping.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 const T = "2026-11-20T16:00:00.000Z";
-const probe: Pack = { id: "probe", inject: ["agent.run", "agent.tree", "action.invoke", "graph.read"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["agent.run", "agent.tree", "action.invoke", "graph.read"], apply() {} };
 
 async function put(file: string, text: string) {
   await mkdir(dirname(file), { recursive: true });
@@ -62,17 +62,17 @@ function setup(home: string, graphFile: string) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "words.ts": words, "loaded.ts": loaded, "written.ts": written, "probe.ts": probe };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "words.ts": words, "loaded.ts": loaded, "written.ts": written, "probe.ts": probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const tree: Entry[] = [
-    { id: "graph", pack: "graph.ts", config: { db: graphFile } },
-    { id: "action", pack: "action.ts" },
-    { id: "exchange", pack: "exchange.ts" },
-    { id: "agent", pack: "agent.ts" },
-    { id: "words", pack: "words.ts" },
-    { id: "loaded", pack: "loaded.ts" },
-    { id: "written", pack: "written.ts", config: { home } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts", config: { db: graphFile } },
+    { id: "action", plugin: "action.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "words", plugin: "words.ts" },
+    { id: "loaded", plugin: "loaded.ts" },
+    { id: "written", plugin: "written.ts", config: { home } },
+    { id: "probe", plugin: "probe.ts" },
   ];
   const as = (actor: { id: string; kind: "person" | "agent" } = { id: "person:owner", kind: "person" }) => {
     const ctx = loader.fiber("probe")!.ctx.intercept({ actor, run: "r1" });
@@ -88,7 +88,7 @@ function setup(home: string, graphFile: string) {
   return { rt, loader, errors, tree, as, call };
 }
 
-/** The pack writes as each change commits; wait until the file says what it should. */
+/** The plugin writes as each change commits; wait until the file says what it should. */
 async function settles(file: string, want: string) {
   for (let i = 0; i < 100; i++) {
     if ((await readFile(file, "utf8").catch(() => undefined)) === want) return;
@@ -138,10 +138,10 @@ test("adopt imports skills and memory as nodes at their places, through an actio
   await loader.apply(tree);
   try {
     const owner = as();
-    // A load seen before adoption: the loaded pack says it until the map does.
+    // A load seen before adoption: the loaded plugin says it until the map does.
     const seen = await call(owner, "loaded.note", { place: "skill:review", kind: "skill", title: "skill review", path: f.projectSkill });
     assert.ok(seen.ok);
-    assert.deepEqual(owner.tree.nodes().filter((n) => n.pack === "loaded").map((n) => n.at), [["skill:review"]]);
+    assert.deepEqual(owner.tree.nodes().filter((n) => n.plugin === "loaded").map((n) => n.at), [["skill:review"]]);
 
     const out = await call(owner, "written.adopt", { scan: { user: true, plugins: true, project }, paths: [f.old, f.settings] });
     assert.ok(out.ok, JSON.stringify(out));
@@ -162,7 +162,7 @@ test("adopt imports skills and memory as nodes at their places, through an actio
     assert.equal(item!.fields.words, await readFile(f.userSkill, "utf8"));
     assert.equal(item!.fields.file, f.userSkill);
     // The loaded record steps aside, and a later note answers the map's node.
-    assert.deepEqual(owner.tree.nodes().filter((n) => n.pack === "loaded"), []);
+    assert.deepEqual(owner.tree.nodes().filter((n) => n.plugin === "loaded"), []);
     const again = await call(owner, "loaded.note", { place: "skill:review", kind: "skill", title: "skill review" });
     assert.deepEqual(again.ok && again.output, { node: review.node });
     const said = await owner.run.reach({ run: "r1", places: ["skill:review"], time: T, input: { text: "# Review" } });

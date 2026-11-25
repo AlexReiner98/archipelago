@@ -2,7 +2,7 @@
 
 The page around the canvas. Edition 8. It is built from [slots](slot.md),
 and the spec owns only two things: the names of six regions, and what a
-fill carries. The frame itself is a pack, and anyone can write one. Types:
+fill carries. The frame itself is a plugin, and anyone can write one. Types:
 [slot.ts](slot.ts).
 
 ```
@@ -20,7 +20,7 @@ role: nothing in the spec says what goes where.
 
 ## A frame
 
-A frame is any pack that fills `root` and shows the six regions. It
+A frame is any plugin that fills `root` and shows the six regions. It
 decides how several fills share a region: side by side, stacked, behind
 tabs. It reads each region's fills with `slot.read` and draws a fill with
 its `Slot`. Turn one frame off and turn another on, and every fill lands
@@ -29,24 +29,24 @@ in the new one unchanged.
 ## A fill
 
 `fill({ slot, name, title, when, view })`, where `slot` is a region, or a
-slot a pack declared.
+slot a plugin declared.
 
 - **`title`**: what a frame shows for it, as a tab or a heading.
 - **`when`**: the fill shows only while `here` matches. `{ "here.view":
   "harness/run" }` matches that value. `{ "here.item": true }` matches
   any value that is set.
-- **`here.view`**: the fill shown in `center`, as `pack/name`. The frame
+- **`here.view`**: the fill shown in `center`, as `plugin/name`. The frame
   sets it. A fill elsewhere uses it to show alongside one view.
 
 ## Arranging
 
 Where a fill shows is config, not code. The slot broker's config holds
-`arrange`, keyed by `pack/name`: a region or slot moves the fill there,
+`arrange`, keyed by `plugin/name`: a region or slot moves the fill there,
 and `"off"` hides it. Order stays the config tree's. So a person or an
 agent rearranges the page by changing config, which can be undone like
 any change.
 
-A pack may lay another arrange over the config while it holds it
+A plugin may lay another arrange over the config while it holds it
 (`slot.arrange`, edition 8): later layers win for a key, and disposing one
 takes it back with no reload. A view uses it to say where every fill goes
-while it shows ([views](../packs/views/README.md)).
+while it shows ([views](../plugins/views/README.md)).

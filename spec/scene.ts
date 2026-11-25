@@ -1,7 +1,7 @@
 /**
  * scene: drawing large graphs. See scene.md.
  *
- * One WebGL2 canvas, owned by the scene pack, that packs fill with layers.
+ * One WebGL2 canvas, owned by the scene plugin, that plugins fill with layers.
  * The scene reads only what is in view, patches what changed, and turns a
  * pointer into an id. Layers draw; they never read the whole graph.
  */
@@ -40,7 +40,7 @@ export interface PlacedLink {
 }
 
 /**
- * `layout.region`: where things are. Whatever pack lays the graph out
+ * `layout.region`: where things are. Whatever plugin lays the graph out
  * provides it; the scene reads through it so that it only ever loads the
  * view.
  */
@@ -97,7 +97,7 @@ export interface PickFrame extends Frame {
  * creates, the disposer it returns frees.
  */
 export interface LayerDef {
-  /** Unique within the pack. */
+  /** Unique within the plugin. */
   name: string;
   title?: string;
   init(gl: WebGL2RenderingContext): Dispose | void;
@@ -108,9 +108,9 @@ export interface LayerDef {
   pick?(frame: PickFrame): void;
 }
 
-/** `scene.layer`. Layers draw in config-tree order of their packs: the first at the bottom. */
+/** `scene.layer`. Layers draw in config-tree order of their plugins: the first at the bottom. */
 export interface SceneLayer {
-  /** Adds a layer, as the calling pack's. */
+  /** Adds a layer, as the calling plugin's. */
   layer(def: LayerDef): Dispose;
 }
 

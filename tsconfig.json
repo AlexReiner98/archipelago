@@ -21,7 +21,7 @@
   "include": [
     "spec/**/*.ts",
     "runtime/**/*.ts",
-    "packs/**/*.ts",
+    "plugins/**/*.ts",
     "test/**/*.ts",
     "app/**/*.ts",
     "scripts/**/*.ts"

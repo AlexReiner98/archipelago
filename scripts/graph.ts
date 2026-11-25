@@ -1,6 +1,6 @@
 /**
  * Moves a graph in and out of a store by the interchange format (change
- * sets as JSON Lines, packs/graph/interchange.ts). Stop the server first
+ * sets as JSON Lines, plugins/graph/interchange.ts). Stop the server first
  * when writing to the store it uses.
  *
  *   node scripts/graph.ts export <db> [out.jsonl]     what the store holds, as change sets
@@ -13,8 +13,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import type { Header } from "../spec/changeset.ts";
-import { Store, applyFacts, type Fields } from "../packs/graph/store.ts";
-import { exportSets, fromLines, importSets, setsOf, toLines } from "../packs/graph/interchange.ts";
+import { Store, applyFacts, type Fields } from "../plugins/graph/store.ts";
+import { exportSets, fromLines, importSets, setsOf, toLines } from "../plugins/graph/interchange.ts";
 
 const { positionals, values } = parseArgs({
   allowPositionals: true,
@@ -25,7 +25,7 @@ const [cmd, a, b] = positionals;
 const header = (action: string): Header => ({
   actor: { id: "person:owner", kind: "person" },
   authority: { of: "human", basis: "run by hand: node scripts/graph.ts" },
-  pack: { id: "graph" },
+  plugin: { id: "graph" },
   action,
   reason: values.reason!,
   time: new Date().toISOString(),

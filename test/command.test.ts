@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { HereRead } from "../spec/here.ts";
 import type { FillDef, SlotFill } from "../spec/slot.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
-import here from "../packs/here/index.ts";
-import command, { isToggle, OPEN } from "../packs/command/index.ts";
+import here from "../plugins/here/index.ts";
+import command, { isToggle, OPEN } from "../plugins/command/index.ts";
 
 test("Ctrl+K and ⌘K open and close the command line; nothing else does", () => {
   assert.equal(isToggle({ key: "k", ctrlKey: true }), true);
@@ -23,7 +23,7 @@ test("the command line fills over while command.open is set, and the keys set it
   g.addEventListener = page.addEventListener.bind(page);
   g.removeEventListener = page.removeEventListener.bind(page);
   const fills: FillDef<unknown>[] = [];
-  const host: Pack = {
+  const host: Plugin = {
     id: "host",
     apply(ctx) {
       ctx.provide("find.line", () => ({ Line: () => null, jump() {} }));
@@ -34,9 +34,9 @@ test("the command line fills over while command.open is set, and the keys set it
   rt.onError = (_f, e) => {
     throw e;
   };
-  const modules: Record<string, Pack> = { host, here, command };
+  const modules: Record<string, Plugin> = { host, here, command };
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
-  await loader.apply(["host", "here", "command"].map((id) => ({ id, pack: id })));
+  await loader.apply(["host", "here", "command"].map((id) => ({ id, plugin: id })));
   const read = rt.root.get<HereRead>("here.read");
 
   assert.deepEqual(fills.map((f) => [f.slot, f.name, f.when]), [["over", "line", { [OPEN]: true }]]);

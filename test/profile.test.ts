@@ -6,26 +6,26 @@ import type { Json } from "../spec/common.ts";
 import type { AgentRun, AgentTree, NodeInfo } from "../spec/agent.ts";
 import type { ExchangeRead } from "../spec/exchange.ts";
 import type { GraphRead } from "../spec/graph.ts";
-import type { ProfileRead } from "../spec/profile.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import type { ProfileHears, ProfileRead } from "../spec/profile.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import types from "../packs/types/index.ts";
-import record from "../packs/record/index.ts";
-import links from "../packs/links/index.ts";
-import items from "../packs/items/index.ts";
-import words, { TRIAL_MARK } from "../packs/words/index.ts";
-import profile from "../packs/profile/index.ts";
-import { hearing, matchFacts, matchNode, placing, runProfiles, type Model, type Profile } from "../packs/profile/model.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import types from "../plugins/types/index.ts";
+import record from "../plugins/record/index.ts";
+import links from "../plugins/links/index.ts";
+import items from "../plugins/items/index.ts";
+import words, { TRIAL_MARK } from "../plugins/words/index.ts";
+import profile from "../plugins/profile/index.ts";
+import { hearing, matchFacts, matchNode, placing, runProfiles, type Model, type Profile } from "../plugins/profile/model.ts";
 
 const T = "2026-11-20T14:00:00.000Z";
 
 // --- The rules, pure ---
 
-const node = (id: string, at: string[], source?: string, kind = "instruction"): NodeInfo => ({ id, name: id, kind, title: id, at, pack: "words", ...(source ? { source } : {}) });
+const node = (id: string, at: string[], source?: string, kind = "instruction"): NodeInfo => ({ id, name: id, kind, title: id, at, plugin: "words", ...(source ? { source } : {}) });
 const prof = (p: Partial<Profile> & { id: string }): Profile => ({ title: p.id, state: "on", parts: [], places: [], holds: [], drops: [], ...p });
 const modelOf = (...ps: Profile[]): Model => ({ profiles: new Map(ps.map((p) => [p.id, p])) });
 
@@ -36,10 +36,10 @@ test("match lines read facts by name, globbed; members read a node's places, kin
   assert.ok(matchFacts("hub:e_2", facts));
   assert.ok(!matchFacts("remote:*/archipelago*", facts));
   assert.ok(!matchFacts("", facts), "an empty match matches nothing");
-  const ui = node("words/ui", ["file:packs/map/**", "file:packs/harness/**"]);
-  assert.ok(matchNode("at:file:packs/**", ui));
-  assert.ok(matchNode("at:file:spec/** at:file:packs/**", ui), "same key: any");
-  assert.ok(!matchNode("at:file:packs/** kind:skill", ui), "different keys: all");
+  const ui = node("words/ui", ["file:plugins/map/**", "file:plugins/harness/**"]);
+  assert.ok(matchNode("at:file:plugins/**", ui));
+  assert.ok(matchNode("at:file:spec/** at:file:plugins/**", ui), "same key: any");
+  assert.ok(!matchNode("at:file:plugins/** kind:skill", ui), "different keys: all");
   assert.ok(matchNode("at:skill:rhino*", node("words/r", ["skill:rhinocommon"], undefined, "skill")));
   assert.ok(!matchNode("", ui));
 });
@@ -78,10 +78,10 @@ test("a run nothing places is in the fallback profile and what it is part of; a 
 });
 
 test("hearing: a node in no profile, or a run in no profile, hears; an exclusion wins; a shadow only records", () => {
-  const m = modelOf(prof({ id: "studio", title: "Studio", places: ["r_ap"], holds: ["n_rhino"] }), prof({ id: "arch", title: "Archipelago", places: ["r_arch"], members: "at:file:packs/**", drops: ["n_pills"] }), prof({ id: "biz", title: "Business", state: "shadow", holds: ["n_art"] }));
+  const m = modelOf(prof({ id: "studio", title: "Studio", places: ["r_ap"], holds: ["n_rhino"] }), prof({ id: "arch", title: "Archipelago", places: ["r_arch"], members: "at:file:plugins/**", drops: ["n_pills"] }), prof({ id: "biz", title: "Business", state: "shadow", holds: ["n_art"] }));
   const rhino = node("words/n_rhino", ["skill:rhinocommon"], "n_rhino");
-  const ui = node("words/n_ui", ["file:packs/map/**"], "n_ui");
-  const pills = node("words/n_pills", ["file:packs/map/**"], "n_pills");
+  const ui = node("words/n_ui", ["file:plugins/map/**"], "n_ui");
+  const pills = node("words/n_pills", ["file:plugins/map/**"], "n_pills");
   const art = node("words/n_art", ["session_start"], "n_art");
   const plain = node("words/n_plain", ["session_start"], "n_plain");
   const inArch = { repo: "r_arch" };
@@ -105,10 +105,10 @@ test("placing a run in one profile names it and drops every other it matches, ea
 
 // --- On the map, through the agent ---
 
-const probe: Pack = { id: "probe", inject: ["agent.run", "agent.tree", "action.invoke", "graph.read", "exchange.read", "profile.read"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["agent.run", "agent.tree", "action.invoke", "graph.read", "exchange.read", "profile.read", "profile.hears"], apply() {} };
 
-/** Writes facts as they are, before the profile pack loads: what the map held before umwelt. */
-const seeding = (facts: Fact[]): Pack => ({
+/** Writes facts as they are, before the profile plugin loads: what the map held before context filter. */
+const seeding = (facts: Fact[]): Plugin => ({
   id: "seed",
   inject: ["action.register", "action.invoke"],
   async apply(ctx) {
@@ -124,11 +124,11 @@ async function setup(seed?: Fact[]) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { graph, action, types, record, links, items, exchange, agent, words: words as Pack, profile, probe, seed: seeding(seed ?? []) } as Record<string, Pack>;
-  const BASE = "mem:/packs/";
+  const modules: Record<string, Plugin> = { graph, action, types, record, links, items, exchange, agent, words: words as Plugin, profile, probe, seed: seeding(seed ?? []) } as Record<string, Plugin>;
+  const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
-  const tree: Entry[] = ["graph", "action", "types", "record", "links", "items", "exchange", "agent", "words", ...(seed ? ["seed"] : []), "profile", "probe"].map((id) => ({ id, pack: id }));
-  // Packs load side by side: what was on the map is written first, as on a server that starts with it.
+  const tree: Entry[] = ["graph", "action", "types", "record", "links", "items", "exchange", "agent", "words", ...(seed ? ["seed"] : []), "profile", "probe"].map((id) => ({ id, plugin: id }));
+  // Plugins load side by side: what was on the map is written first, as on a server that starts with it.
   if (seed) await loader.apply(tree.filter((e) => e.id !== "profile" && e.id !== "probe"));
   await loader.apply(tree);
   await rt.settle();
@@ -139,20 +139,21 @@ async function setup(seed?: Fact[]) {
     assert.ok(out.ok, JSON.stringify(out));
     return out.ok ? out.output : (undefined as never);
   };
-  return { rt, loader, errors, ctx, act, read: p.get<ProfileRead>("profile.read"), tree: p.get<AgentTree>("agent.tree"), graph: p.get<GraphRead>("graph.read") };
+  return { rt, loader, errors, ctx, act, read: p.get<ProfileRead>("profile.read"), hearsOf: p.get<ProfileHears>("profile.hears"), tree: p.get<AgentTree>("agent.tree"), graph: p.get<GraphRead>("graph.read") };
 }
 
 const start = (run: string, facts: Record<string, string>) => ({ run, agent: { id: "e_agent", kind: "agent" as const }, harness: "test", reaches: [], facts });
 
 test("profiles on the map hold a node back from runs outside them; shadow records, on holds; a miss where it listens is told", async () => {
-  const { rt, errors, ctx, act, read, tree, graph } = await setup();
+  const { rt, errors, ctx, act, read, hearsOf, tree, graph } = await setup();
   const rhino = (await act("words.add", { title: "RhinoCommon", kind: "skill", at: ["tool:Bash"], words: "Use RhinoCommon." })).node;
   const plain = (await act("words.add", { title: "Plain", at: ["tool:Bash"], words: "Plain." })).node;
   const apRepo = (await act("items.create", { type: "record", title: "Studio repo" })).id;
   const archRepo = (await act("items.create", { type: "record", title: "Archipelago repo" })).id;
-  const studio = (await act("items.create", { type: "umwelt", title: "Studio" })).id;
-  const arch = (await act("items.create", { type: "umwelt", title: "Archipelago" })).id;
-  await act("items.link", { type: "in_umwelt", from: rhino, to: studio });
+  const studio = (await act("items.create", { type: "context_filter", title: "Studio" })).id;
+  // Archipelago is open: its runs also hear what no filter holds. Studio is strict, as a saved filter is by default.
+  const arch = (await act("items.create", { type: "context_filter", title: "Archipelago", fields: { strict: false } })).id;
+  await act("items.link", { type: "in_context_filter", from: rhino, to: studio });
   await act("items.link", { type: "uses", from: apRepo, to: studio });
   await act("items.link", { type: "uses", from: archRepo, to: arch });
   const [p] = await graph.get([studio]);
@@ -172,7 +173,14 @@ test("profiles on the map hold a node back from runs outside them; shadow record
   assert.deepEqual(held.said.map((s) => s.text), ["Plain."]);
   const inAp = ctx("r3").get<AgentRun>("agent.run");
   await inAp.begin(start("r3", { repo: apRepo }));
-  assert.deepEqual((await inAp.reach({ run: "r3", places: ["tool:Bash"], time: T })).said.map((s) => s.text), ["Use RhinoCommon.", "Plain."]);
+  assert.deepEqual((await inAp.reach({ run: "r3", places: ["tool:Bash"], time: T })).said.map((s) => s.text), ["Use RhinoCommon."], "strict: only what Studio holds");
+  const strictHeld = (await ctx("r1").get<ExchangeRead>("exchange.read").events("r3")).items.filter((e) => e.kind === "gated");
+  assert.deepEqual(strictHeld.map((e) => [e.node, e.text]), [[`words/${plain}`, "Not held by Studio, which gives its runs only what it holds."]]);
+  // profile.hears counts strictness; profile.read's hears keeps edition 5: a node in no profile is every run's.
+  const r3info = { ...start("r3", { repo: apRepo }), started: T };
+  const plainNode = tree.nodes().find((n) => n.id === `words/${plain}`)!;
+  assert.deepEqual(await hearsOf.hears(r3info, plainNode), { hears: false, why: "Not held by Studio, which gives its runs only what it holds." });
+  assert.deepEqual(await read.hears(r3info, plainNode), { hears: true }, "profile.read leaves strictness out");
 
   const events = (await ctx("r1").get<ExchangeRead>("exchange.read").events("r2")).items;
   const gated = events.filter((e) => e.kind === "gated");
@@ -197,8 +205,8 @@ test("profiles on the map hold a node back from runs outside them; shadow record
 test("profile.place moves a live run into one profile: begun again, out of the one it matched", async () => {
   const { errors, ctx, act, read } = await setup();
   const repo = (await act("items.create", { type: "record", title: "Studio repo" })).id;
-  const studio = (await act("items.create", { type: "umwelt", title: "Studio" })).id;
-  const biz = (await act("items.create", { type: "umwelt", title: "Business" })).id;
+  const studio = (await act("items.create", { type: "context_filter", title: "Studio" })).id;
+  const biz = (await act("items.create", { type: "context_filter", title: "Business" })).id;
   await act("items.link", { type: "uses", from: repo, to: studio });
   const run = ctx("r9").get<AgentRun>("agent.run");
   await run.begin({ ...start("r9", { repo }), title: "A session" });
@@ -214,18 +222,18 @@ test("profile.place moves a live run into one profile: begun again, out of the o
   assert.deepEqual(errors, []);
 });
 
-test("any item an umwelt link gives places is said there, as a node, to that umwelt's runs only", async () => {
+test("any item a context filter link gives places is said there, as a node, to that context filter's runs only", async () => {
   const { errors, ctx, act, tree, graph } = await setup();
   const rule = (await act("items.create", { type: "record", title: "Layers by trade", fields: { note: "Name layers by trade." } })).id;
   const apRepo = (await act("items.create", { type: "record", title: "Studio repo" })).id;
   const archRepo = (await act("items.create", { type: "record", title: "Archipelago repo" })).id;
-  const studio = (await act("items.create", { type: "umwelt", title: "Studio", fields: { status: "on" } })).id;
-  const arch = (await act("items.create", { type: "umwelt", title: "Archipelago", fields: { status: "on" } })).id;
+  const studio = (await act("items.create", { type: "context_filter", title: "Studio", fields: { status: "on" } })).id;
+  const arch = (await act("items.create", { type: "context_filter", title: "Archipelago", fields: { status: "on" } })).id;
   await act("items.link", { type: "uses", from: apRepo, to: studio });
   await act("items.link", { type: "uses", from: archRepo, to: arch });
-  const plain = (await act("items.link", { type: "in_umwelt", from: rule, to: arch })).id;
+  const plain = (await act("items.link", { type: "in_context_filter", from: rule, to: arch })).id;
   assert.ok(!tree.nodes().some((n) => n.source === plain || n.source === rule), "a link without places says nothing");
-  const link = (await act("items.link", { type: "in_umwelt", from: rule, to: studio, fields: { at: ["tool:Bash"] } })).id;
+  const link = (await act("items.link", { type: "in_context_filter", from: rule, to: studio, fields: { at: ["tool:Bash"] } })).id;
   const node = tree.nodes().find((n) => n.source === link);
   assert.deepEqual(node && [node.id, node.kind, node.title, node.at], [`words/${link}`, "record", "Layers by trade", ["tool:Bash"]]);
 
@@ -255,7 +263,7 @@ test("any item an umwelt link gives places is said there, as a node, to that umw
   assert.deepEqual(errors, []);
 });
 
-test("profiles and their links from before umwelt are renamed on load, as one change", async () => {
+test("profiles and umwelts and their links are renamed on load to context filters", async () => {
   const seed: Fact[] = [
     ["+", "p1", "type", "profile"],
     ["+", "p1", "title", "Studio"],
@@ -270,18 +278,23 @@ test("profiles and their links from before umwelt are renamed on load, as one ch
     ["+", "l2", "type", "out_of_profile"],
     ["+", "l2", "from", "n1"],
     ["+", "l2", "to", "p1"],
+    ["+", "p2", "type", "umwelt"],
+    ["+", "p2", "title", "Docs"],
+    ["+", "l3", "type", "in_umwelt"],
+    ["+", "l3", "from", "n1"],
+    ["+", "l3", "to", "p2"],
   ];
   const { errors, graph, read } = await setup(seed);
-  const got = await graph.get(["p1", "l1", "l2"]);
-  assert.deepEqual(got.map((i) => i?.type), ["umwelt", "in_umwelt", "out_of_umwelt"]);
+  const got = await graph.get(["p1", "l1", "l2", "p2", "l3"]);
+  assert.deepEqual(got.map((i) => i?.type), ["context_filter", "in_context_filter", "out_of_context_filter", "context_filter", "in_context_filter"]);
   assert.deepEqual((await read.nodes("p1")).out, ["words/n1"]);
   assert.deepEqual(errors, []);
 });
 
-test("a node a run heard, moved to a record said by its umwelt link, isn't told as retired", async () => {
+test("a node a run heard, moved to a record said by its context filter link, isn't told as retired", async () => {
   const { errors, ctx, act } = await setup([]);
   const node = (await act("words.add", { title: "Rule", kind: "instruction", at: ["tool:Bash"], words: "Keep it small." })).node;
-  const umwelt = (await act("items.create", { type: "umwelt", title: "Here" })).id;
+  const cf = (await act("items.create", { type: "context_filter", title: "Here" })).id;
   const run = ctx("m1").get<AgentRun>("agent.run");
   await run.begin(start("m1", {}));
   assert.deepEqual((await run.reach({ run: "m1", places: ["tool:Bash"], time: T })).said.map((s) => s.text), ["Keep it small."]);
@@ -289,7 +302,7 @@ test("a node a run heard, moved to a record said by its umwelt link, isn't told 
     facts: [
       ["-", node, "type", "node"], ["+", node, "type", "record"], ["-", node, "words", "Keep it small."], ["-", node, "at", ["tool:Bash"]],
       ["-", node, "kind", "instruction"], ["+", node, "kind", "rule"], ["+", node, "note", "Keep it small."], ["+", node, "status", "current"],
-      ["+", "l1", "type", "in_umwelt"], ["+", "l1", "from", node], ["+", "l1", "to", umwelt], ["+", "l1", "at", ["tool:Bash"]], ["+", "l1", "kind", "instruction"],
+      ["+", "l1", "type", "in_context_filter"], ["+", "l1", "from", node], ["+", "l1", "to", cf], ["+", "l1", "at", ["tool:Bash"]], ["+", "l1", "kind", "instruction"],
     ],
   });
   const told = (await run.reach({ run: "m1", places: ["prompt"], time: T })).said.map((s) => s.text);
@@ -298,4 +311,19 @@ test("a node a run heard, moved to a record said by its umwelt link, isn't told 
   const reworded = (await run.reach({ run: "m1", places: ["prompt"], time: T })).said.map((s) => s.text).join("\n");
   assert.match(reworded, /"Rule" now says: Keep it smaller\./, "a rewording after the move is told as one");
   assert.deepEqual(errors, []);
+});
+
+test("hearing: a strict profile gives its runs only what it holds of the map; the plugins' own nodes still reach them", () => {
+  const m = modelOf(prof({ id: "front", title: "Front end", places: ["r_front"], holds: ["n_html"], strict: true }), prof({ id: "open", title: "Open", places: ["r_open"] }));
+  const html = node("words/n_html", ["file:*.html"], "n_html");
+  const merge = node("words/n_merge", ["session_start"], "n_merge");
+  const tools: NodeInfo = { id: "mcp/query", name: "query", kind: "instruction", title: "The query tool", at: ["session_start"], plugin: "mcp" };
+  assert.deepEqual(hearing(m, { repo: "r_front" }, html), { hears: true });
+  assert.deepEqual(hearing(m, { repo: "r_front" }, merge), { hears: false, why: "Not held by Front end, which gives its runs only what it holds." });
+  assert.deepEqual(hearing(m, { repo: "r_front" }, tools), { hears: true }, "a plugin's own node is no profile's to hold back");
+  assert.deepEqual(hearing(m, { repo: "r_open" }, merge), { hears: true }, "an open profile: what no profile holds is every run's");
+  assert.deepEqual(hearing(m, { repo: "r_none" }, merge), { hears: true }, "a run in no profile hears it");
+  const fall = modelOf(prof({ id: "home", title: "Home", fallback: true, strict: true, holds: ["n_html"] }));
+  assert.deepEqual(hearing(fall, { cwd: "C:/x" }, merge), { hears: false, why: "Not held by Home, which gives its runs only what it holds." }, "a strict fallback too");
+  assert.deepEqual(hearing(m, { repo: "r_front" }, merge, false), { hears: true }, "strictness left out, as profile.read's hears");
 });
