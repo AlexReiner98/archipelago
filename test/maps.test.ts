@@ -8,7 +8,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
 import { claim, defaultMap, freePort, letPortGo, nameFrom, release, servers } from "../scripts/maps.ts";
@@ -132,7 +132,8 @@ test("two servers for different maps run at once, on free ports nobody gave them
   for (const s of [a.served, b.served]) {
     assert.equal(s.data, join(home, "maps", s.map));
     assert.ok(existsSync(join(s.data, "graph.sqlite")));
-    assert.ok(relative(root, s.data).startsWith(".."), `${s.data} is inside the checkout`);
+    const r = relative(root, s.data);
+    assert.ok(r.startsWith("..") || isAbsolute(r), `${s.data} is inside the checkout`);
     assert.equal(s.checkout, root);
   }
   assert.deepEqual(servers(home).filter((s) => s.running).map((s) => s.map).sort(), ["alpha", "beta"]);
