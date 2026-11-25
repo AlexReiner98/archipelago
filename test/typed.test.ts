@@ -16,7 +16,7 @@ import graph from "../plugins/graph/index.ts";
 import schema from "../plugins/schema/index.ts";
 import types from "../plugins/types/index.ts";
 import typed, { retryOf, systemOf, type TypedAsk, type TypedRecord } from "../plugins/typed/index.ts";
-import { factsOf, inReplyWords, schemaOf, strictSubset } from "../plugins/typed/shape.ts";
+import { factsOf, inReplyWords, itemsOf, schemaOf, strictSubset } from "../plugins/typed/shape.ts";
 import { jsonIn, modelOf, scripted, textPrompt } from "../plugins/typed/model.ts";
 
 // ---------- apart from the runtime ----------
@@ -417,4 +417,24 @@ test("a call names its model by spec: a named one, or refused saying why; typed.
   ]);
   assert.ok(!JSON.stringify(models).includes("sk-test"));
   assert.deepEqual(errors, []);
+});
+
+test("a reply's wrapper slips are taken as meant, its items still checked; anything else says what the reply was", async () => {
+  const one = [{ ref: "a", title: "Sweep" }];
+  // Seen from a small model: wrapped under the type's name, then items as JSON text.
+  assert.deepEqual(itemsOf({ chore: { items: one } }), one);
+  assert.deepEqual(itemsOf({ items: JSON.stringify(one) }), one);
+  assert.deepEqual(itemsOf({ chore: { items: JSON.stringify(one) } }), one);
+  assert.deepEqual(itemsOf(one), one);
+  assert.match(itemsOf({ items: "Sweep the hall" }) as string, /not text: give the array itself/);
+  assert.match(itemsOf({ chore: one, other: 1 }) as string, /at its top level.*keys were `chore`, `other`/);
+  assert.match(itemsOf("just words") as string, /this reply was string/);
+
+  // On a call: the wrapped reply fits first time, and a wrong item inside is still a misfit.
+  const { ask } = await setup();
+  const ok = await ask.ask({ type: "chore", prompt: "Plan the hall.", model: scripted([{ chore: { items: JSON.stringify([{ ref: "a", title: "Sweep", room: "hall" }]) } }]) });
+  assert.ok(ok.ok, JSON.stringify(ok));
+  assert.equal(ok.attempts, 1);
+  const bad = await ask.ask({ type: "chore", prompt: "Plan the hall.", retries: 0, model: scripted([{ chore: { items: [{ ref: "a", title: "Sweep", room: "garden" }] } }]) });
+  assert.equal(bad.ok, false);
 });

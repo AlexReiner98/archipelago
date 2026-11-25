@@ -52,7 +52,12 @@ statuses and its own. `strictSubset` makes it the shape providers' strict
 modes take (every property required, optional ones nullable).
 
 The reply becomes facts: each item new, at its base's first open status
-unless it gives one, each link an item of its own. Shape problems (no
+unless it gives one, each link an item of its own. Slips in the wrapper alone are taken as meant (`itemsOf`): the
+reply wrapped once more under one key (`{ "explanation": { "items": [...] } }`,
+a small model's habit with a tool named after the type), `items` given as
+JSON text, or the bare array; the items are then checked as always, and the
+attempt's reply is recorded as it came. Any other wrapper is a problem that
+says what the reply was (its keys), so a retry can fix it. Shape problems (no
 `items`, no title, a ref used twice, `type` given) are found here;
 everything else (a field the type hasn't, a value of the wrong kind, a
 status not its base's, a link end that isn't there or isn't of the bases
