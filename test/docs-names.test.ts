@@ -71,8 +71,8 @@ for (const g of ["customElements", "customElements.define", "window", "document"
 
 /** A source file's extension. Data files (`.log`, `.sqlite`, `.jsonl`) live in ignored folders, so a bare one is not checked. */
 const EXT = /\.(ts|js|json|md|html|css|sh)$/;
-/** Places a doc may name that the repo never holds: ignored or outside it. */
-const IGNORED = /(^|\/)(\.data|node_modules|\.claude\/skills)(\/|$)|^\.\.\//;
+/** Places a doc may name that the repo never holds: ignored or outside it (connect:here's files are kept out of git). */
+const IGNORED = /(^|\/)(\.data|node_modules|\.claude\/skills)(\/|$)|^\.\.\/|^(\.mcp\.json|\.claude\/settings\.local\.json)$/;
 
 interface Miss { line: number; name: string; kind: string }
 

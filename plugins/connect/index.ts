@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import type { ActionContext, ActionRegister } from "../../spec/action.ts";
 import { Refused } from "../../spec/common.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
-import { FOLDER, setup, type Setup } from "./setup.ts";
+import { CONNECT, FOLDER, setup, type Setup } from "./setup.ts";
 
 export interface ConnectConfig {
   hook?: string;
@@ -46,18 +46,24 @@ export const MAKE_TOKEN = "connect.token";
 const CHECKOUT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /**
- * The checkout's own session command, when it reaches `mcp`: its
- * plugins/claude-code/mcp.json names one address (the dev port's), so on
- * another port, or a server with tokens, there is none.
+ * How the checkout's own sessions reach the adapter at `mcp`, on this
+ * machine: `npm run connect:here`, with `--port` off the dev port; and
+ * where its plugins/claude-code/mcp.json names `mcp` (the dev port), the
+ * terminal command that writes nothing. None for an adapter elsewhere, or
+ * outside a checkout.
  */
-export function folderSession(mcp: string, root = CHECKOUT): { here: string; folder: string } | undefined {
+export function folderSession(mcp: string, root = CHECKOUT): { here: string; folder: string; session?: string } | undefined {
+  const m = /^http:\/\/127\.0\.0\.1:(\d+)\/mcp$/.exec(mcp);
+  if (!m) return undefined;
+  let reaches: boolean;
   try {
     const file = JSON.parse(readFileSync(join(root, "plugins", "claude-code", "mcp.json"), "utf8")) as { mcpServers?: Record<string, { url?: string }> };
-    if (!Object.values(file.mcpServers ?? {}).some((s) => s.url === mcp)) return undefined;
+    reaches = Object.values(file.mcpServers ?? {}).some((s) => s.url === mcp);
   } catch {
     return undefined;
   }
-  return { here: FOLDER, folder: root };
+  const page = Number(m[1]) - 1;
+  return { here: reaches ? CONNECT : `${CONNECT} -- --port ${page}`, folder: root, ...(reaches ? { session: FOLDER } : {}) };
 }
 
 /** This checkout's hook script, as a hook command for `hook`. */

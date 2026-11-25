@@ -55,14 +55,23 @@ you there). The map is kept in `app/.data/`, which git ignores.
 
 ## Connect Claude Code
 
-In the same folder, start a session that reports to your map, without
-touching your own settings:
+In the same folder, connect its sessions to your map, then start a new
+Claude Code session there (in a terminal or the desktop app):
+
+```
+npm run connect:here
+```
+
+It writes the repository's hooks and MCP server into this folder's
+`.claude/settings.local.json` and `.mcp.json`, keeps both out of git, and
+touches nothing outside the folder. `npm run disconnect:here` takes them out
+again. In a terminal you can instead start one session that writes nothing:
 
 ```
 claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json
 ```
 
-Its hooks report each prompt, tool call and answer, and its MCP server gives
+Either way, its hooks report each prompt, tool call and answer, and its MCP server gives
 the agent the map's tools. Open **the Context interface** to watch the run
 live, and give the session something to plan:
 

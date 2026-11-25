@@ -142,11 +142,12 @@ const connectView: Plugin = {
       const [tokenErr, setErr] = useState<string | undefined>(undefined);
       const err = tokenErr ?? failed;
       if (had !== false || !setup) return null;
-      // A local map: the one command that starts a session reporting here, as a line of text.
+      // A local map: the one command that connects this checkout's sessions, as a line of text.
       if (!(setup.token || setup.install)) {
-        return setup.here
-          ? html`<div class="cn-here" title=${`Run in ${setup.folder}: a Claude Code session that reports here, your own settings untouched.`}>${setup.here}</div>`
-          : null;
+        if (!setup.here) return null;
+        const also = setup.session ? `\nOr, in a terminal, writing nothing: ${setup.session}` : "";
+        const tip = `Run in ${setup.folder}, then start a new Claude Code session there (the desktop app too): it reports to this map. npm run disconnect:here takes it out.${also}`;
+        return html`<div class="cn-here" title=${tip}>${setup.here}</div>`;
       }
       const make = async () => {
         if (setup?.tokenAt) {

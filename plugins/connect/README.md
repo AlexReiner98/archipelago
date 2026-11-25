@@ -4,8 +4,10 @@ The first moments of a new map: what to do until the first run lands. On a
 hosted map with no run (the server takes a token or serves its hook script),
 Field's empty state shows the next step, connect Claude Code, with what to
 copy for this server and the token only the page can make. A local map shows
-one line of text instead: the command that starts a session reporting here,
-when the checkout's `plugins/claude-code/mcp.json` reaches this server. When the first run begins, a line
+one line of text instead: `npm run connect:here` (with `-- --port` off the
+dev port), which connects the checkout's sessions to this server; its
+tooltip names the terminal command that writes nothing, where the
+checkout's `plugins/claude-code/mcp.json` reaches this server. When the first run begins, a line
 says so, live, and opens it in the harness view.
 
 ```
@@ -17,6 +19,7 @@ first run begins ─▶ ◐ First run · <its name>  open ─▶ Harness, on tha
 | File | Runs | What it is |
 |---|---|---|
 | [setup.ts](setup.ts) | both | The MCP line and the hooks, from where the server is. Plain data |
+| [here.ts](here.ts) | script | `npm run connect:here` / `disconnect:here` ([scripts/connect.ts](../../scripts/connect.ts)): the repository's hooks and server into this folder's `.claude/settings.local.json` and `.mcp.json`, beside what is there (the context filter's entries included), kept out of git through `.git/info/exclude`, and taken out leaving the files as they were. Plain data |
 | [index.ts](index.ts) | server | `connect.setup`, and `connect.token` when a token action is named. Injects `action.register` |
 | [view.ts](view.ts) | page | Fills Field's `field.empty`, `over`, and `top` on a guest map. Injects `action.invoke`, `exchange.read`, `exchange.watch`, `here.set`, `slot.fill` |
 

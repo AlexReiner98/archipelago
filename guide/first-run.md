@@ -28,12 +28,24 @@ adopt onto the map, so a change made there is what the next session loads;
 ## Connect Claude Code
 
 A map with no run opens on an empty canvas, with one line: the command that
-starts a session against it without touching your settings. Run it, and the
-first run shows as it begins:
+connects this folder's sessions to it. Run it, start a new Claude Code
+session in the folder (a terminal or the desktop app), and the first run
+shows as it begins:
+
+```
+npm run connect:here
+```
+
+It writes only this folder's `.claude/settings.local.json` and `.mcp.json`,
+kept out of git; `npm run disconnect:here` takes them out. In a terminal,
+one session that writes nothing:
 
 ```
 claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json
 ```
+
+A session that connected without the hooks (only the MCP server) is told so
+by the map, and asks you to restart it with them.
 
 The session's hooks report each prompt, tool call and answer to the
 adapter, and its MCP server gives the agent the map's tools. Open

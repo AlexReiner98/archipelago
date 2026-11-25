@@ -6,12 +6,14 @@ import { Loader, type Entry } from "../runtime/loader.ts";
 import action from "../plugins/action/index.ts";
 import graph from "../plugins/graph/index.ts";
 import connect, { folderSession, localCommand, MAKE_TOKEN, SETUP } from "../plugins/connect/index.ts";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { EVENTS, FOLDER, install, setup, TOKEN, withToken, type Setup } from "../plugins/connect/setup.ts";
+import { CONNECT, EVENTS, FOLDER, install, setup, TOKEN, withToken, type Setup } from "../plugins/connect/setup.ts";
 import { runName } from "../plugins/connect/view.ts";
+import { connectHere, disconnectHere, forPort, MARK, NAME } from "../plugins/connect/here.ts";
 
 const BASE = "mem:/plugins/";
 
@@ -90,22 +92,81 @@ test("connect.setup answers what to copy, and with no token action there is no c
   assert.ok(s.hooks.includes("http://127.0.0.1:5281/hook"));
   const none = await call(person, MAKE_TOKEN);
   assert.equal(none.ok, false);
-  // The checkout's own files reach this adapter: a session from here comes first, changing no settings.
-  assert.equal(s.here, FOLDER);
+  // On this machine, from a checkout: the command that connects its sessions, and the terminal one that writes nothing.
+  assert.equal(s.here, CONNECT);
+  assert.equal(s.session, FOLDER);
   assert.ok(s.folder);
 });
 
-test("a session from the checkout is offered only where its mcp.json reaches the server, with no token", async () => {
-  assert.equal(folderSession("http://127.0.0.1:5281/mcp")?.here, FOLDER, "the dev port, as the files name it");
-  assert.equal(folderSession("http://127.0.0.1:5181/mcp"), undefined, "another port: the files would miss it");
-  assert.equal(folderSession("http://127.0.0.1:5281/mcp", join(tmpdir(), "no-such-checkout")), undefined, "no files");
+test("the checkout's sessions are connected on any local port; the terminal command only where its mcp.json reaches", async () => {
+  const dev = folderSession("http://127.0.0.1:5281/mcp");
+  assert.deepEqual([dev?.here, dev?.session], [CONNECT, FOLDER], "the dev port, as the files name it");
+  const other = folderSession("http://127.0.0.1:5181/mcp");
+  assert.deepEqual([other?.here, other?.session], [`${CONNECT} -- --port 5180`, undefined], "another port: connect:here is told it; the files would miss it");
+  assert.equal(folderSession("https://map.example.test/mcp"), undefined, "an adapter elsewhere");
+  assert.equal(folderSession("http://127.0.0.1:5281/mcp", join(tmpdir(), "no-such-checkout")), undefined, "no checkout");
   const tokened = await setupTree({ hook: "http://127.0.0.1:5281/hook", mcp: "http://127.0.0.1:5281/mcp", token: "tokens.make" });
   const o = await call(tokened.person, SETUP);
   assert.ok(o.ok);
   const s = o.output as unknown as Setup;
   assert.equal(s.here, undefined, "a server with tokens: the files carry none");
-  // The README and the files say the same command.
-  assert.ok(readFileSync(new URL("../README.md", import.meta.url), "utf8").includes(FOLDER));
+  // The README says both commands.
+  const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+  assert.ok(readme.includes(FOLDER) && readme.includes(CONNECT));
+});
+
+const REPO = {
+  settings: JSON.parse(readFileSync(new URL("../plugins/claude-code/settings.json", import.meta.url), "utf8")),
+  mcp: JSON.parse(readFileSync(new URL("../plugins/claude-code/mcp.json", import.meta.url), "utf8")),
+};
+
+test("connect:here adds the repository's hooks and server beside what is there, once; disconnect:here leaves it as it was", () => {
+  // What a person had, and what the context filter (lean) writes into the same file: kept through both.
+  const before = {
+    settings: { permissions: { deny: ["mcp__unused"] }, disabledMcpjsonServers: ["unused"], hooks: { Stop: [{ hooks: [{ type: "command", command: "my-own-thing" }] }] } },
+    mcp: { mcpServers: { other: { type: "http", url: "https://other.example.test/mcp" } } },
+    exclude: "# a comment\n*.tmp\n",
+  };
+  const on = connectHere(before, REPO);
+  const hooks = on.settings!.hooks as Record<string, unknown[]>;
+  assert.equal(Object.keys(hooks).length, EVENTS.length, "every event the repository's settings name");
+  assert.equal(hooks.Stop!.length, 2, "the person's own Stop hook stays beside ours");
+  assert.deepEqual(on.settings!.enabledMcpjsonServers, [NAME], "the server starts without a prompt");
+  assert.deepEqual([on.settings!.permissions, on.settings!.disabledMcpjsonServers], [before.settings.permissions, before.settings.disabledMcpjsonServers], "the context filter's entries are untouched");
+  assert.deepEqual(Object.keys(on.mcp!.mcpServers as object), ["other", NAME]);
+  assert.equal(on.exclude, ["# a comment", "*.tmp", MARK, ".mcp.json", ".claude/settings.local.json", ""].join("\n"));
+  assert.deepEqual(connectHere(on, REPO), on, "run again, it changes nothing");
+  assert.deepEqual(disconnectHere(on), before, "taken out, the files are as they were");
+  assert.deepEqual(disconnectHere(connectHere({}, REPO)), { settings: undefined, mcp: undefined, exclude: "" }, "files it made go");
+});
+
+test("connect:here moves the hooks and server to another page's adapter", () => {
+  const moved = JSON.stringify(forPort(REPO, 5180));
+  assert.ok(!moved.includes(":5281/"));
+  assert.ok(moved.includes("http://127.0.0.1:5181/mcp") && moved.includes("http://127.0.0.1:5181/hook"));
+});
+
+test("npm run connect:here and disconnect:here, in a checkout: files written, kept out of git, and gone again", () => {
+  const dir = mkdtempSync(join(tmpdir(), "connect-here-"));
+  try {
+    const git = (...a: string[]) => execFileSync("git", a, { cwd: dir, encoding: "utf8" });
+    git("init", "-q");
+    for (const p of ["scripts", "plugins/connect", "plugins/claude-code"]) mkdirSync(join(dir, p), { recursive: true });
+    for (const p of ["scripts/connect.ts", "plugins/connect/here.ts", "plugins/claude-code/settings.json", "plugins/claude-code/mcp.json"]) {
+      writeFileSync(join(dir, p), readFileSync(new URL(`../${p}`, import.meta.url)));
+    }
+    const run = (...a: string[]) => execFileSync(process.execPath, [join(dir, "scripts", "connect.ts"), ...a], { cwd: dir, encoding: "utf8" });
+    const seen = () => git("status", "--porcelain", "--untracked-files=all").split("\n").filter((l) => l.includes(".mcp.json") || l.includes("settings.local"));
+    run("here", "--port", "5380");
+    assert.equal(JSON.parse(readFileSync(join(dir, ".mcp.json"), "utf8")).mcpServers[NAME].url, "http://127.0.0.1:5381/mcp");
+    assert.ok(readFileSync(join(dir, ".claude", "settings.local.json"), "utf8").includes("127.0.0.1:5381/hook"));
+    assert.deepEqual(seen(), [], "git status stays clean");
+    run("away");
+    assert.ok(!existsSync(join(dir, ".mcp.json")) && !existsSync(join(dir, ".claude")), "nothing left behind, the folder it made included");
+    assert.ok(!readFileSync(join(dir, ".git", "info", "exclude"), "utf8").includes(MARK));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("connect.token makes a token for a person, and refuses an agent", async () => {
