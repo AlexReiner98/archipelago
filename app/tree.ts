@@ -91,6 +91,8 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
     { id: "links", plugin: "plugins/links/index.ts" },
     { id: "branch", plugin: "plugins/branch/index.ts" },
     { id: "items", plugin: "plugins/items/index.ts" },
+    // Games: a situation as players, strategies and payoffs, reasoned out (plugins/game).
+    { id: "game", plugin: "plugins/game/index.ts" },
     { id: "page", plugin: "plugins/page/index.ts" },
     { id: "views", plugin: "plugins/views/index.ts" },
     { id: "switch", plugin: "plugins/switch/server.ts" },
