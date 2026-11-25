@@ -4,7 +4,7 @@
  *
  * `call.ask(start, ask)`: begins a run (`harness: "call"`, `parent`), reaches
  * the call's places through `agent.run`, so what is said there is chosen by
- * the same nodes and gates (umwelts) as an agent's, hands what was said to
+ * the same nodes and gates (context filters) as an agent's, hands what was said to
  * `ask`, records its answer as a `reply` act at `reply_end`, and ends the
  * run. The domain's own context (`subject`) is recorded by its type and size
  * only, never its text.

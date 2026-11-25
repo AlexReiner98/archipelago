@@ -106,7 +106,7 @@ function boughsFor(n: NodeInfo, o: Required<TreeOptions>): Bough[] | undefined {
   }
   if (o.by === "pack") return [{ key: `pack:${n.pack}`, title: n.pack }, { key: `pack:${n.pack}:${n.kind}`, title: words(n.kind) }];
   if (o.by === "profile") {
-    const from = o.profiles.get(n.id)?.[0] ?? "no umwelt";
+    const from = o.profiles.get(n.id)?.[0] ?? "no context filter";
     return [{ key: `profile:${from}`, title: from }, { key: `profile:${from}:${n.kind}`, title: words(n.kind) }];
   }
   if (!n.at.length) return o.unsaid ? [NEVER] : undefined;
@@ -248,6 +248,8 @@ export const STYLE = {
   node: 3,
   leaf: 2.5,
   root: 7,
+  /** The radius the root is drawn at as its context filter's mark, in screen px. */
+  rootMark: 20,
   hit: 8,
   branch: 3.2,
   branchStep: 0.45,
@@ -374,11 +376,17 @@ export function ringFor(tree: Tree, o: { ring: number; ringMost: number; nameTex
 /** Where everything stands. The same tree is placed the same each time. */
 export function radial(tree: Tree, options: RadialOptions = {}): Placed {
   const o = { ...STYLE, measure: roughWidth, ...options };
-  const sx = o.spreadX;
   const angles = anglesOf(tree);
   const ring = ringFor(tree, o);
   const polar = new Map<string, { a: number; r: number }>();
   for (const t of tree.order) polar.set(t.id, { a: angles.get(t.id)!.a, r: ring * t.depth });
+  return placedAt(tree, polar, ring, options);
+}
+
+/** The picture from each node's polar place: its point, its branch (and the points along it), its name, the bounds. */
+export function placedAt(tree: Tree, polar: Map<string, { a: number; r: number }>, ring: number, options: RadialOptions = {}): Placed {
+  const o = { ...STYLE, measure: roughWidth, ...options };
+  const sx = o.spreadX;
   // `+ 0` keeps the root at 0, not -0.
   const at = (a: number, r: number): [number, number] => [Math.cos(a) * r * sx + 0, Math.sin(a) * r + 0];
   const xy = new Map([...polar].map(([id, p]) => {
@@ -403,7 +411,9 @@ export function radial(tree: Tree, options: RadialOptions = {}): Placed {
     }));
   }
 
-  // Names along their rays: a leaf's outward from its dot, a bough's inward, lifted off its branch.
+  // Names along their rays: a leaf's outward from its dot, a bough's inward, lifted off its branch. A bough
+  // straight off the root is named level, centred over its dot (as the Landscape names it): inward, the
+  // root's boughs' names would all meet at the root.
   const labels = new Map<string, Label>();
   const ends: [number, number][] = [...xy.values()].map((p) => [p.x, p.y]);
   for (const t of tree.order) {
@@ -414,6 +424,12 @@ export function radial(tree: Tree, options: RadialOptions = {}): Placed {
     const right = ux >= -1e-9;
     const text = cut(nameOf(t.title), o.nameMost);
     const wide = o.measure(text, o.nameText);
+    if (t.parent === tree.root && t.kids.length) {
+      const up = -o.nameText * (0.5 + o.nameLift);
+      labels.set(t.id, { text, turn: 0, dx: -wide / 2, dy: up, anchor: "start" });
+      for (const x of [-wide / 2, wide / 2]) for (const y of [up - o.nameText / 2, up + o.nameText / 2]) ends.push([here.x + x, here.y + y]);
+      continue;
+    }
     const out = t.kids.length ? -1 : 1;
     const lift = out > 0 ? 0 : -o.nameText * o.nameLift;
     // Text reads left to right: on the left half it turns half round, and runs the other way.

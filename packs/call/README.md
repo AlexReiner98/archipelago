@@ -7,7 +7,7 @@ made it. Provides its own `call.ask`. Injects `agent.run`, `exchange.read`,
 
 ```
 parent run ── call run (harness: "call", parent)
-                begin ─ say at its places (the umwelt's nodes) ─ reply act ─ end
+                begin ─ say at its places (the context filter's nodes) ─ reply act ─ end
                                          later: decision act (a person) ─▶ verdict
 ```
 
@@ -24,7 +24,7 @@ parent run ── call run (harness: "call", parent)
 It begins the run (`harness: "call"`, `parent`), reaches the places through
 `agent.run`, so what is said there is chosen as it is for an agent: nodes
 listening there, held back by gates (the [profile](../profile/README.md)
-pack's umwelts), each say on the exchange. `ask` gets the run and what was
+pack's context filters), each say on the exchange. `ask` gets the run and what was
 said (`{node, text}`), sends it with its request, and answers `{text,
 subject?, usage?}`. The answer is a `reply` act at `reply_end`: its output
 the text and the model's own count (`usage`: input, output, model), its

@@ -80,10 +80,21 @@ The strip stays its parent's, that call marked, with "‹ parent" back. The
 run picker names it "call · …". Calls are read from the newest 500 runs
 (`LIMIT_MAX`), the runs from the 50 newest that aren't calls.
 
+## From a context filter ([open.ts](open.ts))
+
+A context filter's item page (the Landscape or the Map, a click on the
+item) has a button into its view here, in the item pack's `item.actions`
+slot: with a session live in the filter, "Watch its live session", which
+opens the live view focused on it; with none, "Its context", which opens
+the filter's own tree (`openFilter`).
+
 ## The agents ([trees.ts](trees.ts), [agents.ts](agents.ts))
 
 Live mode and the agents are one idea: each live run is an agent, in the
-colour live mode gives it, with a tree of its own. One is in focus, big,
+colour live mode gives it, with a tree of its own. An agent's tree is drawn
+once both where it is placed and what it hears are known (`heardYet`), and
+"No agent is live" only once the runs are read: the view never shows every
+node, or none, before its filter's tree. One is in focus, big,
 with every name; the others are small previews in a column to its left, in
 the order of their colours so each keeps its place, and a click on one
 brings it into focus. The switch is smooth: the one clicked grows into
@@ -108,7 +119,11 @@ click on the focused agent's name looks at it alone.
 What an agent is told runs a light from the root along its tree to that
 node, in the agent's colour (red for a refusal), and the name lights when
 the light gets there; an act sparks on the bough of its place. The light
-and spark are the tree's own (see the tree, below).
+and spark are the tree's own (see the tree, below). When a node comes or
+goes, the tree glides into its new shape over `layout_ms` (600; each node's
+angle and ring eased, a new one growing out of its parent: `glide` in
+[glide.ts](glide.ts)), and a light already running
+reads its route from the tree as drawn each frame, so it follows its branch.
 
 The dials, in the bar's ⋯ menu: how long a switch of focus takes
 (`switch_s`), how long the pointer rests on a node or a bough before its
@@ -118,7 +133,7 @@ the size on screen below which a node's name shows only if the run said
 it, refused with it, or it is picked (`quiet_px`, 0 for every name, as it starts),
 the most characters a name shows (`name_most`, 28; 0 for whole),
 whether wire names give way where they overlap (`give_way`, 0: they always show),
-how long and how big an act's spark is (`spark_s`, 1.6; `spark_x`, 2.2 times the style's), how tall each agent preview is (`peek_px`, 200, its column a third wider), so
+how long and how big an act's spark is (`spark_s`, 1.6; `spark_x`, 2.2 times the style's), how long a new line of the run is lit as it lands (`row_ms`, 600: a background that fades, painted rather than composited, as an opacity fade on each new row made Chrome show half-drawn frames; the list glides to its foot rather than jumping, and an MCP tool's place reads `tool:archipelago.query`, `placeLabel`), how tall each agent preview is (`peek_px`, 200, its column a third wider, opening from nothing over `open_s` as a second agent arrives), so
 a tree seen whole reads by its shape and what it was told, and how long a run may be
 quiet and still be live (`quiet_min`). Its value is `harness.dials` (page scope), so an agent can
 set it; the browser remembers it. Colours are style tokens only.
@@ -130,6 +145,12 @@ through the profile pack's `profile.place`, and its tree changes to match;
 the page never writes itself.
 
 ## The tree ([layout.ts](layout.ts), [canvas.ts](canvas.ts), [scene.ts](scene.ts), [paint.ts](paint.ts))
+
+The view is titled with the context filter the run is in (or "no context
+filter"), over the top of its tree with the filter's mark beside it. When
+the Landscape has said how it draws that item's type (the page key
+`field.marks`), the tree's root is drawn as that mark, its shape in its
+colour, so the filter looks the same in both views.
 
 Every node in `agent.tree` hangs under one root at its first place: tool,
 then the MCP server, then the tool; file, then its glob's top folders;
@@ -165,7 +186,7 @@ zoom, double-click to fit; a press picks a node by its name, or anywhere
 within 22 px of its dot (`HIT_PX`). The key ([key.ts](key.ts)) is always
 there, bottom left of one run's tree or the agent in focus: collapsed by
 its head ("key ▸") to one line of the marks that filter until it is
-opened, or open, every mark with its words; the browser remembers which. It lists only the marks
+opened, or open, every mark with its words; the browser remembers which, and what its marks have turned off ([keyoff.ts](keyoff.ts)), so a view switch keeps both. It lists only the marks
 the tree in sight shows (`marksIn`): a new user's key is who and how, and
 held-back, shadow, verdict and trial marks join it as they appear. Its
 rows stand in titled sections, each a line apart, with what it means in
@@ -190,11 +211,14 @@ reading, 23 Nov 2026), the whole title in its words, and never show a path: a pa
 whose it is, after a dot (`nameOf`, `placeName`): its project's folder,
 and the file when it isn't the usual CLAUDE.md or MEMORY.md, so
 "project memory · archipelago-next", "auto memory · Aperture". The whole
-title is in its words, shown beside it when the pointer rests on it. The big tree's camera fits its names too (the layout's measured box), so
+title is in its words, shown beside it when the pointer rests on it. Names run along their rays (a leaf's outward, a bough's inward), but a bough straight off the root is named level over its dot, as the Landscape names it, so the root's boughs' names never meet at the root. The big tree's camera fits its names too (the layout's measured box), so
 every name is in sight; a preview fits its dots. Every tree fits when
 first laid out, again when it outgrows the view (a profile that hears
 more, Claude Code's nodes shown again, a smaller window), and on a
-double-click; once moved by hand it stays where it is put, and the map
+double-click; a fit lands at once while the tree is still finding its size
+(the first, and any within `fit_settle_ms`, 800, `snapsFit`), and a later one glides there over `fit_ms` (eased, the
+zoom in proportion, `easeView`), so the tree is seen to settle, and the
+wheel's zoom eases to where it sends the camera over `wheel_ms`, so its notches glide; once moved by hand it stays where it is put, and the map
 changing under it never moves it otherwise (`shouldFit`, `outgrown`).
 
 The names on the wires (a bough's, along its branch) grow and shrink with
@@ -226,16 +250,21 @@ nodes. The camera's pure parts are in [camera.ts](camera.ts).
 
 ## The window ([windowbar.ts](windowbar.ts))
 
-With the context pack ([context](../context/README.md)), a bar over the
-agent in focus, and over one run's tree, says how full its context window
+With the context pack ([context](../context/README.md)), a bar along the
+foot of the agent in focus, and of one run's tree, says how full its context window
 is at the playhead, or live (`context.window`): the tokens in it of the
 window's size and the share that is, "≈" when it is an estimate (no usage
 in the transcript yet), and how many compactions. It starts folded to that
-one line; its head ("window ▸") opens the rows below, and the browser
-remembers which (`harness.window-open`). Under it two thin rows
+one line, so the tree is read first; its head ("window ▸") opens it, and
+the browser remembers which (`harness.window-open`). Before the window is read it keeps its
+room, open or folded, so the tree above never moves when it comes. Live,
+it is read again as events come, at most every 3 s; an event inside that
+time reads once the time is up, and a read in flight is kept unless the
+run or the moment looked at changed, so a busy session's bar keeps up. Under it two thin rows
 on the window's one scale: its share by source (the map's, Claude Code's,
 the conversation, a call's subject, and what the model counts beyond those), and by channel
-(hook, rule, file, context, talk). A share's tooltip says its tokens, its
+(hook, rule, file, context, talk), each channel in a hue of its own
+(`CHANNEL_HUE`). A share's tooltip says its tokens, its
 part of the window, and how sure: each number carries its mark (`~`
 fitted, `~≈` partly, `≈` estimated, none measured), and a share's bar is
 solid for what is fitted and faded for what is estimated. A click on a share filters the tree to
@@ -246,8 +275,11 @@ filter.
 
 A third row is what the map controls alone, node by node (`mapShares`):
 each of its nodes said, or only listed (faded), in the window at the
-playhead, in its pack's hue, biggest first, on a scale of its own (the
-map's whole share), headed by that share and its part of the window. The
+playhead, in the hue of the channel it came in by (a node beside another of
+the same hue a shade darker, so each shows), biggest first, on a scale of round steps just
+above the map's whole share (250, 500, 1k, 2.5k…: `stepScale`), so a
+session's start is part full and the row grows as the map says more,
+headed by that share, its scale and its part of the window. The
 biggest four are named under it, named as the tree names them, never a
 path, and the rest counted; each a click to pick the node, outlined while
 picked. Live, the
@@ -265,14 +297,20 @@ a step at a time, "● live" (or "■ end") follows the end again.
 
 ## The run ([events.ts](events.ts))
 
+Three or more held-back lines in a row at one place (what other context
+filters keep from this run) fold into one line, "63 held back from this
+run ▸", which a click opens (`foldHeld`): a run in a map of
+many filters reads from its start.
+
 The line at the playhead is picked; those after it are faint. New lines
 keep the list at its foot only while it is at its foot (`atFoot`):
 scrolled up to read, it stays where it is. A click
 picks its node for the node pane: its own, or for an act the node it
 failed, else the node told just before it (`nodeOf`, replay.ts); and it
 opens the line in place ([expand.ts](expand.ts)): for the map to the agent,
-the node, place, pack and what was said, whole, then, for a Claude Code
-run, "agent got": the whole block the hook handed the agent at that moment,
+the node, place, pack and what was said, whole, or, for a Claude Code
+run, "agent got" in its place: the whole block the hook handed the agent at that moment
+(which holds what was said, so it shows once),
 each node's words under its tag and in the adapter's order, rebuilt with
 the adapter's own formatting ([got.ts](got.ts), packs/claude-code/context.ts);
 for the agent to the map,
@@ -363,7 +401,7 @@ the previews (or, one run looked at, beside the tree), under a way back:
 "‹ Agents" (or "× Close", one run looked at). It gives way to them when
 none is picked: that, or a click on the tree's background.
 
-The Run pane's line under its head (the run's umwelts) ends with the
+The Run pane's line under its head (the run's context filters) ends with the
 `harness.run` slot: other packs' marks on the run shown, each fill given
 its `RunInfo` as `run`. The otel pack's view puts where the run was
 exported there ([otel](../otel/README.md)).

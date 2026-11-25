@@ -339,3 +339,172 @@ test("the legend's fill switches hide open items by how full they are drawn", as
   assert.equal(ids({ sides: ["fresh", "moving"] }), "c");
   assert.deepEqual(toggle(toggle({}, "sides", "fresh"), "sides", "fresh"), {});
 });
+
+test("an item that leaves the map fades out where it stood over gone_ms, closed ones from their faintness", async () => {
+  const { goneOf, ghostFade } = await import("../packs/field/gone.ts");
+  const item = (id: string, closed = false) => ({ id, title: id, type: "work", status: "", closed });
+  const whole: FieldIn = { items: [item("a"), item("b", true), item("c")], links: [], types: ["work"] };
+  const S = { ...settings(), gone_ms: 600, closed_fade: 0.28, shapes: 0 };
+  const all = build(whole, null);
+  seed(all, S);
+  const less = build({ ...whole, items: [item("a")] }, all);
+  const ghosts = goneOf(all, less, 1000, S);
+  const at = (id: string) => [all.x[all.idIx.get(id)!], all.y[all.idIx.get(id)!]];
+  assert.deepEqual(ghosts.map((q) => [q.x, q.y, q.alpha, q.at]), [[...at("b"), 0.28, 1000], [...at("c"), 1, 1000]], "b and c left, each where it stood; b closed, so as faint as it was drawn");
+  assert.deepEqual(goneOf(all, less, 1000, { ...S, gone_ms: 0 }), [], "0: they vanish at once, no ghosts");
+  assert.deepEqual(goneOf(null, less, 1000, S), [], "a first map leaves nothing behind");
+  const { FAINT, FOUND } = await import("../packs/field/filter.ts");
+  const kept = goneOf(all, less, 1000, { ...S, query_fade: 0.1 }, Uint8Array.from([FOUND, FOUND, FAINT]));
+  assert.deepEqual(kept.map((q) => q.alpha), [1, 0.1], "found, a closed item is drawn whole; kept faint by the find line, it fades from faint");
+  assert.equal(ghostFade(0, 600), 1);
+  assert.equal(ghostFade(600, 600), 0);
+  assert.ok(ghostFade(150, 600) > 0.75 && ghostFade(450, 600) < 0.25, "eased: slow to start, slow to end");
+});
+
+test("a link with an end that left fades out with it, and a ghost keeps the title it was shown with", async () => {
+  const { goneLinksOf, goneOf } = await import("../packs/field/gone.ts");
+  const item = (id: string) => ({ id, title: "Item " + id, type: "work", status: "", closed: false });
+  const whole: FieldIn = { items: [item("a"), item("b"), item("c")], links: [{ id: "l1", type: "part_of", from: "b", to: "a" }, { id: "l2", type: "depends_on", from: "c", to: "a" }], types: ["work"] };
+  const S = { ...settings(), gone_ms: 600, link_alpha: 0.5, shapes: 0 };
+  const all = build(whole, null);
+  seed(all, S);
+  const less = build({ items: [item("a"), item("c")], links: [whole.links[1]!], types: ["work"] }, all);
+  const gone = goneLinksOf(all, less, 1000, S);
+  const at = (id: string) => [all.x[all.idIx.get(id)!], all.y[all.idIx.get(id)!]];
+  assert.equal(gone.length, 1, "only b's link went");
+  assert.deepEqual([gone[0]!.x1, gone[0]!.y1, gone[0]!.x2, gone[0]!.y2], [...at("b"), ...at("a")]);
+  assert.equal(gone[0]!.alpha, 0.5 * 1.4, "part_of as strong as it is drawn");
+  assert.deepEqual(goneLinksOf(all, less, 1000, { ...S, gone_ms: 0 }), []);
+  const label = { x: 3, y: 4, lines: ["Item b"], center: false };
+  assert.deepEqual(goneOf(all, less, 1000, S, null, 4000, new Map([["b", label]])).map((q) => q.label), [label], "its title where it was placed");
+  assert.deepEqual(goneOf(all, less, 1000, S).map((q) => q.label), [undefined], "not shown, no title");
+});
+
+test("link names follow their links into a rebuilt map; one whose link left fades where it stood", async () => {
+  const { rekeyWires } = await import("../packs/field/gone.ts");
+  const item = (id: string) => ({ id, title: id, type: "work", status: "", closed: false });
+  const links = [{ id: "l1", type: "part_of", from: "b", to: "a" }, { id: "l2", type: "depends_on", from: "c", to: "a" }];
+  const all = build({ items: [item("a"), item("b"), item("c")], links, types: ["work"] }, null);
+  const less = build({ items: [item("a"), item("c")], links: [links[1]!], types: ["work"] }, all);
+  const ix = (g: typeof all, from: string) => [...Array(g.m).keys()].find((e) => g.id[g.a[e]!] === from)!;
+  const wires = new Map([[ix(all, "b"), { a: 1, x: 120, y: 60, angle: 0.5 }], [ix(all, "c"), { a: 0.5, x: 10, y: 20, angle: 0 }]]);
+  const gone = rekeyWires(all, less, wires, { k: 2, tx: 100, ty: 40 }, 1000);
+  assert.deepEqual([...wires.keys()], [ix(less, "c")], "c's link kept its fade under its new index");
+  assert.equal(wires.get(ix(less, "c"))!.a, 0.5);
+  assert.deepEqual(gone.map((n) => [n.x, n.y, n.angle, n.text, n.at]), [[10, 10, 0.5, "part of", 1000]], "b's name, in world units where it stood");
+});
+
+test("an item that stays but takes a new size eases to it over resize_ms; a ghost leaves as hollow as it was drawn", async () => {
+  const { resizeOf, resizeAt, goneOf } = await import("../packs/field/gone.ts");
+  const item = (id: string) => ({ id, title: id, type: "work", status: "", closed: false });
+  const whole: FieldIn = { items: [item("a"), item("b"), item("c")], links: [{ id: "l1", type: "depends_on", from: "a", to: "b" }, { id: "l2", type: "depends_on", from: "a", to: "c" }], types: ["work"] };
+  const S = { ...settings(), shapes: 1 };
+  const all = build(whole, null);
+  seed(all, S);
+  const less = build({ items: [item("a"), item("b")], links: [whole.links[0]!], types: ["work"] }, all);
+  seed(less, S);
+  const before = all.r[all.idIx.get("a")!]!, after = less.r[less.idIx.get("a")!]!;
+  assert.ok(after < before, "a lost a link, so it is smaller");
+  const rs = resizeOf(all, less, 1000)!;
+  assert.equal(resizeAt(less, rs, 1000, 600), true);
+  assert.ok(Math.abs(less.r[less.idIx.get("a")!]! - before) < 1e-4, "it starts at its old size");
+  assert.equal(resizeAt(less, rs, 1600, 600), false);
+  assert.ok(Math.abs(less.r[less.idIx.get("a")!]! - after) < 1e-4, "and ends at its new one");
+  assert.equal(resizeOf(null, less, 0), null);
+  assert.equal(resizeOf(less, less, 0), null, "nothing changed size: nothing to ease");
+  const gone = goneOf(all, less, 1000, S);
+  assert.deepEqual(gone.map((q) => q.how), [all.side && (await import("../packs/field/shapes.ts")).fill(all.side[all.idIx.get("c")!]!)]);
+});
+
+test("the map follows the find line once typing pauses: a value is taken only after it holds still for find_wait_ms", async (t) => {
+  const { Settle } = await import("../packs/field/filter.ts");
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const took: string[] = [];
+  const s = new Settle("", (v) => took.push(v));
+  for (const q of ["c", "ca", "can"]) s.put(q, 350), t.mock.timers.tick(100);
+  assert.deepEqual(took, [], "still typing: nothing taken");
+  t.mock.timers.tick(350);
+  assert.deepEqual(took, ["can"], "a pause: the last words are taken, once");
+  s.put("x", 0);
+  assert.deepEqual(took, ["can", "x"], "no wait: taken at once");
+  s.put("x", 350);
+  t.mock.timers.tick(400);
+  assert.deepEqual(took, ["can", "x"], "the same words again: nothing new");
+});
+
+test("an item that comes onto the map fades in where it lands over come_ms; what was there stays whole", async () => {
+  const { bornOf, comeFade } = await import("../packs/field/gone.ts");
+  const item = (id: string) => ({ id, title: id, type: "work", status: "", closed: false });
+  const one = build({ items: [item("a")], links: [], types: ["work"] }, null);
+  one.born = bornOf(null, one, 0);
+  assert.equal(one.born[0], -Infinity, "a first map was all there");
+  const two = build({ items: [item("a"), item("b")], links: [], types: ["work"] }, one);
+  two.born = bornOf(one, two, 500);
+  assert.deepEqual([two.born[two.idIx.get("a")!], two.born[two.idIx.get("b")!]], [-Infinity, 500]);
+  assert.equal(comeFade(Infinity, 600), 1);
+  assert.equal(comeFade(0, 600), 0);
+  assert.equal(comeFade(100, 0), 1, "0: it shows at once");
+});
+
+test("an arranged tree's names are boxes on screen that the items' titles give way to: ghosts' below, boughs' above", async () => {
+  const { treeNameBoxes } = await import("../packs/field/treeover.ts");
+  const a = { profile: "P", items: {}, wires: [], boughs: [{ at: [10, 0] as [number, number], text: "tool" }], ghosts: [{ at: [0, 0] as [number, number], text: "Check" }] };
+  const S = { ...settings(), tree_text: 10, tree_ghost_text: 5 };
+  const boxes = treeNameBoxes(a, { k: 2, tx: 100, ty: 50 }, 1, S, (t, px) => t.length * px * 0.5);
+  assert.equal(boxes.length, 2);
+  const g = boxes[0]!, b = boxes[1]!;
+  assert.ok(g[0]! < 100 && g[2]! > 100, "the ghost's name is centred on its spot");
+  assert.ok(g[1]! > 50, "and sits below it");
+  assert.ok(b[3]! < 50 && b[0]! < 120 && b[2]! > 120, "a bough's name sits above its spot, centred");
+});
+
+test("an arranged tree waits tree_in_ms while the old map fades out, then comes in at least as fast as gone_ms", async () => {
+  const { treeStrength } = await import("../packs/field/treeover.ts");
+  const S = { ...settings(), tree_in_ms: 450, gone_ms: 600 };
+  assert.equal(treeStrength(1, 0, S), 0, "not yet, however far the items have come");
+  assert.equal(treeStrength(1, 449, S), 0);
+  assert.equal(treeStrength(0, 450, S), 0, "then it starts from nothing");
+  assert.ok(treeStrength(0, 750, S) > 0.4 && treeStrength(0, 750, S) < 0.6, "eased in over gone_ms");
+  assert.equal(treeStrength(0, 1050, S), 1);
+  assert.equal(treeStrength(0.8, 500, S), 0.8, "or as far as the items have arrived, once it may show");
+  assert.equal(treeStrength(0, 0, { ...S, tree_in_ms: 0, gone_ms: 0 }), 1, "0 and 0: at once");
+});
+
+test("a title that takes another spot than last frame's has moved, and fades across; a new one or one kept in place has not", async () => {
+  const { movedTitles } = await import("../packs/field/paint.ts");
+  const was = new Map([["a", 0], ["b", 2], ["c", 1]]);
+  assert.deepEqual(movedTitles(was, [["a", 0], ["b", 3], ["d", 1], ["c", undefined]]), ["b", "c"]);
+  assert.deepEqual(movedTitles(new Map(), [["a", 0]]), [], "a first frame moves nothing");
+  const at0 = new Map<string, [number, number]>([["b", [10, 10]], ["c", [50, 50]]]);
+  const at1 = new Map<string, [number, number]>([["b", [11, 10]], ["c", [80, 50]]]);
+  assert.deepEqual(movedTitles(was, [["b", 3], ["c", 2]], at0, at1), ["b"], "c's particle is flying: its title goes with it, no fade");
+});
+
+test("after a jump the camera eases in from rest over find_follow_ms, then closes a share of the gap as before", async () => {
+  const { followShare } = await import("../packs/field/follow.ts");
+  assert.equal(followShare(16, 350, 0), 0, "the first frame of a jump does not move");
+  assert.ok(followShare(16, 350, 100) < followShare(16, 350, 300), "it gathers speed");
+  assert.equal(followShare(16, 350, 400), 1 - Math.exp(-16 / 350), "then as it always did");
+  assert.equal(followShare(16, 1000), 1 - Math.exp(-16 / 1000), "a settle with no jump: as before");
+  assert.equal(followShare(16, 0, 0), 1, "0: it snaps");
+});
+
+test("a placed name's corners reach along its turned line, so the arranged tree's fit keeps it in view", async () => {
+  const { nameCorners } = await import("../packs/field/treeover.ts");
+  const flat = nameCorners(10, 20, "abcd", { turn: 0, dx: 5, dy: 0, anchor: "start" }, 10);
+  const xs = flat.map((p) => p[0]), ys = flat.map((p) => p[1]);
+  assert.deepEqual([Math.min(...xs), Math.max(...xs)], [15, 15 + 4 * 10 * 0.55]);
+  assert.deepEqual([Math.min(...ys), Math.max(...ys)], [13, 27]);
+  const down = nameCorners(0, 0, "abcd", { turn: 90, dx: 5, dy: 0, anchor: "start" }, 10);
+  assert.ok(Math.max(...down.map((p) => p[1])) > 25, "turned down its ray, it reaches below");
+  const back = nameCorners(0, 0, "abcd", { turn: 0, dx: -5, dy: 0, anchor: "end" }, 10);
+  assert.ok(Math.max(...back.map((p) => p[0])) <= -5 + 1e-9, "anchored at its end, it runs back from the dot");
+});
+
+test("a link with places is named with them, so the map shows where its item is said", async () => {
+  const { wireName } = await import("../packs/field/wires.ts");
+  assert.equal(wireName("in_context_filter"), "in context filter");
+  assert.equal(wireName("in_context_filter", ["tool:Edit", "file:*.html"]), "at tool:Edit, file:*.html", "the places are what it says: the filter it points to says the rest");
+  const g = build({ items: [{ id: "a", title: "a", type: "record", status: "", closed: false }, { id: "b", title: "b", type: "context_filter", status: "", closed: false }], links: [{ id: "l", type: "in_context_filter", from: "a", to: "b", places: ["prompt"] }], types: ["record", "context_filter"] }, null);
+  assert.deepEqual(g.places?.[0], ["prompt"]);
+});

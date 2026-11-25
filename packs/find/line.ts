@@ -28,7 +28,10 @@ export const STYLE = sheet(`
 .fd { position:relative; display:flex; align-items:center; gap:var(--space-3); flex:1; min-width:0; }
 .fd input { flex:1; min-width:0; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-1) var(--space-3); }
 .fd .n { color:var(--dim); white-space:nowrap; font-variant-numeric:tabular-nums; }
-.fd-list { position:absolute; top:calc(100% + var(--space-1)); left:0; right:0; z-index:20; background:var(--panel); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-1) 0; white-space:nowrap; box-shadow:0 4px 14px color-mix(in srgb, var(--fg) 14%, transparent); }
+.fd-list.out { animation:fd-out var(--fd-out, .14s) ease-in both; pointer-events:none; }
+@keyframes fd-out { to { opacity:0; transform:translateY(-3px); } }
+.fd-list { animation:fd-in .14s ease-out both; position:absolute; top:calc(100% + var(--space-1)); left:0; right:0; z-index:20; background:var(--panel); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-1) 0; white-space:nowrap; box-shadow:0 4px 14px color-mix(in srgb, var(--fg) 14%, transparent); }
+@keyframes fd-in { from { opacity:0; transform:translateY(-3px); } }
 .fd-row { display:flex; gap:var(--space-3); align-items:baseline; padding:var(--space-1) var(--space-3); cursor:pointer; }
 .fd-row.on { background:color-mix(in srgb, var(--pick) 16%, transparent); }
 .fd-row .k { color:var(--dim); width:3.6em; flex:none; font-size:var(--text-s); }
@@ -63,11 +66,25 @@ export function commandList(list: Suggestion[], offers: Suggestion[]): Suggestio
   return at < 0 ? [...list, ...offers] : [...list.slice(0, at), ...offers, ...list.slice(at)];
 }
 
+/** How long the query holds still before the suggestions and the count follow it, in ms: typing does not flicker them. */
+export const LIST_WAIT_MS = 220;
+/** How long the suggestions take to fade out as they close, in ms. */
+export const LIST_OUT_MS = 140;
+
 export function makeLine(d: LineDeps) {
   return function Line({ command, done }: LineProps) {
     const [q, setQ] = useState(command ? "" : (d.here.get<string>(d.query) ?? ""));
     const [n, setN] = useState<Result | undefined>();
     const [open, setOpen] = useState(!!command);
+    // What the suggestions and the count follow: the query once it holds still (the command line's at once).
+    const [still, setStill] = useState(q);
+    const stillTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    useEffect(() => {
+      clearTimeout(stillTimer.current);
+      if (command || still === q) setStill(q);
+      else stillTimer.current = setTimeout(() => setStill(q), LIST_WAIT_MS);
+      return () => clearTimeout(stillTimer.current);
+    }, [q]);
     const [sel, setSel] = useState(-1);
     const [, tick] = useState(0);
     const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -77,13 +94,24 @@ export function makeLine(d: LineDeps) {
       return d.here.watch(d.query, (c) => setQ(typeof c.value === "string" ? c.value : "")) as () => void;
     }, []);
     useEffect(() => {
-      const count = () => (setN(run(d.index, q)), tick((x) => x + 1));
+      const count = () => (setN(run(d.index, still)), tick((x) => x + 1));
       count();
       d.watchers.add(count);
       return () => void d.watchers.delete(count);
-    }, [q]);
+    }, [still]);
 
-    const list = !open ? [] : command ? commandList(suggest(d.index, q), offered(d.offers, q)) : suggest(d.index, q);
+    const list = !open ? [] : command ? commandList(suggest(d.index, q), offered(d.offers, q)) : suggest(d.index, still);
+    // A list that closes stays a moment, fading out, rather than going in one frame.
+    const [leaving, setLeaving] = useState<typeof list>([]);
+    const shownList = useRef<typeof list>([]);
+    useEffect(() => {
+      if (list.length) return void ((shownList.current = list), setLeaving([]));
+      if (!shownList.current.length) return;
+      setLeaving(shownList.current);
+      shownList.current = [];
+      const t = setTimeout(() => setLeaving([]), LIST_OUT_MS);
+      return () => clearTimeout(t);
+    }, [list.length]);
     // The command line starts on the first thing to go to (a view or an item), so Enter goes there.
     useEffect(() => setSel(command ? list.findIndex((s) => s.kind !== "term") : -1), [q, open]);
 
@@ -169,7 +197,7 @@ export function makeLine(d: LineDeps) {
           autoFocus=${!!command}
           value=${q}
           placeholder=${command ? "Go to a view or an item, or find: words, is:open, type:…" : "find: words, is:open, type:question, in:<id>"}
-          title="words match titles · is:open is:closed · status:x · type:x · in:<id> · near:<id> · umwelt:<title> arranges the Landscape into that umwelt's tree · Ctrl+K jumps"
+          title="words match titles · is:open is:closed · status:x · type:x · in:<id> · near:<id> · context:<title> arranges the Landscape into that context filter's tree · Ctrl+K jumps"
           onInput=${(e: Event) => type((e.target as HTMLInputElement).value)}
           onFocus=${() => setOpen(true)}
           onBlur=${() => !command && setOpen(false)}
@@ -178,6 +206,7 @@ export function makeLine(d: LineDeps) {
         ${!command && html`<span class="n">${n ? `${n.items.length}${n.more ? ` of ${n.items.length + n.more}` : ""}` : ""}</span>`}
         ${list.length > 0 &&
         html`<div class="fd-list">${list.map((s, i) => [i === firstItem && i > 0 && html`<div class="fd-sep" key="sep" />`, row(s, i)])}</div>`}
+        ${list.length === 0 && leaving.length > 0 && html`<div class="fd-list out" style=${`--fd-out:${LIST_OUT_MS}ms`}>${leaving.map((s, i) => row(s, i))}</div>`}
       </div>
     `;
   };

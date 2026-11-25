@@ -29,7 +29,8 @@ export interface FieldIn {
    * cube, a rule as a ruler). Absent: the mark's shape.
    */
   icons?: Record<string, string>;
-  links: { id: Id; type: string; from: Id; to: Id }[];
+  /** `places`: where the link has its item said (a context filter link's `at`), shown with its name. */
+  links: { id: Id; type: string; from: Id; to: Id; places?: string[] }[];
 }
 
 /** The dials' values, by key. */
@@ -79,6 +80,8 @@ export interface G {
   a: Int32Array;
   b: Int32Array;
   kind: Int32Array;
+  /** Each link's places, when it has them (its name shows them). */
+  places?: (string[] | undefined)[];
   /** Each particle's neighbours, as compressed rows. */
   adjStart: Int32Array;
   adj: Int32Array;
@@ -92,6 +95,8 @@ export interface G {
   target?: { on: Uint8Array; x: Float32Array; y: Float32Array };
   /** The panel it is drawn in: its width over its height (the aspect behaviour). Absent: round. */
   view?: { aspect: number };
+  /** When each particle came onto the map, in ms (performance.now); it fades in over `come_ms` (gone.ts). Absent: all were there. */
+  born?: Float64Array;
   sim: Sim;
   /** Scratch, kept so each step does not allocate. */
   force: { x: Float32Array; y: Float32Array; z: Float32Array };
@@ -102,7 +107,7 @@ export function build(input: FieldIn, last: G | null, pal: string[] = []): G {
   const items = input.items;
   const n = items.length;
   const at = new Map(items.map((it, i) => [it.id, i]));
-  const types = typeColours(input.types ?? items.map((it) => it.type), pal, input.colours).map((t) => (input.icons?.[t.name] ? { ...t, icon: input.icons[t.name] } : t));
+  const types = inputColours(input, pal).map((t) => (input.icons?.[t.name] ? { ...t, icon: input.icons[t.name] } : t));
   const typeNames = types.map((t) => t.name);
   const typeIx = new Map(typeNames.map((t, k) => [t, k]));
   const links = input.links.filter((l) => at.has(l.from) && at.has(l.to) && l.from !== l.to);
@@ -162,6 +167,7 @@ export function build(input: FieldIn, last: G | null, pal: string[] = []): G {
     g.a[e] = a;
     g.b[e] = b;
     g.kind[e] = linkKinds.indexOf(l.type);
+    if (l.places?.length) (g.places ??= [])[e] = l.places;
     g.degree[a]!++;
     g.degree[b]!++;
     g.incident[a]!.push(e);
@@ -251,8 +257,21 @@ export function neighbours(g: G, i: number): Set<number> {
 }
 
 /** The types among these, sorted, each with its colour (from `pal`, the style's hues, then its own): what the particles and the legend use. */
-export function typeColours(names: string[], pal: string[] = [], colours: Record<string, string> = {}): { name: string; colour: string }[] {
-  return [...new Set(names)].sort().map((name, k) => ({ name, colour: colours[name] ?? pal[k] ?? hue(k) }));
+export function typeColours(names: string[], pal: string[] = [], colours: Record<string, string> = {}, after: string[] = []): { name: string; colour: string }[] {
+  const first = [...new Set(names)].sort();
+  const rest = [...new Set(after)].filter((n) => !first.includes(n)).sort();
+  return [...first, ...rest].map((name, k) => ({ name, colour: colours[name] ?? pal[k] ?? hue(k) }));
+}
+
+/**
+ * Each type's colour for an input: its listed types in order, then any an item has that the list lacks (a live
+ * session on the Landscape), after them, so a type coming or going there never shifts the listed ones' colours.
+ * A colour the input gives a type (`colours`) stands in for its hue.
+ */
+export function inputColours(input: FieldIn, pal: string[] = []): { name: string; colour: string }[] {
+  const listed = input.types ?? input.items.map((it) => it.type);
+  const known = new Set(listed);
+  return typeColours(listed, pal, input.colours, input.items.map((it) => it.type).filter((t) => !known.has(t)));
 }
 
 /** Type colours: evenly round the hue wheel, lightness alternating so neighbours in the list differ. */

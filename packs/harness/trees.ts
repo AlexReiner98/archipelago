@@ -32,6 +32,8 @@ import type { KeyFilter } from "./key.ts";
 import { radial, treeOf, type Grouping } from "./layout.ts";
 import { stateAt } from "./replay.ts";
 import { WindowBar, type WindowMark, type WindowRead } from "./windowbar.ts";
+import type { RootMark } from "./paint.ts";
+import { useGlide } from "./glide.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -86,9 +88,11 @@ html.hv-switching { view-transition-name:none; }
 ::view-transition-old(*.hv-agent), ::view-transition-new(*.hv-agent) { height:100%; object-fit:contain; animation-duration:var(--hv-switch, .4s); }
 ::view-transition-old(*.hv-agent) { animation:hv-gone .12s ease-out both; }
 @keyframes hv-gone { to { opacity:0; } }
-.hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); }
-.hv-trees.many { grid-template-columns:minmax(180px, max(22%, calc(var(--peek, 140px) * 4 / 3))) minmax(0,1fr); }
-.hv-peeks { order:-1; min-height:0; overflow-y:auto; border-right:1px solid var(--line); scrollbar-width:thin; }
+.hv-trees { display:grid; height:100%; min-height:0; overflow:hidden; grid-template-columns:0px minmax(0,1fr); grid-template-rows:minmax(0,1fr); transition:grid-template-columns var(--hv-open, .35s) cubic-bezier(.2,.7,.2,1); }
+.hv-trees.many { grid-template-columns:max(180px, 22%, calc(var(--peek, 140px) * 4 / 3)) minmax(0,1fr); }
+.hv-trees > :not(.hv-peeks) { grid-column:2; grid-row:1; min-width:0; }
+.hv-peeks { grid-column:1; grid-row:1; min-width:0; min-height:0; overflow-y:auto; border-right:1px solid var(--line); scrollbar-width:thin; animation:hv-peeks-in var(--hv-open, .35s) ease-out both; }
+@keyframes hv-peeks-in { from { opacity:0; } }
 .hv-peeks > .hv-tree { height:var(--peek, 140px); }
 .hv-side { display:flex; flex-direction:column; }
 .hv-side > .hv-pane { flex:1; min-height:0; }
@@ -107,7 +111,7 @@ html.hv-switching { view-transition-name:none; }
 .hv-tree.peek .rx-canvas { pointer-events:none; }
 .hv-tree.peek .who, .hv-tree.peek .prof { cursor:pointer; }
 .hv-tree.big .hd { padding:var(--space-3) var(--space-4); }
-.hv-tree.big.win { grid-template-rows:auto auto minmax(0,1fr); }
+.hv-tree.big.win { grid-template-rows:auto minmax(0,1fr) auto; }
 .hv-tree.big.win .hd { padding-bottom:var(--space-1); }
 .hv-tree { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; min-width:0; overflow:hidden; border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
 .hv-tree .hd { display:flex; gap:var(--space-3); align-items:baseline; padding:var(--space-2) var(--space-4); white-space:nowrap; min-width:0; }
@@ -164,6 +168,10 @@ export interface TreesProps {
   /** The window of the agent in focus, live, and each node's place in it (windowbar.ts). */
   win?: WindowRead;
   winMarks?: ReadonlyMap<string, WindowMark>;
+  /** The window will be read (the context pack is here): its bar keeps its room before it is. */
+  winSoon?: boolean;
+  /** The focused agent's context filter's mark as the Landscape draws it: its root is drawn so. */
+  rootMark?: RootMark;
   /** How long the pointer rests on a node before its words show (the `tip_ms` dial). */
   tipMs?: number;
   nameSteps?: number;
@@ -171,6 +179,16 @@ export interface TreesProps {
   giveWay?: boolean;
   sparkS?: number;
   sparkX?: number;
+  /** How long a fit glides, in ms (the fit_ms dial). */
+  fitMs?: number;
+  /** How long a tree glides into its new shape, in ms (the `layout_ms` dial). */
+  layoutMs?: number;
+  /** For how long after its first fit a tree's fit still lands at once (the fit_settle_ms dial). */
+  settleMs?: number;
+  /** How long the wheel's zoom eases, in ms (the wheel_ms dial). */
+  wheelMs?: number;
+  /** Seconds the previews' column takes to open (the open_s dial). */
+  openS?: number;
   /** Each preview's height in px (the peek_px dial); the column is as wide as a preview a third wider. */
   peekPx?: number;
   /** The most characters a name shows (the name_most dial); 0 or none, whole. */
@@ -185,19 +203,21 @@ const One = ({ a, p, big }: { a: AgentTree; p: TreesProps; big: boolean }) => {
   const nodes = useMemo(() => (extra?.length ? [...heard, ...extra] : heard), [heard, extra]);
   const tree = useMemo(() => treeOf(nodes, { by: p.by }), [nodes, p.by]);
   const nameMost = p.nameMost || Infinity;
-  const placed = useMemo(() => radial(tree, { nameMost }), [tree, nameMost]);
+  const laid = useMemo(() => radial(tree, { nameMost }), [tree, nameMost]);
+  // A change to the tree glides into its new shape (glide.ts).
+  const placed = useGlide(tree, laid, p.layoutMs ?? 0, nameMost);
   const mine = useMemo(() => p.events.filter((e) => e.run === a.run.run), [p.events, a.run.run]);
   const state = useMemo(() => stateAt(mine, mine.length - 1), [mine]);
   const title = runName(a.run);
-  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}${big && p.win ? " win" : ""}`} style=${`--hv-vt:${transitionName(a.slot)}`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
+  return html`<div class=${`hv-tree${a.quiet ? " quiet" : ""} ${big ? "big" : "peek"}${big && (p.win || p.winSoon) ? " win" : ""}`} style=${`--hv-vt:${transitionName(a.slot)}`} title=${big ? "" : `${title}\nBring it into focus`} onClick=${big ? undefined : () => p.onFocus(a.run.run)}>
     <div class="hd">
       <span class="d" style=${`color:${a.colour}`}>●</span>
       <span class="who" title=${big ? `${title}\nLook at it alone` : `${title}\nBring it into focus`} onClick=${big ? () => p.onOpen(a.run.run) : undefined}>${title}</span>
       ${a.placement && html`<span class="prof" title=${`${placementTip(a.placement)}${big && p.canPlace ? "\nMove it to another profile" : ""}`} onClick=${big ? (e: MouseEvent) => p.canPlace && p.onProfile(a.run.run, e) : undefined}>${placementText(a.placement)}${big && p.canPlace ? " ▾" : ""}</span>`}
       <span class="n" title=${`The nodes it hears, of all${extra?.length ? `; and ${extra.length} the harness gave it` : ""}`}>${a.hears ? (big ? `${heard.length} / ${p.nodes.length}` : heard.length) : ""}${extra?.length ? ` + ${extra.length}` : ""}</span>
     </div>
-    ${big && p.win && html`<${WindowBar} w=${p.win} filter=${p.keyFilter} hues=${p.hues} picked=${p.picked} onPick=${p.onPick} />`}
-    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} quietPx=${p.quietPx} giveWay=${p.giveWay} sparkS=${p.sparkS} sparkX=${p.sparkX} />
+    <${Canvas} tree=${tree} placed=${placed} hues=${p.hues} statuses=${p.statuses} heard=${state.heard} held=${state.held} counts=${state.counts} standing=${p.standing} picked=${p.picked} fires=${a.fires} onPick=${p.onPick} showKey=${big && !!p.showKey} keyOpen=${p.keyOpen} onKeyOpen=${p.onKeyOpen} keyFilter=${p.keyFilter} small=${!big} window=${big ? p.winMarks : undefined} root=${a.placement ? (a.placement.kind === "none" ? "no context filter" : a.placement.title) : undefined} rootMark=${big ? p.rootMark : undefined} tipMs=${p.tipMs} nameSteps=${p.nameSteps} quietPx=${p.quietPx} giveWay=${p.giveWay} sparkS=${p.sparkS} sparkX=${p.sparkX} fitMs=${p.fitMs} settleMs=${p.settleMs} wheelMs=${p.wheelMs} />
+    ${big && (p.win || p.winSoon) && html`<${WindowBar} w=${p.win} filter=${p.keyFilter} hues=${p.hues} picked=${p.picked} onPick=${p.onPick} />`}
   </div>`;
 };
 
@@ -207,7 +227,8 @@ export const Trees = (p: TreesProps) => {
   const big = p.agents.find((a) => a.run.run === focus);
   // The previews stand at a fixed height and scroll, however many agents are live.
   // The left bar is one: the previews, or, while a node is picked, the node in their place.
-  return html`<div class="hv-trees${p.side || rest.length || p.rows?.length ? " many" : ""}" style=${p.peekPx ? `--peek:${p.peekPx}px` : ""}>
+  // The previews' column opens over open_s, from nothing, as a second agent arrives.
+  return html`<div class="hv-trees${p.side || rest.length || p.rows?.length ? " many" : ""}" style=${`${p.peekPx ? `--peek:${p.peekPx}px;` : ""}--hv-open:${p.openS ?? 0.35}s`}>
     ${big && html`<${One} key=${big.run.run} a=${big} p=${p} big=${true} />`}
     ${p.side ? html`<div class="hv-peeks hv-side">${p.side}</div>` : (rest.length > 0 || !!p.rows?.length) && html`<div class="hv-peeks">
       ${rest.map((a) => html`<${One} key=${a.run.run} a=${a} p=${p} big=${false} />`)}

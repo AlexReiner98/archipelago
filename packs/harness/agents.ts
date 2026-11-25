@@ -22,6 +22,8 @@ export interface Placement {
   title: string;
   /** Every profile it is in, parts included. */
   ids: string[];
+  /** The first profile it matched: the context filter its tree is named for. */
+  id?: string;
 }
 
 /** An agent's placement: in a profile it matches; only in the fallback, unless it named it itself; or in none. */
@@ -29,13 +31,16 @@ export function placementOf(ps: ProfileInfo[], fallbacks: ReadonlySet<string>, s
   const matched = ps.filter((p) => p.by === "match");
   if (!matched.length) return { kind: "none", title: "", ids: [] };
   const fallback = matched.every((p) => fallbacks.has(p.id) && !said.includes(p.id));
-  return { kind: fallback ? "fallback" : "matched", title: matched.map((p) => p.title).join(", "), ids: ps.map((p) => p.id) };
+  return { kind: fallback ? "fallback" : "matched", title: matched.map((p) => p.title).join(", "), ids: ps.map((p) => p.id), id: matched[0]!.id };
 }
 
+/** Whether an agent's tree can be drawn yet: what it hears, and where it is placed, are both known. */
+export const heardYet = (a: { hears?: ReadonlySet<string>; placement?: Placement }): boolean => a.hears !== undefined && a.placement !== undefined;
+
 export const PLACEMENT_MARK: Record<Placement["kind"], string> = { matched: "●", fallback: "○", none: "–" };
-export const placementText = (p: Placement) => `${PLACEMENT_MARK[p.kind]} ${p.kind === "none" ? "no umwelt" : p.title}`;
+export const placementText = (p: Placement) => `${PLACEMENT_MARK[p.kind]} ${p.kind === "none" ? "no context filter" : p.title}`;
 export const placementTip = (p: Placement) =>
-  p.kind === "matched" ? `In ${p.title}, by its facts or its own say` : p.kind === "fallback" ? `In ${p.title}: the fallback, as nothing else placed it` : "In no umwelt: it hears every node";
+  p.kind === "matched" ? `In ${p.title}, by its facts or its own say` : p.kind === "fallback" ? `In ${p.title}: the fallback, as nothing else placed it` : "In no context filter: it hears every node";
 
 export const AGENTS_STYLE = sheet(`
 .hv-menu { position:absolute; z-index:4; min-width:180px; max-width:280px; padding:var(--space-1) 0; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:0 6px 20px color-mix(in srgb, var(--bg) 60%, transparent); }

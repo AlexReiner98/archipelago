@@ -30,7 +30,7 @@ const host = await startBrowser({
     { id: "here", pack: "packs/here/index.ts" },
     { id: "style", pack: "packs/style/index.ts" },
     { id: "renderer", pack: "packs/renderer/index.ts", config: { mount: "#app" } },
-    { id: "frame", pack: "packs/frame/index.ts", config: { folded: ["harness/run"] } },
+    { id: "frame", pack: "packs/frame/index.ts", config: { folded: ["harness/run"], wait: true } },
     { id: "views", pack: "packs/views/view.ts", config: { home: "field" } },
     { id: "harness", pack: "packs/harness/index.ts" },
     { id: "activity", pack: "packs/activity/index.ts" },
@@ -41,6 +41,7 @@ const host = await startBrowser({
     { id: "page", pack: "packs/page/view.ts" },
     { id: "field", pack: "packs/field/index.ts" },
     { id: "arrange", pack: "packs/arrange/index.ts" },
+    { id: "sessions", pack: "packs/sessions/index.ts" },
     { id: "connect", pack: "packs/connect/view.ts" },
     { id: "gate", pack: "packs/gate/view.ts" },
     // Map (packs/map) and its legend (packs/legend) are kept but not loaded, so no one sees them

@@ -13,7 +13,7 @@ import { HUES } from "../spec/style.ts";
 import { colourOf, colours, isLive, keepLast, liveRuns, LIVE_MOST } from "../packs/harness/live.ts";
 import { groupsOf } from "../packs/harness/hooks.ts";
 import { DECIDED, dotsBox, nameOf, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
-import { fitKey, HIT_PX, nearest, shouldFit } from "../packs/harness/canvas.ts";
+import { easeView, fitKey, HIT_PX, nearest, shouldFit } from "../packs/harness/canvas.ts";
 import { crowded, quadsOverlap, type Quad } from "../packs/harness/labels.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 import { placementOf, placementText } from "../packs/harness/agents.ts";
@@ -235,19 +235,29 @@ test("radial: the ring grows until leaves' names clear each other", () => {
   assert.equal(radial(huge).ring, STYLE.ringMost);
 });
 
-test("radial: names read left to right and point away from their dot", () => {
+test("radial: names read left to right and point away from their dot; the root's boughs are named level, over their dot", () => {
   const t = treeOf(NODES);
   const p = radial(t);
+  let level = 0;
   for (const n of t.order) {
     if (!n.parent) continue;
     const l = p.labels.get(n.id)!;
     assert.ok(l.turn > -90 - 1e-6 && l.turn <= 90 + 1e-6, `${n.id} turned ${l.turn}`);
+    if (n.parent === t.root && n.kids.length) {
+      // Level, centred on its dot, above it: the root's boughs' names never meet at the root.
+      assert.equal(l.turn, 0, n.id);
+      assert.equal(l.anchor, "start");
+      assert.ok(l.dx < 0 && l.dy < 0, n.id);
+      level++;
+      continue;
+    }
     const out = n.kids.length ? -1 : 1;
     const x = p.xy.get(n.id)!.x;
     // A leaf's name runs outward: away from the middle on its side.
     const outward = (l.anchor === "start") === (x >= -1e-6);
     assert.equal(outward, out > 0, n.id);
   }
+  assert.ok(level > 0, "the fixture has boughs off the root");
 });
 
 test("route: from the root through each bough to the node", () => {
@@ -478,12 +488,12 @@ test("each agent's own tree: the nodes it hears, all while that isn't known; the
 test("placementOf: matched, the fallback, or none; a run that named the fallback itself is matched", () => {
   const p = (id: string, by: "match" | "part" = "match") => ({ id, title: id[0]!.toUpperCase() + id.slice(1), by, holding: true });
   const fallbacks = new Set(["arch"]);
-  assert.deepEqual(placementOf([p("aperture"), p("everyone", "part")], fallbacks), { kind: "matched", title: "Aperture", ids: ["aperture", "everyone"] });
+  assert.deepEqual(placementOf([p("aperture"), p("everyone", "part")], fallbacks), { kind: "matched", title: "Aperture", ids: ["aperture", "everyone"], id: "aperture" }, "the first it matched names its tree");
   assert.equal(placementOf([p("arch"), p("everyone", "part")], fallbacks).kind, "fallback");
   assert.equal(placementOf([p("arch")], fallbacks, ["arch"]).kind, "matched");
   assert.deepEqual(placementOf([], fallbacks), { kind: "none", title: "", ids: [] });
   assert.equal(placementText(placementOf([p("arch")], fallbacks)), "○ Arch");
-  assert.equal(placementText(placementOf([], fallbacks)), "– no umwelt");
+  assert.equal(placementText(placementOf([], fallbacks)), "– no context filter");
 });
 
 test("landsLive: nothing picked watches every live run; a run, every run or live turned off doesn't", () => {
@@ -672,7 +682,8 @@ test("an opened say shows the whole block the agent got at its moment, tagged an
   assert.equal(gotAt(events, 4, speakers), "[Rule a] Later.", "another moment is its own block");
   assert.equal(gotAt(events, 5, speakers), undefined, "a load's words aren't handed back");
   assert.equal(gotAt(events, 0, speakers), undefined, "not a say");
-  assert.deepEqual(expand(events[1]!, block).map((p) => p.label), ["kind", "node", "place", "said", "agent got", "at"]);
+  assert.deepEqual(expand(events[1]!, block).map((p) => p.label), ["kind", "node", "place", "agent got", "at"], "a say's words once: in the block the agent got");
+  assert.deepEqual(expand(events[1]!).map((p) => p.label), ["kind", "node", "place", "said", "at"], "with no block, the say's own words");
 });
 
 test("the window bar: each share on the window's scale, a click shows only that share, a mark per node at the playhead", async () => {
@@ -771,6 +782,13 @@ test("the map's own row: each node it controls in the window, biggest first, nam
   const shares = mapShares(w);
   assert.deepEqual(shares.map((s) => [s.id, s.pack, s.tokens, s.state]), [["loaded/mem", "loaded", 400, "said"], ["words/a", "words", 100, "said"], ["loaded/docs", "loaded", 3, "listed"]], "the map's alone, dropped left out");
   assert.ok(!shares[0]!.title.includes("Users"), "never a path");
+  assert.ok(shares.every((s) => s.channel === "hook"), "each node with the channel it came in by, for its hue");
+});
+
+test("the window bar's hues: each channel its own, so the rows tell apart", async () => {
+  const { CHANNEL_HUE } = await import("../packs/harness/windowbar.ts");
+  const hues = Object.values(CHANNEL_HUE);
+  assert.equal(new Set(hues).size, hues.length);
 });
 
 test("the wire names give way the same through the grid: a crowded name hides, the first of two overlapping keeps", async () => {
@@ -912,4 +930,109 @@ test("an act refused with a fix shows each fix and the input to send instead, un
   assert.equal(by.get("fix /fields"), "wants an object: it is required\ne.g. {}");
   assert.equal(by.get("send instead"), '{\n  "id": "i_1",\n  "fields": {}\n}');
   assert.deepEqual(parts.map((p) => p.label).slice(-4), ["output", "fix /fields", "send instead", "at"]);
+});
+
+test("easeView: a fit glides from where the camera is to where it fits, eased, the zoom in proportion", () => {
+  const a = { x: 0, y: 0, k: 1 }, b = { x: 100, y: 50, k: 4 };
+  assert.deepEqual(easeView(a, b, 0, 800, 600), a);
+  const end = easeView(a, b, 1, 800, 600);
+  assert.ok(Math.abs(end.x - 100) < 1e-9 && Math.abs(end.y - 50) < 1e-9 && Math.abs(end.k - 4) < 1e-9);
+  assert.ok(Math.abs(easeView(a, b, 0.5, 800, 600).k - 2) < 1e-9, "halfway, the zoom is halfway by its logarithm");
+  const c = (v: { x: number; y: number; k: number }) => v.x + 400 / v.k;
+  assert.ok(Math.abs(c(easeView(a, b, 0.5, 800, 600)) - (c(a) + c(b)) / 2) < 1e-9, "the centre goes in a straight line");
+  assert.ok(easeView(a, b, 0.1, 800, 600).k - 1 < (4 - 1) * 0.1, "it starts slowly");
+});
+
+test("harness: the key's turned-off marks are read back from what the browser stored, and nothing else", async () => {
+  const { offOf } = await import("../packs/harness/keyoff.ts");
+  assert.deepEqual([...offOf('["harness","words"]')], ["harness", "words"]);
+  assert.deepEqual([...offOf(null)], []);
+  assert.deepEqual([...offOf("not json")], []);
+  assert.deepEqual([...offOf('{"harness":true}')], []);
+  assert.deepEqual([...offOf('["harness", 3]')], ["harness"]);
+});
+
+test("harness: a fit lands at once first and while the tree finds its size (fit_settle_ms); later fits glide", async () => {
+  const { snapsFit } = await import("../packs/harness/camera.ts");
+  assert.equal(snapsFit(true, 0, 800, 600), true, "the first");
+  assert.equal(snapsFit(false, 300, 800, 600), true, "settling: a view that just appeared is not seen to zoom into place");
+  assert.equal(snapsFit(false, 900, 800, 600), false, "after: it glides");
+  assert.equal(snapsFit(false, 900, 800, 0), true, "fit_ms 0: always at once");
+});
+
+test("placeLabel: an MCP tool's place reads as its server and name; any other place as it is", async () => {
+  const { placeLabel } = await import("../packs/harness/events.ts");
+  assert.equal(placeLabel("tool:mcp__archipelago__query"), "tool:archipelago.query");
+  assert.equal(placeLabel("tool:mcp__my_server__do_it"), "tool:my_server.do_it");
+  assert.equal(placeLabel("tool:Edit"), "tool:Edit");
+  assert.equal(placeLabel("file:index.html"), "file:index.html");
+});
+
+test("openFilter: a context filter's view, live on its session when one is live, else its own tree", async () => {
+  const { openFilter, VIEW } = await import("../packs/harness/open.ts");
+  const live = new Map(openFilter("f1", ["r1", "r2"]));
+  assert.equal(live.get("harness.live"), true);
+  assert.equal(live.get("harness.focus"), "r1");
+  assert.equal(live.get("harness.profile"), undefined);
+  assert.equal(live.get("here.view"), VIEW);
+  const none = new Map(openFilter("f1", []));
+  assert.equal(none.get("harness.profile"), "f1");
+  assert.equal(none.get("harness.live"), undefined);
+  assert.equal(none.get("here.view"), VIEW);
+});
+
+test("heardYet: an agent's tree waits for what it hears and where it is placed, never every node first", async () => {
+  const { heardYet } = await import("../packs/harness/agents.ts");
+  const placement = { kind: "matched" as const, title: "F", ids: ["f"], id: "f" };
+  assert.equal(heardYet({}), false);
+  assert.equal(heardYet({ hears: new Set(["a"]) }), false, "placed not yet known");
+  assert.equal(heardYet({ placement }), false, "what it hears not yet known");
+  assert.equal(heardYet({ hears: new Set(), placement }), true);
+});
+
+test("markSvgPath: a filter's mark as a path beside the view's title, a hexagon six corners", async () => {
+  const { markSvgPath } = await import("../packs/harness/paint.ts");
+  assert.equal(markSvgPath("hexagon").split("L").length, 6);
+  assert.equal(markSvgPath("triangle").split("L").length, 3);
+  assert.ok(markSvgPath("circle").includes("A"), "a circle is arcs");
+});
+
+test("glide: a changed tree moves into its new shape, a new node growing out of its parent, the end exactly the new layout", async () => {
+  const { radial, treeOf } = await import("../packs/harness/layout.ts");
+  const { glide } = await import("../packs/harness/glide.ts");
+  const before = treeOf([node("words", "a", ["tool:Bash"]), node("words", "b", ["prompt"])]);
+  const after = treeOf([node("words", "a", ["tool:Bash"]), node("words", "b", ["prompt"]), node("words", "c", ["tool:Edit"])]);
+  const from = radial(before), to = radial(after);
+  assert.equal(glide(after, from, to, 1), to, "at the end, the new layout itself");
+  const start = glide(after, from, to, 0);
+  // At the start, what was there is where it was.
+  assert.deepEqual(start.polar.get("words/a"), from.polar.get("words/a"));
+  // A new node starts where its nearest old ancestor was, and every node has a branch to draw.
+  const c = after.byId.get("words/c")!;
+  let up = c.parent;
+  while (up && !from.polar.has(up.id)) up = up.parent;
+  assert.deepEqual(start.polar.get("words/c"), from.polar.get(up!.id));
+  for (const t of after.order) if (t.parent) assert.ok(start.branch.has(t.id) && start.along.has(t.id), t.id);
+  // Half way, a moved node is between its two places.
+  const mid = glide(after, from, to, 0.5).polar.get("words/a")!, a0 = from.polar.get("words/a")!, a1 = to.polar.get("words/a")!;
+  assert.ok(Math.abs(mid.r - (a0.r + a1.r) / 2) < 1e-6);
+});
+
+test("stepScale: the map's own row grows on round steps from 250, so a session's start is part full", async () => {
+  const { stepScale } = await import("../packs/harness/windowbar.ts");
+  assert.equal(stepScale(0), 250);
+  assert.equal(stepScale(116), 250);
+  assert.equal(stepScale(250), 250);
+  assert.equal(stepScale(251), 500);
+  assert.equal(stepScale(900), 1000);
+  assert.equal(stepScale(1200), 2500);
+  assert.equal(stepScale(30_000), 50_000);
+});
+
+test("foldHeld: three or more held-back events in a row at one place fold into one line; the rest stay lines", async () => {
+  const { foldHeld } = await import("../packs/harness/events.ts");
+  const ev = (kind: string, place?: string) => ({ kind, place }) as never;
+  const events = [ev("begin"), ev("gated", "session_start"), ev("gated", "session_start"), ev("gated", "session_start"), ev("say", "session_start"), ev("gated", "tool:Bash"), ev("gated", "tool:Bash"), ev("act", "tool:Bash")];
+  assert.deepEqual(foldHeld(events), [{ ev: 0 }, { held: [1, 3], place: "session_start" }, { ev: 4 }, { ev: 5 }, { ev: 6 }, { ev: 7 }]);
+  assert.deepEqual(foldHeld([ev("gated", "prompt"), ev("gated", "tool:Edit"), ev("gated", "tool:Edit"), ev("gated", "tool:Edit")]), [{ ev: 0 }, { held: [1, 3], place: "tool:Edit" }], "only at one place");
 });

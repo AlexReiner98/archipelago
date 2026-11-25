@@ -40,16 +40,16 @@ const tokens: Pack = {
   },
 };
 
-/** The umwelts each run is in: by id, the test sets them. */
-const umwelts = new Map<string, ProfileInfo[]>();
+/** The context filters each run is in: by id, the test sets them. */
+const filters = new Map<string, ProfileInfo[]>();
 const profile: Pack = {
   id: "profile",
   inject: ["types.define"],
   apply(ctx) {
-    // The profile pack's own umwelt base: budget_ratio is one of its fields.
+    // The profile pack's own context filter base: budget_ratio is one of its fields.
     ctx.get<TypesDefine>("types.define").base(PROFILE);
     ctx.provide<ProfileRead>("profile.read", () => ({
-      of: async (run) => umwelts.get(run.run) ?? [],
+      of: async (run) => filters.get(run.run) ?? [],
       hears: async () => ({ hears: true }) as never,
       nodes: async () => ({ in: [], out: [] }),
       watch: () => () => {},
@@ -65,7 +65,7 @@ test("spend counts what an estimate counts: input, cache writes, output; not cac
   assert.match(askText({ spent: 320_000, estimate: 200_000, ratio: 1.5, task: "i_x" }), /spent 320k tokens, 1\.6× its task's estimate of 200k \(i_x\), past the 1\.5×/);
 });
 
-test("a run past its estimate is asked once at reply_end; the ratio comes from its umwelt, else config, else 1.5", async () => {
+test("a run past its estimate is asked once at reply_end; the ratio comes from its context filter, else config, else 1.5", async () => {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
@@ -112,14 +112,14 @@ test("a run past its estimate is asked once at reply_end; the ratio comes from i
   usage.set("r3", [row(1, 99_999, 0)]);
   assert.equal((await run.reach(stop("r3"))).refused, undefined);
 
-  // An umwelt's budget_ratio: a run in it is asked sooner.
-  const tight = await create("Tight", { budget_ratio: 1.1 }, "umwelt");
+  // A context filter's budget_ratio: a run in it is asked sooner.
+  const tight = await create("Tight", { budget_ratio: 1.1 }, "context_filter");
   await start("r4", task);
   usage.set("r4", [row(1, 1200, 0)]);
   assert.equal((await run.reach(stop("r4"))).refused, undefined, "1.2× is under the default 1.5×");
-  umwelts.set("r4", [{ id: tight, title: "Tight", by: "match", holding: true }]);
+  filters.set("r4", [{ id: tight, title: "Tight", by: "match", holding: true }]);
   usage.get("r4")!.push(row(2, 0, 1));
-  assert.equal((await run.reach(stop("r4"))).refused?.node, ASKER, "past the umwelt's 1.1×");
+  assert.equal((await run.reach(stop("r4"))).refused?.node, ASKER, "past the context filter's 1.1×");
 
   // The harness reads each run's spend against its estimate.
   const out = await invoke.invoke({ action: SPEND, input: { runs: ["r1", "r2", "r3", "nope"] }, authority: { of: "human", basis: "test" }, reason: "test" });
@@ -135,7 +135,7 @@ test("a run past its estimate is asked once at reply_end; the ratio comes from i
   await loader.apply([]);
 });
 
-test("the config sets the ratio when no umwelt does", async () => {
+test("the config sets the ratio when no context filter does", async () => {
   const rt = new Runtime();
   const modules: Record<string, Pack> = { graph, action, types, work, items, exchange, agent, transcript: tokens, profile, budget, probe };
   const BASE = "mem:/packs/";

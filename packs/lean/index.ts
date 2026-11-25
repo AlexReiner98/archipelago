@@ -33,7 +33,7 @@ import { kept, leaveOut, MIN_RUNS } from "./plan.ts";
 export const PLAN = "lean.plan";
 export const SET = "lean.set";
 export const USED = "used.tools";
-export const TYPE = "umwelt";
+export const TYPE = "context_filter";
 export const FIELD = "leave_out";
 /** The most profiles one plan reads. */
 export const PROFILES_MAX = LIMIT_MAX;

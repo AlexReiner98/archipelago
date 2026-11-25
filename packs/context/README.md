@@ -2,7 +2,7 @@
 
 What is in a run's window at a moment: its parts by source and channel,
 each with a size and a state, and the total in tokens against the window's
-limit. The context interface shows it as the window bar over the agent in
+limit. The context interface shows it as the window bar under the agent in
 focus, and as marks on its tree ([harness](../harness/README.md)). Injects
 `exchange.read`, `agent.tree`, `action.list`, `action.invoke` and
 `action.register`.

@@ -43,10 +43,17 @@ find line has words, only what it finds and what lies near it.
   each item's rank is its longest chain of what it waits on, and what it
   waits on is to the left) and `collide` (by each shape's edge along the
   line between two particles), and `tree` (while the Landscape is
-  arranged into a context profile, packs/arrange's page key
-  `arrange.tree`, each of its items pulled to its place in that profile's
-  tree; only those items are laid out, and the tree's branches and names
-  ([treeover.ts](treeover.ts)) come in under them as they arrive).
+  arranged into a context filter, packs/arrange's page key `arrange.tree`, each
+  of its items flies from where it stood to its place in that context filter's
+  tree over `tree_ms`, eased, however fast the run steps; only those items
+  are laid out, the camera keeps the whole tree in view, and the tree's
+  branches and names ([treeover.ts](treeover.ts)), each name along its ray as the context view
+  places it (the items' own too: the tree names each item as it lands, its map title quiet meanwhile; the
+  fit counts every name where it reaches), come in under them as
+  they arrive, once what left the map has faded for `tree_in_ms` (600, as long as `gone_ms`) so
+  the two are never drawn over each other, and then at least as fast as
+  `gone_ms`; the
+  items' titles give way to its names once it shows).
 - **Every number is a dial**, in the legend's dials tab: each behaviour's,
   then the start, find, the run and the drawing, in sections that start
   closed and say how many of their dials are changed; springs and flow are
@@ -58,6 +65,18 @@ find line has words, only what it finds and what lies near it.
   full, and `find_faint` links further, drawn faint (`query_fade`); the
   rest of the map leaves the layout and what is kept settles again
   (`alpha_filter`). The view goes to what it finds (`find_follow_ms`).
+  The map follows the words once typing pauses (`find_wait_ms`, `Settle`),
+  not at every letter. The camera eases to what it keeps from rest (`find_follow_ms`,
+  [follow.ts](follow.ts)), so the map never lurches on the first frame. Whatever leaves the map, by the find line or the
+  legend, fades out where it stood over `gone_ms` ([gone.ts](gone.ts)),
+  from as strong as it was drawn, and whatever comes onto it fades in where
+  it lands over `come_ms`. What stays but takes a new size (fewer of its
+  links shown) grows or shrinks to it over `resize_ms`. A ghost keeps the
+  hollow or half shape it was drawn with. Its links (arrowheads and names too) and its title, where it was placed, leave with it,
+  and a pointed-at item's light fades the other titles out over `dim_ms`
+  before they go. A title that must take another side of its particle fades
+  out where it was and in where it goes over `label_move_ms` (220); one carried by a moving particle
+  moves with it.
   What it finds is drawn whole, closed or not, and named first; the
   legend's open and closed switches do not apply while it has words, so a
   plan shows its done steps.
@@ -73,11 +92,28 @@ find line has words, only what it finds and what lies near it.
   B). A head is `arrow_strength` times as strong as its line, keeps
   `arrow_keep` of that while a pointer dims the rest or find fades its
   edge, and is `arrow_lit` times bigger on a lit link. A link long enough on screen, whose ends are big enough to be
-  titled, or lit, has its type's name along its middle, over no title and
+  titled, or lit, has its type's name along its middle (or, a link with places, where it has its item said:
+  `at tool:Edit`, short enough to fit the link), over no title and
   no other name. A name grows and shrinks with the zoom (`link_name_size`
   times the zoom, between `link_name_least_px` and `link_name_most_px`),
   and fades in and out over `link_name_fade_ms` as it gains or loses its
   room, never popping.
+- **Live sessions are drawn beside the map** ([sessions.ts](sessions.ts)).
+  Their colour comes after the map's own types' (`inputColours` in
+  [graph.ts](graph.ts)), so a session coming or going never recolours
+  the map.
+- **Each type's mark is a page key**, `field.marks` (`marksOf`): by type,
+  its colour and the shape its items are drawn in, so another view draws
+  an item as the Landscape does (the Context interface draws a tree's root
+  as its context filter).
+  The agent sessions live now (the page key `sessions.live`, set by
+  [packs/sessions](../sessions/README.md)) are each a pentagon of the type
+  `session`, linked `runs_in` to each of their context filters on the map.
+  They are not items and nothing is written: they come and go with the
+  sessions. A find that finds a filter finds its sessions too; one coming
+  or going is a change to the map, not a new find, so the view is not
+  fitted again for it. The
+  `sessions` dial turns them off.
 - **The legend is the filter, and holds the dials** ([legend.ts](legend.ts),
   [panel.ts](panel.ts)). Closed, one line: the count and two tabs.
   `filter` opens each type (its mark in its colour and shape), each of a
@@ -99,25 +135,34 @@ find line has words, only what it finds and what lies near it.
   pointed at and its neighbours, what the find line finds, the hubs, what
   was named last frame (so names hold still while it settles), then the
   largest on screen. The hubs are the map's central topics: the
-  `label_hubs` most linked with at least `label_hub_links` links, named at
-  any zoom, over other particles if need be. The set is worked out only
+  `label_hubs` (60) most linked with at least `label_hub_links` (8) links,
+  named at any zoom, over other particles if need be but never over another
+  title, so each cluster a map shows zoomed out is named. The set is worked out only
   when the graph or a dial changes, and a hub stays until `label_hub_keep`
   more items outrank it, so zoomed out the same few names hold through the
-  solve. A particle wide enough (`label_inside`) holds its title inside,
-  wrapped onto up to three lines; otherwise a title tries eight spots round
+  solve. A title stays beside its particle at every zoom, as zoomed out;
+  the dial `label_inside` (0, never, as shipped) lets a particle wide
+  enough hold its title inside, wrapped onto up to three lines. A title tries eight spots round
   its particle, the one it had last frame first, and takes the first inside
   the view that overlaps no title, no particle and not the legend. At most
   one per `label_room` square pixels.
 - **Hover** lights a particle, its links and its neighbours, dims the rest,
   and names them ([paint.ts](paint.ts)); the pointer picks the nearest
-  particle within `hover_px` of its edge. A click sets `here.item`; the item
-  page opens in `right`. Drag a particle to move it (it settles again when
+  particle within `hover_px` of its edge. A change to the map (an item or a
+  session coming) renumbers the particles, and the hover and the light stay
+  on the same items, by id ([carry.ts](carry.ts)), so nothing pointed at
+  goes dark in one frame. A click sets `here.item`; the item, lit as if
+  pointed at while its page is open and the pointer is elsewhere, so going
+  to its page dims nothing. Its page opens in `right`. Drag a particle to move it (it settles again when
   let go), drag the sea to pan, wheel to zoom, double-click the sea to fit.
   While it settles the view eases after the picture (`follow_ms`).
   ([engine.ts](engine.ts))
 - The physics runs on its own loop (a message channel), in slices of
-  `frame_ms`; animation frames only paint. A tab in the background settles
-  as fast.
+  `frame_ms`; animation frames only paint. Once the map has settled and
+  is shown, a run is paced to the screen instead: at most `frame_steps`
+  steps per painted frame, so a change (an item coming, a session, a drag)
+  is seen moving, never in its new place in one frame. The first run, and
+  a tab in the background, settle as fast as `frame_ms` allows.
 - **Empty.** A map with no items shows a mark and one line, and under it
   the slot `field.empty`, which other packs fill with what to do first
   (the [connect](../connect/README.md) pack: connect Claude Code). A map

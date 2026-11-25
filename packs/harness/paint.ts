@@ -130,6 +130,52 @@ export interface PaintState {
    * picked (the `quiet_px` dial), so a tree seen whole reads by its shape and what the run was told. 0: every name.
    */
   quiet?: number;
+  /** The context filter the tree is of, named at its root, so the tree reads as that item on the map. */
+  root?: string;
+  /** That filter's mark as the Landscape draws it (its type's colour and shape, `field.marks`): the root is drawn so. */
+  rootMark?: RootMark;
+}
+
+
+/** A mark shape as an SVG path in a 0..24 box: the filter's mark beside the view's title. */
+export function markSvgPath(shape: string): string {
+  const p = SHAPES[shape];
+  if (!p) return "M22 12A10 10 0 1 1 2 12A10 10 0 1 1 22 12Z";
+  const pts = Array.from({ length: p[0] }, (_, i) => {
+    const a = p[1] + (i * 2 * Math.PI) / p[0];
+    return `${(12 + 11 * Math.cos(a)).toFixed(2)} ${(12 + 11 * Math.sin(a)).toFixed(2)}`;
+  });
+  return `M${pts.join("L")}Z`;
+}
+
+/** A context filter's mark, as the Landscape draws its type: a colour and a MARK_SHAPES name. */
+export interface RootMark {
+  colour: string;
+  shape: string;
+}
+
+/** Regular polygons by mark shape: sides and the first corner's angle (as packs/field/shapes.ts draws them). */
+const SHAPES: Record<string, [number, number]> = { square: [4, Math.PI / 4], diamond: [4, 0], triangle: [3, -Math.PI / 2], pentagon: [5, -Math.PI / 2], hexagon: [6, 0] };
+
+/** The root drawn as the filter's own mark, at one screen size (`rootMark` px across its middle), over the root's dot. */
+function rootShape(c: CanvasRenderingContext2D, mark: RootMark, k: number, ink: Ink): void {
+  const r = S.rootMark, p = SHAPES[mark.shape];
+  c.save();
+  c.scale(1 / k, 1 / k);
+  c.beginPath();
+  if (!p) c.arc(0, 0, r, 0, Math.PI * 2);
+  else for (let i = 0; i < p[0]; i++) {
+    const a = p[1] + (i * 2 * Math.PI) / p[0];
+    if (i) c.lineTo(r * Math.cos(a), r * Math.sin(a));
+    else c.moveTo(r * Math.cos(a), r * Math.sin(a));
+  }
+  c.closePath();
+  c.fillStyle = ink.color(mark.colour);
+  c.fill();
+  c.lineWidth = 2;
+  c.strokeStyle = ink.color(INK.bg);
+  c.stroke();
+  c.restore();
 }
 
 /** How far a node's name shows at an on-screen size of `px`: whole from `quiet`, gone two px below it. */
@@ -336,6 +382,7 @@ export function paint(c: CanvasRenderingContext2D, scene: Scene, cam: Camera, vi
   c.arc(0, 0, S.root, 0, Math.PI * 2);
   c.fillStyle = ink.color(INK.fg);
   c.fill();
+  if (state.rootMark && !state.small) rootShape(c, state.rootMark, cam.k, ink);
   after?.(c);
   c.globalAlpha = 1;
 }

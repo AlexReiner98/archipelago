@@ -66,3 +66,11 @@ own.
 - **`here.view`** set by something else (an agent, a panel) shows the
   view of that kind; not while the shown view's own fill is gone, when the
   frame is only standing another fill in for it. `views.view` (page) says which view shows.
+- **A picked view fades in** ([fade.ts](fade.ts)) through the page's own
+  ground: a cover of the background colour fades in over half of
+  `switch_ms` (450), the view changes under it and lays itself out for
+  `switch_wait_ms` (100), and the cover fades away over the other half. The
+  old view and the new are never drawn over each other, and the new one's
+  first unsettled frames are never seen. Both are the pack's config;
+  `switch_ms: 0` or reduced motion changes it at once. The list itself fades
+  in over 200 ms and goes under the cover with the view it was over.

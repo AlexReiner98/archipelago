@@ -11,7 +11,7 @@ here nothing is stopped, the agent keeps going and hears it. Injects
 |---|---|
 | Spend | The run's measured tokens, from the [transcript](../transcript/README.md) pack's `transcript.tokens` (usage rows, paged): input, cache writes and output, not cached re-reads, as the work base's `tokens_estimated` counts them. Nothing reads transcripts: no spend, no ask. |
 | Estimate | The `tokens_estimated` of the run's task (its `task` fact). No task or no estimate: no ask. |
-| Ratio | The first umwelt the run is in ([profile](../profile/README.md)) whose `budget_ratio` is set, else the pack's config `ratio`, else 1.5. |
+| Ratio | The first context filter the run is in ([profile](../profile/README.md)) whose `budget_ratio` is set, else the pack's config `ratio`, else 1.5. |
 | Ask | The node `budget/ask` refuses at `reply_end` with the code `ask` once spend passes estimate × ratio, so the agent keeps going and hears why ([spec/agent.md](../../spec/agent.md#places)). Once per run: a refusal of its own among the run's events keeps it quiet, across restarts. As the grow pack's, an asking refusal is not a miss to the verdict pack. |
 | Show | The read-only action `budget.spend` (`runs`, at most 50): each run's `spent`, `task`, `estimate`, `ratio`, `over`, `asked`, and `none` when no transcript was read. The [harness](../harness/README.md) shows it on each run's row and the run pane's head. |
 

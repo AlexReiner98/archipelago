@@ -165,3 +165,19 @@ test("an item find didn't hold, given a type it shows, is read whole: a moved no
   await new Promise((r) => setTimeout(r, 10));
   assert.equal(index.item("n1")?.fields.title, "Moved rule");
 });
+
+test("near: and in: take an item's title as well as its id (underscores for spaces, any case)", async () => {
+  const { itemRef, run } = await import("../packs/find/query.ts");
+  const items = new Map([
+    ["i_f", { id: "i_f", type: "context_filter", fields: { title: "Frontend" } }],
+    ["i_r", { id: "i_r", type: "record", fields: { title: "Semantic HTML" } }],
+    ["i_x", { id: "i_x", type: "record", fields: { title: "Elsewhere" } }],
+  ]);
+  const links = new Map([["l1", { id: "l1", type: "in_context_filter", from: "i_r", to: "i_f", fields: { at: ["file:*.html"] } }]]);
+  const index = { items, links, type: () => undefined, linksOf: () => [], marks: () => ({}), closed: () => false } as never;
+  assert.equal(itemRef(index, "i_f"), "i_f");
+  assert.equal(itemRef(index, "frontend"), "i_f");
+  assert.equal(itemRef(index, "Semantic_HTML"), "i_r");
+  assert.equal(itemRef(index, "nothing"), "nothing", "unknown stays as given: it finds nothing");
+  assert.deepEqual(run(index, "near:Frontend").items.map((r) => r.id).sort(), ["i_f", "i_r"]);
+});

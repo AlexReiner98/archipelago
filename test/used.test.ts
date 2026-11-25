@@ -75,7 +75,7 @@ test("used.tools: across the runs with a transcript, given and used from the too
   const ctx = (run: string) => loader.fiber("probe")!.ctx.intercept({ actor: { id: "e_agent", kind: "agent" }, run });
   const invoke = (a: string, input: object) => ctx("r0").get<ActionInvoke>("action.invoke").invoke({ action: a, input: input as never, authority: { of: "human", basis: "test" }, reason: "test" });
   try {
-    const prof = await invoke("items.create", { type: "umwelt", title: "Lean" });
+    const prof = await invoke("items.create", { type: "context_filter", title: "Lean" });
     assert.ok(prof.ok);
     const pid = (prof.output as { id: string }).id;
     for (const r of ["r1", "r2", "r3", "r4"]) {

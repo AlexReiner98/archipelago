@@ -11,6 +11,10 @@
  *   about the pointer; a double-click on the sea fits the picture.
  * - The picture is fitted while it settles, until the reader moves it.
  */
+import { wireSize } from "./wires.ts";
+import { followShare } from "./follow.ts";
+import { carryIndex } from "./carry.ts";
+import { bornOf, comeFade, goneLinksOf, goneOf, paintGone, rekeyWires, resizeAt, resizeOf, type Ghost, type GoneLink, type GoneName, type Resize } from "./gone.ts";
 import type { Id } from "../../spec/common.ts";
 import type { Dial } from "./behaviour.ts";
 import { bounds, build, grid, seed, sizes, type FieldIn, type G, type Grid, type Settings } from "./graph.ts";
@@ -19,7 +23,7 @@ import { ink, Light, paint, palette, type Cam, type Ink } from "./paint.ts";
 import { BEHAVIOURS, isOn, step, warm } from "./step.ts";
 import { frame } from "./behaviours/edges.ts";
 import { FAINT, FOUND } from "./filter.ts";
-import { arrived, paintTree, targetsOf, type Arranged } from "./treeover.ts";
+import { arrived, fly, paintTree, takeOff, targetsOf, treeBox, treeNameBoxes, treeStrength, type Arranged, type Flight } from "./treeover.ts";
 
 export interface Stats {
   n: number;
@@ -42,6 +46,8 @@ export interface Field {
   input(next: FieldIn, warmTo?: number, refit?: boolean): void;
   /** How each item is drawn while the find line has words (filter.ts FOUND, NEAR, FAINT), or null for none. */
   found(levels: Map<Id, number> | null): void;
+  /** The item whose page is open: lit as if pointed at while nothing else is, so leaving it for its page dims nothing. */
+  opened(id: Id | null): void;
   /** A context profile's tree to arrange the items into (packs/arrange), or null for none. */
   arranged(a: Arranged | null): void;
   settings(S: Settings, then: Dial["then"] | "none"): void;
@@ -54,6 +60,8 @@ export interface Field {
   graph(): G;
   /** Where each particle is now, by id: for tests and for whoever asks. */
   places(): Map<Id, [number, number]>;
+  /** The camera now (a copy): a place's spot on the canvas is place × k + (tx, ty), in css px. */
+  view(): Cam;
   destroy(): void;
 }
 
@@ -76,9 +84,17 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   /** The particle a view picked, by id (Field.pick). */
   let picked: Id | null = null;
   let hover = -1, dirty = true, awake = false, stopped = false;
+  // The item whose page is open (here.item), kept lit by id while the pointer is elsewhere.
+  let openedId: Id | null = null;
   let levels: Map<Id, number> | null = null, match: Uint8Array | null = null;
-  let tree: Arranged | null = null;
+  let tree: Arranged | null = null, flight: Flight | null = null, flying = false;
   const scale = () => S.tree_scale ?? 1.4;
+  /** New places in a tree: the items set off for them from where they stand. */
+  const aim = () => {
+    g.target = targetsOf(g, tree, scale());
+    flight = takeOff(g, performance.now());
+    flying = !!flight;
+  };
   const remark = () => {
     match = levels ? Uint8Array.from(g.id, (id) => levels!.get(id) ?? FAINT) : null;
     dirty = true;
@@ -101,6 +117,11 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
       [x0, y0, x1, y1] = [Math.max(-f.w, x0 - m), Math.max(-f.h, y0 - m), Math.min(f.w, x1 + m), Math.min(f.h, y1 + m)];
     }
     const { width, height } = size();
+    // Arranged into a tree: the whole tree is in view, names and all, and the items on their way to it.
+    if (tree) {
+      const [a0, b0, a1, b1] = treeBox(tree, scale(), S);
+      [x0, y0, x1, y1] = [Math.min(x0, a0), Math.min(y0, b0), Math.max(x1, a1), Math.max(y1, b1)];
+    }
     const pad = S.fit_pad!;
     const w = Math.max(1, width - 2 * pad), h = Math.max(1, height - 2 * pad);
     const k = Math.min(w / Math.max(1, x1 - x0), h / Math.max(1, y1 - y0), S.fit_zoom_most ?? Infinity);
@@ -112,14 +133,15 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
    * a share of the gap each frame (`follow_ms`), zooming by ratio about the
    * picture's middle, so the picture never jumps. True while still moving.
    */
-  let lastFollow = 0, jump = false;
+  let lastFollow = 0, jump = false, jumpAt = 0;
   const follow = (): boolean => {
     const now = performance.now(), dt = lastFollow ? Math.min(100, now - lastFollow) : 16;
     lastFollow = now;
     const to = fitted();
     // After a jump to what the find line keeps, the camera eases faster (find_follow_ms) until it gets there.
     const ms = jump ? S.find_follow_ms! : S.follow_ms!;
-    const a = ms > 0 ? 1 - Math.exp(-dt / ms) : 1;
+    // A jump eases in from rest too (follow.ts), so the map never lurches on its first frame.
+    const a = followShare(dt, ms, jump ? now - jumpAt : undefined);
     const { width, height } = size();
     // Where the middle of the view looks, in the world, eased; then the zoom, eased by ratio.
     const mx = (width / 2 - cam.tx) / cam.k, my = (height / 2 - cam.ty) / cam.k;
@@ -134,30 +156,39 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
   };
   // ─── The physics' own loop: a slice, then a message to itself, until settled ───
   const chan = new MessageChannel();
-  let queued = false;
+  let queued = false, shown = false;
   const slice = () => {
     queued = false;
     if (stopped || !awake) return;
     const t0 = performance.now();
     let steps = 0, energy = 0;
     g.view = view();
+    // In flight the run moves for as long as the flight lasts, whatever its step count.
+    if (flight && flying && (flying = fly(g, flight, t0, S.tree_ms ?? 0))) g.sim.from = g.sim.steps;
+    // Once the map has been shown settled, a run is paced to the screen: a few steps per painted frame, so what
+    // moves is seen moving. Before that (the first run), or in a tab no one sees, it steps as fast as frame_ms
+    // allows, slice after slice.
+    const paced = shown && !flying && !document.hidden;
+    const most = paced ? S.frame_steps ?? 2 : Infinity;
     do {
       energy = step(g, S);
       steps++;
-    } while (energy && performance.now() - t0 < S.frame_ms!);
+    } while (energy && steps < most && performance.now() - t0 < S.frame_ms!);
     const per = (performance.now() - t0) / steps;
     stepMs = stepMs ? stepMs * 0.8 + per * 0.2 : per;
     pick = grid(g);
     dirty = true;
-    if (!energy && !press) {
+    if (!energy && !press && !flying) {
       awake = false;
+      shown = true;
       settledIn = { steps: g.sim.steps - runStart.steps, ms: performance.now() - runStart.at };
       return;
     }
     // Held by a hand, a sleeping run waits for the next move instead of spinning.
-    if (!energy) return;
+    if (!energy && !flying) return;
     queued = true;
-    chan.port2.postMessage(0);
+    if (paced) requestAnimationFrame(() => slice());
+    else chan.port2.postMessage(0);
   };
   chan.port1.onmessage = slice;
   const wake = () => {
@@ -178,6 +209,13 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
 
   // ─── The loop ───
   let raf = 0, following = false;
+  const ghosts: Ghost[] = [];
+  const goneLinks: GoneLink[] = [];
+  const goneNames: GoneName[] = [];
+  let sizing: Resize | null = null;
+  let coming = 0;
+  // What was last painted, so what leaves fades from how it was drawn.
+  let drawn: { g: G | null; match: Uint8Array | null } = { g: null, match: null };
   const tick = () => {
     if (stopped) return;
     if (dirty || following) {
@@ -188,18 +226,39 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
         canvas.width = Math.round(s.width * s.dpr);
         canvas.height = Math.round(s.height * s.dpr);
       }
-      const easing = light.ease(g, hover, S);
+      const easing = light.ease(g, hover >= 0 ? hover : g.idIx.get(openedId ?? "") ?? -1, S);
+      // A kept particle that changes size grows or shrinks to it over resize_ms.
+      const resizing = !!sizing && resizeAt(g, sizing, performance.now(), S.resize_ms ?? 0);
+      if (!resizing) sizing = null;
       // What lies over the canvas (the legend), in canvas pixels: no title goes under it.
       const at = canvas.getBoundingClientRect();
       const clear = Array.from(canvas.parentElement?.querySelectorAll(".fl-key") ?? [], (el) => {
         const r = el.getBoundingClientRect();
         return [r.left - at.left - 4, r.top - at.top - 4, r.right - at.left + 4, r.bottom - at.top + 4] as [number, number, number, number];
       });
-      paint(c, g, cam, S, light, colours, pick, s, match, clear);
+      // Arranged, the tree's own names are taken too, once it shows: an item's title gives way to them.
+      const strength = tree ? (flight ? treeStrength(arrived(g, scale(), flight), performance.now() - flight.at, S) : arrived(g, scale(), flight)) : 0;
+      if (tree && strength > 0.02) {
+        c.font = "500 10px ui-sans-serif, system-ui, sans-serif";
+        clear.push(...treeNameBoxes(tree, cam, scale(), S, (t, px) => (c.measureText(t).width * px) / 10));
+      }
+      // Arranged, the tree names its items itself, as they land: the map's own titles for them stay quiet.
+      const quiet = tree?.names ? new Set(Object.keys(tree.names).map((id) => g.idIx.get(id)).filter((i): i is number => i !== undefined)) : null;
+      paint(c, g, cam, S, light, colours, pick, s, match, clear, quiet);
+      drawn = { g, match };
       // Arranged into a profile: its tree comes in under the items as they reach their places.
-      if (tree) paintTree(c, tree, cam, s.dpr, scale(), arrived(g, scale()), colours, S);
-      // A link name still fading keeps the view painting.
-      dirty = easing || following || light.wiresMoving;
+      // It comes in as the items arrive, and at least as fast as what left fades out (gone_ms), so the two crossfade.
+      if (tree) paintTree(c, tree, cam, s.dpr, scale(), strength, colours, S, (id) => {
+        const i = g.idIx.get(id), t = g.target;
+        if (i === undefined || !t?.on[i]) return undefined;
+        // How near it is to its place, where the flight ends: 1 there, 0 sixty units out.
+        const px = flight && flight.px.length === t.x.length ? flight.px[i]! : t.x[i]!, py = flight && flight.py.length === t.y.length ? flight.py[i]! : t.y[i]!;
+        const near = Math.max(0, 1 - Math.hypot(g.x[i]! - px, g.y[i]! - py) / (60 * scale()));
+        return [g.x[i]!, g.y[i]!, near * near];
+      });
+      const fading = paintGone(c, ghosts, cam, s.dpr, performance.now(), S, goneLinks, colours, goneNames, S.link_names ? wireSize(S.link_name_size!, cam.k, S.link_name_least_px!, S.link_name_most_px!) : 0) || performance.now() < coming;
+      // A link name or a ghost still fading keeps the view painting.
+      dirty = easing || following || light.wiresMoving || light.labelsMoving || fading || resizing;
     }
     raf = requestAnimationFrame(tick);
   };
@@ -309,18 +368,38 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     input(next, warmTo, refit) {
       const first = !g.n;
       given = next.colours ?? {};
-      g = build(next, g.n ? g : null, pal);
+      const last = g.n ? g : null;
+      g = build(next, last, pal);
       light.picked = picked === null ? -1 : (g.idIx.get(picked) ?? -1);
-      g.target = targetsOf(g, tree, scale());
+      // The particle pointed at stays pointed at, by id: a new item elsewhere never drops the hover (carry.ts).
+      const pointed = carryIndex(last, g, hover);
+      // What left the map fades out where it stood.
+      const now = performance.now();
+      const was = drawn.g === last ? drawn.match : null;
+      ghosts.push(...goneOf(last, g, now, S, was, 4000, light.labels));
+      goneNames.push(...rekeyWires(last, g, light.wires, cam, now));
+      goneLinks.push(...goneLinksOf(last, g, now, S, was));
+      // What came onto the map fades in where it lands.
+      g.born = bornOf(last, g, now);
+      coming = now + (S.come_ms ?? 0);
+      aim();
       seed(g, S);
+      sizing = S.resize_ms ? resizeOf(last, g, now) : null;
+      if (sizing) resizeAt(g, sizing, now, S.resize_ms!);
       if (first) g.sim = { alpha: 1, steps: 0 };
       else warm(g, S, warmTo);
       pick = grid(g);
-      hover = -1;
+      hover = pointed;
+      if (hover < 0) hooks.hover(null);
       remark();
       if (first && !cam.moved) fit();
-      if (refit) (cam.moved = false), (jump = true);
+      if (refit) (cam.moved = false), (jump = true), (jumpAt = performance.now());
       wake();
+    },
+    opened(id) {
+      if (id === openedId) return;
+      openedId = id;
+      dirty = true;
     },
     found(next) {
       levels = next;
@@ -328,20 +407,22 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     },
     arranged(a) {
       tree = a;
-      g.target = targetsOf(g, tree, scale());
+      aim();
       warm(g, S, S.alpha_filter);
       wake();
       dirty = true;
     },
     settings(next, then) {
       S = next;
-      if (tree) g.target = targetsOf(g, tree, scale());
+      if (tree) aim();
       if (then === "seed") return this.reseed();
       if (then === "size") sizes(g, S);
       if (then === "warm" || then === "size") warm(g, S), wake();
       dirty = true;
     },
     reseed() {
+      // A fresh layout steps fast again, until it has settled once.
+      shown = false;
       g.placed.fill(0);
       g.vx.fill(0);
       g.vy.fill(0);
@@ -373,6 +454,9 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
     },
     places() {
       return new Map(g.id.map((id, i) => [id, [g.x[i]!, g.y[i]!]]));
+    },
+    view() {
+      return { k: cam.k, tx: cam.tx, ty: cam.ty };
     },
     destroy() {
       stopped = true;

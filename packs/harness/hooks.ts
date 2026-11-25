@@ -124,10 +124,11 @@ export function hooks(c: Caps) {
   /**
    * The runs, last active first: the 50 newest that aren't calls, and apart
    * from them the calls among the newest LIMIT_MAX (calls.ts), which hang
-   * under the runs that made them.
+   * under the runs that made them. Undefined until first read, so a view
+   * never says "none" before it knows.
    */
-  const useRuns = (): { runs: RunInfo[]; calls: RunInfo[] } => {
-    const [runs, setRuns] = useState<{ runs: RunInfo[]; calls: RunInfo[] }>({ runs: [], calls: [] });
+  const useRuns = (): { runs: RunInfo[]; calls: RunInfo[] } | undefined => {
+    const [runs, setRuns] = useState<{ runs: RunInfo[]; calls: RunInfo[] }>();
     useEffect(() => {
       // Runs come last active first, so any event may move one up: read again, at most every so often.
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -159,7 +160,10 @@ export function hooks(c: Caps) {
    * the view lands on them.
    */
   const useRun = () => {
-    const { runs, calls } = useRuns();
+    const read = useRuns();
+    const loaded = read !== undefined;
+    const runs = useMemo(() => read?.runs ?? [], [read]);
+    const calls = useMemo(() => read?.calls ?? [], [read]);
     const pinned = useHere<string>("here.run");
     const said = useHere<boolean>(LIVE);
     const every = useHere<boolean>(ALL) === true;
@@ -174,7 +178,7 @@ export function hooks(c: Caps) {
     const live = landsLive(said, pinned, every, current.length > 0);
     const all = !live && every;
     const run = all || live ? undefined : (pinned ?? runs[0]?.run);
-    return { runs, calls, run, pinned, all, live, lives: live ? current : [], current, info: runs.find((r) => r.run === run) ?? calls.find((r) => r.run === run) };
+    return { runs, calls, run, pinned, all, live, lives: live ? current : [], current, info: runs.find((r) => r.run === run) ?? calls.find((r) => r.run === run), loaded };
   };
 
   /** The calls given, each with its mark and how many nodes were said to it (its verdicts), kept live. */
@@ -344,14 +348,14 @@ export function hooks(c: Caps) {
       let gone = false;
       const load = async () => {
         const out: ProfileRow[] = [];
-        for (let p = await c.graph.of("umwelt", { limit: 500 }); ; p = await c.graph.of("umwelt", { limit: 500, after: p.next })) {
+        for (let p = await c.graph.of("context_filter", { limit: 500 }); ; p = await c.graph.of("context_filter", { limit: 500, after: p.next })) {
           for (const i of p.items) out.push({ id: i.id, title: String(i.fields.title ?? i.id), status: String(i.fields.status ?? "shadow"), ...(i.fields.fallback === true ? { fallback: true } : {}) });
           if (!p.next) break;
         }
         if (!gone) setList(out.sort((a, b) => a.title.localeCompare(b.title)));
       };
       void load();
-      const stop = c.graphLive.watch({ types: ["umwelt"] }, () => void load());
+      const stop = c.graphLive.watch({ types: ["context_filter"] }, () => void load());
       return () => {
         gone = true;
         void stop();
@@ -401,10 +405,17 @@ export function hooks(c: Caps) {
    * kept live: each agent's own tree. Runs in the same profiles hear the
    * same nodes, so it is asked once per set of profiles, not once per run.
    */
+  /** No run's answer yet. */
+  const EMPTY_HEARS = new Map<string, Set<string>>();
   const useHears = (runs: RunInfo[], nodes: NodeInfo[], placements: Map<string, ProfileInfo[]>): Map<string, Set<string>> => {
-    const [m, setM] = useState<Map<string, Set<string>>>(new Map());
+    // Kept with the placements it was read for: a run's answer shows only for the placements it has now, never one
+    // read before they came (which would be every node, then its filter's).
+    const [got, setGot] = useState<{ key: string; m: Map<string, Set<string>> }>({ key: "", m: new Map() });
     const groups = groupsOf(runs, placements);
-    const key = `${[...groups].map(([g, rs]) => `${g}:${rs.map((r) => r.run).join(",")}`).join("\n")}|${nodes.map((n) => n.id).join(",")}`;
+    const placed = [...groups].map(([g, rs]) => `${g}:${rs.map((r) => r.run).join(",")}`).join("\n");
+    const key = `${placed}|${nodes.map((n) => n.id).join(",")}`;
+    // Read again for new nodes, the last answer stands meanwhile; only new placements wait for theirs.
+    const setM = (m: Map<string, Set<string>>) => setGot({ key: placed, m });
     useEffect(() => {
       let gone = false;
       const load = () =>
@@ -422,7 +433,7 @@ export function hooks(c: Caps) {
         void stop();
       };
     }, [key]);
-    return m;
+    return got.key === placed ? got.m : EMPTY_HEARS;
   };
 
   /**

@@ -81,8 +81,15 @@ export class Lights {
     if (this.still) return this.light(l.at, l.tone, color);
     const ink = (k: Ink) => k.color(color ?? TONE[l.tone]);
     if (l.kind === "light") {
-      const pts = route(tree, placed, l.at);
-      if (pts.length < 2) return;
+      const first = route(tree, placed, l.at);
+      if (first.length < 2) return;
+      // Read again from the layout as it is drawn now: a light follows its branch when the tree changes shape.
+      const now = () => {
+        const { tree: t, placed: p } = this.get();
+        if (!t.byId.has(l.at)) return first;
+        const pts = route(t, p, l.at);
+        return pts.length < 2 ? first : pts;
+      };
       let reached = false;
       this.wait(l.at);
       this.fx.push({
@@ -92,6 +99,7 @@ export class Lights {
           const flash = u < 1 ? 1 : 1 - (age - S.pulse) / S.flashTime;
           if (u >= 1 && !reached) (reached = true), this.arrive(l.at), this.light(l.at, l.tone, color);
           if (flash <= 0) return false;
+          const pts = now();
           const [hx, hy] = pointAt(pts, u);
           const upto = pts.slice(0, Math.floor(u * (pts.length - 1)) + 1);
           const tone = ink(inks);

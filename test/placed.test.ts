@@ -76,9 +76,9 @@ test("a profile's skill moves from home into the folders of the runs it holds it
     const node = adopted.adopted[0]!.node;
     const rA = String((await act("items.create", { type: "record", title: "Studio repo" })).id);
     const rB = String((await act("items.create", { type: "record", title: "Archipelago repo" })).id);
-    const pA = String((await act("items.create", { type: "umwelt", title: "Studio" })).id);
-    const pB = String((await act("items.create", { type: "umwelt", title: "Archipelago" })).id);
-    await act("items.link", { type: "in_umwelt", from: node, to: pA });
+    const pA = String((await act("items.create", { type: "context_filter", title: "Studio" })).id);
+    const pB = String((await act("items.create", { type: "context_filter", title: "Archipelago" })).id);
+    await act("items.link", { type: "in_context_filter", from: node, to: pA });
     await act("items.link", { type: "uses", from: rA, to: pA });
     await act("items.link", { type: "uses", from: rB, to: pB });
     const start = (run: string, cwd: string, repo: string) => ctx(run).get<AgentRun>("agent.run").begin({ run, agent: { id: "e_agent", kind: "agent" }, harness: "test", reaches: [], cwd, facts: { repo } });

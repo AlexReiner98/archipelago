@@ -6,9 +6,9 @@ with the item as its `source`. Its words are read from the graph at every
 say, so an edit takes effect the next time it speaks. A node with `when` (a
 reflex's condition) speaks only when the moment's input holds that text.
 
-## Any item, through its umwelt link
+## Any item, through its context filter link
 
-Any item, of any type, is said like a node when an `in_umwelt` link (the
+Any item, of any type, is said like a node when an `in_context_filter` link (the
 [profile](../profile/README.md) pack's) gives it places. The link is the
 node's `source`, and its name: `words/<link id>`. It says the item's
 `words`, or else its `note`, under the item's title. Its kind is how
@@ -58,8 +58,8 @@ as no longer applying. A node told that way doesn't say the same new words
 again at its place in that context. Reached at its place before the
 prompt, a reworded node says its new words itself, and the agent pack
 records that say `reworded`. A node item moved to an ordinary type, said
-now by its umwelt link, is compared with what that link says: the move
-itself isn't told as a retirement. At most 200 runs are held.
+now by its context filter link, is compared with what that link says: the move
+itself isn't told as a retirement. A node heard at the same moment the change node reads (said at that same prompt) is checked next time, never told as retired. At most 200 runs are held.
 
 A node whose item has `held` (a reason) is held as written: `words.set`,
 `words.title` and `words.retire` refuse it, with the reason (`words.held`). The

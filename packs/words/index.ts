@@ -1,7 +1,7 @@
 /**
  * The words pack: agent nodes whose words are on the map. Each graph item
  * of type `node` becomes a node (spec/agent.md) with that item as its
- * `source`; so does any item an `in_umwelt` link gives places (`said`), with
+ * `source`; so does any item an `in_context_filter` link gives places (`said`), with
  * the link as its source. Its words are read from the item at every say, so changing them
  * through `words.set` takes effect the next time the node speaks.
  *
@@ -34,8 +34,8 @@ import { changes, Hearing, HEARD, listing, SAY_HOW, sayHow, wholeWords, type Say
 export { HEARD, listing, TOOL } from "./heard.ts";
 
 export const TYPE = "node";
-/** A link that brings any item into an umwelt; with places (`at`) it is said there (the profile pack defines it). */
-export const LINK = "in_umwelt";
+/** A link that brings any item into a context filter; with places (`at`) it is said there (the profile pack defines it). */
+export const LINK = "in_context_filter";
 
 /**
  * What a link with places says, as a node item would: the item it brings
@@ -117,7 +117,7 @@ const words: Pack<WordsConfig> = {
     const register = ctx.get<ActionRegister>("action.register");
     const registered = new Map<Id, { dispose: Dispose; shape: string }>();
     const hearing = new Hearing();
-    /** Each item an umwelt link says, and the links that say it, so a change to the item is followed. */
+    /** Each item a context filter link says, and the links that say it, so a change to the item is followed. */
     const sayers = new Map<Id, Set<Id>>();
 
     /** What each id says now: a node item as it is, a link with places as `said` makes it, else null. At most LIMIT_MAX ids. */
@@ -130,7 +130,7 @@ const words: Pack<WordsConfig> = {
         (await graph.get(part)).forEach((it, j) => items.set(part[j]!, it));
       }
       const out = got.map((i) => (!i ? null : i.type === TYPE ? i : i.type === LINK ? said(i, items.get(String(i.fields.from))) : null));
-      // A node item moved to an ordinary type (record, …) is said by its umwelt link now: what a run heard from it
+      // A node item moved to an ordinary type (record, …) is said by its context filter link now: what a run heard from it
       // is what that link says, so the move isn't told as a retirement.
       for (const [k, i] of got.entries()) {
         if (!moved || !i || out[k] || i.type === TYPE || i.type === LINK) continue;
@@ -375,7 +375,7 @@ const words: Pack<WordsConfig> = {
     });
 
     // Follow the graph first, then read what is there, so nothing is missed.
-    // An umwelt link's node follows the link and the item it brings: a new title or kind registers it again.
+    // A context filter link's node follows the link and the item it brings: a new title or kind registers it again.
     const linkFrom = new Map<Id, Id>();
     const follow = (id: Id, item: Item | null) => {
       const was = linkFrom.get(id);

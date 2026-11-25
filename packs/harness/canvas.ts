@@ -35,15 +35,15 @@ import htm from "htm";
 import type { NodeInfo } from "../../spec/agent.ts";
 import { onStyle, sheet } from "../../spec/style.ts";
 import { crowdedNames, boxQuad, nameQuad, type Quad } from "./labels.ts";
-import { HIT_PX, nearest, outgrown, SETTLE_MS, shouldFit, fitKey } from "./camera.ts";
-export { fitKey, HIT_PX, nearest, shouldFit } from "./camera.ts";
+import { HIT_PX, nearest, outgrown, SETTLE_MS, shouldFit, snapsFit, fitKey, easeView } from "./camera.ts";
+export { easeView, fitKey, HIT_PX, nearest, shouldFit } from "./camera.ts";
 import { dotsBox, STYLE, type Placed, type Tree } from "./layout.ts";
 import type { Verdict } from "./hooks.ts";
 import type { Heard, Hold } from "./replay.ts";
 import { windowShown, type WindowMark } from "./windowbar.ts";
 import { Lights, type Fire } from "./lights.ts";
 export type { Fire } from "./lights.ts";
-import { dotExtent, dotOf, Ink, nameLayout, paint, Widths, type Camera } from "./paint.ts";
+import { dotExtent, dotOf, Ink, markSvgPath, nameLayout, paint, Widths, type Camera, type RootMark } from "./paint.ts";
 import { Atlas } from "./sprites.ts";
 import { nameInk, sceneOf, type Mark, type Scene, type Standing } from "./scene.ts";
 export type { Standing } from "./scene.ts";
@@ -59,6 +59,8 @@ const pad = (b: { x: number; y: number; width: number; height: number }, m: numb
 
 export const CANVAS_STYLE = sheet(`
 .rx-canvas { position:relative; overflow:hidden; cursor:grab; user-select:none; min-height:0; }
+.rx-title { position:absolute; top:var(--space-4); left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:var(--space-3); font-size:var(--text-l); font-weight:var(--bold); color:var(--fg); pointer-events:none; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
+.rx-title svg { width:18px; height:18px; flex:none; }
 .rx-canvas.panning { cursor:grabbing; }
 .rx-canvas.on-node { cursor:pointer; }
 .rx-canvas > canvas { position:absolute; inset:0; width:100%; height:100%; display:block; }
@@ -108,6 +110,10 @@ export interface CanvasProps {
   small?: boolean;
   /** Each node's place in the agent's window at the playhead: in it, listed only, dropped (windowbar.ts). */
   window?: ReadonlyMap<string, WindowMark>;
+  /** The context filter the tree is of, named at its root. */
+  root?: string;
+  /** That filter's mark as the Landscape draws it: the root is drawn so. */
+  rootMark?: RootMark;
   /** How long the pointer rests on a node before its words show, in ms (the `tip_ms` dial); 0, never. */
   tipMs?: number;
   /** While moving, names are drawn at this many sizes per doubling of the zoom (the `name_steps` dial); 0, every size. */
@@ -120,6 +126,12 @@ export interface CanvasProps {
   sparkS?: number;
   /** How big an act's spark is, a multiple of the style's (the spark_x dial). */
   sparkX?: number;
+  /** How long a fit glides from where the camera is to where it fits, in ms (the `fit_ms` dial); 0, at once. The first fit is always at once. */
+  fitMs?: number;
+  /** For how long after its first fit a fit still lands at once, while the tree finds its size (the fit_settle_ms dial). */
+  settleMs?: number;
+  /** How long the camera eases to where the wheel sends it, in ms (the `wheel_ms` dial); 0, at once. */
+  wheelMs?: number;
 }
 
 /** A name's outline in the picture's units, along its own line: where it starts, how long, how tall. */
@@ -155,7 +167,7 @@ function crowdedAt(scene: Scene, k: number, ink: Ink, widths: Widths, waiting: R
   return crowdedNames(names, others);
 }
 
-export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, tipMs = 600, nameSteps = 4, quietPx = 0, giveWay = false, sparkS = 0, sparkX = 1 }: CanvasProps) => {
+export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, fires, onPick, showKey, keyOpen, onKeyOpen, keyFilter, small, window: win, root, rootMark, tipMs = 600, nameSteps = 4, quietPx = 0, giveWay = false, sparkS = 0, sparkX = 1, fitMs = 0, wheelMs = 0, settleMs = 0 }: CanvasProps) => {
   const box = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
   const tipEl = useRef<HTMLDivElement>(null);
@@ -168,8 +180,8 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     () => sceneOf({ tree, placed, hues, statuses, ...(rings ? { rings } : {}), heard, held, counts, standing, ...(picked ? { picked } : {}), ...(win ? { window: win } : {}), theirs }),
     [tree, placed, hues, statuses, rings, heard, held, counts, standing, picked, win, theirs],
   );
-  const now = useRef({ tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx, giveWay, sparkS, sparkX });
-  now.current = { tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx, giveWay, sparkS, sparkX };
+  const now = useRef({ tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx, giveWay, sparkS, sparkX, root, rootMark });
+  now.current = { tree, placed, scene, small: !!small, tipMs, nameSteps, quietPx, giveWay, sparkS, sparkX, root, rootMark };
 
   // The painter: made once, outside Preact, as the Landscape's engine is.
   type Painter = { schedule(): void; recrowd(): void; lights: Lights; ink: Ink; widths: Widths; moving: boolean; zooming: boolean };
@@ -216,7 +228,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
         if (next !== goal) fading = true;
       }
       const v = viewRef.current;
-      paint(c, now.current.scene, v, { width, height, dpr }, ink, widths, { waiting: P.lights.waiting, lit: P.lights.lit, shown, small: now.current.small, steps: now.current.nameSteps, zooming: P.zooming, quiet: now.current.quietPx }, paths, (cx) => P.lights.draw(cx, v.k, ink, t), atlas);
+      paint(c, now.current.scene, v, { width, height, dpr }, ink, widths, { waiting: P.lights.waiting, lit: P.lights.lit, shown, small: now.current.small, steps: now.current.nameSteps, zooming: P.zooming, quiet: now.current.quietPx, ...(now.current.root ? { root: now.current.root } : {}), ...(now.current.rootMark ? { rootMark: now.current.rootMark } : {}) }, paths, (cx) => P.lights.draw(cx, v.k, ink, t), atlas);
       if (fading || P.lights.running) P.schedule();
       else last = 0;
     };
@@ -269,7 +281,9 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   // the map changing under it never moves it.
   const manual = useRef(false);
   const fitted = useRef(false);
+  const firstFit = useRef(0);
   const ask = useRef(false);
+  const gliding = useRef(0);
   const shape = fitKey(tree.order.length, bounds);
   useEffect(() => {
     const W = box.current?.clientWidth ?? 0;
@@ -277,10 +291,25 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     if (!W || !H) return;
     if (!shouldFit({ fitted: fitted.current, manual: manual.current, asked: ask.current, outgrown: outgrown(bounds, viewRef.current, W, H) })) return;
     ask.current = false;
+    const first = !fitted.current;
     fitted.current = true;
+    if (first) firstFit.current = performance.now();
     const k = Math.min(3, Math.max(0.1, Math.min(W / bounds.width, H / bounds.height)));
-    setView({ k, x: bounds.x - (W / k - bounds.width) / 2, y: bounds.y - (H / k - bounds.height) / 2 });
+    const goal = { k, x: bounds.x - (W / k - bounds.width) / 2, y: bounds.y - (H / k - bounds.height) / 2 };
+    cancelAnimationFrame(gliding.current);
+    wheelGoal.current = undefined;
+    if (snapsFit(first, performance.now() - firstFit.current, settleMs, fitMs)) return setView(goal);
+    // A fit after the first glides there, so the tree is seen to settle rather than jump.
+    const from = viewRef.current, t0 = performance.now();
+    const step = (t: number) => {
+      const k = (t - t0) / fitMs;
+      if (k >= 1) return setView(goal);
+      glide(easeView(from, goal, k, W, H));
+      gliding.current = requestAnimationFrame(step);
+    };
+    gliding.current = requestAnimationFrame(step);
   }, [shape, fits, small]);
+  useEffect(() => () => cancelAnimationFrame(gliding.current), []);
   // Fit again when the canvas changes size: it is first measured before the page has laid it out.
   useEffect(() => {
     let lastSize = "";
@@ -354,28 +383,52 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
     }, now.current.tipMs);
   };
 
+  // The wheel sets where the zoom goes; the camera eases there over wheel_ms, so its notches don't show.
+  const wheelGoal = useRef<Camera | undefined>(undefined);
   const onWheel = (e: WheelEvent) => {
     e.preventDefault();
     hideTip();
+    cancelAnimationFrame(gliding.current);
     manual.current = true;
-    const p = toWorld(e);
-    const k = Math.min(6, Math.max(0.05, viewRef.current.k * Math.exp(-e.deltaY * 0.0015)));
     const r = box.current!.getBoundingClientRect();
-    glide({ k, x: p.x - (e.clientX - r.left) / k, y: p.y - (e.clientY - r.top) / k });
+    const from = wheelGoal.current ?? viewRef.current;
+    const sx = e.clientX - r.left, sy = e.clientY - r.top;
+    const p = { x: from.x + sx / from.k, y: from.y + sy / from.k };
+    const k = Math.min(6, Math.max(0.05, from.k * Math.exp(-e.deltaY * 0.0015)));
+    const goal = { k, x: p.x - sx / k, y: p.y - sy / k };
+    if (!wheelMs) return glide(goal);
+    wheelGoal.current = goal;
+    const W = r.width, H = r.height;
+    let last = performance.now();
+    const step = (t: number) => {
+      const g = wheelGoal.current;
+      if (!g) return;
+      const a = 1 - Math.exp(-Math.max(1, t - last) / (wheelMs / 3));
+      last = t;
+      const v = easeView(viewRef.current, g, a, W, H, false);
+      const done = Math.abs(Math.log(g.k / v.k)) < 0.002 && Math.hypot(g.x - v.x, g.y - v.y) * g.k < 0.5;
+      glide(done ? g : v);
+      if (done) wheelGoal.current = undefined;
+      else gliding.current = requestAnimationFrame(step);
+    };
+    gliding.current = requestAnimationFrame(step);
   };
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
     hideTip();
     const at = toWorld(e);
     const on = named(at)?.node ?? hit(at);
-    const start = { cx: e.clientX, cy: e.clientY, view: viewRef.current };
+    let start = { cx: e.clientX, cy: e.clientY, view: viewRef.current };
     let moved = false;
     const el = box.current!;
     el.setPointerCapture(e.pointerId);
     const move = (m: PointerEvent) => {
       if (!moved && Math.hypot(m.clientX - start.cx, m.clientY - start.cy) < 4) return;
-      if (!moved) el.classList.add("panning");
+      // The picture moves from where the drag is first seen, so it never jumps the few px a press may wander.
+      if (!moved) (start = { cx: m.clientX, cy: m.clientY, view: viewRef.current }), el.classList.add("panning");
       moved = true;
+      cancelAnimationFrame(gliding.current);
+      wheelGoal.current = undefined;
       manual.current = true;
       glide({ ...start.view, x: start.view.x - (m.clientX - start.cx) / start.view.k, y: start.view.y - (m.clientY - start.cy) / start.view.k });
     };
@@ -403,6 +456,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
       <div class="rx-tip" ref=${tipEl} style="display:none"></div>
       ${tree.order.length === 1 && html`<div class="rx-empty">No nodes</div>`}
       ${showKey && html`<${Key} hues=${hues} filter=${keyFilter} open=${keyOpen ?? true} onOpen=${onKeyOpen} present=${present} />`}
+      ${root && !small && html`<div class="rx-title" title="The context filter this tree is of">${rootMark && html`<svg viewBox="0 0 24 24"><path d=${markSvgPath(rootMark.shape)} style=${`fill:${rootMark.colour}`} /></svg>`}<span>${root}</span></div>`}
     </div>
   `;
 };

@@ -108,6 +108,8 @@ export function runSlot(slots: SlotRead) {
 export interface EventsProps {
   info?: RunInfo;
   events: ExchangeEvent[];
+  /** How long a new line is lit as it lands, in ms (the row_ms dial). */
+  rowMs?: number;
   /** The playhead. */
   index: number;
   /** The run is looked at to its end: it follows live. */
@@ -126,14 +128,46 @@ export interface EventsProps {
 }
 
 /** Whether a list is scrolled to its foot, within `slack` px: new lines then keep it there. */
+/** How long the list's own glide to its foot takes, at most: its scroll events then are not yours. */
+const GLIDE_MS = 700;
+
+/** A place as the run's list shows it: an MCP tool by its server and name (tool:archipelago.query), the rest as it is. */
+export function placeLabel(place: string): string {
+  const m = /^tool:mcp__([^_]+(?:_[^_]+)*)__(.+)$/.exec(place);
+  return m ? `tool:${m[1]}.${m[2]}` : place;
+}
+
+/** A line of the run's list: one event, or a run of held-back ones at one place, folded into one line. */
+export type Fold = { ev: number } | { held: [number, number]; place: string };
+
+/**
+ * The run's list as lines: `least` or more held-back events in a row at one place (the nodes other context filters
+ * keep from this run, `gated`) fold into one line, which a click opens; every other event is its own line. So a run
+ * in a map of many filters reads from its start, not from under a page of what it didn't hear.
+ */
+export function foldHeld(events: readonly Pick<ExchangeEvent, "kind" | "place">[], least = 3): Fold[] {
+  const out: Fold[] = [];
+  for (let i = 0; i < events.length; ) {
+    let j = i;
+    while (j < events.length && events[j]!.kind === "gated" && events[j]!.place === events[i]!.place) j++;
+    if (events[i]!.kind === "gated" && j - i >= least) {
+      out.push({ held: [i, j - 1], place: events[i]!.place ?? "" });
+      i = j;
+    } else out.push({ ev: i++ });
+  }
+  return out;
+}
+
 export function atFoot(scrollHeight: number, scrollTop: number, clientHeight: number, slack = 24): boolean {
   return scrollHeight - scrollTop - clientHeight <= slack;
 }
 
-export const Events = ({ info, events, index, end, verdicts, titles, speakers, node, profiles, spend, extra, onPick }: EventsProps) => {
+export const Events = ({ info, events, index, end, verdicts, titles, speakers, node, profiles, spend, extra, onPick, rowMs }: EventsProps) => {
   const body = useRef<HTMLDivElement>(null);
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const stick = useRef(true);
+  /** When the list last glided to its foot itself: its own scrolling then says nothing about where you are reading. */
+  const glidedAt = useRef(0);
   // Another run: nothing open, and it starts at its foot.
   useEffect(() => {
     setOpened(new Set());
@@ -145,13 +179,40 @@ export const Events = ({ info, events, index, end, verdicts, titles, speakers, n
   // New events keep the list at its foot only while you are at its foot: scrolled up to read, it stays put.
   useEffect(() => {
     const el = body.current;
-    if (el && end && stick.current) el.scrollTop = el.scrollHeight;
+    // Glided there, so a new line never jumps the list a whole row in one frame.
+    if (el && end && stick.current) {
+      glidedAt.current = performance.now();
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
   }, [end, events.length]);
   // The playhead moved (a pick, a step): its line comes into sight.
   useEffect(() => {
     const el = body.current;
     if (el && !end && at) el.querySelector(`[data-ev="${CSS.escape(at.id)}"]`)?.scrollIntoView({ block: "nearest" });
   }, [at?.id]);
+  const toggle = (key: string) =>
+    setOpened((o) => {
+      const n = new Set(o);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
+  const row = (e: ExchangeEvent, i: number) => {
+    const isOpen = opened.has(e.id);
+    const cls = ["hv-ev", i === index && !end ? "hv-pick hv-lit" : "", node && e.node === node ? "hv-lit" : "", i > index ? "hv-later" : "", broke.has(e.seq) ? "broke" : ""].join(" ");
+    return html`
+      <div key=${e.id} data-ev=${e.id} class=${cls} onClick=${() => (toggle(e.id), onPick(e))}>
+        <div class="hv-line" title=${`#${e.seq} ${e.kind}${e.place ? ` @${e.place}` : ""}${e.node ? ` ${e.node}` : ""}\n${e.text ?? actLine(e)}`}>
+          <span class="s">${e.seq}</span>
+          <span class="hv-dir">${e.direction === "to_agent" ? "→" : "←"}</span>
+          <${EventMark} e=${e} v=${e.node ? verdictOf.get(e.node)?.verdict : undefined} />
+          ${e.place && html`<span class="p" title=${e.place}>${placeLabel(e.place)}</span>`}
+          <span class="x">${what(e, titles, info?.cwd)}</span>
+        </div>
+        ${isOpen && html`<div class="hv-open" onClick=${(ev: Event) => ev.stopPropagation()}>${expand(e, info?.harness === "claude-code" && speakers ? gotAt(events, i, speakers) : undefined).map((p, k) => html`<${PartRow} key=${k} p=${p} />`)}</div>`}
+      </div>
+    `;
+  };
   // The transcript fact is a path on this machine: never shown.
   const facts = Object.fromEntries(Object.entries(info?.facts ?? {}).filter(([k]) => k !== "transcript"));
   return html`
@@ -164,37 +225,31 @@ export const Events = ({ info, events, index, end, verdicts, titles, speakers, n
         ${facts.remote && html`<span class="hv-dim hv-cut">${String(facts.remote).split("/").slice(-1)[0]}${facts.branch ? ` · ${facts.branch}` : ""}</span>`}
       </div>
       ${info && html`<div class="hv-prof">
-        ${profiles && !profiles.length && html`<span class="part" title="In no umwelt: it hears every node">no umwelt</span>`}
+        ${profiles && !profiles.length && html`<span class="part" title="In no context filter: it hears every node">no context filter</span>`}
         ${(profiles ?? []).map((p) => html`<span class=${p.by === "part" ? "part" : ""} title=${`${p.holding ? "holds" : "shadow: only records"}${p.by === "part" ? ", as a part" : ""}`}>${p.holding ? "●" : "◌"} ${p.title}</span>`)}
         ${extra}
       </div>`}
-      <div class="hv-body" ref=${body} onScroll=${(ev: Event) => {
+      <div class="hv-body" style=${`--hv-row:${rowMs ?? 600}ms`} ref=${body} onScroll=${(ev: Event) => {
         const el = ev.currentTarget as HTMLElement;
+        if (performance.now() - glidedAt.current < GLIDE_MS) return;
         stick.current = atFoot(el.scrollHeight, el.scrollTop, el.clientHeight);
       }}>
         ${!info && html`<div class="hv-empty" title="A run shows here as its agent works: what the map said, and what it did.">No run yet</div>`}
-        ${events.map((e, i) => {
-          const isOpen = opened.has(e.id);
-          const cls = ["hv-ev", i === index && !end ? "hv-pick hv-lit" : "", node && e.node === node ? "hv-lit" : "", i > index ? "hv-later" : "", broke.has(e.seq) ? "broke" : ""].join(" ");
+        ${foldHeld(events).map((f) => {
+          if ("ev" in f) return row(events[f.ev]!, f.ev);
+          const [from, to] = f.held, key = `held:${events[from]!.id}`, isOpen = opened.has(key);
+          const here = index >= from && index <= to && !end;
           return html`
-            <div data-ev=${e.id} class=${cls} onClick=${() => {
-              setOpened((o) => {
-                const n = new Set(o);
-                if (n.has(e.id)) n.delete(e.id);
-                else n.add(e.id);
-                return n;
-              });
-              onPick(e);
-            }}>
-              <div class="hv-line" title=${`#${e.seq} ${e.kind}${e.place ? ` @${e.place}` : ""}${e.node ? ` ${e.node}` : ""}\n${e.text ?? actLine(e)}`}>
-                <span class="s">${e.seq}</span>
-                <span class="hv-dir">${e.direction === "to_agent" ? "→" : "←"}</span>
-                <${EventMark} e=${e} v=${e.node ? verdictOf.get(e.node)?.verdict : undefined} />
-                ${e.place && html`<span class="p">${e.place}</span>`}
-                <span class="x">${what(e, titles, info?.cwd)}</span>
+            <div key=${key} class=${`hv-ev hv-held${here && !isOpen ? " hv-pick hv-lit" : ""}`} onClick=${() => toggle(key)}>
+              <div class="hv-line" title=${`#${events[from]!.seq}–${events[to]!.seq}: nodes this run's context filters keep from it (another filter's, or no filter's under a strict one)${f.place ? ` @${f.place}` : ""}`}>
+                <span class="s">${events[from]!.seq}</span>
+                <span class="hv-dir">→</span>
+                <span class="hv-m m-quiet">⊝</span>
+                ${f.place && html`<span class="p" title=${f.place}>${placeLabel(f.place)}</span>`}
+                <span class="x">${to - from + 1} held back from this run ${isOpen ? "▾" : "▸"}</span>
               </div>
-              ${isOpen && html`<div class="hv-open" onClick=${(ev: Event) => ev.stopPropagation()}>${expand(e, info?.harness === "claude-code" && speakers ? gotAt(events, i, speakers) : undefined).map((p, k) => html`<${PartRow} key=${k} p=${p} />`)}</div>`}
             </div>
+            ${isOpen && events.slice(from, to + 1).map((e, k) => row(e, from + k))}
           `;
         })}
       </div>

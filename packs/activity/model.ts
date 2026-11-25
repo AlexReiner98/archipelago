@@ -169,3 +169,16 @@ export function line(c: Change): string {
   const what = t.length === 1 ? (t[0]!.title ?? t[0]!.id) : `${t.length} items`;
   return `${c.header.action} · ${what}`;
 }
+
+/**
+ * The groups shown open at first: the newest, every live run, and the run
+ * picked (`here.run`). Each other folds to its one line until a click opens
+ * it, so the page opens on what is happening now, not on every change ever made.
+ */
+export function openAtFirst(groups: readonly Group[], live: (g: Group) => boolean, picked?: string): Set<string> {
+  const out = new Set<string>();
+  groups.forEach((g, i) => {
+    if (i === 0 || live(g) || (!!picked && g.run?.run === picked)) out.add(g.key);
+  });
+  return out;
+}

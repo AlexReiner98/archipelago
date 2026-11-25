@@ -56,7 +56,9 @@ export interface View {
   section?: { id: Id; title: string };
 }
 
-export interface Config {
+import type { Fade } from "./fade.ts";
+
+export interface Config extends Fade {
   /** The kind that is home while no view item is tagged home. Default `field`. */
   home?: string;
   /** Kinds listed next after home, in order. */

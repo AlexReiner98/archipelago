@@ -1,5 +1,5 @@
 /**
- * The window bar: how full the agent's context window is, over the agent in
+ * The window bar: how full the agent's context window is, under the agent in
  * focus (or one run's tree), at the playhead or live, from the context
  * pack's `context.window` (packs/context). Two thin rows share one scale,
  * the window's limit: its share by source (the map's, Claude Code's, the
@@ -7,9 +7,9 @@
  * acts). A click on a share filters the tree to it, through the key's
  * filter (key.ts): a second click shows everything again.
  *
- * A third row is what the map controls alone, node by node, on a scale of
- * its own (the map's whole share): each node it said, or listed, in its
- * pack's hue, biggest first; a click picks the node (`mapShares`).
+ * A third row is what the map controls alone, node by node, on a stepped scale of
+ * its own (round steps just above the map's whole share, `stepScale`): each node it said, or listed, in its
+ * channel's hue (`CHANNEL_HUE`), biggest first; a click picks the node (`mapShares`).
  *
  * Also each node's state at the playhead (`windowMarks`): in the window,
  * only named in a listing, or dropped by a compaction, a mark of its own on
@@ -28,6 +28,19 @@ import { nameOf, type Tree } from "./layout.ts";
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
 export const WINDOW = "context.window";
+/**
+ * Each channel's hue, so the channel row's shares tell apart, and the map's own row says by what channel each of
+ * its nodes came in. The pack hues, minus the map's own purple; the agent's acts keep the exchange's write.
+ */
+export const CHANNEL_HUE: Record<WindowPart["channel"], string> = {
+  hook: v("hue-1"),
+  rule: v("hue-4"),
+  file: v("hue-2"),
+  context: v("hue-6"),
+  talk: v("hue-3"),
+  act: v("write"),
+};
+
 /** How long a live window is kept before it is read again. */
 const AGAIN_MS = 3000;
 /** The most pages of parts one read takes. */
@@ -141,10 +154,9 @@ export function sharesOf(w: WindowRead): { sources: Share[]; channels: Share[] }
       : { key: "agent", title: "the agent's", tokens: w.sources.agent, fitted: fs?.agent ?? 0, colour: v("write"), tip: "What the agent did: tool calls and results, replies, a person's prompts" },
     { key: "subject", title: "the subject", tokens: w.sources.subject ?? 0, fitted: fs?.subject ?? 0, colour: `color-mix(in srgb, ${v("fg")} 45%, transparent)`, tip: "A call's own context, from the pack that made the call: counted by its size, its text never kept" },
   ];
-  const ink = [80, 60, 44, 30, 18];
   const channels: Share[] = [
-    ...CHANNELS.map((c, i) => ({ filter: c.channel as Filter, key: c.channel, title: `${GLYPH[shapeOf(c.channel)]} ${c.title}`, tokens: w.channels[c.channel], fitted: fc?.[c.channel] ?? 0, colour: `color-mix(in srgb, ${v("fg")} ${ink[i]}%, transparent)`, tip: `${c.title}: ${c.doc}` })),
-    { key: "act", title: "acts", tokens: w.channels.act, fitted: 0, colour: v("write"), tip: "The agent's own acts" },
+    ...CHANNELS.map((c, i) => ({ filter: c.channel as Filter, key: c.channel, title: `${GLYPH[shapeOf(c.channel)]} ${c.title}`, tokens: w.channels[c.channel], fitted: fc?.[c.channel] ?? 0, colour: CHANNEL_HUE[c.channel], tip: `${c.title}: ${c.doc}` })),
+    { key: "act", title: "acts", tokens: w.channels.act, fitted: 0, colour: CHANNEL_HUE.act, tip: "The agent's own acts" },
   ];
   return { sources: [...sources.filter((s) => s.tokens > 0), ...unseen], channels: [...channels.filter((s) => s.tokens > 0), ...unseen] };
 }
@@ -174,37 +186,53 @@ export function useWindow(invoke: ActionInvoke, has: boolean, run: string | unde
   const [got, setGot] = useState<{ key: string; w: WindowRead }>();
   const last = useRef<{ key: string; t: number }>({ key: "", t: 0 });
   const key = `${run ?? ""}@${at ?? ""}`;
-  // What is looked at now: a read lands only if it still is (a tick alone doesn't drop a read in flight).
-  const now = useRef(key);
-  now.current = key;
+  // The key a read is for now: a read that lands for another (the run or the moment changed) is dropped.
+  const want = useRef(key);
+  want.current = key;
+  const later = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(later.current), []);
   useEffect(() => {
     if (!has || !run) return;
-    // A moment looked at doesn't change; live, read again as events come, not more often than AGAIN_MS.
-    if (last.current.key === key && (at || Date.now() - last.current.t < AGAIN_MS)) return;
-    last.current = { key, t: Date.now() };
-    void (async () => {
-      let w: WindowRead | undefined;
-      let after = 0;
-      for (let i = 0; i < PAGES; i++) {
-        const out = await invoke.invoke({ action: WINDOW, input: { run, limit: LIMIT_MAX, ...(at ? { at } : {}), ...(after ? { after } : {}) }, authority: { of: "human", basis: "read in the context interface" }, reason: "Show what is in the agent's window" });
-        if (!out.ok) {
-          last.current.t = 0;
-          return;
+    const read = () => {
+      clearTimeout(later.current);
+      last.current = { key, t: Date.now() };
+      void (async () => {
+        let w: WindowRead | undefined;
+        let after = 0;
+        for (let i = 0; i < PAGES; i++) {
+          const out = await invoke.invoke({ action: WINDOW, input: { run, limit: LIMIT_MAX, ...(at ? { at } : {}), ...(after ? { after } : {}) }, authority: { of: "human", basis: "read in the context interface" }, reason: "Show what is in the agent's window" });
+          if (!out.ok) {
+            last.current.t = 0;
+            return;
+          }
+          const o = out.output as unknown as WindowRead & { next?: number };
+          w = w ? { ...w, parts: [...w.parts, ...o.parts] } : o;
+          if (typeof o.next !== "number") break;
+          after = o.next;
         }
-        const o = out.output as unknown as WindowRead & { next?: number };
-        w = w ? { ...w, parts: [...w.parts, ...o.parts] } : o;
-        if (typeof o.next !== "number") break;
-        after = o.next;
+        if (w && want.current === key) setGot({ key, w });
+      })().catch(() => (last.current.t = 0));
+    };
+    // A moment looked at doesn't change. Live, read again as events come, not more often than AGAIN_MS: an event
+    // inside that time reads once the time is up, so the bar always ends on the latest, even while events keep coming.
+    if (last.current.key === key) {
+      if (at) return;
+      const wait = AGAIN_MS - (Date.now() - last.current.t);
+      if (wait > 0) {
+        clearTimeout(later.current);
+        later.current = setTimeout(read, wait);
+        return;
       }
-      if (w && now.current === key) setGot({ key, w });
-    })().catch(() => (last.current.t = 0));
+    }
+    read();
   }, [has, key, tick]);
   // The last window read stays while the next is read, so the bar doesn't blink as the playhead moves.
   return has && run && got && got.key.startsWith(`${run}@`) ? got.w : undefined;
 }
 
 export const WINDOWBAR_STYLE = sheet(`
-.hv-win { padding:var(--space-1) var(--space-4) var(--space-2); display:grid; gap:3px; min-width:0; }
+.hv-win { padding:var(--space-2) var(--space-4) var(--space-3); display:grid; gap:3px; min-width:0; border-top:1px solid var(--line); box-sizing:border-box; min-height:26px; align-content:start; }
+.hv-win.open { min-height:128px; }
 .hv-win .t { display:flex; gap:var(--space-3); align-items:baseline; white-space:nowrap; color:var(--dim); font-size:var(--text-s); min-width:0; overflow:hidden; }
 .hv-win .hv-whead { font:inherit; background:none; border:0; color:inherit; padding:0; cursor:pointer; }
 .hv-win .hv-whead:hover { color:var(--fg); }
@@ -254,11 +282,12 @@ const Row = ({ shares, limit, filter, label }: { shares: Share[]; limit: number;
 };
 
 /** The bar: how full, then the two rows. Nothing while the window isn't read. */
-/** One of the map's nodes in the window: its tokens, and its pack for its hue. */
+/** One of the map's nodes in the window: its tokens, its pack, and the channel it came in by (its hue). */
 export interface MapShare {
   id: string;
   title: string;
   pack: string;
+  channel: WindowPart["channel"];
   tokens: number;
   state: WindowState;
 }
@@ -267,32 +296,45 @@ export interface MapShare {
 export function mapShares(w: WindowRead): MapShare[] {
   return w.parts
     .filter((p) => p.source === "map" && p.state !== "dropped" && p.tokens > 0)
-    .map((p) => ({ id: p.id, title: nameOf(p.title), pack: p.id.includes("/") ? p.id.slice(0, p.id.indexOf("/")) : p.id, tokens: p.tokens, state: p.state }))
+    .map((p) => ({ id: p.id, title: nameOf(p.title), pack: p.id.includes("/") ? p.id.slice(0, p.id.indexOf("/")) : p.id, channel: p.channel, tokens: p.tokens, state: p.state }))
     .sort((a, b) => b.tokens - a.tokens || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/**
+ * The map's own row's scale: the round number at or just above what it holds (1, 2.5 and 5 of each power of ten,
+ * from 250), so the row starts part full at a session's start and grows as the map says more, stepping up only
+ * when it passes the mark.
+ */
+export function stepScale(tokens: number): number {
+  for (let ten = 100; ; ten *= 10) for (const k of [2.5, 5, 10]) if (k * ten >= tokens) return k * ten;
 }
 
 /** How many of the biggest are named under the row; the rest are counted. */
 const NAMED = 4;
 
 /** The map's own row: its nodes on the scale of its whole share, each a click to pick it. */
-const MapRow = ({ w, hues, picked, onPick }: { w: WindowRead; hues?: Map<string, string>; picked?: string; onPick?(id: string): void }) => {
+const MapRow = ({ w, picked, onPick }: { w: WindowRead; hues?: Map<string, string>; picked?: string; onPick?(id: string): void }) => {
   const shares = mapShares(w);
   if (!shares.length) return "";
   const all = shares.reduce((n, s) => n + s.tokens, 0);
-  const hue = (s: MapShare) => hues?.get(s.pack) ?? v("owner");
+  const scale = stepScale(all);
+  // Each node in its channel's hue; one beside another of the same hue is a shade darker, so every node shows.
+  const shade: number[] = shares.map((s, i) => (i > 0 && shares[i - 1]!.channel === s.channel ? 1 : 0));
+  for (let i = 1; i < shares.length; i++) if (shade[i]) shade[i] = 1 - shade[i - 1]!;
+  const hue = (s: MapShare, i = -1) => (i >= 0 && shade[i] ? `color-mix(in srgb, ${CHANNEL_HUE[s.channel]} 65%, ${v("bg")})` : CHANNEL_HUE[s.channel]);
   const tip = (s: MapShare) =>
-    `${s.title}: ${sure(s.tokens).text} tokens, ${pct(s.tokens, all).toFixed(1)}% of what the map put in, ${pct(s.tokens, w.total.tokens).toFixed(2)}% of the window\n${s.state === "listed" ? "Only named in a listing" : "Said, in the window now"}\n${SURE.estimated.tip}${onPick ? "\nA click picks it" : ""}`;
+    `${s.title} (${s.channel}): ${sure(s.tokens).text} tokens, ${pct(s.tokens, all).toFixed(1)}% of what the map put in, ${pct(s.tokens, w.total.tokens).toFixed(2)}% of the window\n${s.state === "listed" ? "Only named in a listing" : "Said, in the window now"}\n${SURE.estimated.tip}${onPick ? "\nA click picks it" : ""}`;
   const click = (s: MapShare) => (e: Event) => {
     e.stopPropagation();
     onPick?.(s.id);
   };
   const rest = shares.length - NAMED;
   return html`
-    <div class="t mine" title="What the map controls: its own nodes in the window, each by its size, on a scale of their own">
-      <span>the map's own</span><span><b>${sure(all).text}</b> · ${pct(all, w.total.tokens).toFixed(1)}% of the window · ${shares.length} node${shares.length === 1 ? "" : "s"}</span>
+    <div class="t mine" title="What the map controls: its own nodes in the window, each by its size, on a scale of round steps (250, 500, 1k, 2.5k…) just above what it holds">
+      <span>the map's own</span><span><b>${sure(all).text}</b> of ${tok(scale)} · ${pct(all, w.total.tokens).toFixed(1)}% of the window · ${shares.length} node${shares.length === 1 ? "" : "s"}</span>
     </div>
     <div class="row" role="group" aria-label="the map's nodes">
-      ${shares.map((s) => html`<button key=${s.id} class=${`${onPick ? "" : "plain"}${s.state === "listed" ? " listed" : ""}${picked === s.id ? " on" : ""}`} style=${`width:${pct(s.tokens, all)}%;background:${hue(s)}`} title=${tip(s)} onClick=${click(s)}></button>`)}
+      ${shares.map((s, i) => html`<button key=${s.id} class=${`${onPick ? "" : "plain"}${s.state === "listed" ? " listed" : ""}${picked === s.id ? " on" : ""}`} style=${`width:${pct(s.tokens, scale)}%;background:${hue(s, i)}`} title=${tip(s)} onClick=${click(s)}></button>`)}
     </div>
     <div class="lg">
       ${shares.slice(0, NAMED).map((s) => html`<button key=${s.id} class=${onPick ? "" : "plain"} title=${tip(s)} onClick=${click(s)}><i style=${`background:${hue(s)}`}></i>${s.title} ${sure(s.tokens).text}</button>`)}
@@ -300,7 +342,7 @@ const MapRow = ({ w, hues, picked, onPick }: { w: WindowRead; hues?: Map<string,
     </div>`;
 };
 
-/** The browser's memory of whether the window bar is open: folded to its one line until opened. */
+/** The browser's memory of whether the window bar is open: folded to its one line until opened, so the tree is what is read first. */
 const WINDOW_OPEN = "harness.window-open";
 function windowOpen(): boolean {
   try {
@@ -312,7 +354,8 @@ function windowOpen(): boolean {
 
 export const WindowBar = ({ w, filter, hues, picked, onPick }: { w?: WindowRead; filter?: KeyFilter; hues?: Map<string, string>; picked?: string; onPick?(id: string): void }) => {
   const [open, setOpen] = useState(windowOpen);
-  if (!w) return "";
+  // Before the window is read, its room is kept, open or folded as it will be: the tree above never moves for it.
+  if (!w) return html`<div class=${`hv-win${open ? " open" : ""}`} aria-hidden="true"></div>`;
   const { sources, channels } = sharesOf(w);
   const full = pct(w.total.tokens, w.limit.tokens);
   const limitTip = w.limit.from === "model" ? `the window of ${w.model ?? "the model"}` : w.limit.from === "seen" ? "the long window: more than 200k was seen in it" : "the usual window; the model doesn't say";
@@ -324,7 +367,7 @@ export const WindowBar = ({ w, filter, hues, picked, onPick }: { w?: WindowRead;
       localStorage.setItem(WINDOW_OPEN, open ? "0" : "1");
     } catch {}
   };
-  return html`<div class="hv-win" onPointerDown=${(e: Event) => e.stopPropagation()}>
+  return html`<div class=${`hv-win${open ? " open" : ""}`} onPointerDown=${(e: Event) => e.stopPropagation()}>
     <div class="t">
       <button class="hv-whead" title=${open ? "Fold the window to one line" : "Open the window: its share by source, by channel, and the map's own"} onClick=${toggle}>window ${open ? "▾" : "▸"}</button>
       <span title=${totalTip}>${w.total.from === "estimate" ? "≈ " : ""}<b>${tok(w.total.tokens)}</b> of <span title=${limitTip}>${tok(w.limit.tokens)}</span> · ${full.toFixed(full < 10 ? 1 : 0)}%</span>

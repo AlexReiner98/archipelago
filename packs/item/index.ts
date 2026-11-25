@@ -2,7 +2,8 @@
  * The item pack, page side: one page per item, in the region `right`, for
  * the item `here.item` names. Its mark and title, its fields as marks, its
  * note (the lead shown, sections folded), its neighbours by kind of link,
- * and its history: who changed what and when, each change undoable.
+ * and its history, folded until opened: who changed what and when, each
+ * change undoable.
  *
  * It only looks, and undoes. Nobody adds, links or edits items by hand
  * here: agents change the map through the items actions, and the page
@@ -18,7 +19,10 @@ import type { ActionInvoke } from "../../spec/action.ts";
 import type { Id, Json } from "../../spec/common.ts";
 import type { HereRead, HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
-import type { SlotFill } from "../../spec/slot.ts";
+import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
+
+/** The item page's slot for what other packs offer to do with the item shown. */
+export const ACTIONS = "item.actions";
 import type { TypeInfo } from "../../spec/types.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { markGlyph, markShape, onStyle, read, side, type MarkShape } from "../../spec/style.ts";
@@ -51,12 +55,15 @@ const QUERY = "find.query";
 const item: Pack = {
   id: "item",
   about: "The page for one item: its note, its fields, what it is tied to, and its history with undo.",
-  inject: ["find.index", "here.read", "here.set", "slot.fill", "action.invoke"],
+  inject: ["find.index", "here.read", "here.set", "slot.fill", "slot.read", "slot.declare", "action.invoke"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
     const invoke = ctx.get<ActionInvoke>("action.invoke");
+    // What other packs offer to do with the item shown, under its head: each fill reads here.item itself.
+    ctx.get<SlotDeclare>("slot.declare").declare({ name: ACTIONS, merge: "many", doc: "On the item page, under its head: what another pack offers to do with the item shown (here.item), such as opening a context filter's view." });
+    const Slot = ctx.get<SlotRead>("slot.read").Slot;
 
     const useHere = <T extends Json>(key: string): T | undefined => {
       const [v, setV] = useState<T | undefined>(here.get<T>(key));
@@ -84,6 +91,14 @@ const item: Pack = {
       invoke,
     });
 
+    /** A section folded under its head until opened, and read only then: the page opens on what the item is. */
+    const Fold = ({ label, children }: { label: string; children?: unknown }) => {
+      const [open, setOpen] = useState(false);
+      return html`
+        <button class="ip-label ip-fold" aria-expanded=${open} title=${open ? `Fold the ${label.toLowerCase()}` : `Show the ${label.toLowerCase()}`} onClick=${() => setOpen(!open)}>${label} ${open ? "▾" : "▸"}</button>
+        ${open && children}`;
+    };
+
     const Page = () => {
       const idx = useIndex();
       const id = useHere<string>(KEYS.item);
@@ -107,12 +122,14 @@ const item: Pack = {
             ${close}
           </div>
           <div class="ip-sub">${row.type}${t && t.base !== t.name ? ` (${t.base})` : ""} · ${String(row.fields.status ?? "")}</div>
+          <div class="ip-acts"><${Slot} name=${ACTIONS} /></div>
           <${P.Marks} marks=${marks(row.fields, t?.fields ?? {})} />
           ${note && html`<${P.Note} key=${id} text=${note} />`}
           ${groups.length > 0 && html`<div class="ip-label">Tied to</div>`}
           <${P.Neighbours} key=${id} groups=${groups} />
-          <div class="ip-label">History</div>
-          <${P.History} key=${id} id=${id} tick=${seen} lines=${lines} />
+          <${Fold} key=${id} label="History">
+            <${P.History} id=${id} tick=${seen} lines=${lines} />
+          <//>
           <div class="ip-foot">
             <button class="ip-btn" onClick=${() => set.set(QUERY, `in:${id}`)} title="Draw this and its parts">inside</button>
             <button class="ip-btn" onClick=${() => set.set(QUERY, `near:${id}`)} title="Draw this and what it is linked to">around</button>

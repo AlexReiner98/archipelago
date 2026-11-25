@@ -30,13 +30,14 @@ import type { LinkInfo, TypeInfo } from "../../spec/types.ts";
 import type { Dial } from "./behaviour.ts";
 import { field, type Field } from "./engine.ts";
 import type { FieldIn, Settings } from "./graph.ts";
-import { around, facets as facetsOf, FIND, FOUND, shown, type Hide } from "./filter.ts";
+import { around, facets as facetsOf, FIND, FOUND, Settle, shown, type Hide } from "./filter.ts";
 import { Legend, LEGEND_STYLE } from "./legend.ts";
 import { DRAW, palette } from "./paint.ts";
 import { Panel, PANEL_STYLE, type Section } from "./panel.ts";
 import { BEHAVIOURS, RUN, defaults, step } from "./step.ts";
-import { build, seed } from "./graph.ts";
+import { build, inputColours, seed } from "./graph.ts";
 import { descends, type Verdict } from "./descends.ts";
+import { withFoundSessions, withSessions, type Live } from "./sessions.ts";
 import type { Arranged } from "./treeover.ts";
 
 export { BEHAVIOURS, step } from "./step.ts";
@@ -65,7 +66,17 @@ const DIALS = "field.dials";
 /** The slot under the empty state, on a map with no items. */
 const EMPTY = "field.empty";
 const QUERY = "find.query";
-/** An umwelt's tree to arrange the map into, set by packs/arrange (`umwelt:<title>` on the find line). */
+/** Each type's mark as the Landscape draws it: read by other views by name. */
+export const MARKS = "field.marks";
+/** Each type's colour (as the particles are coloured) and the shape its items are drawn in. */
+export function marksOf(input: FieldIn, pal: string[]): Record<string, { colour: string; shape: string }> {
+  const shapes = new Map<string, string>();
+  for (const it of input.items) if (!shapes.has(it.type)) shapes.set(it.type, MARK_SHAPES[it.shape ?? MARK_SHAPES.indexOf("circle")] ?? "circle");
+  return Object.fromEntries(inputColours(input, pal).map((t) => [t.name, { colour: t.colour, shape: shapes.get(t.name) ?? "circle" }]));
+}
+/** The live agent sessions and the context filters each is in, set by packs/sessions: read by name, a key not an import. */
+const SESSIONS = "sessions.live";
+/** A context filter's tree to arrange the map into, set by packs/arrange (`context:<title>` on the find line). */
 const ARRANGE = "arrange.tree";
 const REMEMBER = "archipelago.field.dials";
 const HIDE = "field.hide";
@@ -122,6 +133,7 @@ const fieldPack: Pack = {
     const set = ctx.get<HereSet>("here.set");
     const declare = ctx.get<HereDeclare>("here.declare");
     declare.declare({ key: DIALS, scope: "page", doc: "The field's dials that differ from where they start, by key." });
+    declare.declare({ key: MARKS, scope: "page", doc: "Each type's mark as the Landscape draws it, by type: { colour, shape } (a MARK_SHAPES name), so another view can draw an item the same way." });
     declare.declare({ key: HIDE, scope: "page", doc: "What the field's legend hides: types, type:status, type:kind, open, closed, links, lone. The layout is what is left. Absent: closed items ({ closed: true }); {} hides nothing." });
     for (const [key, kept] of [[DIALS, REMEMBER], [HIDE, REMEMBER_HIDE]] as const) {
       const v = here.get(key) === undefined ? recall(kept) : undefined;
@@ -196,7 +208,11 @@ const fieldPack: Pack = {
       };
       return {
         items: result.items.map((r) => ({ id: r.id, title: String(r.fields.title ?? r.id), type: r.type, status: String(r.fields.status ?? ""), closed: index.closed(r), kind: typeof r.fields.kind === "string" ? r.fields.kind : "", ...mark(r) })),
-        links: result.links.map((l) => ({ id: l.id, type: l.type, from: l.from, to: l.to })),
+        // A link that says where its item is said (a context filter link's `at`) shows those places with its name.
+        links: result.links.map((l) => {
+          const at = Array.isArray(l.fields.at) ? l.fields.at.filter((p): p is string => typeof p === "string") : [];
+          return { id: l.id, type: l.type, from: l.from, to: l.to, ...(at.length ? { places: at } : {}) };
+        }),
         // Every type on the map, in one order: each keeps its colour whatever the legend hides.
         types: [...new Set(result.items.map((r) => r.type))].sort(),
       };
@@ -205,14 +221,29 @@ const fieldPack: Pack = {
     /** `center`: the canvas and its legend. */
     const Canvas = () => {
       const version = useVersion();
-      const q = useHere<string>(QUERY) ?? "";
+      const typed = useHere<string>(QUERY) ?? "";
       const { all, S } = useDials();
+      // The map follows the find line once typing pauses (find_wait_ms), not at every letter.
+      const [q, setQ] = useState(typed);
+      const settle = useRef<Settle<string> | undefined>(undefined);
+      settle.current ??= new Settle(typed, setQ);
+      useEffect(() => settle.current!.put(typed, S.find_wait_ms!), [typed]);
+      useEffect(() => () => settle.current!.stop(), []);
 
       // Worked out again only when the map or the limit changes, never on a hover or a query.
       const result = useMemo(() => whole(S.field_limit!), [version, S.field_limit]);
-      const found = useMemo(() => (q.trim() ? new Set(index.run(q, S.field_limit).items.map((r) => r.id)) : null), [version, q, S.field_limit]);
+      // The live agent sessions (packs/sessions, a page key by name): drawn beside the map, each linked to its context filters.
+      const live = (useHere<Json>(SESSIONS) ?? []) as unknown as Live[];
+      const liveKey = JSON.stringify(live);
+      // The item whose page is open stays lit on the map while the pointer goes to its page.
+      const opened = useHere<string>(KEYS.item);
+      useEffect(() => engineNow?.opened(opened ?? null), [opened]);
+      // What the find line found, and with it each session in a filter it found. A session coming or going is a
+      // change to the map, not a new find: the view is not fitted again for it (findOf below).
+      const queried = useMemo(() => (q.trim() ? new Set(index.run(q, S.field_limit).items.map((r) => r.id)) : null), [version, q, S.field_limit]);
+      const found = useMemo(() => withFoundSessions(queried, live, !!S.sessions), [queried, liveKey, S.sessions]);
       const shape = useMemo(() => JSON.stringify([result.items.map((r) => [r.id, r.fields.title, r.fields.status]), result.links.map((l) => l.id)]), [result]);
-      const input = useMemo<FieldIn>(() => inputOf(result), [shape]);
+      const input = useMemo<FieldIn>(() => withSessions(inputOf(result), live, !!S.sessions), [shape, liveKey, S.sessions]);
 
       // What the legend hides is left out of the layout: a change to it settles the graph again with what is left.
       const hide = (useHere<Json>(HIDE) ?? HIDE_START) as Hide;
@@ -220,6 +251,10 @@ const fieldPack: Pack = {
       const [styled, restyle] = useState(0);
       useEffect(() => onStyle(() => restyle((n) => n + 1)), []);
       const facets = useMemo(() => facetsOf(input, hide, palette()), [input, hideKey, styled]);
+      // Each type's mark, for other views to draw an item as here (the Context interface's root).
+      const marks = useMemo(() => marksOf(input, palette()), [input, styled]);
+      const marksKey = JSON.stringify(marks);
+      useEffect(() => void (JSON.stringify(here.get(MARKS) ?? null) !== marksKey && set.set(MARKS, marks as unknown as Json)), [marksKey]);
       // While the find line has words, open and closed are not switched: a plan shows its done steps beside the rest.
       const visible = useMemo<FieldIn>(() => {
         const { open: _open, closed: _closed, ...kept } = hide;
@@ -234,11 +269,13 @@ const fieldPack: Pack = {
       const treeLevels = useMemo(() => (arranged ? new Map(input.items.filter((it) => it.id in arranged.items).map((it) => [it.id, FOUND] as const)) : null), [input, arrangedKey]);
       // While the find line has words, only what it finds and what lies near it stay: each by how it is drawn.
       const levels = useMemo(() => treeLevels ?? (found ? around(visible, found, S.find_steps!, S.find_faint!) : null), [treeLevels, visible, found, S.find_steps, S.find_faint]);
-      const laid = useMemo<FieldIn>(() => {
-        if (treeLevels) return { items: input.items.filter((it) => treeLevels.has(it.id)), links: input.links.filter((l) => treeLevels.has(l.from) && treeLevels.has(l.to)), types: input.types };
-        if (!levels) return visible;
+      // Arranged, what is laid out is the tree's items alone: the find line's words settling mid-flight lay nothing out again.
+      const laidTree = useMemo<FieldIn | null>(() => (treeLevels ? { items: input.items.filter((it) => treeLevels.has(it.id)), links: input.links.filter((l) => treeLevels.has(l.from) && treeLevels.has(l.to)), types: input.types } : null), [input, treeLevels]);
+      const laidFound = useMemo<FieldIn>(() => {
+        if (!levels || treeLevels) return visible;
         return { items: visible.items.filter((it) => levels.has(it.id)), links: visible.links.filter((l) => levels.has(l.from) && levels.has(l.to)), types: visible.types };
       }, [visible, levels, treeLevels]);
+      const laid = laidTree ?? laidFound;
       // Kept as it is, {} included (show everything); only the start is absent.
       const setHide = (next: Hide | undefined) => {
         const v = (next ?? {}) as Json;
@@ -259,12 +296,16 @@ const fieldPack: Pack = {
       }, []);
       // A filter change warms the run to alpha_filter; a change to the map, to alpha_warm.
       // A new query (or new find dials) also fits the view to what is kept.
-      const lastHide = useRef(hideKey), lastFind = useRef<Map<Id, number> | null>(levels);
+      // By what it found, not by the set's identity: a map change that leaves the find's answer the same (an agent's
+      // session writing to the map) is not a new find either.
+      const queriedKey = queried ? [...queried].join(" ") : null;
+      const findOf = [queriedKey, treeLevels, S.find_steps, S.find_faint];
+      const lastHide = useRef(hideKey), lastFind = useRef(findOf);
       useEffect(() => {
-        const byFind = lastFind.current !== levels;
+        const byFind = findOf.some((v, k) => v !== lastFind.current[k]);
         const byFilter = lastHide.current !== hideKey || byFind;
         lastHide.current = hideKey;
-        lastFind.current = levels;
+        lastFind.current = findOf;
         engineNow?.found(levels);
         engineNow?.arranged(arranged);
         engineNow?.input(laid, byFilter ? S.alpha_filter : undefined, byFind);

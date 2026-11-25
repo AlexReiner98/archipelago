@@ -50,6 +50,7 @@ export const RUN: Dial[] = [
   { key: "speed_most", label: "fastest", min: 1, max: 100, step: 1, value: 30, doc: "At full warmth, no particle moves further than this in one step." },
   { key: "dt", label: "time per step", min: 0.1, max: 3, step: 0.05, value: 1, doc: "Physics time per step." },
   { key: "frame_ms", label: "ms per frame", min: 1, max: 40, step: 1, value: 12, then: "paint", doc: "How long each frame may spend stepping. Changes how fast it settles, not where." },
+  { key: "frame_steps", label: "steps per frame", min: 1, max: 100, step: 1, value: 2, then: "paint", doc: "Once the map has settled and is shown, the most steps a run takes per painted frame, so a change to it (an item coming, a link, a drag) is seen moving rather than in its new place at once. The first run, before anything has settled, steps as fast as 'ms per frame' allows." },
 ];
 
 /** The pushes of the behaviours on, each times its weight, summed into g.total. */

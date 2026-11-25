@@ -37,10 +37,16 @@ import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { sheet, v } from "../../spec/style.ts";
 import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
+import type { RootMark } from "./paint.ts";
+import { CONTEXT_FILTER, OpenFilterButton } from "./open.ts";
+import { useGlide } from "./glide.ts";
+import type { Json } from "../../spec/common.ts";
+/** Each type's mark as the Landscape draws it (packs/field), read by name: a key, not an import. */
+const FIELD_MARKS = "field.marks";
 import { Events, RUN_SLOT, runSlot, short } from "./events.ts";
 import { ALL, FOCUS, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
 import { colourOf, colours } from "./live.ts";
-import { AGENTS_STYLE, placementOf, ProfileMenu } from "./agents.ts";
+import { AGENTS_STYLE, heardYet, placementOf, ProfileMenu } from "./agents.ts";
 import { focusOf, switchFocus, Trees, TREES_STYLE, treesAndRows } from "./trees.ts";
 import { DIALS_KEY, DIALS_STYLE, DialsPane, useDials } from "./dials.ts";
 import { Bar, BAR_STYLE } from "./bar.ts";
@@ -56,6 +62,7 @@ import { useWindow, WINDOW, WindowBar, WINDOWBAR_STYLE, windowMarks } from "./wi
 import { NODE as NODE_WINDOW, TREND_STYLE } from "./trend.ts";
 import { SpendMark, SPEND, type Spend, SPEND_STYLE, useSpend } from "./spend.ts";
 import { CallStrip, CALLS_STYLE, callsOf, isCall, parentOf, requestNodes } from "./calls.ts";
+import { KEY_OFF, offOf, store, stored } from "./keyoff.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -89,7 +96,8 @@ const STYLE = sheet(`
 .hv-bar button.on { color:var(--fg); text-decoration:underline; text-underline-offset:4px; }
 .hv-select { font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); max-width:220px; min-width:0; }
 .hv-select option { background:var(--panel); color:var(--fg); }
-.hv-ev { cursor:pointer; }
+.hv-ev { cursor:pointer; animation:hv-ev-in var(--hv-row, .6s) ease-out both; }
+@keyframes hv-ev-in { from { background-color:color-mix(in srgb, var(--pick) 22%, transparent); } }
 .hv-line { display:flex; gap:var(--space-2); align-items:baseline; padding:1px var(--space-4) 1px var(--space-2); white-space:nowrap; min-width:0; }
 .hv-line .x { overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; }
 .hv-line .p { color:var(--dim); flex:none; max-width:35%; overflow:hidden; text-overflow:ellipsis; }
@@ -132,8 +140,8 @@ ${WINDOWBAR_STYLE}
 ${TREND_STYLE}
 ${CALLS_STYLE}
 ${SPEND_STYLE}
-.hv-onerun { display:grid; grid-template-rows:auto minmax(0,1fr); min-height:0; min-width:0; }
-.hv-onerun > .rx-canvas { grid-row:2; }`);
+.hv-onerun { display:grid; grid-template-rows:minmax(0,1fr) auto; min-height:0; min-width:0; }
+.hv-onerun > .rx-canvas { grid-row:1; }`);
 
 const values = (v: string | string[] | undefined) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
@@ -215,7 +223,7 @@ const harness: Pack = {
 
     const Center = () => {
       const nodes = hk.useNodes();
-      const { runs, calls, run, pinned, all, live, lives, current, info } = hk.useRun();
+      const { runs, calls, run, pinned, all, live, lives, current, info, loaded } = hk.useRun();
       const colour = useLiveColours(lives);
       const liveEvents = hk.useLiveEvents(lives.map((r) => r.run), live);
       const fires = useRef<Fire | undefined>(undefined);
@@ -279,10 +287,12 @@ const harness: Pack = {
       // What the harness gave each agent shown (packs/transcript): read-only nodes in its tree, a toggle in the ⋯ menu.
       const hasGiven = hk.useHas(GIVEN);
       // The key doubles as a filter: a channel, the map's own, or the harness's (canvas.ts Key, channels.ts shows).
-      const [off, setOff] = useState<Set<string>>(new Set());
+      // The browser remembers what is turned off, as it does the key's being open: a view switch keeps it.
+      const [off, setOff] = useState<Set<string>>(() => offOf(stored(KEY_OFF)));
       const toggle = (f: string) => setOff((was) => {
         const next = new Set(was);
         if (!next.delete(f)) next.add(f);
+        store(KEY_OFF, JSON.stringify([...next]));
         return next;
       });
       const showGiven = !off.has("harness");
@@ -313,7 +323,9 @@ const harness: Pack = {
       const tree = useMemo(() => treeOf(treeNodes, { by, unsaid, profiles: membership, decided }), [treeNodes, by, unsaid, membership, decided]);
       const dials = useDials(here);
       const nameMost = dials.name_most || Infinity;
-      const placed = useMemo(() => radial(tree, { nameMost }), [tree, nameMost]);
+      const laid = useMemo(() => radial(tree, { nameMost }), [tree, nameMost]);
+      // A change to the tree glides into its new shape (glide.ts).
+      const placed = useGlide(tree, laid, dials.layout_ms ?? 0, nameMost);
       // The harness's given nodes are grey, not a pack hue (canvas.ts).
       const hues = useMemo(() => packHues(nodes.map((n) => n.pack)), [nodes]);
       // Live: each run an agent with a tree of its own (what it hears), in its colour, its profile over it.
@@ -346,7 +358,14 @@ const harness: Pack = {
           }),
         [lives, colour, placements, fallbacks, acting, hears],
       );
-      const agents = useMemo(() => everyAgent.filter((a) => split.trees.includes(a.run.run)), [everyAgent, split]);
+      // An agent's tree is drawn once what it hears is known: never every node first, then its filter's.
+      const agents = useMemo(() => everyAgent.filter((a) => split.trees.includes(a.run.run) && heardYet(a)), [everyAgent, split]);
+      // The root of the run looked at, drawn as its context filter is on the Landscape: its item's type's mark
+      // there (field.marks, a page key by name), so the tree reads as that item.
+      const rootFilter = windowRun && placements.has(windowRun) ? placementOf(placements.get(windowRun)!, fallbacks).id : undefined;
+      const rootItem = hk.useItem(rootFilter);
+      const fieldMarks = hk.useHere<Json>(FIELD_MARKS) as Record<string, RootMark> | undefined;
+      const rootMark = rootItem ? fieldMarks?.[rootItem.type] : undefined;
       const rows = useMemo(() => everyAgent.filter((a) => split.rows.includes(a.run.run)), [everyAgent, split]);
       const onProfile = (r: string, ev: MouseEvent) => {
         const box = stage.current?.getBoundingClientRect();
@@ -450,15 +469,15 @@ const harness: Pack = {
           <${CallStrip} parent=${parentInfo} calls=${strip} open=${callsOpen || !!call} at=${call?.run} onOpen=${setCallsOpen} onPick=${openRun} onBack=${call && stripParent ? () => openRun(stripParent) : undefined} />
           <div style="position:relative;min-height:0;display:grid;overflow:hidden" ref=${stage}>
             ${live
-              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winMarks=${marks} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} nameMost=${dials.name_most} peekPx=${dials.peek_px} />`
+              ? html`<${Trees} agents=${agents} nodes=${kept} events=${liveEvents} by=${by} hues=${hues} statuses=${statuses} standing=${standing} picked=${picked} canPlace=${canPlace} onPick=${pick} onOpen=${onOpen} onProfile=${onProfile} side=${picked ? html`<${NodeSide} label="‹ Agents" tip="Back to the agents' previews" onBack=${() => pick(undefined)} given=${given} run=${windowRun} />` : undefined} focus=${focus} onFocus=${(r: string) => switchFocus(() => setFocus(r), dials.switch_s!)} rows=${rows} given=${keptGiven} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} win=${win} winSoon=${hasWindow} winMarks=${marks} rootMark=${rootMark} layoutMs=${dials.layout_ms} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} fitMs=${dials.fit_ms} settleMs=${dials.fit_settle_ms} wheelMs=${dials.wheel_ms} nameMost=${dials.name_most} peekPx=${dials.peek_px} openS=${dials.open_s} />`
               : html`<div class=${`hv-trees${picked ? " many" : ""}`}>
                   <div class="hv-onerun">
-                    ${run ? html`<${WindowBar} w=${win} filter=${keyFilter} hues=${hues} picked=${picked} onPick=${pick} />` : html`<span></span>`}
-                    <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} window=${run ? marks : undefined} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} />
+                    <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} rings=${rings} heard=${state.heard} held=${held} counts=${counts} standing=${standing} picked=${picked} fires=${fires} onPick=${pick} showKey=${true} keyOpen=${keyOpen} onKeyOpen=${setKeyOpen} keyFilter=${keyFilter} window=${run ? marks : undefined} rootMark=${rootMark} root=${run && placements.has(run) ? ((pl) => (pl.kind === "none" ? "no context filter" : pl.title))(placementOf(placements.get(run)!, fallbacks)) : undefined} tipMs=${dials.tip_ms} nameSteps=${dials.name_steps} quietPx=${dials.quiet_px} giveWay=${!!dials.give_way} sparkS=${dials.spark_s} sparkX=${dials.spark_x} fitMs=${dials.fit_ms} settleMs=${dials.fit_settle_ms} wheelMs=${dials.wheel_ms} />
+                    ${run && (win || hasWindow) ? html`<${WindowBar} w=${win} filter=${keyFilter} hues=${hues} picked=${picked} onPick=${pick} />` : html`<span></span>`}
                   </div>
                   ${picked && html`<div class="hv-peeks hv-side"><${NodeSide} label="× Close" tip="Close the node" onBack=${() => pick(undefined)} given=${given} run=${windowRun} /></div>`}
                 </div>`}
-            ${live && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
+            ${live && loaded && !lives.length && html`<div class="rx-empty">No agent is live.</div>`}
             ${menu && html`<${ProfileMenu} x=${menu.x} y=${menu.y} title=${((r) => (r ? runName(r) : menu.run.slice(0, 8)))(lives.find((r) => r.run === menu.run))} profiles=${profileList} current=${placements.get(menu.run)?.filter((p) => p.by === "match").map((p) => p.id) ?? []} error=${menu.error} onPick=${(id: string) => place(menu.run, id)} onClose=${() => setMenu(undefined)} />`}
           </div>
           ${run && html`<${Timeline}
@@ -483,6 +502,7 @@ const harness: Pack = {
 
     const RunFill = () => {
       const nodes = hk.useNodes();
+      const dials = useDials(here);
       const { run, info, runs, all, live, lives } = hk.useRun();
       const profile = hk.useHere<string>(PROFILE);
       const inProfile = hk.useRunsIn(runs, all ? profile : undefined);
@@ -505,7 +525,7 @@ const harness: Pack = {
       const spendRuns = all ? (inProfile ?? []).map((r) => r.run) : shown ? [shown] : [];
       const spend = useSpend(invoke, hasSpend, spendRuns, all ? runs.length : events.length);
       if (all) return html`<${Runs} runs=${inProfile} of=${profile ? (profileTitle ?? profile) : undefined} spend=${spend} />`;
-      return html`<${Events} spend=${shown ? spend.get(shown) : undefined} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} speakers=${speakers} node=${picked} profiles=${inProfiles} extra=${shownInfo && html`<${RunSlot} run=${shownInfo} />`} onPick=${(e: ExchangeEvent) => {
+      return html`<${Events} spend=${shown ? spend.get(shown) : undefined} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} speakers=${speakers} node=${picked} profiles=${inProfiles} extra=${shownInfo && html`<${RunSlot} run=${shownInfo} />`} rowMs=${dials.row_ms} onPick=${(e: ExchangeEvent) => {
         set.set(KEYS.event, e.id);
         // The node pane follows: the event's node, or for an act the node it failed or was told just before.
         set.set(KEYS.node, nodeOf(events, events.indexOf(e), verdictsOfRun));
@@ -558,6 +578,8 @@ const harness: Pack = {
     const whileShown = { "here.view": "harness/view" };
     fill.fill({ slot: "center", name: "view", title: "Context interface", view: Center });
     fill.fill({ slot: "right", name: "run", title: "Run", when: whileShown, view: RunFill });
+    // On a context filter's item page: the way into its view here (open.ts).
+    fill.fill({ slot: "item.actions", name: "open", view: OpenFilterButton({ set, type: CONTEXT_FILTER, useHere: hk.useHere, useItem: hk.useItem, useLive: () => hk.useRun().current, useRunsIn: hk.useRunsIn }) });
   },
 };
 

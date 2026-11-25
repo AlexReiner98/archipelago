@@ -5,7 +5,7 @@
  *   rows (`transcript.tokens`): input, cache writes and output, not cached
  *   re-reads, as the work base's `tokens_estimated` counts them.
  * - Estimate: the `tokens_estimated` of the run's task (its `task`).
- * - Ratio: the first umwelt the run is in that sets `budget_ratio`, else the
+ * - Ratio: the first context filter the run is in that sets `budget_ratio`, else the
  *   pack's config `ratio`, else RATIO (1.5).
  * - Ask: its node `budget/ask` refuses at `reply_end` with the code `ask`,
  *   once spend passes estimate × ratio, so the agent keeps going and hears
@@ -35,7 +35,7 @@ export const SPEND = "budget.spend";
 export const ASK = "ask";
 /** The default ratio of spend to estimate past which a run is asked. */
 export const RATIO = 1.5;
-/** The umwelt field that sets the ratio for its runs. */
+/** The context filter field that sets the ratio for its runs. */
 export const FIELD = "budget_ratio";
 /** The most pages of usage or events one read goes through. */
 export const PAGES = 64;
@@ -188,7 +188,7 @@ const budget: Pack<BudgetConfig> = {
     ctx.get<ActionRegister>("action.register").register({
       name: SPEND,
       title: "A run's spend against its task's estimate",
-      doc: `For each run (at most ${RUNS_MAX}): spent (measured tokens: input, cache writes, output, not cached re-reads), its task and the task's tokens_estimated, the ratio it is asked at (an umwelt's ${FIELD}, else the config's, else ${RATIO}), over, asked (the ask came), none (no transcript read). Writes nothing.`,
+      doc: `For each run (at most ${RUNS_MAX}): spent (measured tokens: input, cache writes, output, not cached re-reads), its task and the task's tokens_estimated, the ratio it is asked at (a context filter's ${FIELD}, else the config's, else ${RATIO}), over, asked (the ask came), none (no transcript read). Writes nothing.`,
       input: {
         type: "object",
         properties: { runs: { type: "array", items: { type: "string" }, description: `Run ids, at most ${RUNS_MAX}` } },
