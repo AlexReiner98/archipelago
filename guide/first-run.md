@@ -12,7 +12,9 @@ npm run serve
 
 Open http://127.0.0.1:5280/app/. The server's plugins, the page's dev server
 and the bridge between them run on 5280, 5281 and 5282. The map is kept in
-`app/.data/`, which git ignores.
+`app/.data/`, which git ignores. It writes the skill and memory files you
+adopt onto the map, so a change made there is what the next session loads;
+`npm run dev` is the same server without writing them.
 
 ## Look around
 

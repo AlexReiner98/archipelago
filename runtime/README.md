@@ -70,7 +70,7 @@ A new url rebuilds an entry, a new config reloads it, `disabled` unloads it,
 ## Running it
 
 - `npm test` runs the tests, `npm run check` typechecks.
-- `npm run serve` serves the repository on port 5280 (dev); open
+- `npm run dev` serves the repository on port 5280 (dev); open
   `/test/browser/` for the fixture page, and edit `test/browser/plugins/word.ts`
   to see a hot reload.
 - A change to `runtime/` itself is declined by HMR: restart.

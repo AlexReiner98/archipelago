@@ -1,5 +1,6 @@
 /**
- * The app, server side: `npm run serve`. One process runs
+ * The app, server side: `npm run serve` (or `npm run dev`, which writes no
+ * file outside its data). One process runs
  * - the dev server for the page (runtime/serve.ts, port 5180), and
  * - a Node runtime with the server's plugins, hot-reloaded: graph, action,
  *   types and the bases (work, question, record, actor, links, items) with
@@ -22,8 +23,9 @@
  *
  * --no-write (ARCHIPELAGO_WRITE=0) leaves the written plugin off, so the
  * server writes no skill or memory file, and the lean writer, so it writes
- * no project settings. The dev server runs so: those files
- * are what real sessions load, and only live writes them.
+ * no project settings. The dev server (`npm run dev`, `dev:start`) runs so
+ * beside a live one: those files are what real sessions load, and only live
+ * writes them. `npm run serve`, a person's own copy, writes them.
  *
  * Point Claude Code at the adapter (plugins/claude-code/README.md) and open
  * http://127.0.0.1:5180/app/.
