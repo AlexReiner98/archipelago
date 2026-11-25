@@ -163,15 +163,18 @@ const connectView: Plugin = {
           <span class="t" title="Each Claude Code session then reports here: the hooks record every run, and the MCP server lets the agent read and change the map.">Connect Claude Code</span>
           ${needs && html`<button class="cn-btn" onClick=${make} title="A token for your Claude Code, shown to you only, once. It goes into both lines below.">Make a token</button>`}
         </div>
+        ${setup?.here && html`<div class="cn-row" title=${`Run in ${setup.folder}: one session that reports here, your own settings untouched.\n${setup.here}`}>
+          <span class="k">Here</span><span class="v">${setup.here}</span><${Copy} text=${setup.here} />
+        </div>`}
         ${setup && html`
-          <div class="cn-row" title=${`Run in a terminal:\n${hidden(setup.mcp, token)}`}>
+          <div class="cn-row" title=${`Every session: run in a terminal.\n${hidden(setup.mcp, token)}`}>
             <span class="k">MCP</span><span class=${`v${needs ? " off" : ""}`}>${hidden(setup.mcp, token)}</span><${Copy} text=${mcp} off=${needs} />
           </div>
           ${setup.install
-            ? html`<div class="cn-row" title=${`Run in a terminal: it saves the hook script to ~/.archipelago/hook.ts and adds ${EVENTS.length} hooks to ~/.claude/settings.json, keeping the rest. Every event goes to\n${setup.hookUrl}`}>
+            ? html`<div class="cn-row" title=${`Every session: run in a terminal. It saves the hook script to ~/.archipelago/hook.ts and adds ${EVENTS.length} hooks to ~/.claude/settings.json, keeping the rest. Every event goes to\n${setup.hookUrl}`}>
                 <span class="k">Hooks</span><span class=${`v${needs ? " off" : ""}`}>node -e … · ${EVENTS.length} hooks into ~/.claude/settings.json</span><${Copy} text=${hooks} off=${needs} />
               </div>`
-            : html`<div class="cn-row" title=${`Merge into ~/.claude/settings.json: every event goes to\n${setup.hookUrl}`}>
+            : html`<div class="cn-row" title=${`Every session: merge into ~/.claude/settings.json. Every event goes to\n${setup.hookUrl}`}>
                 <span class="k">Hooks</span><span class=${`v${needs ? " off" : ""}`}>~/.claude/settings.json · ${EVENTS.length} hooks</span><${Copy} text=${hooks} off=${needs} />
               </div>`}`}
         ${err && html`<div class="cn-err" title=${err}>${err}</div>`}

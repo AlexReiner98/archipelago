@@ -65,6 +65,18 @@ test("the page server refuses a foreign Host or Origin, and serves the rest", as
   assert.equal((await call(port, "/index.html", {})).body, "<p>hi</p>");
 });
 
+test("the page server says where its bridge is at /bridge/caps, on the host it was asked by", async () => {
+  const root = mkdtempSync(join(tmpdir(), "guard-"));
+  const page = await serve({ root, watch: false, bridge: 5282, ...access });
+  const bare = await serve({ root, watch: false, ...access });
+  after(() => Promise.all([page.close(), bare.close()]).then(() => rmSync(root, { recursive: true, force: true })));
+  const port = Number(new URL(page.url).port);
+  const r = await call(port, "/bridge/caps", { host: `localhost:${port}` });
+  assert.equal(r.status, 200);
+  assert.deepEqual(JSON.parse(r.body), { at: "http://localhost:5282/" });
+  assert.equal((await call(Number(new URL(bare.url).port), "/bridge/caps", {})).status, 404, "without a bridge it is not there");
+});
+
 /** Loads one plugin over stand-ins for every key it injects. */
 async function load(plugin: Plugin, keys: readonly string[], config: Record<string, unknown>) {
   const stub: Plugin = {

@@ -52,9 +52,11 @@ export interface DevServer {
 /**
  * `hosts` and `origins` add to what the guard answers (guard.ts). `files`
  * is a folder served as is at `/files/` (the data's pictures a note shows),
- * read only, nothing outside it.
+ * read only, nothing outside it. `bridge` is the bridge's port: the page
+ * asks `/bridge/caps` first (app/boot.ts), and is told `{ at }`, the
+ * bridge's address on the host it asked, instead of a 404.
  */
-export async function serve(options: { port?: number; root?: string; watch?: boolean; files?: string } & LocalAccess = {}): Promise<DevServer> {
+export async function serve(options: { port?: number; root?: string; watch?: boolean; files?: string; bridge?: number } & LocalAccess = {}): Promise<DevServer> {
   const root = resolve(options.root ?? join(fileURLToPath(import.meta.url), "../.."));
   const files = options.files && resolve(options.files);
   const graph = new ModuleGraph();
@@ -85,6 +87,12 @@ export async function serve(options: { port?: number; root?: string; watch?: boo
     }
     if (url.pathname === "/") {
       res.writeHead(302, { location: "/app/" }).end();
+      return;
+    }
+    if (options.bridge && url.pathname === "/bridge/caps") {
+      // The guard has checked the host: the bridge is on the same one, at its own port.
+      const at = `http://${new URL(`http://${req.headers.host}`).hostname}:${options.bridge}/`;
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(JSON.stringify({ at }));
       return;
     }
     let path = decodeURIComponent(url.pathname);
