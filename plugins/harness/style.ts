@@ -1,7 +1,8 @@
 /**
  * The Context interface's style sheet: the panes, the bar, the rows and the
  * lines the harness view draws, and the sheets of its parts (keep, agents,
- * dials, trees, bar, canvas, timeline, window bar, trend, calls, spend).
+ * dials, trees, bar, canvas, timeline, window bar, trend, calls, spend, and
+ * the item page's button into the view).
  * index.ts puts it in the page while the plugin is loaded.
  */
 import { sheet } from "../../spec/style.ts";
@@ -11,6 +12,7 @@ import { CALLS_STYLE } from "./calls.ts";
 import { CANVAS_STYLE } from "./canvas.ts";
 import { DIALS_STYLE } from "./dials.ts";
 import { KEEP_STYLE } from "./keep.ts";
+import { OPEN_STYLE } from "./open.ts";
 import { SPEND_STYLE } from "./spend.ts";
 import { TIMELINE_STYLE } from "./timeline.ts";
 import { TREES_STYLE } from "./trees.ts";
@@ -74,6 +76,7 @@ export const STYLE = sheet(`
 .hv-bar .live { color:var(--say); flex:none; }
 .hv-n { font-variant-numeric:tabular-nums; flex:none; }
 ${KEEP_STYLE}
+${OPEN_STYLE}
 ${AGENTS_STYLE}
 ${DIALS_STYLE}
 ${TREES_STYLE}

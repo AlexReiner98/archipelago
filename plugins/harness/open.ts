@@ -17,6 +17,15 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 /** A context filter's type on the map (plugins/profile): the button shows on its items only. */
 export const CONTEXT_FILTER = "context_filter";
 
+/** What the button does, said in its tip. */
+export const OPEN_TIP = "Open this context filter's view in the Context interface";
+
+/** The button's tip, drawn by the page under the button (index.ts puts it in the page with the view's sheet). */
+export const OPEN_STYLE = `
+.ho-open { position:relative; display:inline-block; }
+.ho-tip { display:none; position:absolute; left:0; top:calc(100% + 4px); z-index:5; width:max-content; max-width:240px; padding:var(--space-1) var(--space-2); background:var(--bg); border:1px solid var(--dim); border-radius:var(--radius); color:var(--fg); font-size:var(--text-s); white-space:normal; box-shadow:0 4px 12px rgb(0 0 0 / .3); pointer-events:none; }
+.ho-open:hover .ho-tip, .ho-open:focus-within .ho-tip { display:block; }`;
+
 /** The Context interface's view, as the frame names it in `here.view`. */
 export const VIEW = "harness/view";
 
@@ -47,6 +56,7 @@ export function OpenFilterButton(deps: {
       for (const [k, v] of openFilter(id, runs)) deps.set.set(k, v);
     };
     const what = runs.length ? `Watch ${runs.length === 1 ? "its live session" : `its ${runs.length} live sessions`}` : "Its context";
-    return html`<button class="ip-btn ip-open" title="Open this context filter's view in the Context interface" onClick=${go}>${what} in the Context interface ›</button>`;
+    // Its tip is the page's own, under the button: a native title is drawn where the browser likes, at times far off.
+    return html`<span class="ho-open"><button class="ip-btn ip-open" aria-describedby="ho-open-tip" onClick=${go}>${what} in the Context interface ›</button><span class="ho-tip" id="ho-open-tip" role="tooltip">${OPEN_TIP}</span></span>`;
   };
 }

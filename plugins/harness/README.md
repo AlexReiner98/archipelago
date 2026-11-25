@@ -86,7 +86,9 @@ A context filter's item page (the Landscape or the Map, a click on the
 item) has a button into its view here, in the item plugin's `item.actions`
 slot: with a session live in the filter, "Watch its live session", which
 opens the live view focused on it; with none, "Its context", which opens
-the filter's own tree (`openFilter`).
+the filter's own tree (`openFilter`). Its tip is the page's own, drawn
+under the button on hover or focus, not a native title, which a browser
+can draw far from it.
 
 ## The agents ([trees.ts](trees.ts), [agents.ts](agents.ts))
 

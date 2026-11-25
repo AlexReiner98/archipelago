@@ -981,6 +981,13 @@ test("openFilter: a context filter's view, live on its session when one is live,
   assert.equal(none.get("here.view"), VIEW);
 });
 
+test("the filter's button: its tip is the page's own, under the button, in the view's sheet", async () => {
+  const { OPEN_STYLE } = await import("../plugins/harness/open.ts");
+  const { STYLE } = await import("../plugins/harness/style.ts");
+  assert.match(OPEN_STYLE, /\.ho-tip \{[^}]*position:absolute; left:0; top:calc\(100% \+ 4px\)/);
+  assert.ok(STYLE.includes(".ho-open:hover .ho-tip"), "the view's sheet carries it");
+});
+
 test("heardYet: an agent's tree waits for what it hears and where it is placed, never every node first", async () => {
   const { heardYet } = await import("../plugins/harness/agents.ts");
   const placement = { kind: "matched" as const, title: "F", ids: ["f"], id: "f" };
