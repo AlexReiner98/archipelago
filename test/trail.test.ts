@@ -133,15 +133,19 @@ test("withTrail: the run hangs from its session, turns in order, calls linked to
   assert.ok(!out.links.slice(map.links.length).some((l) => map.items.some((it) => it.id === l.from)));
 });
 
-test("flow reads a trail's turns left to right; its calls are left to stack", async () => {
-  const { ranks } = await import("../plugins/field/behaviours/flow.ts");
+test("stack lays a trail out as one grid: turns across in order, each turn's calls down under it", async () => {
+  const { cells } = await import("../plugins/field/behaviours/stack.ts");
   const { build } = await import("../plugins/field/graph.ts");
   const out = withTrail(map, trailOf(info, events()), true);
   const g = build(out, null, []);
-  const r = ranks(g, g.linkKinds.map((t) => t === "after"));
-  const rank = (id: string) => r.rank[g.idIx.get(id)!];
-  assert.deepEqual(["session:r1", "trail:r1:turn:1", "trail:r1:turn:3", "trail:r1:turn:9"].map(rank), [0, 1, 2, 3]);
-  assert.equal(rank("trail:r1:6"), -1, "a call has no column of its own: it hangs under its turn");
+  const c = cells(g, g.linkKinds.map((t) => (t === "then" ? 1 : t === "after" ? 2 : 0)));
+  const cell = (id: string) => {
+    const i = g.idIx.get(id)!;
+    return [c.root[i] === -1 ? null : g.id[c.root[i]!], c.col[i], c.row[i]];
+  };
+  assert.deepEqual(cell("session:r1"), [null, 0, 0], "the session is the grid's root");
+  assert.deepEqual(["trail:r1:turn:1", "trail:r1:turn:3", "trail:r1:turn:9"].map(cell), [["session:r1", 1, 0], ["session:r1", 2, 0], ["session:r1", 3, 0]]);
+  assert.deepEqual(["trail:r1:6", "trail:r1:7", "trail:r1:10", "trail:r1:12"].map(cell), [["session:r1", 2, 1], ["session:r1", 2, 2], ["session:r1", 3, 1], ["session:r1", 3, 2]]);
 });
 
 test("withTrail: off, or no trail, the map as it was; a live session is not drawn twice", () => {

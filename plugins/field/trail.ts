@@ -22,9 +22,9 @@ export interface TrailIn {
 /** The types a trail is drawn in: none is a type of the map. */
 export const TRAIL_TYPES = { turn: "trail turn", call: "trail call", said: "trail said" } as const;
 
-/** The link that orders a trail's turns: a turn is `after` the one before it, so flow (behaviours/flow.ts) puts the earlier on the left. */
+/** The link that orders a trail's turns: a turn is `after` the one before it, so stack (behaviours/stack.ts) puts it one column to the right. */
 export const TRAIL_AFTER = "after";
-/** The link that orders a turn's calls: a call is `then` the one above it (the turn, or the call before), so stack (behaviours/stack.ts) hangs them in order below the turn. */
+/** The link that orders a turn's calls: a call is `then` the one above it (the turn, or the call before), so stack puts it one row below. */
 export const TRAIL_THEN = "then";
 
 const shape = (s: (typeof MARK_SHAPES)[number]) => MARK_SHAPES.indexOf(s);
@@ -52,9 +52,8 @@ export function withTrail(input: FieldIn, trail: TrailIn | null | undefined, on:
   const session = sessionId(trail.run);
   if (!ids.has(session)) items.push({ id: session, title: trail.title, type: "session", status: "past", closed: false, kind: "", base: "session", shape: shape("pentagon"), side: 0 });
 
-  // The turns in order, each `after` the one before (an order link: flow reads them left to right), from the
-  // session; each turn's calls hang under it in order, each `then` the one before (a stacking link: stack
-  // reads them top to bottom).
+  // One grid (behaviours/stack.ts) from the session: the turns across in order, each `after` the one before;
+  // each turn's calls down under it in order, each `then` the one above.
   let before: Id = session;
   const next = (id: Id) => (link(TRAIL_AFTER, id, before), (before = id));
   if (trail.earlier) {
