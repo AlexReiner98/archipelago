@@ -27,11 +27,8 @@ adopt onto the map, so a change made there is what the next session loads;
 
 ## Connect Claude Code
 
-A map with no run opens on Field with what to copy: the MCP line and the
-hooks for `~/.claude/settings.json`, for this server. Copy both, start
-Claude Code in any repository, and the first run shows as it begins.
-
-Or start one session against it, without touching your settings:
+A map with no run opens on an empty canvas. Start one session against it,
+without touching your settings, and the first run shows as it begins:
 
 ```
 claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json

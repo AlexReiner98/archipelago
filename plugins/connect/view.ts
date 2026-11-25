@@ -1,9 +1,11 @@
 /**
  * The connect plugin, page side: the first moments of a new map.
  *
- * - While the map has no run, the next step: connect Claude Code. It fills
+ * - While the map has no run, on a server that takes a token or serves its
+ *   hook script (a hosted map), the next step: connect Claude Code. It fills
  *   Field's `field.empty` with the MCP line and the hooks for this server
- *   (`connect.setup`), each one line and copied whole with a click. Where the
+ *   (`connect.setup`), each one line and copied whole with a click. A local
+ *   map shows its canvas alone: its README has the command. Where the
  *   server takes a token, "Make a token" asks for one (`connect.token`) and
  *   puts it in what is copied; the line on the page keeps it hidden.
  * - When the first run begins, a line in `over` says so, live, with the
@@ -137,7 +139,8 @@ const connectView: Plugin = {
       const [token, setToken] = useState<string | undefined>(undefined);
       const [tokenErr, setErr] = useState<string | undefined>(undefined);
       const err = tokenErr ?? failed;
-      if (had !== false || (!setup && !err)) return null;
+      // Only where the page holds what the terminal can't: a token, or a hosted hook script. A local map is its canvas alone (README, "Connect Claude Code").
+      if (had !== false || !setup || !(setup.token || setup.install)) return null;
       const make = async () => {
         if (setup?.tokenAt) {
           // The host keeps tokens: ask it, on this origin, with this page's cookie.

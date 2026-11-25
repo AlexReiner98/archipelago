@@ -1,8 +1,10 @@
 # connect
 
 The first moments of a new map: what to do until the first run lands. On a
-map with no run, Field's empty state shows the next step, connect Claude
-Code, with what to copy for this server. When the first run begins, a line
+hosted map with no run (the server takes a token or serves its hook script),
+Field's empty state shows the next step, connect Claude Code, with what to
+copy for this server and the token only the page can make. A local map shows
+its canvas alone; the README has the command. When the first run begins, a line
 says so, live, and opens it in the harness view.
 
 ```

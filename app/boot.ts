@@ -9,14 +9,18 @@
 import { startBrowser } from "../runtime/browser.ts";
 
 /**
- * Where the bridge is: two ports above the page, or, when a host serves the
- * page and the bridge on one origin, at `/bridge/` there (it answers `caps`).
+ * Where the bridge is: at `/bridge/` on the page's origin when a host serves
+ * both there (it answers `caps`); where the dev server's `/bridge/caps`
+ * says (`{ at }`, runtime/serve.ts); else two ports above the page.
  */
 async function bridgeUrl(): Promise<string> {
   const same = new URL("/bridge/", location.href).href;
   try {
     const r = await fetch(same + "caps");
-    if (r.ok && (r.headers.get("content-type") ?? "").includes("json")) return same;
+    if (r.ok && (r.headers.get("content-type") ?? "").includes("json")) {
+      const at = ((await r.json()) as { at?: unknown }).at;
+      return typeof at === "string" ? at : same;
+    }
   } catch {
     // Not there: the dev server's own ports.
   }

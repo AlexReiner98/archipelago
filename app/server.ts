@@ -69,7 +69,7 @@ for (const s of host.loader.status()) {
   if (s.state !== "active") console.log(`${s.id}: ${s.state}${s.missing ? ` (waiting for ${s.missing.join(", ")})` : ""}${s.error ? ` ${s.error}` : ""}`);
 }
 // A note's pictures: <data>/files, at /files/ on the page's own origin.
-const page = await serve({ port: PAGE, root, watch: values.watch, files: join(values.data, "files"), ...pageAccess({ port: PAGE }) });
+const page = await serve({ port: PAGE, root, watch: values.watch, files: join(values.data, "files"), bridge: PAGE + 2, ...pageAccess({ port: PAGE }) });
 console.log(`context interface on ${page.url}app/${values.watch ? "" : " (hot reload off)"}`);
 
 const stop = async () => {
