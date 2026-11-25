@@ -25,8 +25,17 @@ npm run live:setup        # the worktree at main's head, its own npm ci
 npm run live:start        # also live:stop, live:status
 ```
 
-Open http://127.0.0.1:5180/app/. Point the user-level hooks and MCP server
-at it ([plugins/claude-code/README.md](../plugins/claude-code/README.md), "Every
+`live:setup` refuses a checkout in a folder that goes away (the system's
+temp folder, one an app made for one session, a session's own worktree),
+since live's data would go with it; `--here-anyway` goes on regardless.
+
+Open http://127.0.0.1:5180/app/. Live runs from its own worktree, so
+`live:start` tells it the checkout you set it up from
+(`ARCHIPELAGO_CHECKOUT`): its empty map offers to connect this folder, and
+`connect.here` with no folder connects it, not the worktree. Sessions
+started here then report to live. To have every session report, wherever
+it runs, point the user-level hooks and MCP server at it
+([plugins/claude-code/README.md](../plugins/claude-code/README.md), "Every
 session"): the hook command runs the worktree's `plugins/claude-code/hook.ts`,
 not this checkout's.
 

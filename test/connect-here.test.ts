@@ -23,7 +23,7 @@ const REPO = JSON.parse(await readFile(new URL("../plugins/claude-code/settings.
 const probe: Plugin = { id: "probe", inject: ["action.invoke"], apply() {} };
 const wait = (ms = 200) => new Promise((r) => setTimeout(r, ms));
 
-async function tree(dir: string, opts: { writes: boolean }) {
+async function tree(dir: string, opts: { writes: boolean; folder?: string }) {
   const home = join(dir, "home");
   await mkdir(home, { recursive: true });
   const rt = new Runtime();
@@ -33,7 +33,7 @@ async function tree(dir: string, opts: { writes: boolean }) {
   const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const config: Record<string, object> = {
-    connect: { hook: HOOK, mcp: MCP_URL, writes: opts.writes, home },
+    connect: { hook: HOOK, mcp: MCP_URL, writes: opts.writes, home, ...(opts.folder ? { folder: opts.folder } : {}) },
     "connect-write": { hook: HOOK, mcp: MCP_URL, home, ledger: join(dir, "data", "connect.json") },
   };
   const entries: Entry[] = Object.keys(modules)
@@ -134,6 +134,25 @@ test("connect.here is refused where the server writes no files, and for a folder
     assert.ok(!above.ok && above.refused.code === "connect.folder", "a folder above it");
   } finally {
     await w.loader.apply([]);
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a server that runs from another worktree (live) is told the checkout people work in: what it offers and connects by default", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "connect-checkout-"));
+  const work = join(dir, "archipelago");
+  await mkdir(work, { recursive: true });
+  const t = await tree(dir, { writes: false, folder: work });
+  try {
+    const state = await t.invoke(FOLDER_STATE, {});
+    assert.ok(state.ok, JSON.stringify(state));
+    assert.equal((state.output as { folder: string }).folder, work, "the default folder is the one named, not the server's own");
+    const setup = await t.invoke("connect.setup", {});
+    assert.ok(setup.ok);
+    assert.equal((setup.output as { folder?: string }).folder, work, "the empty map offers the checkout people work in");
+    assert.deepEqual(t.errors, []);
+  } finally {
+    await t.loader.apply([]);
     await rm(dir, { recursive: true, force: true });
   }
 });

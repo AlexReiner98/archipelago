@@ -51,7 +51,42 @@ npm run serve
 ```
 
 Open http://127.0.0.1:5280/app/ (or http://127.0.0.1:5280/, which sends
-you there). The map is kept in `app/.data/`, which git ignores.
+you there). The map is kept in `app/.data/`, which git ignores. That is
+enough to try it; for a map you mean to keep, set it up as below.
+
+## Set it up to keep
+
+The map is its data folder, so it lasts as long as the folder it is in.
+Where it lives is your choice: clone into a folder you keep, such as the
+one you keep code in. Not the system's temp folder, a folder an app made
+for one session, or a Claude Code session's own worktree
+(`.claude/worktrees/`): those go away with the session and take the map
+with them. `npm run serve` says so when it starts in one, and `live:setup`
+refuses one.
+
+Then run the live copy, the one your sessions report to:
+
+```
+cd <the folder you chose>/archipelago
+npm install
+npm run live:setup        # once: a worktree at main beside this one (../archipelago-live), with its own data
+npm run live:start        # detached: it outlives the terminal; also live:stop, live:status
+```
+
+Open http://127.0.0.1:5180/app/. Live runs a fixed commit with hot reload
+off, keeps its map in `../archipelago-live/app/.data/`, and offers to
+connect the checkout you set it up from (this one, not its own worktree):
+click **Connect Claude Code in archipelago** on the empty map. Sessions
+started in that folder report to it from then on. Edit and test here
+(`npm run dev` on 5280 never touches live), and move live to new code with
+`npm run promote` ([Live and dev](guide/live-and-dev.md)).
+
+**If an agent sets it up for you,** these are its steps: it asks you where
+your map should live before it clones anything (your choice, not its),
+never works in a folder that goes away, starts live, and connects that
+folder with `connect.here { folder }` (the page's line does the same). A
+session that began in a temporary folder then tells you to start your
+next session in the clone, since it is the folder that reports to the map.
 
 ## Connect Claude Code
 

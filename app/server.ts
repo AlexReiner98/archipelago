@@ -27,13 +27,18 @@
  * beside a live one: those files are what real sessions load, and only live
  * writes them. `npm run serve`, a person's own copy, writes them.
  *
+ * --checkout dir (ARCHIPELAGO_CHECKOUT) names the checkout people work in,
+ * when the server runs from another: what the page offers to connect, and
+ * what `connect.here` connects by default. scripts/live.ts sets it to the
+ * checkout live was set up from, since live runs from a worktree of its own.
+ *
  * The page serves <data>/files at /files/, images only: a note's
  * `![alt](/files/shot.png)` draws from there (plugins/item/README.md).
  *
  * Point Claude Code at the adapter (plugins/claude-code/README.md) and open
  * http://127.0.0.1:5180/app/.
  *
- *   node app/server.ts [--data dir] [--port 5180] [--no-watch] [--no-write]
+ *   node app/server.ts [--data dir] [--port 5180] [--no-watch] [--no-write] [--checkout dir]
  */
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -41,6 +46,7 @@ import { parseArgs } from "node:util";
 import { NodeHost } from "../runtime/node.ts";
 import { serve } from "../runtime/serve.ts";
 import { otelFromEnv, pageAccess, serverTree } from "./tree.ts";
+import { temporaryPlace } from "../scripts/place.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { values } = parseArgs({
@@ -50,11 +56,15 @@ const { values } = parseArgs({
     port: { type: "string", default: process.env.ARCHIPELAGO_PORT ?? "5180" },
     watch: { type: "boolean", default: process.env.ARCHIPELAGO_WATCH !== "0" },
     write: { type: "boolean", default: process.env.ARCHIPELAGO_WRITE !== "0" },
+    checkout: { type: "string", default: process.env.ARCHIPELAGO_CHECKOUT || undefined },
   },
 });
 const PAGE = Number(values.port);
+// A map kept somewhere that goes away goes with it: said once, at start (scripts/place.ts).
+const away = temporaryPlace(values.data);
+if (away) console.log(`note: this map's data (${values.data}) won't last: ${away}. To keep a map, run it from a checkout in a folder you keep (README, "Set it up to keep").`);
 
-const tree = serverTree({ data: values.data, port: PAGE, write: values.write, otel: otelFromEnv(process.env) });
+const tree = serverTree({ data: values.data, port: PAGE, write: values.write, otel: otelFromEnv(process.env), ...(values.checkout ? { checkout: values.checkout } : {}) });
 
 const host = new NodeHost({
   tree,

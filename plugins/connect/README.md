@@ -23,7 +23,7 @@ first run begins ─▶ ◐ First run · <its name>  open ─▶ Harness, on tha
 | [here.ts](here.ts) | server | The `connection` type, and what a connected folder's files hold: the repository's hooks for this adapter, the MCP server, git's exclude lines. Plain data |
 | [folders.ts](folders.ts) | server | `connect.here`, `connect.away`, `connect.folder`: a folder's connection on or off, as a change set (history shows it, undo takes it back). Refused where the server writes no files |
 | [write.ts](write.ts) | server | `connect-write`: each connection that is on written into its folder's files through [project-files](../project-files/README.md), beside what is there; taken out when it goes off, is undone, or the server shuts down (Ctrl+C; after a crash or a hard kill, at its next start, if the connection is off by then). Loaded only when the server writes and has no host in front |
-| [index.ts](index.ts) | server | `connect.setup`, `connect.token` when a token action is named, and the folder actions (folders.ts). Config `writes`, `home`. Injects `action.register`, `types.define`, `graph.read` |
+| [index.ts](index.ts) | server | `connect.setup`, `connect.token` when a token action is named, and the folder actions (folders.ts). Config `writes`, `home`, `folder`. Injects `action.register`, `types.define`, `graph.read` |
 | [view.ts](view.ts) | page | Fills Field's `field.empty`, `over`, and `top` on a guest map. Injects `action.invoke`, `exchange.read`, `exchange.watch`, `here.set`, `slot.fill` |
 
 ## What is copied
@@ -67,6 +67,7 @@ shows it as dots. With no token action, nothing asks for one.
 | `script` | none | Where a hook script is served (`<origin>/hook.ts`): the hooks row is then one command |
 | `name` | `archipelago` | The MCP server's name |
 | `save` | none | On a guest map: where the guest goes to keep it. The page then shows a quiet "save" in `top` |
+| `folder` | the checkout the server runs from | The checkout people work in: what the empty map offers to connect and `connect.here` connects when no folder is named. The live server runs from a worktree of its own, so `live:start` sets it to the checkout live was set up from (`--checkout`, `ARCHIPELAGO_CHECKOUT`) |
 
 [app/tree.ts](../../app/tree.ts) sets `hook` and `mcp` from the page's port.
 A host in front sets its own address, command and token action.

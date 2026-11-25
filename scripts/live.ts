@@ -3,7 +3,8 @@
  * from its own git worktree outside this checkout, with hot reload off and
  * its own data, so editing this checkout never touches it.
  *
- *   node scripts/live.ts setup [--data-from dir]   make the worktree at main's head, install, (copy data in)
+ *   node scripts/live.ts setup [--data-from dir]   make the worktree at main's head, install, (copy data in);
+ *                                                  refused in a folder that goes away (place.ts) without --here-anyway
  *   node scripts/live.ts start|stop|status          the live server, on 5180 (adapter 5181, bridge 5182)
  *   node scripts/live.ts promote [commit]           test the commit, move live to it, restart (default main)
  *   node scripts/live.ts rollback                   move live back to the commit before the last promote
@@ -22,6 +23,7 @@ import { dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { placeAdvice, temporaryPlace } from "./place.ts";
 
 const here = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const older = join(here, "..", "archipelago-next-live");
@@ -33,7 +35,7 @@ const DEV_PAGE = "http://127.0.0.1:5280/app/";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { "data-from": { type: "string" } },
+  options: { "data-from": { type: "string" }, "here-anyway": { type: "boolean" } },
 });
 
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
@@ -49,8 +51,13 @@ function npm(cwd: string, ...args: string[]): boolean {
   return spawnSync(["npm", ...args].join(" "), { cwd, stdio: "inherit", shell: true }).status === 0;
 }
 
-/** The live server, through scripts/server.ts: no hot reload, default ports. */
+/**
+ * The live server, through scripts/server.ts: no hot reload, default ports.
+ * It runs from its own worktree, so it is told the checkout people work in
+ * (this one, ARCHIPELAGO_CHECKOUT): what its page offers to connect.
+ */
 function server(verb: "start" | "stop" | "status"): boolean {
+  process.env.ARCHIPELAGO_CHECKOUT = here;
   return run(here, process.execPath, [join(here, "scripts", "server.ts"), verb, "--root", live, "--data", liveData, "--no-watch"]);
 }
 
@@ -137,6 +144,12 @@ function move(sha: string, why: string): boolean {
 const verb = positionals[0] ?? "status";
 switch (verb) {
   case "setup": {
+    // A map meant to last never starts in a folder that goes away (scripts/place.ts).
+    const why = temporaryPlace(here) ?? temporaryPlace(live);
+    if (why && !values["here-anyway"]) {
+      console.log(placeAdvice(temporaryPlace(here) ? here : live, why));
+      process.exit(1);
+    }
     if (existsSync(join(live, ".git"))) {
       console.log(`live worktree already at ${live} (${short(git(live, "rev-parse", "HEAD"))})`);
     } else {
