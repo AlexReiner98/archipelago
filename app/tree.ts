@@ -44,6 +44,8 @@ export interface TreeOptions {
   hosts?: string[];
   /** Where the otel plugin sends the exchange as spans (plugins/otel). Absent: it sends nothing. */
   otel?: OtelConfig;
+  /** The checkout people work in, when it isn't the one the server runs from (the live server's): what the page offers to connect. */
+  checkout?: string;
 }
 
 /**
@@ -77,7 +79,7 @@ export function pageAccess({ port: PAGE, origins = [], hosts = [] }: Pick<TreeOp
  * The server's config tree. A host that runs the server its own way (more
  * plugins, another front) starts from this tree and adds to it.
  */
-export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], otel = {} }: TreeOptions): Entry[] {
+export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], otel = {}, checkout }: TreeOptions): Entry[] {
   // The app's own origin is the page's: the adapter and the bridge answer it, and a host's in front.
   const access = pageAccess({ port: PAGE, origins, hosts });
   return [
@@ -132,7 +134,7 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
     // What a person copies to connect Claude Code: the adapter as this machine reaches it. A host in front sets its own.
     // A folder's sessions are connected from the page, as an item; its files written only by a server that writes and
     // has no host in front (a host never writes hooks into folders on its own machine).
-    { id: "connect", plugin: "plugins/connect/index.ts", config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp`, writes: write && !origins.length && !hosts.length } },
+    { id: "connect", plugin: "plugins/connect/index.ts", config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp`, writes: write && !origins.length && !hosts.length, ...(checkout ? { folder: checkout } : {}) } },
     {
       id: "connect-write",
       plugin: "plugins/connect/write.ts",
