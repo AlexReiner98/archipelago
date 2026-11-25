@@ -22,7 +22,8 @@ From the top:
   and item ids drawn by name with their mark, one click away.
 - **Tied to:** neighbours by kind of link, what it points at (→) and then
   what points at it (←), six at a time per kind. A click opens one.
-- **History:** the change sets that touched it (its fields, or a link to
+- **History:** folded under its head until opened (a click on "History ▸"),
+  and read only then: the change sets that touched it (its fields, or a link to
   or from it), newest first, ten at a time: who, when, why, and what
   changed (`status todo → doing`, `linked → part of …`). Each has an
   undo, which writes its inverse as a new change; a refusal (a field has

@@ -680,7 +680,8 @@ test("an opened say shows the whole block the agent got at its moment, tagged an
   assert.equal(gotAt(events, 4, speakers), "[Rule a] Later.", "another moment is its own block");
   assert.equal(gotAt(events, 5, speakers), undefined, "a load's words aren't handed back");
   assert.equal(gotAt(events, 0, speakers), undefined, "not a say");
-  assert.deepEqual(expand(events[1]!, block).map((p) => p.label), ["kind", "node", "place", "said", "agent got", "at"]);
+  assert.deepEqual(expand(events[1]!, block).map((p) => p.label), ["kind", "node", "place", "agent got", "at"], "a say's words once: in the block the agent got");
+  assert.deepEqual(expand(events[1]!).map((p) => p.label), ["kind", "node", "place", "said", "at"], "with no block, the say's own words");
 });
 
 test("the window bar: each share on the window's scale, a click shows only that share, a mark per node at the playhead", async () => {

@@ -16,6 +16,8 @@ export const STYLE = sheet(`
 .ip-marks { display:flex; flex-wrap:wrap; gap:var(--space-1); padding:0 var(--space-4) var(--space-2); }
 .ip-chip { font-size:var(--text-s); border:1px solid var(--line); border-radius:var(--radius); padding:0 var(--space-2); white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
 .ip-label { padding:var(--space-3) var(--space-4) var(--space-1); color:var(--dim); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:.06em; }
+.ip-fold { display:block; width:100%; text-align:left; font-family:inherit; background:none; border:0; cursor:pointer; }
+.ip-fold:hover { color:var(--fg); }
 .ip-note { margin:var(--space-1) var(--space-4) var(--space-2); }
 .ip-note p { margin:0 0 var(--space-2); }
 .ip-note ul, .ip-note ol { margin:0 0 var(--space-2); padding-left:1.3em; }

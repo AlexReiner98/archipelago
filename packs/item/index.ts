@@ -2,7 +2,8 @@
  * The item pack, page side: one page per item, in the region `right`, for
  * the item `here.item` names. Its mark and title, its fields as marks, its
  * note (the lead shown, sections folded), its neighbours by kind of link,
- * and its history: who changed what and when, each change undoable.
+ * and its history, folded until opened: who changed what and when, each
+ * change undoable.
  *
  * It only looks, and undoes. Nobody adds, links or edits items by hand
  * here: agents change the map through the items actions, and the page
@@ -90,6 +91,14 @@ const item: Pack = {
       invoke,
     });
 
+    /** A section folded under its head until opened, and read only then: the page opens on what the item is. */
+    const Fold = ({ label, children }: { label: string; children?: unknown }) => {
+      const [open, setOpen] = useState(false);
+      return html`
+        <button class="ip-label ip-fold" aria-expanded=${open} title=${open ? `Fold the ${label.toLowerCase()}` : `Show the ${label.toLowerCase()}`} onClick=${() => setOpen(!open)}>${label} ${open ? "▾" : "▸"}</button>
+        ${open && children}`;
+    };
+
     const Page = () => {
       const idx = useIndex();
       const id = useHere<string>(KEYS.item);
@@ -118,8 +127,9 @@ const item: Pack = {
           ${note && html`<${P.Note} key=${id} text=${note} />`}
           ${groups.length > 0 && html`<div class="ip-label">Tied to</div>`}
           <${P.Neighbours} key=${id} groups=${groups} />
-          <div class="ip-label">History</div>
-          <${P.History} key=${id} id=${id} tick=${seen} lines=${lines} />
+          <${Fold} key=${id} label="History">
+            <${P.History} id=${id} tick=${seen} lines=${lines} />
+          <//>
           <div class="ip-foot">
             <button class="ip-btn" onClick=${() => set.set(QUERY, `in:${id}`)} title="Draw this and its parts">inside</button>
             <button class="ip-btn" onClick=${() => set.set(QUERY, `near:${id}`)} title="Draw this and what it is linked to">around</button>

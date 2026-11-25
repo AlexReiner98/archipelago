@@ -31,7 +31,7 @@ import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import type { BridgeLink } from "../bridge/client.ts";
 import { sheet } from "../../spec/style.ts";
-import { brief, group, liveness, standing, status, touches, type Change, type Group } from "./model.ts";
+import { brief, group, liveness, openAtFirst, standing, status, touches, type Change, type Group } from "./model.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -50,6 +50,8 @@ const STYLE = sheet(`
 .av-head .sp { flex:1; }
 .av-body { flex:1; overflow:auto; min-height:0; padding-bottom:var(--space-5); }
 .av-run { display:flex; gap:var(--space-3); align-items:baseline; padding:var(--space-3) var(--space-4) 1px; white-space:nowrap; cursor:pointer; }
+.av-fold { font:inherit; background:none; border:0; padding:0; color:var(--dim); cursor:pointer; width:1em; }
+.av-fold:hover { color:var(--fg); }
 .av-run .x { font-weight:var(--bold); overflow:hidden; text-overflow:ellipsis; min-width:0; }
 .av-run:hover .x { text-decoration:underline; }
 .av-lit { background:var(--lit); }
@@ -248,18 +250,19 @@ const activity: Pack = {
       `;
     };
 
-    const GroupRows = ({ g, lit, now }: { g: Group; lit: boolean; now: number }) => {
+    const GroupRows = ({ g, lit, now, open, onFold }: { g: Group; lit: boolean; now: number; open: boolean; onFold(): void }) => {
       const state = g.run ? liveness(g.run, heard.get(g.run.run), now) : "ended";
       const title = g.run ? runName(g.run) : g.actor;
       return html`
         <div class=${`av-run ${lit ? "av-lit" : ""}`} onClick=${() => g.run && set.set(KEYS.run, g.run.run)} title=${g.run ? `${g.run.run}${g.run.task ? ` · on ${g.run.task}` : ""}` : "changes made outside a run"}>
+          <button class="av-fold" aria-expanded=${open} title=${open ? "Fold its changes" : "Show its changes"} onClick=${(e: Event) => (e.stopPropagation(), onFold())}>${open ? "▾" : "▸"}</button>
           <span class=${state === "live" ? "av-open" : "av-dim"} title=${g.run ? state : "no run"}>${g.key.startsWith("run:") ? (state === "live" ? "●" : state === "open" ? "◌" : "○") : "◇"}</span>
           <span class="x">${title ?? g.key.slice(4, 12)}</span>
           <span class="av-n">${day(g.run?.started ?? g.last)}${g.run?.ended ? `–${clock(g.run.ended)}` : g.run ? ` · ${state}` : ""}</span>
           <span class="av-n">${plural(g.changes.length, "change")}</span>
           ${g.key.startsWith("run:") && html`<button class="av-btn" title="Show what was said and done in the harness" onClick=${(e: Event) => (e.stopPropagation(), openRun(g.key.slice(4)))}>⇢ harness</button>`}
         </div>
-        ${g.changes.map((c) => html`<${ChangeRows} key=${c.id} c=${c} />`)}
+        ${open && g.changes.map((c) => html`<${ChangeRows} key=${c.id} c=${c} />`)}
       `;
     };
 
@@ -267,10 +270,20 @@ const activity: Pack = {
       const store = useStore();
       const pinned = useHere<string>(KEYS.run);
       const [quiet, setQuiet] = useState(false);
+      // What a click has opened or folded, over what is open at first (openAtFirst).
+      const [flip, setFlip] = useState<ReadonlySet<string>>(new Set());
       const groups = group(store.runs, store.changes);
       const shown = groups.filter((g) => quiet || g.changes.length > 0 || (!!g.run && liveness(g.run, heard.get(g.run.run), store.now) === "live"));
       const hidden = groups.length - shown.length;
       const st = status(store.runs, [], heard, store.now);
+      const first = openAtFirst(shown, (g) => !!g.run && liveness(g.run, heard.get(g.run.run), store.now) === "live", pinned);
+      const isOpen = (k: string) => first.has(k) !== flip.has(k);
+      const fold = (k: string) => setFlip((f) => {
+        const n = new Set(f);
+        if (n.has(k)) n.delete(k);
+        else n.add(k);
+        return n;
+      });
       return html`
         <div class="av">
           <div class="av-head">
@@ -283,7 +296,7 @@ const activity: Pack = {
           </div>
           <div class="av-body">
             ${shown.length === 0 && html`<div class="av-empty" title="When an agent runs or changes the map, it shows here, each change with its undo.">No runs or changes yet</div>`}
-            ${shown.map((g) => html`<${GroupRows} key=${g.key} g=${g} now=${store.now} lit=${!!g.run && g.run.run === pinned} />`)}
+            ${shown.map((g) => html`<${GroupRows} key=${g.key} g=${g} now=${store.now} lit=${!!g.run && g.run.run === pinned} open=${isOpen(g.key)} onFold=${() => fold(g.key)} />`)}
             ${store.next && html`<button class="av-btn av-more" onClick=${() => void more()}>older changes</button>`}
           </div>
         </div>

@@ -340,13 +340,13 @@ const MapRow = ({ w, picked, onPick }: { w: WindowRead; hues?: Map<string, strin
     </div>`;
 };
 
-/** The browser's memory of whether the window bar is open: open until folded to its one line. */
+/** The browser's memory of whether the window bar is open: folded to its one line until opened, so the tree is what is read first. */
 const WINDOW_OPEN = "harness.window-open";
 function windowOpen(): boolean {
   try {
-    return localStorage.getItem(WINDOW_OPEN) !== "0";
+    return localStorage.getItem(WINDOW_OPEN) === "1";
   } catch {
-    return true;
+    return false;
   }
 }
 

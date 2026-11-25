@@ -5,7 +5,8 @@
  *
  * - The map to the agent: what a node said or refused (whole), its node,
  *   place and pack; a gate's hold and why; for a Claude Code run, the whole
- *   block the agent got at that moment (got.ts).
+ *   block the agent got at that moment (got.ts), which holds a say's words,
+ *   so they are not shown twice.
  * - The agent to the map: an act's kind, who did it, and its input and
  *   output field by field (a tool call's arguments, a `tell`'s words, an
  *   action's input, a prompt or a reply in full); whether it worked.
@@ -86,7 +87,8 @@ export function expand(e: ExchangeEvent, got?: string): Part[] {
     head("node", e.node);
     head("place", e.place);
     head("pack", e.pack);
-    if (e.text) out.push({ label: e.kind === "refuse" ? "refused" : e.kind === "say" ? "said" : "text", text: e.text });
+    // A say's words are in the block the agent got, under its node's name: shown once, there.
+    if (e.text && !(got && e.kind === "say")) out.push({ label: e.kind === "refuse" ? "refused" : e.kind === "say" ? "said" : "text", text: e.text });
     if (got) out.push({ label: "agent got", text: got });
   }
   if (e.detail !== undefined && e.detail !== null) out.push(...fields("detail", e.detail));

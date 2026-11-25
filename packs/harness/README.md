@@ -235,9 +235,9 @@ With the context pack ([context](../context/README.md)), a bar along the
 foot of the agent in focus, and of one run's tree, says how full its context window
 is at the playhead, or live (`context.window`): the tokens in it of the
 window's size and the share that is, "≈" when it is an estimate (no usage
-in the transcript yet), and how many compactions. It starts open; its
-head ("window ▾") folds it to that one line, and the browser remembers
-which (`harness.window-open`). Before the window is read it keeps its
+in the transcript yet), and how many compactions. It starts folded to that
+one line, so the tree is read first; its head ("window ▸") opens it, and
+the browser remembers which (`harness.window-open`). Before the window is read it keeps its
 room, open or folded, so the tree above never moves when it comes. Live,
 it is read again as events come, at most every 3 s; an event inside that
 time reads once the time is up, and a read in flight is kept unless the
@@ -288,8 +288,9 @@ scrolled up to read, it stays where it is. A click
 picks its node for the node pane: its own, or for an act the node it
 failed, else the node told just before it (`nodeOf`, replay.ts); and it
 opens the line in place ([expand.ts](expand.ts)): for the map to the agent,
-the node, place, pack and what was said, whole, then, for a Claude Code
-run, "agent got": the whole block the hook handed the agent at that moment,
+the node, place, pack and what was said, whole, or, for a Claude Code
+run, "agent got" in its place: the whole block the hook handed the agent at that moment
+(which holds what was said, so it shows once),
 each node's words under its tag and in the adapter's order, rebuilt with
 the adapter's own formatting ([got.ts](got.ts), packs/claude-code/context.ts);
 for the agent to the map,

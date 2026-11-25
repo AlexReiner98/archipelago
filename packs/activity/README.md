@@ -24,6 +24,9 @@ their new values (∅ cleared).
   set, such as `graph.conflict` when a later change moved the same field.
   People write nothing else here.
 - Runs that changed nothing and aren't live are hidden behind "+ N quiet".
+- Open at first: the newest group, every live run, and the run picked
+  (`openAtFirst`). Each other folds to its one line (▸) until a click
+  opens it, so the page opens on what is happening now.
 - It meets the harness through `here.run`: a run picked here is the run the
   harness shows, and `⇢ harness` opens it there. The harness shows what was
   said and done in a run; this shows what it changed. An item opens on the
