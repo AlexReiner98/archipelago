@@ -57,7 +57,7 @@ export const DESCRIPTIONS: Record<string, string> = {
   query:
     "Find items. find: words match titles; is:open, is:closed, type:<type or base>, status:<s>, in:<id> (what is part of it), near:<id>. " +
     "walk follows links from what is found. At most limit come back.",
-  tell: "Say what you concluded, in one short line, about the items it concerns. It is kept as a record; replaces supersedes an earlier one.",
+  tell: "Say what you concluded: said, one short line; about, the ids of the items it concerns. It is kept as a record; replaces supersedes an earlier one.",
   run: "Say what this run is: its title, the task it took on, the run that started it; end: true when it is over.",
 };
 
@@ -529,7 +529,11 @@ const mcp: Plugin<McpConfig> = {
         },
         async call(args, run) {
           if (!run) return no(NO_RUN);
-          const input: { [key: string]: Json } = { said: typeof args.said === "string" ? args.said : "" };
+          if (typeof args.said !== "string" || !args.said.trim()) {
+            const other = Object.keys(args).filter((k) => !["said", "about", "replaces"].includes(k));
+            return no(`tell takes said: the one short line${other.length ? `, not ${other.join(", ")}` : ""}.`);
+          }
+          const input: { [key: string]: Json } = { said: args.said };
           const about = ids(args.about);
           if (about.length) input.about = about;
           if (typeof args.replaces === "string") input.replaces = args.replaces;

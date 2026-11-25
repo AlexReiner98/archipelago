@@ -33,6 +33,8 @@ export interface McpPorts {
   runFor(toolUseId: string | undefined): ToolRun | undefined;
   /** Makes the call itself, when the adapter records it (a client without hooks); absent, `tool.call`. */
   call?(tool: ToolDef, args: { [key: string]: Json }, run: ToolRun | undefined): Promise<ToolResult>;
+  /** What `initialize` tells the client to keep in mind (MCP's `instructions`). */
+  instructions?: string;
 }
 
 const result = (id: JsonRpc["id"], value: Json) => ({ jsonrpc: "2.0", id: id ?? null, result: value });
@@ -48,6 +50,7 @@ export async function rpc(msg: JsonRpc, ports: McpPorts): Promise<object | undef
         protocolVersion: typeof msg.params?.protocolVersion === "string" ? msg.params.protocolVersion : PROTOCOL,
         capabilities: { tools: {} },
         serverInfo: SERVER,
+        ...(ports.instructions ? { instructions: ports.instructions } : {}),
       });
     case "ping":
       return result(msg.id, {});

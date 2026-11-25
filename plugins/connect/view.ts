@@ -5,7 +5,8 @@
  *   hook script (a hosted map), the next step: connect Claude Code. It fills
  *   Field's `field.empty` with the MCP line and the hooks for this server
  *   (`connect.setup`), each one line and copied whole with a click. A local
- *   map shows its canvas alone: its README has the command. Where the
+ *   map shows one line instead: the command that starts a session reporting
+ *   here (`here`), when the checkout's mcp.json reaches this server. Where the
  *   server takes a token, "Make a token" asks for one (`connect.token`) and
  *   puts it in what is copied; the line on the page keeps it hidden.
  * - When the first run begins, a line in `over` says so, live, with the
@@ -51,6 +52,7 @@ const STYLE = sheet(`
 .cn-btn { flex:none; font:inherit; font-size:var(--text-s); background:var(--control); border:1px solid var(--control-line); color:var(--control-fg); border-radius:var(--radius); padding:0 var(--space-3); cursor:pointer; }
 .cn-wait { display:flex; gap:var(--space-4); align-items:baseline; color:var(--dim); white-space:nowrap; padding-top:var(--space-3); }
 .cn-wait .k { width:3.5em; flex:none; }
+.cn-here { max-width:calc(100vw - 2 * var(--space-5)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:var(--mono); font-size:var(--text-s); color:var(--dim); user-select:all; pointer-events:auto; }
 .cn-mark::before { content:var(--glyph-circle-fresh); color:var(--mark-fresh); }
 .cn-err { color:var(--failed); font-size:var(--text-s); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cn-landed { position:fixed; left:50%; bottom:calc(var(--space-5) * 3); transform:translateX(-50%); max-width:calc(100vw - 2 * var(--space-5)); display:flex; gap:var(--space-4); align-items:baseline; white-space:nowrap;
@@ -139,8 +141,13 @@ const connectView: Plugin = {
       const [token, setToken] = useState<string | undefined>(undefined);
       const [tokenErr, setErr] = useState<string | undefined>(undefined);
       const err = tokenErr ?? failed;
-      // Only where the page holds what the terminal can't: a token, or a hosted hook script. A local map is its canvas alone (README, "Connect Claude Code").
-      if (had !== false || !setup || !(setup.token || setup.install)) return null;
+      if (had !== false || !setup) return null;
+      // A local map: the one command that starts a session reporting here, as a line of text.
+      if (!(setup.token || setup.install)) {
+        return setup.here
+          ? html`<div class="cn-here" title=${`Run in ${setup.folder}: a Claude Code session that reports here, your own settings untouched.`}>${setup.here}</div>`
+          : null;
+      }
       const make = async () => {
         if (setup?.tokenAt) {
           // The host keeps tokens: ask it, on this origin, with this page's cookie.

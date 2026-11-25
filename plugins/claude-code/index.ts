@@ -11,7 +11,8 @@
  *   tools plugins add through `mcp.host`, which this plugin provides. A client
  *   without hooks gets an `Mcp-Session-Id` on `initialize`, and its session
  *   is a run of its own (`mcp-<id>`, the client as agent); `DELETE /mcp`
- *   ends it.
+ *   ends it, and so does a quiet `idleMinutes`. It is told (HOOKLESS) that
+ *   only its tool calls are recorded, and how a Claude Code session gets hooks.
  *
  * Each run (a Claude Code session) gets its own context, intercepted with the
  * agent as actor and the session id as run, so every call is the run's.
@@ -66,7 +67,20 @@ export interface ClaudeCodeConfig extends LocalAccess {
    * sets false: a hook's path names a file on another machine, and it reads only the pages the hook sends.
    */
   files?: boolean;
+  /** Minutes a hook-less MCP session may be quiet before it is ended, and its run with it. Default 10. */
+  idleMinutes?: number;
 }
+
+/**
+ * What a client without hooks is told: on `initialize` (MCP's `instructions`)
+ * and with its first tool's answer, since a script reads no instructions.
+ */
+export const HOOKLESS =
+  "Only your calls to these tools are recorded on this map, not your prompts or your other tools. " +
+  "If you are a Claude Code session, ask the person to restart it with Archipelago's hooks " +
+  "(in a checkout of the repository: claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json), " +
+  "and keep asking until a session with them starts. A chat client that has no hooks can go on as it is. " +
+  "Keep one MCP session open for the whole run: each new one is a run of its own, ended after a quiet while.";
 
 /** The transcript plugin's action for a page a hook sent (plugins/transcript). */
 const TAKE = "transcript.take";
@@ -103,6 +117,8 @@ interface Session {
   actor: Actor;
   client: string;
   state: RunState;
+  /** When it was last heard from (ms): quiet past `idleMinutes`, it is ended. */
+  last: number;
 }
 
 interface RunState extends RunPort {
@@ -279,6 +295,7 @@ const claudeCode: Plugin<ClaudeCodeConfig> = {
         if (!st.begun) {
           await st.agent.begin({ run: s.run, agent: s.actor, harness: s.client, reaches: MCP_REACHES, title: s.client });
           st.begun = true;
+          said.push(HOOKLESS);
           said.push(spoken(await st.agent.reach({ run: s.run, places: ["session_start"], time: now() }), speakers, ["session_start"]));
         }
         const place = `tool:${prefix}${tool.name}`;
@@ -314,7 +331,7 @@ const claudeCode: Plugin<ClaudeCodeConfig> = {
       const run = `mcp-${id}`;
       const runCtx = ctx.intercept({ [META.actor]: agent, [META.run]: run });
       const state: RunState = { agent: runCtx.get<AgentRun>("agent.run"), invoke: runCtx.get<ActionInvoke>("action.invoke"), begun: false, seen: new Set(), queue: Promise.resolve() };
-      sessions.set(id, { run, actor: agent, client: agent.id, state });
+      sessions.set(id, { run, actor: agent, client: agent.id, state, last: Date.now() });
       return id;
     };
     const endSession = async (id: string) => {
@@ -327,10 +344,20 @@ const claudeCode: Plugin<ClaudeCodeConfig> = {
       await s.state.queue;
     };
     ctx.effect(() => () => void sessions.clear());
+    // A client that never says DELETE (a script, a crash, a dropped line) is ended once quiet: its id then answers 404, MCP's sign to start again.
+    const idle = (config.idleMinutes ?? 10) * 60_000;
+    ctx.effect(() => {
+      const sweep = setInterval(() => {
+        const cut = Date.now() - idle;
+        for (const [id, s] of sessions) if (s.last < cut) void endSession(id);
+      }, Math.min(60_000, idle));
+      sweep.unref?.();
+      return () => clearInterval(sweep);
+    });
 
     const sessionMcp = (msg: JsonRpc, s: Session) => {
       const run: ToolRun = { run: s.run, actor: s.actor, agent: s.state.agent, invoke: s.state.invoke };
-      return rpc(msg, { runFor: () => run, tools: () => [...tools.values()], call: (tool, args, r) => sessionCall(s, tool, args, r ?? run) });
+      return rpc(msg, { runFor: () => run, tools: () => [...tools.values()], call: (tool, args, r) => sessionCall(s, tool, args, r ?? run), instructions: HOOKLESS });
     };
 
     const mcp = (msg: JsonRpc) =>
@@ -390,14 +417,17 @@ const claudeCode: Plugin<ClaudeCodeConfig> = {
             return send(res, 204);
           }
           if (req.method !== "POST") return send(res, 405);
+          if (session) session.last = Date.now();
           const parsed = JSON.parse(await body(req)) as JsonRpc | JsonRpc[];
-          const answer = (m: JsonRpc) => (session ? sessionMcp(m, session) : mcp(m));
+          const opened = session || Array.isArray(parsed) ? undefined : sessionOf(parsed);
+          if (opened) res.setHeader("mcp-session-id", opened);
+          // A session's own answers, `initialize` included: it is told what is recorded.
+          const mine = session ?? (opened ? sessions.get(opened) : undefined);
+          const answer = (m: JsonRpc) => (mine ? sessionMcp(m, mine) : mcp(m));
           if (Array.isArray(parsed)) {
             const out = (await Promise.all(parsed.map(answer))).filter(Boolean);
             return out.length ? send(res, 200, out) : send(res, 202);
           }
-          const opened = session ? undefined : sessionOf(parsed);
-          if (opened) res.setHeader("mcp-session-id", opened);
           const out = await answer(parsed);
           return out ? send(res, 200, out) : send(res, 202);
         }
