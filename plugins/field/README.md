@@ -123,7 +123,7 @@ find line has words, only what it finds and what lies near it.
   switch) and
   closed (faded), items with no links, and each link type as a switch, with how many the map has and how many show. Each mark is drawn by
   `markPath` ([shapes.ts](shapes.ts)) with the drawing's own dials
-  (`shapes`, `hollow_line`, `closed_fade`), so the key reads as the map
+  ([draw.ts](draw.ts): `shapes`, `hollow_line`, `closed_fade`), so the key reads as the map
   does; with shapes off, the shape and fill keys go. What is hidden is
   left out of the layout and the graph settles again with what is shown.
   What is hidden is `field.hide` (page scope); it starts with closed items
@@ -147,7 +147,8 @@ find line has words, only what it finds and what lies near it.
   the view that overlaps no title, no particle and not the legend. At most
   one per `label_room` square pixels.
 - **Hover** lights a particle, its links and its neighbours, dims the rest,
-  and names them ([paint.ts](paint.ts)); the pointer picks the nearest
+  and names them ([paint.ts](paint.ts) draws, [light.ts](light.ts) eases
+  the light, [particle.ts](particle.ts) draws one particle); the pointer picks the nearest
   particle within `hover_px` of its edge. A change to the map (an item or a
   session coming) renumbers the particles, and the hover and the light stay
   on the same items, by id ([carry.ts](carry.ts)), so nothing pointed at

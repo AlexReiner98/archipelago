@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { build, seed, type FieldIn } from "../plugins/field/graph.ts";
 import { BEHAVIOURS, RUN, defaults, step } from "../plugins/field/step.ts";
-import { DRAW } from "../plugins/field/paint.ts";
+import { DRAW } from "../plugins/field/draw.ts";
 import { CHECK, descends } from "../plugins/field/descends.ts";
 import { FIND } from "../plugins/field/filter.ts";
 

@@ -11,7 +11,7 @@
  *   agent with a tree of its own, the nodes its profile lets it hear
  *   (trees.ts), its profile over it and a click from changing (agents.ts);
  *   what it is told runs a light along its tree, in its colour.
- * - Right: the run's events, one line each (events.ts): the wider side,
+ * - Right (runfill.ts): the run's events, one line each (events.ts): the wider side,
  *   as an opened line needs the room. Live: the agent in focus's
  *   (`harness.focus`), opening in place as one run's do.
  *   Every run: the runs, or a profile's runs.
@@ -21,48 +21,49 @@
  *
  * The playhead is `here.event`: unset, the view follows the run's end
  * live. A click on a node sets `here.node`; on an event, `here.event` and
- * `here.node`. Everything it shows, and its styles, go when it unloads.
+ * `here.node`. Everything it shows, and its styles (style.ts), go when it
+ * unloads.
  */
 import { h } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import type { ActionInvoke, ActionList } from "../../spec/action.ts";
 import { runName, type AgentTree, type NodeInfo, type RunInfo } from "../../spec/agent.ts";
-import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
+import type { ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
 import type { ProfileHears, ProfileRead } from "../../spec/profile.ts";
 import { KEYS } from "../../spec/here.ts";
 import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
-import { sheet, v } from "../../spec/style.ts";
-import { Canvas, CANVAS_STYLE, type Fire, type Standing } from "./canvas.ts";
+import { v } from "../../spec/style.ts";
+import { Canvas, type Fire, type Standing } from "./canvas.ts";
 import type { RootMark } from "./paint.ts";
 import { CONTEXT_FILTER, OpenFilterButton } from "./open.ts";
 import { useGlide } from "./glide.ts";
 import type { Json } from "../../spec/common.ts";
 /** Each type's mark as the Landscape draws it (plugins/field), read by name: a key, not an import. */
 const FIELD_MARKS = "field.marks";
-import { Events, RUN_SLOT, runSlot, short } from "./events.ts";
+import { RUN_SLOT, runSlot } from "./events.ts";
 import { ALL, FOCUS, hooks, LIVE, PROFILE, type VerdictRead } from "./hooks.ts";
 import { colourOf, colours } from "./live.ts";
-import { AGENTS_STYLE, heardYet, placementOf, ProfileMenu } from "./agents.ts";
-import { focusOf, switchFocus, Trees, TREES_STYLE, treesAndRows } from "./trees.ts";
-import { DIALS_KEY, DIALS_STYLE, DialsPane, useDials } from "./dials.ts";
-import { Bar, BAR_STYLE } from "./bar.ts";
-import { KEEP_STYLE, keepParts } from "./keep.ts";
+import { heardYet, placementOf, ProfileMenu } from "./agents.ts";
+import { focusOf, switchFocus, Trees, treesAndRows } from "./trees.ts";
+import { DIALS_KEY, DialsPane, useDials } from "./dials.ts";
+import { Bar } from "./bar.ts";
+import { keepParts } from "./keep.ts";
 import { pluginHues, radial, treeOf, type Grouping } from "./layout.ts";
 import { nodePane } from "./node.ts";
 import { shows } from "./channels.ts";
 import { GIVEN, GivenPane, parseGiven, useGiven, type GivenInfo } from "./given.ts";
-import { holdsOf, nodeOf, playhead, stateAt } from "./replay.ts";
-import { day } from "./clock.ts";
-import { Timeline, TIMELINE_STYLE } from "./timeline.ts";
-import { useWindow, WINDOW, WindowBar, WINDOWBAR_STYLE, windowMarks } from "./windowbar.ts";
-import { NODE as NODE_WINDOW, TREND_STYLE } from "./trend.ts";
-import { SpendMark, SPEND, type Spend, SPEND_STYLE, useSpend } from "./spend.ts";
-import { CallStrip, CALLS_STYLE, callsOf, isCall, parentOf, requestNodes } from "./calls.ts";
+import { holdsOf, playhead, stateAt } from "./replay.ts";
+import { Timeline } from "./timeline.ts";
+import { useWindow, WINDOW, WindowBar, windowMarks } from "./windowbar.ts";
+import { NODE as NODE_WINDOW } from "./trend.ts";
+import { CallStrip, callsOf, isCall, parentOf, requestNodes } from "./calls.ts";
 import { KEY_OFF, offOf, store, stored } from "./keyoff.ts";
+import { STYLE } from "./style.ts";
+import { runFill } from "./runfill.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -72,76 +73,6 @@ const KEY_OPEN = "harness.key-open";
 
 /** How long a step lasts when the run plays, in ms. */
 const STEP = 260;
-
-const STYLE = sheet(`
-.hv-pane { display:flex; flex-direction:column; min-width:0; min-height:0; height:100%; }
-.hv-head { display:flex; gap:var(--space-3); align-items:center; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; min-height:20px; min-width:0; overflow:hidden; }
-.hv-head .t { font-weight:var(--bold); }
-.hv-head .sp, .hv-bar .sp { flex:1; }
-.hv-dim { color:var(--dim); }
-.hv-cut { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
-.hv-body { flex:1; overflow:auto; min-height:0; }
-.hv-row { display:flex; gap:var(--space-3); align-items:baseline; padding:1px var(--space-4); white-space:nowrap; cursor:pointer; }
-.hv-row:hover, .hv-ev:hover { background:color-mix(in srgb, var(--line) 50%, transparent); }
-.hv-row .x { overflow:hidden; text-overflow:ellipsis; flex:1; min-width:6em; }
-.hv-row .n { color:var(--dim); font-variant-numeric:tabular-nums; min-width:0; overflow:hidden; text-overflow:ellipsis; }
-.hv-group { padding:var(--space-3) var(--space-4) 1px; color:var(--dim); font-size:var(--text-s); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.hv-lit { background:var(--lit) !important; }
-.hv-pick { box-shadow:inset 3px 0 0 var(--pick); }
-.hv-m { width:1em; text-align:center; flex:none; }
-.m-held { color:var(--held); } .m-failed { color:var(--failed); } .m-quiet, .m-none { color:var(--quiet); } .m-act { color:${"var(--write)"}; }
-.hv-btn { font:inherit; background:var(--control); border:1px solid var(--control-line); color:var(--dim); padding:0 var(--space-3); border-radius:var(--radius); cursor:pointer; }
-.hv-bar button { font:inherit; background:none; border:0; color:var(--dim); padding:0; cursor:pointer; flex:none; }
-.hv-bar button:hover { color:var(--fg); }
-.hv-bar button.on { color:var(--fg); text-decoration:underline; text-underline-offset:4px; }
-.hv-select { font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); max-width:220px; min-width:0; }
-.hv-select option { background:var(--panel); color:var(--fg); }
-.hv-ev { cursor:pointer; animation:hv-ev-in var(--hv-row, .6s) ease-out both; }
-@keyframes hv-ev-in { from { background-color:color-mix(in srgb, var(--pick) 22%, transparent); } }
-.hv-line { display:flex; gap:var(--space-2); align-items:baseline; padding:1px var(--space-4) 1px var(--space-2); white-space:nowrap; min-width:0; }
-.hv-line .x { overflow:hidden; text-overflow:ellipsis; min-width:0; flex:1; }
-.hv-line .p { color:var(--dim); flex:none; max-width:35%; overflow:hidden; text-overflow:ellipsis; }
-.hv-line .s { color:var(--dim); flex:none; font-variant-numeric:tabular-nums; width:2.5em; text-align:right; }
-.hv-dir { color:var(--dim); flex:none; width:1em; text-align:center; }
-.hv-later { opacity:.4; }
-.hv-ev.broke { box-shadow:inset -3px 0 0 var(--failed); }
-.hv-open { margin:0 var(--space-2) var(--space-2) var(--space-3); padding:var(--space-1) 0 var(--space-1) var(--space-3); border-left:2px solid var(--line); cursor:default; white-space:normal; }
-.hv-part { padding:2px 0; min-width:0; }
-.hv-part .k { display:block; color:var(--dim); font-size:var(--text-xs); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.hv-part pre { margin:0; font:var(--text-s)/var(--leading) var(--mono); white-space:pre-wrap; overflow-wrap:anywhere; max-width:70ch; }
-.hv-fold { font:inherit; font-size:var(--text-xs); background:none; border:0; color:var(--pick); cursor:pointer; padding:0; }
-.hv-kv { display:flex; gap:var(--space-3); padding:1px var(--space-4); white-space:nowrap; }
-.hv-kv .k { color:var(--dim); width:4.5em; flex:none; }
-.hv-kv .v { overflow:hidden; text-overflow:ellipsis; }
-.hv-kv .v.hv-link { color:var(--pick); cursor:pointer; }
-.hv-words { margin:var(--space-3) var(--space-4); }
-.hv-given { padding:var(--space-2) var(--space-4); }
-.hv-words textarea { width:100%; box-sizing:border-box; min-height:84px; overflow:hidden; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-2) var(--space-3); resize:none; }
-.hv-words .ro { white-space:pre-wrap; padding:var(--space-2) var(--space-3); border-left:2px solid var(--line); }
-.hv-words .bar { display:flex; gap:var(--space-3); align-items:center; margin-top:var(--space-2); color:var(--dim); white-space:nowrap; }
-.hv-empty { padding:var(--space-4); color:var(--dim); display:flex; gap:var(--space-3); align-items:baseline; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.hv-empty::before { content:var(--glyph-circle-fresh); color:var(--mark-fresh); flex:none; }
-.hv-tag { flex:none; font-size:var(--text-xs); padding:0 var(--space-2); border-radius:var(--radius); border:1px dashed var(--pick); color:var(--pick); }
-.hv-prof { display:flex; gap:var(--space-4); padding:var(--space-1) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; overflow:hidden; }
-.hv-prof .part { color:var(--dim); }
-.hv-miss { margin:var(--space-1) var(--space-4) var(--space-3); padding:var(--space-2) var(--space-3); border-left:3px solid var(--failed); white-space:pre-wrap; color:var(--dim); max-height:8em; overflow:auto; }
-.hv-view { display:grid; grid-template-rows:auto auto 1fr auto; height:100%; min-height:0; }
-.hv-bar { display:flex; gap:var(--space-3); align-items:center; padding:var(--space-2) var(--space-4); border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; position:relative; z-index:2; }
-.hv-bar .live { color:var(--say); flex:none; }
-.hv-n { font-variant-numeric:tabular-nums; flex:none; }
-${KEEP_STYLE}
-${AGENTS_STYLE}
-${DIALS_STYLE}
-${TREES_STYLE}
-${BAR_STYLE}
-${CANVAS_STYLE}
-${TIMELINE_STYLE}
-${WINDOWBAR_STYLE}
-${TREND_STYLE}
-${CALLS_STYLE}
-${SPEND_STYLE}
-.hv-onerun { display:grid; grid-template-rows:minmax(0,1fr) auto; min-height:0; min-width:0; }
-.hv-onerun > .rx-canvas { grid-row:1; }`);
 
 const values = (v: string | string[] | undefined) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
 
@@ -200,6 +131,7 @@ const harness: Plugin = {
       },
     });
     const node = nodePane({ hk, invoke, set, read, verdicts, kp });
+    const RunFill = runFill({ hk, here, set, invoke, RunSlot });
 
     /** The nodes each profile holds, by node id: its titles. For grouping by profile. */
     const useMembership = (list: { id: string; title: string }[], nodes: NodeInfo[]): Map<string, string[]> => {
@@ -502,49 +434,6 @@ const harness: Plugin = {
       `;
     };
 
-    const RunFill = () => {
-      const nodes = hk.useNodes();
-      const dials = useDials(here);
-      const { run, info, runs, all, live, lives } = hk.useRun();
-      const profile = hk.useHere<string>(PROFILE);
-      const inProfile = hk.useRunsIn(runs, all ? profile : undefined);
-      const profileTitle = hk.useProfileList().find((p) => p.id === profile)?.title;
-      // Live: the agent in focus (its tree is big), its events as one run's, each line opening in place.
-      const focusKey = hk.useHere<string>(FOCUS);
-      const focused = live ? focusOf(lives.map((r) => r.run), focusKey) : undefined;
-      const shown = live ? focused : run;
-      const shownInfo = live ? lives.find((r) => r.run === focused) : info;
-      const events = hk.useEvents(shown);
-      const event = hk.useHere<string>(KEYS.event);
-      const picked = hk.useHere<string>(KEYS.node);
-      const index = playhead(events, event);
-      const verdictsOfRun = hk.useVerdictsOfRun(shown);
-      const titles = useMemo(() => new Map(nodes.map((n) => [n.id, n.title])), [nodes]);
-      const speakers = useMemo(() => new Map(nodes.map((n) => [n.id, { title: n.title, kind: n.kind }])), [nodes]);
-      const inProfiles = hk.useRunProfiles(shownInfo);
-      // Spend against estimate: the runs listed, or the one shown (the budget plugin's action).
-      const hasSpend = hk.useHas(SPEND);
-      const spendRuns = all ? (inProfile ?? []).map((r) => r.run) : shown ? [shown] : [];
-      const spend = useSpend(invoke, hasSpend, spendRuns, all ? runs.length : events.length);
-      if (all) return html`<${Runs} runs=${inProfile} of=${profile ? (profileTitle ?? profile) : undefined} spend=${spend} />`;
-      return html`<${Events} spend=${shown ? spend.get(shown) : undefined} info=${shownInfo} events=${events} index=${index} end=${index === events.length - 1} verdicts=${verdictsOfRun} titles=${titles} speakers=${speakers} node=${picked} profiles=${inProfiles} extra=${shownInfo && html`<${RunSlot} run=${shownInfo} />`} rowMs=${dials.row_ms} onPick=${(e: ExchangeEvent) => {
-        set.set(KEYS.event, e.id);
-        // The node pane follows: the event's node, or for an act the node it failed or was told just before.
-        set.set(KEYS.node, nodeOf(events, events.indexOf(e), verdictsOfRun));
-      }} />`;
-    };
-
-    /** Every run, or a profile's (`of`), last active first: a click looks at it alone. */
-    const Runs = ({ runs, of, spend }: { runs?: RunInfo[]; of?: string; spend?: Map<string, Spend> }) => html`
-      <div class="hv-pane">
-        <div class="hv-head"><span class="t">Runs</span>${of && html`<span class="hv-cut" title="Only the runs this profile has in it">in ${of}</span>`}<span class="hv-dim">${runs ? runs.length : "…"}</span></div>
-        <div class="hv-body">
-          ${runs && !runs.length && html`<div class="hv-empty" title="Of the last 50 runs, by profile.read.of">${of ? `No run in ${of}` : "No run yet"}</div>`}
-          ${(runs ?? []).map((r) => html`<div class="hv-row" title=${r.title ?? r.run} onClick=${() => set.set(KEYS.run, r.run)}>
-            <span class="hv-m">${r.ended ? "○" : "●"}</span><span class="x" title=${runName(r)}>${runName(r)}</span><${SpendMark} s=${spend?.get(r.run)} /><span class="n">${day(r.started)}</span>
-          </div>`)}
-        </div>
-      </div>`;
 
     /** Each live run's colour, kept while it stays live. */
     const useLiveColours = (lives: RunInfo[]): Map<string, number> => {
