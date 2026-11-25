@@ -13,7 +13,9 @@
  * response, an outcome every player best-responds in is an equilibrium
  * (ringed), and a strictly dominated strategy is struck through. It reads
  * through find's index, reasons with analysis.ts as `game.analyze` does,
- * and writes only through that action ("Keep this analysis").
+ * and writes only through actions: `game.analyze` ("Keep this analysis"),
+ * and the explain plugin's `explain.game` and `explain.decide` (the game
+ * in plain words, from the configured model, with accept and reject).
  */
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
@@ -27,13 +29,15 @@ import { sheet } from "../../spec/style.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import type { FindIndex } from "../find/index.ts";
 import type { Row } from "../find/query.ts";
-import { analyze, readGame, type Analysis, type Game } from "./analysis.ts";
+import { analyze, readGame, versionOf, type Analysis, type Game } from "./analysis.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
 export const VIEW = "game/games";
 const TYPE = "game";
 const LIMIT = 200;
+/** The explain plugin's flavour (explain.ts), named here so the page needs none of its server code. */
+const EXPLANATION = "explanation";
 
 const STYLE = sheet(`
 .gm { padding:var(--space-3) var(--space-4); overflow:auto; height:100%; box-sizing:border-box; font-size:var(--text-s); display:flex; gap:var(--space-4); }
@@ -65,6 +69,13 @@ const STYLE = sheet(`
 .gm-small .gm-mx { margin:var(--space-1) 0; }
 .gm-small .gm-mx th, .gm-small .gm-mx td { padding:1px var(--space-2); }
 .gm-empty { color:var(--dim); padding:var(--space-4) 0; }
+.gm-plain { margin-top:var(--space-4); padding-top:var(--space-3); border-top:1px solid var(--line); max-width:44rem; }
+.gm-h { color:var(--dim); font-size:var(--text-xs); text-transform:uppercase; letter-spacing:.06em; margin-bottom:var(--space-2); }
+.gm-pt { font-weight:var(--bold); font-size:var(--text-m); margin-bottom:var(--space-1); }
+.gm-plain p { margin:var(--space-1) 0 var(--space-2); line-height:1.5; }
+.gm-stale { opacity:.6; }
+.gm-btn.on { border-color:var(--pick); color:var(--pick); }
+.gm-btn[disabled] { opacity:.6; cursor:default; }
 `);
 
 const HUMAN = (basis: string) => ({ of: "human" as const, basis });
@@ -164,6 +175,48 @@ const view: Plugin = {
         <div class="gm-key">underlined: a best response · ringed: an equilibrium · struck: strictly dominated · the first payoff is ${g.players[0]?.name ?? "the first player"}'s</div>
         <ul class="gm-sum">${a.summary.map((l) => html`<li>${l}</li>`)}</ul>
         <div class="gm-bar"><${Keep} row=${row} a=${a} />${findings.map((f) => html`<a class="gm-dim" title=${String(f.fields.note ?? "")} onClick=${() => (set.set(KEYS.view, "field/field"), set.set(KEYS.item, f.id))}>kept ${String(f.fields.as_of ?? "")}</a>`)}</div>
+        <${Plain} row=${row} g=${g} a=${a} />
+      </div>`;
+    };
+
+    /** The game in plain words: the explanation kept about it, and asking for one (explain.game, as the person at the page). */
+    const Plain = ({ row, g, a }: { row: Row; g: Game; a: Analysis }) => {
+      const [busy, setBusy] = useState(false);
+      const [err, setErr] = useState("");
+      const e = index
+        .linksOf(row.id)
+        .filter((l) => l.type === "about" && l.to === row.id)
+        .map((l) => index.item(l.from))
+        .find((r): r is Row => !!r && r.type === EXPLANATION && r.fields.status === "current");
+      if (!a.complete) return null;
+      const stale = !!e && e.fields.version !== versionOf(g);
+      const ask = async () => {
+        setBusy(true);
+        setErr("");
+        const out = await invoke.invoke({ action: "explain.game", input: { game: row.id }, authority: HUMAN("pressed Explain on the game"), reason: `Explain ${String(row.fields.title ?? row.id)} in plain words` });
+        setBusy(false);
+        if (!out.ok) setErr(out.refused.message);
+      };
+      const decide = async (decision: "accepted" | "rejected") => {
+        const out = await invoke.invoke({ action: "explain.decide", input: { explanation: e!.id, decision }, authority: HUMAN(`pressed ${decision === "accepted" ? "accept" : "reject"} on an explanation`), reason: `${decision === "accepted" ? "Accept" : "Reject"} the explanation of ${String(row.fields.title ?? row.id)}` });
+        if (!out.ok) setErr(out.refused.message);
+      };
+      const chosen = (d: string) => (e && e.fields.decision === d && e.fields.decided_version === e.fields.version ? " on" : "");
+      return html`<div class="gm-plain">
+        <div class="gm-h">In plain words</div>
+        ${e &&
+        html`<div class=${stale ? "gm-stale" : ""}>
+          <div class="gm-pt">${String(e.fields.title ?? "")}</div>
+          ${String(e.fields.note ?? "")
+            .split(/\n\s*\n/)
+            .map((p) => html`<p>${p.replace(/\*\*|__/g, "")}</p>`)}
+          ${stale && html`<div class="gm-dim">Said of an earlier version of the game: explain it again.</div>`}
+        </div>`}
+        <div class="gm-bar">
+          <button class="gm-btn" disabled=${busy} title="Ask the configured model (explain.game): what the map says at game:explain sets its voice" onClick=${ask}>${busy ? "Asking the model…" : e ? "Explain again" : "Explain in plain words"}</button>
+          ${e && !stale && html`<button class=${"gm-btn" + chosen("accepted")} title="It rings true: the nodes said to it held" onClick=${() => decide("accepted")}>accept</button><button class=${"gm-btn" + chosen("rejected")} title="It misses: the nodes said to it failed" onClick=${() => decide("rejected")}>reject</button>`}
+          ${err && html`<span class="gm-err">${err}</span>`}
+        </div>
       </div>`;
     };
 

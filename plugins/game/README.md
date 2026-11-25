@@ -9,6 +9,7 @@ map as a finding about the game, and like every change it can be undone.
 |---|---|---|
 | [analysis.ts](analysis.ts) | both | The reasoning, pure: a game in, an analysis out |
 | [index.ts](index.ts) | server | The `game` flavour, the `plays` link and the actions. Injects `types.define`, `action.register`, `graph.read` |
+| [explain.ts](explain.ts) | server | The game in plain words from a model: the `explanation` flavour, `explain.game`, `explain.decide` (below) |
 | [view.ts](view.ts) | page | The view Games and the matrix on a game's item page. Injects `find.index`, `here.read`, `here.set`, `slot.fill`, `action.invoke` |
 
 ## On the map
@@ -69,6 +70,41 @@ page, and the findings kept. On a game's item page (`item.actions`), the
 same matrix small, its equilibria, and the way into Games. More than two
 players are drawn one row per outcome.
 
+## In plain words: the explain plugin
+
+[explain.ts](explain.ts), server side, its own entry (`explain`) so games
+work on a server with no model. Injects `types.define`, `action.register`,
+`graph.read` and `typed.ask`.
+
+| Type | Is | Fields |
+|---|---|---|
+| `explanation` | a flavour of `record`, on trial, linked `about` what it explains | `version` (the game's players and payoffs, hashed: `versionOf`), `decision` (`accepted`, `rejected`), `decided_version` |
+
+| Action | Takes | Does |
+|---|---|---|
+| `explain.game` | `game` | Asks the model what the game means for the people in it, through `typed.ask`: one explanation, its `title` the takeaway and its `note` a few paragraphs. Keeps it about the game and supersedes the one before. Refused for an incomplete game (`explain.incomplete`) and with no model (`typed.no_model`) |
+| `explain.decide` | `explanation`, `decision` | A person's `accepted` or `rejected`, at the explanation's version |
+
+It is a call ([call](../call/README.md)): a run of its own under "explain
+calls", shown in the Context interface. Its voice starts from `SYSTEM` in
+explain.ts, and **what the map's nodes say at `game:explain` is added to
+it**: write a node there ("write for a shop owner, not an economist") and
+the next explanation hears it, with context filters choosing as they do for
+agents. The call follows the explanation, so a person's accept or reject is
+recorded on its run and judges the nodes said to it, as the learning loop
+judges any node. The model sees the game, its players (and the actors who
+play them), the outcomes and the analysis's lines; the exchange records the
+prompt only by size.
+
+The model is the typed plugin's: `ARCHIPELAGO_MODEL` on the server
+(`anthropic:<model>` with `ANTHROPIC_API_KEY` in the environment,
+`openai:<model>`, or `claude[:<model>]` for the Claude Code CLI). The
+plugin's own config may name a `model` instead, for tests and demos.
+
+In Games, under the analysis: **Explain in plain words** (then **Explain
+again**), the explanation kept, accept and reject. One said of an earlier
+version of the game is dimmed, with a word to explain it again.
+
 ## A worked example: a pricing standoff
 
 Two firms sell the same thing. Each can keep its price high or cut it. If
@@ -115,5 +151,7 @@ change; undo takes it back.
   more), and dominance by a mixed strategy.
 - Games in extensive form (moves in turn, information sets), repeated
   games, and games of incomplete information.
+- An explanation in one voice per map: nodes at `game:explain` set it, not
+  a choice per reader.
 - Editing in the page: a person models a game through the actions, as an
   agent does, and the page shows it.

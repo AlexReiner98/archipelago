@@ -91,6 +91,17 @@ export function readGame(fields: Record<string, Json | undefined>): Read {
   return { players, payoffs, problems };
 }
 
+/** A word that changes when the game does: its players and payoffs, hashed (FNV-1a). An explanation is of a version. */
+export function versionOf(game: Game): string {
+  const s = JSON.stringify({ players: game.players, payoffs: game.payoffs });
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
 /** How many outcomes the game has: the product of each player's strategies. */
 export const size = (players: Player[]): number => (players.length ? players.reduce((n, p) => n * p.strategies.length, 1) : 0);
 
