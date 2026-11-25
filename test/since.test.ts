@@ -100,3 +100,38 @@ test("what it tells is brief: the last few, and how many came before", () => {
   const titles = new Map(sets.map((c, i) => [`i${i}`, `Task ${i}`]));
   assert.equal(tell(sets, titles, 2), 'Since you last heard, a person changed the map:\n- changed "Task 3": step 3\n- changed "Task 4": step 4\n(and 3 earlier)');
 });
+
+test("before its next tool call, a working run hears a person's failed call to a model: not the agent's own, not another run's", async () => {
+  const s = await setup();
+  try {
+    assert.ok(s.tree().nodes().some((n) => n.id === "since/heard" && n.at.includes("tool:*")));
+    await s.agentRun().begin({ run: "r1", agent: AGENT, harness: "test", reaches: ["prompt", "tool:*"] });
+    const step = async () => (await s.agentRun().reach({ run: "r1", places: ["tool:Bash"], time: new Date().toISOString(), input: { command: "ls" } })).said.map((x) => x.text);
+    assert.deepEqual(await step(), [], "nothing yet");
+
+    const call = async (run: string, facts: Record<string, string>) => {
+      const r = s.as(OWNER, run).get<AgentRun>("agent.run");
+      await r.begin({ run, agent: { id: "explain", kind: "agent" }, harness: "call", reaches: [], title: "Explain Pricing standoff", facts: { harness: "call", ...facts } });
+      await r.act({ run, place: "reply_end", time: new Date().toISOString(), kind: "reply", by: "agent", ok: false, output: { text: "0 of 1 fit: the reply is an object with items" } });
+    };
+    await new Promise((r) => setTimeout(r, 5));
+    await call("call:a", { asked_kind: "person", parent: "calls:explain:1", model: "anthropic:claude-haiku-5-5" });
+    await call("call:b", { asked_kind: "agent", parent: "r1" });
+    await call("call:c", { asked_kind: "person", parent: "r2" });
+    await new Promise((r) => setTimeout(r, 20));
+    const said = await step();
+    assert.equal(said.length, 1);
+    assert.match(said[0]!, /- asked a model \("Explain Pricing standoff", anthropic:claude-haiku-5-5\) and it failed: 0 of 1 fit: the reply is an object with items\. Its replies: act typed\.get \{ "run": "call:a" \}$/);
+    assert.doesNotMatch(said[0]!, /call:b|call:c/);
+    assert.deepEqual(await step(), [], "heard once");
+
+    // A person's call made under this run is heard at the next prompt too.
+    await call("call:d", { asked_kind: "person", parent: "r1" });
+    await new Promise((r) => setTimeout(r, 20));
+    const atPrompt = await s.prompt();
+    assert.match(atPrompt[0] ?? JSON.stringify(atPrompt), /"run": "call:d"/);
+    assert.deepEqual(s.errors, []);
+  } finally {
+    await s.loader.apply([]);
+  }
+});

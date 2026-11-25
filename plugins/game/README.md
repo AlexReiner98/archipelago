@@ -82,11 +82,23 @@ work on a server with no model. Injects `types.define`, `action.register`,
 
 | Action | Takes | Does |
 |---|---|---|
-| `explain.game` | `game`, `model?` | Asks the model (the one named, a spec passed to `typed.ask` as it is, else the server's) what the game means for the people in it, through `typed.ask`: one explanation, its `title` the takeaway and its `note` a few paragraphs. Keeps it about the game and supersedes the one before. Refused for an incomplete game (`explain.incomplete`) and with no model (`typed.no_model`) |
+| `explain.game` | `game`, `model?`, `parent?` | Asks the model (the one named, a spec passed to `typed.ask` as it is, else the server's) what the game means for the people in it, through `typed.ask`: one explanation, its `title` the takeaway and its `note` a few paragraphs. Keeps it about the game and supersedes the one before. Refused for an incomplete game (`explain.incomplete`) and with no model (`typed.no_model`) |
 | `explain.decide` | `explanation`, `decision` | A person's `accepted` or `rejected`, at the explanation's version |
 
-It is a call ([call](../call/README.md)): a run of its own under "explain
-calls", shown in the Context interface. Its voice starts from `SYSTEM` in
+It is a call ([call](../call/README.md)): a run of its own, shown in the
+Context interface, under the run that asked (an agent's own, through `act`),
+or the one named in `parent` (the session a person works with, from the
+page), else under "explain calls". Its facts say who asked (`asked_by`,
+`asked_kind`) and the game (`about`).
+
+**A failed call reaches the agent.** A reply that doesn't fit is refused
+(`explain.misfit`) with what a fix needs: the problems, where the raw replies
+are (`act typed.get { "run": … }`, also in `detail`), and the fixes there are
+(the typed check for a wrapper slip, words at `game:explain` or another model
+for the content). An agent that called it hears this in its own tool result,
+at once. When a person pressed Explain, the [since](../since/README.md)
+plugin tells it to the session they picked, before that agent's next tool
+call (or at its next prompt, when it is waiting). Its voice starts from `SYSTEM` in
 explain.ts, and **what the map's nodes say at `game:explain` is added to
 it**: write a node there ("write for a shop owner, not an economist") and
 the next explanation hears it, with context filters choosing as they do for
@@ -102,7 +114,8 @@ passes `model` on: a spec (`anthropic:claude-sonnet-5-5` with
 `claude[:<model>]` for the Claude Code CLI). Without one, the server's
 `ARCHIPELAGO_MODEL`, or the plugin's own config `model`.
 
-In Games, under the analysis: the model to ask (`typed.models`: the
+In Games, under the analysis: the session the call is for (the one looked
+at, else the only one live; shown only when an agent session is live), the model to ask (`typed.models`: the
 server's default, then each spec offered, greyed where the server has no
 key), **Explain in plain words** (then **Explain
 again**), the explanation kept, accept and reject. One said of an earlier

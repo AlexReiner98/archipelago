@@ -43,6 +43,12 @@ interface Models {
   default: string | null;
   choices: { spec: string; key?: string; ready: boolean }[];
 }
+/** The page key the sessions plugin keeps the live agent sessions in (plugins/sessions). */
+const SESSIONS = "sessions.live";
+interface LiveSession {
+  run: string;
+  title: string;
+}
 /** The model last picked on this page, kept across games while the page is open. */
 let chosenModel = "";
 
@@ -193,6 +199,11 @@ const view: Plugin = {
       const [err, setErr] = useState("");
       const [models, setModels] = useState<Models | null>(null);
       const [model, setModel] = useState<string>(chosenModel);
+      // The agent session the person works with: the one looked at (here.run) if live, else the only one live.
+      const live = (useHere<Json>(SESSIONS) as unknown as LiveSession[] | undefined ?? []).filter((x) => !x.run.startsWith("call:") && !x.run.startsWith("calls:"));
+      const looked = useHere<string>(KEYS.run);
+      const [picked, setPicked] = useState<string | undefined>(undefined);
+      const session = picked !== undefined ? live.find((x) => x.run === picked) : (live.find((x) => x.run === looked) ?? (live.length === 1 ? live[0] : undefined));
       useEffect(() => {
         void invoke.invoke({ action: "typed.models", input: {}, authority: HUMAN("opened a game"), reason: "List the models an explanation can be asked of" }).then((o) => o.ok && setModels(o.output as unknown as Models));
       }, []);
@@ -206,9 +217,9 @@ const view: Plugin = {
       const ask = async () => {
         setBusy(true);
         setErr("");
-        const out = await invoke.invoke({ action: "explain.game", input: { game: row.id, ...(model ? { model } : {}) }, authority: HUMAN("pressed Explain on the game"), reason: `Explain ${String(row.fields.title ?? row.id)} in plain words` });
+        const out = await invoke.invoke({ action: "explain.game", input: { game: row.id, ...(model ? { model } : {}), ...(session ? { parent: session.run } : {}) }, authority: HUMAN("pressed Explain on the game"), reason: `Explain ${String(row.fields.title ?? row.id)} in plain words` });
         setBusy(false);
-        if (!out.ok) setErr(out.refused.message);
+        if (!out.ok) setErr(out.refused.message.split("\n")[0]! +(session ? ` · ${session.title} hears this at its next step` : ""));
       };
       const decide = async (decision: "accepted" | "rejected") => {
         const out = await invoke.invoke({ action: "explain.decide", input: { explanation: e!.id, decision }, authority: HUMAN(`pressed ${decision === "accepted" ? "accept" : "reject"} on an explanation`), reason: `${decision === "accepted" ? "Accept" : "Reject"} the explanation of ${String(row.fields.title ?? row.id)}` });
@@ -230,6 +241,11 @@ const view: Plugin = {
           html`<select class="gm-sel" title="The model to ask" value=${model} onChange=${(ev: any) => ((chosenModel = ev.target.value), setModel(ev.target.value))}>
             <option value="">${models.default ? `server's: ${models.default}` : "server's model (none set)"}</option>
             ${models.choices.map((c) => html`<option value=${c.spec} disabled=${!c.ready}>${c.spec}${c.ready ? "" : ` (no ${c.key} on the server)`}</option>`)}
+          </select>`}
+          ${live.length > 0 &&
+          html`<select class="gm-sel" title="The agent session this call is told to: it hears what happens here at its next step" value=${session?.run ?? ""} onChange=${(ev: any) => setPicked(ev.target.value)}>
+            <option value="">no session</option>
+            ${live.map((x) => html`<option value=${x.run}>for ${x.title}</option>`)}
           </select>`}
           <button class="gm-btn" disabled=${busy} title="Ask the configured model (explain.game): what the map says at game:explain sets its voice" onClick=${ask}>${busy ? "Asking the model…" : e ? "Explain again" : "Explain in plain words"}</button>
           ${e && typeof e.fields.model === "string" && html`<span class="gm-dim">by ${e.fields.model}</span>`}

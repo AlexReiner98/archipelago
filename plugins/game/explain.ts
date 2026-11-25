@@ -53,9 +53,23 @@ export const SYSTEM = [
   "The title is the takeaway in one line. The note is two to four short paragraphs of Markdown.",
 ].join("\n");
 
-const refuse = (code: string, message: string): never => {
-  throw new Refused({ code: `explain.${code}`, message, by: { plugin: "explain" } });
+const refuse = (code: string, message: string, detail?: Json): never => {
+  throw new Refused({ code: `explain.${code}`, message, by: { plugin: "explain" }, ...(detail !== undefined ? { detail } : {}) });
 };
+
+/**
+ * A misfit, said so that whoever hears it (the agent that called, or the
+ * one told of a person's call) can suggest a fix: what failed, where the raw
+ * replies are, and the three fixes there are.
+ */
+export function misfitText(run: string, model: string | undefined, attempts: number, problems: string[]): string {
+  return [
+    `The model's explanation didn't fit the map after ${attempts} attempt${attempts === 1 ? "" : "s"}${model ? ` (${model})` : ""}: ${problems.join("; ")}`,
+    `Its raw replies: act typed.get { "run": "${run}" }.`,
+    "Fixes: a reply right in content but wrong in wrapper is the typed check's to take (itemsOf in plugins/typed/shape.ts); a reply wrong in content wants other words at game:explain (a node there) or another model (explain.game's model).",
+  ].join("\n");
+}
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** What the model is told about a game: the situation, the matrix and the analysis. */
@@ -113,12 +127,17 @@ const explain: Plugin = {
             type: "string",
             description: `The model to ask, as a spec: anthropic:<model> (its key in ANTHROPIC_API_KEY on the server), openai:<model>, or claude[:<model>] (the Claude Code CLI). Passed to typed.ask; absent, the server's configured model. typed.models lists those offered.`,
           },
+          parent: {
+            type: "string",
+            description: "The run the call belongs under: the agent session a person is working with, from the page. Absent: the caller's own run (an agent's, through act), else the plugin's own run of calls.",
+          },
         },
         required: ["game"],
       },
-      async run(input: { game: Id; model?: string }, call: ActionContext) {
+      async run(input: { game: Id; model?: string; parent?: string }, call: ActionContext) {
         const item = await one(input.game, "game");
         const chosen = input.model?.trim() || config.model;
+        const parent = input.parent?.trim() || call.caller.run;
         const g = readGame(item.fields);
         const game = { players: g.players, payoffs: g.payoffs };
         const a = analyze(game);
@@ -147,8 +166,11 @@ const explain: Plugin = {
           follow: { made: true, version },
           subject: { type: "game", tokens: Math.ceil(prompt.length / 4) },
           ...(chosen ? { model: chosen } : {}),
+          ...(parent ? { parent } : {}),
+          // Who asked, so a person's failed call can be told to the agent they work with (plugins/since).
+          facts: { asked_by: call.caller.actor?.id ?? call.caller.plugin, asked_kind: call.caller.actor?.kind ?? "plugin", about: item.id },
         });
-        if (!out.ok) return refuse("model", `The model's answer didn't fit: ${out.problems.map((p) => p.message).join("; ")}`);
+        if (!out.ok) return refuse("misfit", misfitText(out.run, chosen, out.attempts, out.problems.map((p) => p.message)), { run: out.run, attempts: out.attempts, problems: out.problems as unknown as Json, ...(chosen ? { model: chosen } : {}) });
         const facts: Fact[] = [...out.facts];
         for (const r of before) facts.push(["-", r.id, "status", "current"], ["+", r.id, "status", "superseded"]);
         call.write(facts);

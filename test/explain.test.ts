@@ -56,7 +56,8 @@ async function map(model: Model | undefined, more: { models?: Record<string, Mod
     if (!out.ok) assert.fail(`${name} refused: ${out.refused.code} ${out.refused.message}`);
     return out as { ok: true; output: any; change?: string };
   };
-  return { call: call_, ok, read, exchange: ctx.get<ExchangeRead>("exchange.read"), errors, item: async (id: string) => (await read.get([id]))[0]!, done: () => loader.apply([]) };
+  const as = (actor: { id: string; kind: "agent" | "person" }, run: string) => loader.fiber("probe")!.ctx.intercept({ actor, run }).get<ActionInvoke>("action.invoke");
+  return { call: call_, ok, read, as, exchange: ctx.get<ExchangeRead>("exchange.read"), errors, item: async (id: string) => (await read.get([id]))[0]!, done: () => loader.apply([]) };
 }
 
 const STANDOFF = {
@@ -176,4 +177,30 @@ test("a call chooses its model by spec through typed.ask: used, recorded, refuse
   const r = await n.call("explain.game", { game: g2, model: "anthropic:claude-haiku-5-5" });
   assert.match(r.ok ? "" : r.refused.message, /set ANTHROPIC_API_KEY/);
   await n.done();
+});
+
+test("the agent's own call: under its run, who asked recorded, and a misfit refused with what a fix needs", async () => {
+  const bad = scripted([{ wrong: true }, { still: "wrong" }], "bad");
+  const m = await map(bad);
+  const g = (await m.ok("game.create", STANDOFF)).output.id;
+  // As an agent in its run, the way act calls it.
+  const asAgent = m.as({ id: "claude-code", kind: "agent" }, "run-7");
+  const out = await asAgent.invoke<any>({ action: "explain.game", input: { game: g }, authority: { of: "agent", basis: "test" }, reason: "test" });
+  assert.equal(out.ok, false);
+  const r = out.ok ? undefined : out.refused;
+  assert.equal(r!.code, "explain.misfit");
+  const detail = r!.detail as { run: string; attempts: number };
+  assert.equal(detail.attempts, 2);
+  assert.match(r!.message, /didn't fit the map after 2 attempts/);
+  assert.match(r!.message, new RegExp(`act typed\.get \{ "run": "${detail.run}" \}`));
+  assert.match(r!.message, /Fixes: .*itemsOf.*game:explain/);
+  const run = (await m.exchange.runs()).items.find((x) => x.run === detail.run)!;
+  assert.deepEqual([run.facts?.parent, run.facts?.asked_by, run.facts?.asked_kind, run.facts?.about], ["run-7", "claude-code", "agent", g]);
+
+  // A person's call names the session they work with as its parent.
+  const asPerson = await m.call("explain.game", { game: g, parent: "run-7" });
+  assert.equal(asPerson.ok, false);
+  const pr = (await m.exchange.runs()).items.find((x) => x.run === (asPerson.ok ? "" : (asPerson.refused.detail as any).run))!;
+  assert.deepEqual([pr.facts?.parent, pr.facts?.asked_kind], ["run-7", "person"]);
+  await m.done();
 });
