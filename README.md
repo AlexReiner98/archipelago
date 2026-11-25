@@ -1,29 +1,40 @@
 # Archipelago
 
-**Sculpt the landscape around your agents:** build views into their world, so
-you can decide how they plan, remember, and evolve.
+**A typed knowledge graph that you and your agents share, and that you can
+build on.** Declare the kinds of things your work is made of, and the views,
+rules and tools that work with them are plugins on top.
 
 https://github.com/user-attachments/assets/33d78d55-55c4-43cb-be13-d03aef9581a8
 
 ## What it is
 
-- **Landscape**: one shared memory for you and your agents, as a typed graph
-  of the items and links you both add.
-- **Context interface**: each agent session, live or replayed, on the tree of
-  what the map tells it: what it was told, where, by which plugin, and
-  whether it worked.
-- **Context filter**: an item on the map that decides what a session is told.
-  A session joins one by its match rule, such as `cwd:*landing-page`.
-- **Plugins**: everything is one, so an agent can add views, features and
-  types without knowing the whole codebase ([Concepts](guide/concepts.md)).
+- **The map**: one typed graph of items and links, the same for a person and
+  an agent, drawn on the **Landscape**. Plugins declare the kinds of item and
+  link ([types](spec/types.md)).
+- **One way to change it**: every change, whoever makes it, goes through a
+  declared action. History keeps each change set whole, and anything can be
+  undone.
+- **Agents use the same tools you do**: its MCP server gives an agent the
+  map's actions and queries, and records what it was told and what it did.
+- **Plugins all the way down**: the graph, the schema, history, views and the
+  page itself are plugins, added and removed while it runs. An agent can add
+  one without knowing the whole codebase ([Concepts](guide/concepts.md)).
   Inspired by DeepSeek Harness.
 
 ## What it is for
 
-- See what your agents are told, and change it.
-- Keep their plans, decisions and rules on one map you can read.
-- Keep what helps them, and retire what doesn't.
-- Undo anything an agent or a plugin did.
+A base to build on: model a domain as types, then add the views and tools
+that work on it. Each of these is a plugin on the same map:
+
+- **The Context interface**: each Claude Code session, live or replayed, on
+  the tree of what the map told it, where, by which plugin, and whether it
+  worked.
+- **Context filters**: an item on the map that decides what a session is
+  told. A session joins one by its match rule, such as `cwd:*landing-page`.
+- **Plans, decisions and rules**: kept as items and links you and your agents
+  both read and change.
+
+More is coming over the next weeks, built on the map in the open.
 
 ## Quickstart
 
@@ -96,9 +107,9 @@ plugin.
 
 ## Status
 
-Early. The first build is the **Context interface** for Claude Code sessions:
-what is said to the agent, where it was said, by which plugin, and whether it
-worked.
+Early. The graph, its plugins and the **Context interface** for Claude Code
+are the first build. More plugins follow in the open, each a new thing built
+on the same map.
 
 ## Contributing
 
