@@ -1,0 +1,73 @@
+/**
+ * Where a map's server is: the registry of servers on this machine, read by
+ * the hook script (hook.ts `--map`) and the MCP proxy (proxy.ts) on every
+ * call, so a session connected to a map by name follows it to whatever port
+ * it runs on, and does nothing while it isn't running.
+ *
+ * - The home: `ARCHIPELAGO_HOME`, else `~/.archipelago`.
+ * - A map's data: `<home>/maps/<name>/`, never inside a checkout.
+ * - Its server: `<home>/servers/<name>.json` (`Served`), written by
+ *   app/server.ts while it runs (scripts/maps.ts writes it).
+ *
+ * Plain Node, no imports from the repository: hook.ts loads it only when a
+ * hook names a map.
+ */
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
+/** One server, as the registry keeps it. */
+export interface Served {
+  map: string;
+  pid: number;
+  /** The page's port: the adapter is one above, the bridge two. Absent while it starts. */
+  port?: number;
+  /** The commit it runs, short, with `+` when the checkout has changes. */
+  commit?: string;
+  /** The checkout it runs from. */
+  checkout: string;
+  /** The map's data folder. */
+  data: string;
+  started: string;
+}
+
+/** A map's name: letters, digits, `.`, `_` and `-`, so it is a file name everywhere. */
+export const MAP_NAME = /^[a-z0-9][a-z0-9._-]{0,63}$/i;
+
+export const homeOf = (env: Record<string, string | undefined> = process.env) => env.ARCHIPELAGO_HOME || join(homedir(), ".archipelago");
+export const mapDir = (name: string, home = homeOf()) => join(home, "maps", name);
+export const serverFile = (name: string, home = homeOf()) => join(home, "servers", `${name}.json`);
+
+/** Whether a process is there. */
+export function alive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/** The registry's entry for a map, whether or not its process is there. */
+export function entryOf(name: string, home = homeOf()): Served | undefined {
+  if (!MAP_NAME.test(name)) return undefined;
+  try {
+    const e = JSON.parse(readFileSync(serverFile(name, home), "utf8")) as Served;
+    return typeof e.pid === "number" ? e : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** A map's server while it runs and has its port; else nothing. */
+export function servedOf(name: string, home = homeOf()): Served | undefined {
+  const e = entryOf(name, home);
+  return e && e.port && alive(e.pid) ? e : undefined;
+}
+
+/** The map's adapter (`http://127.0.0.1:<port + 1>`), or nothing while it isn't running. */
+export function adapterOf(name: string, home = homeOf()): string | undefined {
+  const e = servedOf(name, home);
+  return e ? `http://127.0.0.1:${e.port! + 1}` : undefined;
+}

@@ -50,6 +50,8 @@ export interface ConnectConfig extends FoldersConfig {
    * fixed commit, so `live:start` names the checkout it was set up from.
    */
   folder?: string;
+  /** The map's name, when the server serves one by name: hooks and MCP then reach it by name, at any port. */
+  map?: string;
 }
 
 export const SETUP = "connect.setup";
@@ -78,11 +80,15 @@ export function folderSession(mcp: string, root = CHECKOUT): { folder: string; s
   return { folder: root, ...(reaches ? { session: FOLDER } : {}) };
 }
 
-/** This checkout's hook script, as a hook command for `hook`. */
-export function localCommand(hook: string): string {
-  const script = join(dirname(fileURLToPath(import.meta.url)), "..", "claude-code", "hook.ts").replaceAll("\\", "/");
-  return `node "${script}" ${hook}`;
+const besideAdapter = (file: string) => join(dirname(fileURLToPath(import.meta.url)), "..", "claude-code", file).replaceAll("\\", "/");
+
+/** This checkout's hook script, as a hook command for `hook`; for a map served by name, for the map, whatever port it is on. */
+export function localCommand(hook: string, map?: string): string {
+  return map ? `node "${besideAdapter("hook.ts")}" --map ${map}` : `node "${besideAdapter("hook.ts")}" ${hook}`;
 }
+
+/** This checkout's MCP proxy (plugins/claude-code/proxy.ts), which finds a map's server by its name. */
+export const proxyScript = () => besideAdapter("proxy.ts");
 
 const connect: Plugin = {
   id: "connect",
@@ -94,7 +100,7 @@ const connect: Plugin = {
     const mcp = config.mcp ?? "http://127.0.0.1:5181/mcp";
     // A token is made by an action (an action name), or by the host in front (a path the page posts to).
     const tokenAt = config.token?.startsWith("/") ? config.token : undefined;
-    const made: Setup = setup({ hook, mcp, command: config.command ?? localCommand(hook), token: !!config.token, name: config.name, save: config.save, signin: config.signin, script: config.script, tokenAt });
+    const made: Setup = setup({ hook, mcp, command: config.command ?? localCommand(hook, config.map), token: !!config.token, name: config.name, save: config.save, signin: config.signin, script: config.script, tokenAt });
     // Run from this checkout, with no token: its folder (the one people work in, when named), and a terminal session that changes nobody's settings.
     const checkout = config.folder ?? CHECKOUT;
     const own = !config.token && !config.script && !config.command ? folderSession(mcp) : undefined;

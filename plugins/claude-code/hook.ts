@@ -23,6 +23,11 @@
  * reads the file itself); asked once, a session keeps that.
  *
  *   node plugins/claude-code/hook.ts [url]    (default http://127.0.0.1:5181/hook)
+ *   node plugins/claude-code/hook.ts --map <name>
+ *
+ * With `--map`, the adapter is the named map's, found in the registry of
+ * servers (registry.ts) at each call: a session follows its map to whatever
+ * port it runs on, and while the map isn't running the hook says nothing.
  *
  * ARCHIPELAGO_HOOK_URL sets the url, ARCHIPELAGO_HOOK_TIMEOUT_MS how long to
  * wait for the answer (default 3000). ARCHIPELAGO_TOKEN, else the file
@@ -43,7 +48,18 @@ import type { Sent } from "./slim.ts";
 /** slim.ts beside this script, when it is there: without it, the hook forwards as it always did. */
 const slimmer = () => import("./slim.ts").catch(() => undefined);
 
-const url = process.argv[2] ?? process.env.ARCHIPELAGO_HOOK_URL ?? "http://127.0.0.1:5181/hook";
+const mapAt = process.argv.indexOf("--map");
+/** The map named, when the hook reaches a map by name rather than an address. */
+const map = mapAt >= 2 ? process.argv[mapAt + 1] : undefined;
+const given = mapAt >= 2 ? undefined : (process.argv[2] ?? process.env.ARCHIPELAGO_HOOK_URL ?? "http://127.0.0.1:5181/hook");
+
+/** The hook's address now: the one given, or the named map's adapter (registry.ts beside this script) while it runs. */
+async function hookUrl(): Promise<string | undefined> {
+  if (!map) return given;
+  const registry = await import("./registry.ts").catch(() => undefined);
+  const adapter = registry?.adapterOf(map);
+  return adapter && `${adapter}/hook`;
+}
 const timeout = Number(process.env.ARCHIPELAGO_HOOK_TIMEOUT_MS) || 3000;
 
 /** A remote url as `host/owner/name`: https, ssh and scp forms alike, no `.git`, no credentials. As the git plugin's normalRemote. */
@@ -203,6 +219,9 @@ function tokenOf(): string | undefined {
 if (import.meta.main) {
   let done: ((answer: string | null, ok: boolean) => void) | undefined;
   try {
+    const url = await hookUrl();
+    // The map isn't running: say nothing.
+    if (!url) process.exit(0);
     const chunks: Buffer[] = [];
     for await (const c of process.stdin) chunks.push(c as Buffer);
     const sending = await withTranscript(withRemote(Buffer.concat(chunks).toString("utf8")));

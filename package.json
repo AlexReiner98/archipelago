@@ -8,6 +8,7 @@
   },
   "scripts": {
     "check": "tsc -p .",
+    "map": "node --disable-warning=ExperimentalWarning scripts/archipelago.ts",
     "test": "node --test --test-timeout=20000 test/*.test.ts",
     "serve": "node app/server.ts --port 5280",
     "dev": "node app/server.ts --port 5280 --no-write",

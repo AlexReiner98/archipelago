@@ -52,6 +52,10 @@ human or agent) when working in this repository. The
 - To see a change in the browser, `npm run dev` (it writes no skill or
   memory file, so it never competes with a live server) and open
   http://127.0.0.1:5280/app/. Node runs the TypeScript directly: there is no build.
+- When 5280 is taken (another checkout, a worktree), `npm run map -- serve`
+  serves a map named after the branch, copied from `live` when there is one,
+  on any free port, and prints where; `npm run map -- ls` lists every server
+  ([guide](guide/live-and-dev.md), "Maps by name").
 
 ## Setting it up for someone
 
