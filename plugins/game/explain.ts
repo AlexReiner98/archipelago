@@ -8,6 +8,9 @@
  *   a call, recorded as a run, and what the map's nodes say at
  *   `game:explain` is in its system prompt), keeps the explanation `about`
  *   the game, and supersedes the one before.
+ *   A call may name its model (`model`, a spec such as
+ *   `anthropic:claude-sonnet-5-5`), which goes to `typed.ask` as it is;
+ *   `typed.models` says which are offered.
  * - `explain.decide`: a person's accepted or rejected, at the explanation's
  *   version. The call follows the explanation, so the decision judges the
  *   nodes that were said to it.
@@ -23,7 +26,6 @@ import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { FlavourDef, TypesDefine } from "../../spec/types.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import type { TypedAsk } from "../typed/index.ts";
-import type { Model } from "../typed/model.ts";
 import { analyze, readGame, versionOf, type Analysis, type Game } from "./analysis.ts";
 
 export const EXPLANATION: FlavourDef = {
@@ -35,6 +37,7 @@ export const EXPLANATION: FlavourDef = {
     version: { kind: "text", doc: "The version of what it explains (a game's players and payoffs, hashed)." },
     decision: { kind: "choice", values: ["accepted", "rejected"], doc: "A person's word on it." },
     decided_version: { kind: "text", doc: "The version the decision was made at." },
+    model: { kind: "text", doc: "The model that said it, when the call chose one (anthropic:<model>, claude)." },
   },
 };
 
@@ -76,9 +79,9 @@ export function promptOf(title: string, note: string | undefined, game: Game, a:
   ].join("\n");
 }
 
-/** Its config: a model of its own, in place of the typed plugin's (`ARCHIPELAGO_MODEL`). For tests and demos. */
+/** Its config: a model of its own, for a call that names none, in place of the typed plugin's configured one. */
 export interface ExplainConfig {
-  model?: Model;
+  model?: string;
 }
 
 const explain: Plugin = {
@@ -102,9 +105,20 @@ const explain: Plugin = {
     register.register({
       name: "explain.game",
       title: "Explain a game in plain words",
-      input: { type: "object", properties: { game: { type: "string" } }, required: ["game"] },
-      async run(input: { game: Id }, call: ActionContext) {
+      input: {
+        type: "object",
+        properties: {
+          game: { type: "string" },
+          model: {
+            type: "string",
+            description: `The model to ask, as a spec: anthropic:<model> (its key in ANTHROPIC_API_KEY on the server), openai:<model>, or claude[:<model>] (the Claude Code CLI). Passed to typed.ask; absent, the server's configured model. typed.models lists those offered.`,
+          },
+        },
+        required: ["game"],
+      },
+      async run(input: { game: Id; model?: string }, call: ActionContext) {
         const item = await one(input.game, "game");
+        const chosen = input.model?.trim() || config.model;
         const g = readGame(item.fields);
         const game = { players: g.players, payoffs: g.payoffs };
         const a = analyze(game);
@@ -128,11 +142,11 @@ const explain: Plugin = {
           places: [PLACE],
           fields: ["title", "note"],
           links: [],
-          set: { version, as_of: today() },
+          set: { version, as_of: today(), ...(chosen ? { model: chosen } : {}) },
           attach: [{ type: "about", to: item.id }],
           follow: { made: true, version },
           subject: { type: "game", tokens: Math.ceil(prompt.length / 4) },
-          ...(config.model ? { model: config.model } : {}),
+          ...(chosen ? { model: chosen } : {}),
         });
         if (!out.ok) return refuse("model", `The model's answer didn't fit: ${out.problems.map((p) => p.message).join("; ")}`);
         const facts: Fact[] = [...out.facts];
@@ -141,7 +155,7 @@ const explain: Plugin = {
         const id = Object.values(out.ids)[0]!;
         const title = out.facts.find((f) => f[1] === id && f[2] === "title")?.[3] ?? "";
         const note = out.facts.find((f) => f[1] === id && f[2] === "note")?.[3] ?? "";
-        return { id, run: out.run, title, note, version, superseded: before.map((r) => r.id) } as unknown as Json;
+        return { id, run: out.run, title, note, version, ...(chosen ? { model: chosen } : {}), superseded: before.map((r) => r.id) } as unknown as Json;
       },
     });
 

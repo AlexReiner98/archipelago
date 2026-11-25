@@ -395,3 +395,26 @@ test("system and retry words", () => {
   assert.equal(systemOf(work, undefined, []), "You make items for a map. Each is a work. Reply with one JSON object that matches the schema you are given, and nothing else.");
   assert.equal(retryOf([{ code: "x", message: "One." }, { code: "y", message: "Two." }]), "That reply doesn't fit the map's types:\n- One.\n- Two.\nGive the whole reply again, fixed.");
 });
+
+test("a call names its model by spec: a named one, or refused saying why; typed.models offers them, keys never shown", async () => {
+  const a = scripted([{ items: [{ ref: "a", title: "Sweep", room: "hall" }] }], "a");
+  const { errors, ask, act } = await setup({ models: { "anthropic:fast": a }, env: { OPENAI_API_KEY: "sk-test" }, choices: ["anthropic:fast", "anthropic:slow", "openai:mini", "claude"] });
+  const out = await ask.ask({ type: "chore", prompt: "Plan the hall.", model: "anthropic:fast" });
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.equal(a.asked.length, 1);
+  const viaAction = (await act("typed.ask", { type: "chore", prompt: "x", model: "nope:x" })) as any;
+  assert.equal(viaAction.refused.code, "typed.model");
+  assert.match(viaAction.refused.message, /No model nope:x/);
+  const noKey = (await act("typed.ask", { type: "chore", prompt: "x", model: "anthropic:slow" })) as any;
+  assert.match(noKey.refused.message, /set ANTHROPIC_API_KEY/);
+  const models = ((await act("typed.models", {})) as any).output;
+  assert.equal(models.default, null);
+  assert.deepEqual(models.choices, [
+    { spec: "anthropic:fast", ready: true, key: "ANTHROPIC_API_KEY" },
+    { spec: "anthropic:slow", ready: false, key: "ANTHROPIC_API_KEY" },
+    { spec: "openai:mini", ready: true, key: "OPENAI_API_KEY" },
+    { spec: "claude", ready: true },
+  ]);
+  assert.ok(!JSON.stringify(models).includes("sk-test"));
+  assert.deepEqual(errors, []);
+});

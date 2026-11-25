@@ -38,6 +38,13 @@ const TYPE = "game";
 const LIMIT = 200;
 /** The explain plugin's flavour (explain.ts), named here so the page needs none of its server code. */
 const EXPLANATION = "explanation";
+/** What typed.models answers. */
+interface Models {
+  default: string | null;
+  choices: { spec: string; key?: string; ready: boolean }[];
+}
+/** The model last picked on this page, kept across games while the page is open. */
+let chosenModel = "";
 
 const STYLE = sheet(`
 .gm { padding:var(--space-3) var(--space-4); overflow:auto; height:100%; box-sizing:border-box; font-size:var(--text-s); display:flex; gap:var(--space-4); }
@@ -76,6 +83,7 @@ const STYLE = sheet(`
 .gm-stale { opacity:.6; }
 .gm-btn.on { border-color:var(--pick); color:var(--pick); }
 .gm-btn[disabled] { opacity:.6; cursor:default; }
+.gm-sel { font:inherit; background:var(--control); color:var(--control-fg); border:1px solid var(--control-line); border-radius:var(--radius); }
 `);
 
 const HUMAN = (basis: string) => ({ of: "human" as const, basis });
@@ -183,6 +191,11 @@ const view: Plugin = {
     const Plain = ({ row, g, a }: { row: Row; g: Game; a: Analysis }) => {
       const [busy, setBusy] = useState(false);
       const [err, setErr] = useState("");
+      const [models, setModels] = useState<Models | null>(null);
+      const [model, setModel] = useState<string>(chosenModel);
+      useEffect(() => {
+        void invoke.invoke({ action: "typed.models", input: {}, authority: HUMAN("opened a game"), reason: "List the models an explanation can be asked of" }).then((o) => o.ok && setModels(o.output as unknown as Models));
+      }, []);
       const e = index
         .linksOf(row.id)
         .filter((l) => l.type === "about" && l.to === row.id)
@@ -193,7 +206,7 @@ const view: Plugin = {
       const ask = async () => {
         setBusy(true);
         setErr("");
-        const out = await invoke.invoke({ action: "explain.game", input: { game: row.id }, authority: HUMAN("pressed Explain on the game"), reason: `Explain ${String(row.fields.title ?? row.id)} in plain words` });
+        const out = await invoke.invoke({ action: "explain.game", input: { game: row.id, ...(model ? { model } : {}) }, authority: HUMAN("pressed Explain on the game"), reason: `Explain ${String(row.fields.title ?? row.id)} in plain words` });
         setBusy(false);
         if (!out.ok) setErr(out.refused.message);
       };
@@ -213,7 +226,13 @@ const view: Plugin = {
           ${stale && html`<div class="gm-dim">Said of an earlier version of the game: explain it again.</div>`}
         </div>`}
         <div class="gm-bar">
+          ${models &&
+          html`<select class="gm-sel" title="The model to ask" value=${model} onChange=${(ev: any) => ((chosenModel = ev.target.value), setModel(ev.target.value))}>
+            <option value="">${models.default ? `server's: ${models.default}` : "server's model (none set)"}</option>
+            ${models.choices.map((c) => html`<option value=${c.spec} disabled=${!c.ready}>${c.spec}${c.ready ? "" : ` (no ${c.key} on the server)`}</option>`)}
+          </select>`}
           <button class="gm-btn" disabled=${busy} title="Ask the configured model (explain.game): what the map says at game:explain sets its voice" onClick=${ask}>${busy ? "Asking the model…" : e ? "Explain again" : "Explain in plain words"}</button>
+          ${e && typeof e.fields.model === "string" && html`<span class="gm-dim">by ${e.fields.model}</span>`}
           ${e && !stale && html`<button class=${"gm-btn" + chosen("accepted")} title="It rings true: the nodes said to it held" onClick=${() => decide("accepted")}>accept</button><button class=${"gm-btn" + chosen("rejected")} title="It misses: the nodes said to it failed" onClick=${() => decide("rejected")}>reject</button>`}
           ${err && html`<span class="gm-err">${err}</span>`}
         </div>

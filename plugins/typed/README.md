@@ -33,7 +33,7 @@ and `agent.run` (to record attempts in the call's run).
 | `subject` | The caller's own context in the prompt, `{type, tokens}`: recorded on the answer by kind and size, so the context plugin counts it (`subject:<type>`) |
 | `min`, `max` | How many items |
 | `retries` | How many times a misfit is sent back (default the config's, else 1) |
-| `model` | An adapter (below). Default the configured one |
+| `model` | The model, chosen call by call: a spec (`anthropic:claude-sonnet-5-5`, `openai:<model>`, `claude[:<model>]`) or an adapter (below). A spec with no key on the server, or no such provider, is refused (`typed.model`) saying which. Default the configured one |
 | `check` | The caller's own rule, for what a schema can't say: `({ items, facts }) => problems`, run once `schema.check` finds nothing. Its problems (`by: "caller"`) are sent back and fail the call like the schema's; a throw fails it like the model's. Programmatic only, not in the `typed.ask` action |
 | `title`, `parent`, `places`, `facts` | As `call.ask`'s. `places` default `typed:<type>`: what nodes say there goes into the system prompt |
 
@@ -82,6 +82,15 @@ default `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`), never written in config.
 The server reads `ARCHIPELAGO_MODEL`. With none, `typed.ask` is refused
 (`typed.no_model`) unless the caller gives a model.
 
+A caller chooses the model call by call with `model`, in `typed.ask` and
+its action alike, so every plugin built on it (and every agent through
+`act`) can. `typed.models` lists the specs offered (`choices` in config,
+default Haiku, Sonnet and Opus 5.5 and the Claude Code CLI), whether the
+server holds each one's key (`ready`, the variable's name in `key`; never
+the key) and the configured default. Config `models` names models by spec,
+looked up first: for tests and demos (`{ "scripted": scripted([...]) }`,
+with `model: "scripted"`).
+
 ## In the record
 
 A typed call is a [call](../call/README.md): a run (`harness: "call"`,
@@ -106,6 +115,7 @@ reads "attempt 2 · …, after a misfit sent back"; opened, every part shows.
 | Action | Does |
 |---|---|
 | `typed.ask` | `typed.ask` with the configured model, for a person or an agent. Writes nothing |
+| `typed.models` | The specs a call can name, whether each one's key is on the server, and the default. Writes nothing |
 | `typed.get` `{ run }` | The call read back from the exchange: type, model, schema, each attempt (reply, usage, problems, retry), outcome (`fit`, `misfit`, `failed`, `open`), the proposed facts. Writes nothing |
 | `typed.calls` `{ limit?, after? }` | The newest typed calls, each with its outcome and attempts (at most 50 a page). Writes nothing |
 | `typed.apply` `{ run }` | Writes a fitting call's proposed facts as the caller's change, through the write chain (checked again). Refused for a misfit |

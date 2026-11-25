@@ -78,11 +78,11 @@ work on a server with no model. Injects `types.define`, `action.register`,
 
 | Type | Is | Fields |
 |---|---|---|
-| `explanation` | a flavour of `record`, on trial, linked `about` what it explains | `version` (the game's players and payoffs, hashed: `versionOf`), `decision` (`accepted`, `rejected`), `decided_version` |
+| `explanation` | a flavour of `record`, on trial, linked `about` what it explains | `version` (the game's players and payoffs, hashed: `versionOf`), `decision` (`accepted`, `rejected`), `decided_version`, `model` (the spec named, when one was) |
 
 | Action | Takes | Does |
 |---|---|---|
-| `explain.game` | `game` | Asks the model what the game means for the people in it, through `typed.ask`: one explanation, its `title` the takeaway and its `note` a few paragraphs. Keeps it about the game and supersedes the one before. Refused for an incomplete game (`explain.incomplete`) and with no model (`typed.no_model`) |
+| `explain.game` | `game`, `model?` | Asks the model (the one named, a spec passed to `typed.ask` as it is, else the server's) what the game means for the people in it, through `typed.ask`: one explanation, its `title` the takeaway and its `note` a few paragraphs. Keeps it about the game and supersedes the one before. Refused for an incomplete game (`explain.incomplete`) and with no model (`typed.no_model`) |
 | `explain.decide` | `explanation`, `decision` | A person's `accepted` or `rejected`, at the explanation's version |
 
 It is a call ([call](../call/README.md)): a run of its own under "explain
@@ -96,12 +96,15 @@ judges any node. The model sees the game, its players (and the actors who
 play them), the outcomes and the analysis's lines; the exchange records the
 prompt only by size.
 
-The model is the typed plugin's: `ARCHIPELAGO_MODEL` on the server
-(`anthropic:<model>` with `ANTHROPIC_API_KEY` in the environment,
-`openai:<model>`, or `claude[:<model>]` for the Claude Code CLI). The
-plugin's own config may name a `model` instead, for tests and demos.
+The model is chosen in the shared call, `typed.ask`, so this plugin only
+passes `model` on: a spec (`anthropic:claude-sonnet-5-5` with
+`ANTHROPIC_API_KEY` in the server's environment, `openai:<model>`, or
+`claude[:<model>]` for the Claude Code CLI). Without one, the server's
+`ARCHIPELAGO_MODEL`, or the plugin's own config `model`.
 
-In Games, under the analysis: **Explain in plain words** (then **Explain
+In Games, under the analysis: the model to ask (`typed.models`: the
+server's default, then each spec offered, greyed where the server has no
+key), **Explain in plain words** (then **Explain
 again**), the explanation kept, accept and reject. One said of an earlier
 version of the game is dimmed, with a word to explain it again.
 

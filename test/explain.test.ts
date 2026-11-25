@@ -19,7 +19,7 @@ import question from "../plugins/question/index.ts";
 import record from "../plugins/record/index.ts";
 import schema from "../plugins/schema/index.ts";
 import typed from "../plugins/typed/index.ts";
-import { scripted } from "../plugins/typed/model.ts";
+import { scripted, type Model } from "../plugins/typed/model.ts";
 import types from "../plugins/types/index.ts";
 import work from "../plugins/work/index.ts";
 import game from "../plugins/game/index.ts";
@@ -37,14 +37,14 @@ const voice: Plugin = {
 };
 const probe: Plugin = { id: "probe", inject: ["action.invoke", "graph.read", "exchange.read"], apply() {} };
 
-async function map(model: unknown) {
+async function map(model: Model | undefined, more: { models?: Record<string, Model>; env?: Record<string, string> } = {}) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
   const modules: Record<string, Plugin> = { graph, action, types, work, question, record, actor, links, items, schema, history, exchange, agent, call, typed, game, explain, voice, probe };
   const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
-  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, plugin: id, ...(id === "explain" && model ? { config: { model } } : {}) }));
+  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, plugin: id, ...(id === "typed" ? { config: { models: { ...(model ? { default: model } : {}), ...(more.models ?? {}) }, ...(model ? { model: "default" } : {}), env: more.env ?? {} } } : {}) }));
   await loader.apply(tree);
   await rt.settle();
   const ctx = loader.fiber("probe")!.ctx.intercept({ actor: { id: "person:me", kind: "person" } });
@@ -140,4 +140,40 @@ test("refused plainly: an incomplete game, no model, a wrong decision", async ()
   const r3 = await m.call("explain.decide", { explanation: g, decision: "accepted" });
   assert.equal(r3.ok ? "" : r3.refused.code, "explain.not_a_explanation");
   await m.done();
+});
+
+test("a call chooses its model by spec through typed.ask: used, recorded, refused when it can't be had", async () => {
+  const cheap = scripted([{ items: [{ ref: "e", title: "Short", note: "Both cut." }] }], "cheap");
+  const fallback = scripted([], "fallback");
+  const m = await map(fallback, { models: { "anthropic:claude-haiku-5-5": cheap }, env: { ANTHROPIC_API_KEY: "test-key" } });
+  const g = (await m.ok("game.create", STANDOFF)).output.id;
+  const out = await m.ok("explain.game", { game: g, model: "anthropic:claude-haiku-5-5" });
+  assert.equal(out.output.model, "anthropic:claude-haiku-5-5");
+  assert.equal(cheap.asked.length, 1);
+  assert.equal(fallback.asked.length, 0);
+  assert.equal((await m.item(out.output.id)).fields.model, "anthropic:claude-haiku-5-5");
+  const run = (await m.exchange.runs()).items.find((r) => r.run === out.output.run)!;
+  assert.equal(run.facts?.model, "cheap", "the call's run names the model it asked");
+
+  const bad = await m.call("explain.game", { game: g, model: "nope:x" });
+  assert.equal(bad.ok ? "" : bad.refused.code, "typed.model");
+  assert.match(bad.ok ? "" : bad.refused.message, /No model nope:x/);
+
+  // What is offered, and whether each key is there: never the key.
+  const list = await m.ok("typed.models", {});
+  assert.equal(list.output.default, "fallback");
+  assert.deepEqual(list.output.choices.map((c: any) => [c.spec, c.ready]), [
+    ["anthropic:claude-haiku-5-5", true], ["anthropic:claude-sonnet-5-5", true], ["anthropic:claude-opus-5-5", true], ["claude", true],
+  ]);
+  assert.ok(!JSON.stringify(list.output).includes("test-key"));
+  await m.done();
+
+  // No key on the server: offered, not ready, and refused naming the variable.
+  const n = await map(undefined);
+  const g2 = (await n.ok("game.create", STANDOFF)).output.id;
+  const none = (await n.ok("typed.models", {})).output;
+  assert.deepEqual([none.default, none.choices[0].ready, none.choices[0].key], [null, false, "ANTHROPIC_API_KEY"]);
+  const r = await n.call("explain.game", { game: g2, model: "anthropic:claude-haiku-5-5" });
+  assert.match(r.ok ? "" : r.refused.message, /set ANTHROPIC_API_KEY/);
+  await n.done();
 });
