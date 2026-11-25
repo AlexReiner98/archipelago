@@ -34,10 +34,13 @@ const LIMIT = 1000;
 
 const STYLE = sheet(`
 .dc { height:100%; overflow:auto; }
-.dc-page { max-width:46rem; margin:0 auto; padding:var(--gap-l, 24px) var(--gap-l, 24px) 80px; color:var(--fg); font:var(--text-m) var(--font); line-height:1.55; }
-.dc-toc { display:flex; flex-wrap:wrap; gap:4px 14px; padding-bottom:10px; margin-bottom:18px; border-bottom:1px solid var(--line); }
-.dc-toc a { color:var(--dim); cursor:pointer; white-space:nowrap; }
-.dc-toc a:hover { color:var(--fg); }
+.dc-page { max-width:48rem; margin:0 auto; padding:var(--gap-l, 24px) var(--gap-l, 24px) 80px; color:var(--fg); font-family:var(--font); font-size:17px; line-height:1.65; }
+.dc-toc { margin:0 0 8px; }
+.dc-toc-h { color:var(--dim); font-size:.8em; letter-spacing:.06em; text-transform:uppercase; margin:0 0 6px; }
+.dc-toc ol { list-style:none; margin:0; padding:0; }
+.dc-toc li { margin:0; }
+.dc-toc a { display:block; padding:3px 0; color:var(--fg); cursor:pointer; }
+.dc-toc a:hover { color:var(--pick); }
 .dc-sec { margin:0 0 10px; }
 .dc-h { cursor:pointer; margin:1.1em 0 .3em; line-height:1.3; }
 .dc-h:hover { color:var(--pick); }
@@ -53,7 +56,7 @@ h4.dc-h, h5.dc-h { font-size:1em; }
 .dc-note .sub { font-weight:600; margin:.6em 0 .2em; }
 .dc-pic { display:block; margin:.6em 0; }
 .dc-pic img { display:block; box-sizing:border-box; max-width:100%; height:auto; border:1px solid var(--line); border-radius:var(--radius, 4px); }
-.dc-cap { display:block; margin-top:.25em; color:var(--dim); font-size:var(--text-s, .9em); }
+.dc-cap { display:block; margin-top:.3em; color:var(--dim); font-size:.85em; }
 .dc-work { list-style:none; padding-left:0; margin:.2em 0 .5em; }
 .dc-work li { margin:.15em 0; }
 .dc-work .mk { display:inline-block; width:1.3em; }
@@ -169,7 +172,7 @@ const document_: Plugin = {
       const nodes = outline(sections(Array.isArray(named) ? named : undefined, found, src), src);
       const jump = (id: Id) => document.getElementById(`dc-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
       return html`<div class="dc"><div class="dc-page">
-        ${nodes.length > 2 && html`<nav class="dc-toc">${nodes.map((n) => html`<a key=${n.row.id} onClick=${() => jump(n.row.id)}>${String(n.row.fields.title ?? n.row.id)}</a>`)}</nav>`}
+        ${nodes.length > 2 && html`<nav class="dc-toc"><div class="dc-toc-h">Contents</div><ol>${nodes.map((n) => html`<li key=${n.row.id}><a onClick=${() => jump(n.row.id)}>${String(n.row.fields.title ?? n.row.id)}</a></li>`)}</ol></nav>`}
         ${nodes.length ? nodes.map((n) => (isWork(n) ? html`<${Work} nodes=${[n]} />` : html`<${Section} key=${n.row.id} n=${n} />`)) : html`<div class="dc-empty">${idx.ready() ? "Nothing to read here." : "Reading the map…"}</div>`}
       </div></div>`;
     };
