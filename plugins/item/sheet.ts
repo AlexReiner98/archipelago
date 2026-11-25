@@ -24,6 +24,9 @@ export const STYLE = sheet(`
 .ip-note blockquote { margin:0 0 var(--space-2); padding-left:var(--space-3); border-left:2px solid var(--line); color:var(--dim); }
 .ip-note pre { margin:0 0 var(--space-2); font-family:var(--mono); font-size:var(--text-s); white-space:pre-wrap; background:var(--panel); padding:var(--space-2); border-radius:var(--radius); }
 .ip-note code { font-family:var(--mono); font-size:.92em; background:var(--panel); padding:0 3px; border-radius:var(--radius); }
+.ip-pic { display:block; margin:var(--space-2) 0; }
+.ip-pic img { display:block; box-sizing:border-box; max-width:100%; height:auto; border:1px solid var(--line); border-radius:var(--radius); }
+.ip-cap { display:block; margin-top:var(--space-1); color:var(--dim); font-size:var(--text-s); }
 .ip-note table { border-collapse:collapse; margin:0 0 var(--space-2); font-size:var(--text-s); }
 .ip-note th, .ip-note td { border-bottom:1px solid var(--line); padding:1px var(--space-2); text-align:left; vertical-align:top; }
 .ip-fold { margin:0 0 var(--space-1); }

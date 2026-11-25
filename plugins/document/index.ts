@@ -51,6 +51,9 @@ h4.dc-h, h5.dc-h { font-size:1em; }
 .dc-note th, .dc-note td { border:1px solid var(--line); padding:3px 8px; text-align:left; vertical-align:top; }
 .dc-note blockquote { margin:.4em 0; padding-left:10px; border-left:3px solid var(--line); color:var(--dim); }
 .dc-note .sub { font-weight:600; margin:.6em 0 .2em; }
+.dc-pic { display:block; margin:.6em 0; }
+.dc-pic img { display:block; box-sizing:border-box; max-width:100%; height:auto; border:1px solid var(--line); border-radius:var(--radius, 4px); }
+.dc-cap { display:block; margin-top:.25em; color:var(--dim); font-size:var(--text-s, .9em); }
 .dc-work { list-style:none; padding-left:0; margin:.2em 0 .5em; }
 .dc-work li { margin:.15em 0; }
 .dc-work .mk { display:inline-block; width:1.3em; }
@@ -66,6 +69,8 @@ h4.dc-h, h5.dc-h { font-size:1em; }
   .dc-page { position:absolute; left:0; top:0; max-width:none; color:#000; }
   .dc-toc { display:none; }
   .dc-h { break-after:avoid; }
+  .dc-pic { break-inside:avoid; }
+  .dc-cap { color:#444; }
 }
 `);
 
@@ -99,8 +104,9 @@ const document_: Plugin = {
     };
 
     const Spans = ({ text }: { text: string }) =>
-      inline(text).map((s: Span) =>
+      inline(text, location.origin).map((s: Span) =>
         s.k === "t" ? s.text
+        : s.k === "img" ? html`<span class="dc-pic"><img src=${s.src} alt=${s.alt} title=${s.alt} loading="lazy" />${s.alt ? html`<span class="dc-cap">${s.alt}</span>` : null}</span>`
         : s.k === "code" ? html`<code>${s.text}</code>`
         : s.k === "b" ? html`<b>${s.text}</b>`
         : s.k === "i" ? html`<i>${s.text}</i>`

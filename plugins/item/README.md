@@ -20,6 +20,14 @@ From the top:
   the rest of the lead folds under "more", and each heading is a section,
   folded. Lists, quotes, tables, code, **bold**, *emphasis*, web links,
   and item ids drawn by name with their mark, one click away.
+- **Pictures:** an image in Markdown, `![alt]` and its url in brackets
+  (`/files/shot.png`), draws the image at the note's
+  width, its alt as caption and tooltip. Only a URL on the page's own
+  origin loads: the server serves its data's `files/` folder at
+  `/files/` (raster images only; app/server.ts). Any other URL is shown as
+  a link and never fetched, so a note cannot make the page call out; a
+  `data:` or other scheme is its alt as text. `own(url, origin)` in
+  note.ts is the rule.
 - **Tied to:** neighbours by kind of link, what it points at (→) and then
   what points at it (←), six at a time per kind. A click opens one.
 - **History:** folded under its head until opened (a click on "History ▸"),
