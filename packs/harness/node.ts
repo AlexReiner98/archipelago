@@ -196,6 +196,7 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
     const editable = hk.useHas(EDIT);
     const info = nodes.find((n) => n.id === id);
     const record = hk.useVerdictData(() => (id ? verdicts.record(id) : Promise.resolve(undefined)), [id]);
+    const replayed = hk.useVerdictData(() => (id && verdicts.replayed ? verdicts.replayed(id) : Promise.resolve(undefined)), [id]);
     const list = hk.useVerdictData(() => (id ? verdicts.verdicts(id, { limit: 30 }).then((p) => p.items) : Promise.resolve([])), [id]);
     // Its share of the run's window over time (trend.ts, packs/context).
     const playhead = hk.useHere<string>(KEYS.event);
@@ -218,17 +219,28 @@ export function nodePane({ hk, invoke, set, read, verdicts, kp }: Deps) {
             <div class="hv-kv"><span class="k">channel</span><span class="v" title=${channelDoc(channelOf(info))}>${channelOf(info)}</span></div>
           `}
           <${NodeWindowPart} got=${win} colour="var(--owner)" />
-          <div class="hv-kv"><span class="k">record</span><span class="v">
+          <div class="hv-kv"><span class="k" title="Runs where an agent heard it">live</span><span class="v">
             ${record
               ? html`${record.said} in ${record.runs} · <span class="m-held">${mark("held")} ${record.held}</span> <span class="m-failed">${mark("failed")} ${record.failed}</span> <span class="m-quiet">${mark("quiet")} ${record.quiet}</span>`
               : "never said"}
           </span></div>
+          ${replayed &&
+          html`<div class="hv-kv"><span class="k" title="Recorded runs played again with it said (packs/replay): the agent's side is what happened then, and never heard it">replayed</span><span class="v">
+            ${replayed.said} in ${replayed.runs} · <span class="m-held">${mark("held")} ${replayed.held}</span> <span class="m-failed">${mark("failed")} ${replayed.failed}</span> <span class="m-quiet">${mark("quiet")} ${replayed.quiet}</span>
+          </span></div>`}
           <div class="hv-kv"><span class="k">last</span><span class="v">${record?.last ? new Date(record.last).toLocaleString() : "—"}</span></div>
           ${!!list?.length && html`<div class="hv-group">runs</div>`}
           ${(list ?? []).map(
             (x) => html`
-              <div class=${`hv-row ${run === x.run ? "hv-lit" : ""}`} onClick=${() => set.set(KEYS.run, x.run)} title=${`failed by #${x.failed_by.join(", #") || "nothing"}`}>
-                <${Mark} v=${x.verdict} /><span class="x">${x.run.slice(0, 8)} · ${x.said}</span><span class="n">${time(x.said_at)}</span>
+              <div
+                class=${`hv-row ${run === x.run ? "hv-lit" : ""}`}
+                onClick=${() => set.set(KEYS.run, x.run)}
+                title=${`${x.replay_of ? `A replay of ${x.replay_of}: its acts as they were, the map asked again. ` : ""}failed by #${x.failed_by.join(", #") || "nothing"}${x.label ? `. The person's decision after it: ${x.label}` : ""}`}
+              >
+                <${Mark} v=${x.verdict} /><span class="x">${(x.replay_of ?? x.run).slice(0, 8)} · ${x.said}</span>
+                ${x.replay_of && html`<span class="hv-tag">replayed</span>`}
+                ${x.label && html`<span class=${`hv-tag ${x.label === "allow" ? "up" : "down"}`}>${x.label}</span>`}
+                <span class="n">${time(x.said_at)}</span>
               </div>
             `,
           )}

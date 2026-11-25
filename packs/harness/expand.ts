@@ -9,9 +9,13 @@
  * - The agent to the map: an act's kind, who did it, and its input and
  *   output field by field (a tool call's arguments, a `tell`'s words, an
  *   action's input, a prompt or a reply in full); whether it worked.
+ * - A refusal that says how to fix its input (edition 11, `InputRefusal`):
+ *   under its words, a `fix` part per path, what it wants and an example,
+ *   and the input to send instead.
  */
 import type { Json } from "../../spec/common.ts";
 import type { ExchangeEvent } from "../../spec/exchange.ts";
+import { FIX_MARK, fixIn } from "../action/input.ts";
 
 /** One labelled piece of an opened row. */
 export interface Part {
@@ -80,7 +84,15 @@ export function expand(e: ExchangeEvent, got?: string): Part[] {
       if (text !== undefined) out.push({ label: a.kind, text });
       else out.push(...fields("input", a.input), ...fields("output", output(a.output)));
     } else {
-      out.push(...fields("input", a.input), ...fields("output", output(a.output)));
+      const said = output(a.output);
+      const fix = typeof said === "string" ? fixIn(said) : undefined;
+      // A refusal's fix line, read out of its words and shown as parts under them.
+      const words = fix && typeof said === "string" ? said.split("\n").filter((l) => !l.startsWith(FIX_MARK)).join("\n") : said;
+      out.push(...fields("input", a.input), ...fields("output", words));
+      if (fix) {
+        for (const f of fix.fix) out.push({ label: `fix ${f.path || "/"}`, text: `wants ${f.expected}\ne.g. ${JSON.stringify(f.example)}` });
+        out.push({ label: "send instead", text: asText(fix.input) });
+      }
     }
     head("pack", e.pack);
   } else {

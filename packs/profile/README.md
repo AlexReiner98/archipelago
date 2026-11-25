@@ -14,7 +14,7 @@ profile, as the harness pack kept its own.
 
 | | |
 |---|---|
-| `umwelt` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members`, `fallback`, `leave_out` (what Claude Code is to leave out of its runs: the [lean](../lean/README.md) pack's) |
+| `umwelt` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members`, `fallback`, `leave_out` (what Claude Code is to leave out of its runs: the [lean](../lean/README.md) pack's), `budget_ratio` (spend over estimate past which its runs are asked once: the [budget](../budget/README.md) pack's) |
 | `in_umwelt` | Any item → the umwelt that holds it. With places, the link is said there itself (below) |
 | `out_of_umwelt` | An item → an umwelt it is taken out of |
 | `uses` | An item → an umwelt: runs with that item in their facts (a repo, a hub) are in it |
@@ -62,7 +62,9 @@ Decided (20 Nov 2026, all five):
 - A profile in `shadow` holds nothing: the gate's hold is a trial, recorded
   as a `gated` event with `trial`, and the node is still said.
 - A miss in a run, at a place a held node listens at, is told on the
-  profiles (`profile.missed`: a finding about them and the node).
+  profiles (`profile.missed`: a finding about them and the node). Not in
+  a replay (a run with `replay_of`, the [replay](../replay/README.md)
+  pack's): its misses were told about in the recorded run.
 
 ## Moving a run
 

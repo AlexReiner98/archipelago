@@ -34,6 +34,8 @@ const host = await startBrowser({
     { id: "views", pack: "packs/views/view.ts", config: { home: "field" } },
     { id: "harness", pack: "packs/harness/index.ts" },
     { id: "activity", pack: "packs/activity/index.ts" },
+    // On the run pane: whether the run was exported as OpenTelemetry spans, and where (nothing while the server's otel is off).
+    { id: "otel", pack: "packs/otel/view.ts" },
     { id: "find", pack: "packs/find/index.ts" },
     { id: "command", pack: "packs/command/index.ts" },
     { id: "page", pack: "packs/page/view.ts" },

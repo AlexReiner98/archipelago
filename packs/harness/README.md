@@ -17,7 +17,7 @@ background, picking none, brings the previews back.
 
 | Fill | Region | Shows |
 |---|---|---|
-| Context interface (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline. Its left bar: the previews, or the node picked (its words, standing, places, pack, kind, record, and its verdict per run) |
+| Context interface (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline. Its left bar: the previews, or the node picked (its words, standing, places, pack, kind, its live record and its replayed one beside it, and its verdict per run, a replay's marked `replayed`) |
 | Run (`harness/run`, "Run") | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: the events of the agent in focus, opening in place as one run's do. All runs: the runs, or a profile's |
 
 ## The bar ([bar.ts](bar.ts))
@@ -279,11 +279,24 @@ for the agent to the map,
 the act's input and output field by field, each label over its value;
 a list of facts a fact a line. An act whose input says what it is
 (`description`, a [typed call](../typed/README.md)'s attempt) is named by
-it on its line. Each part folds past a dozen lines. A red edge: the event failed the node picked.
+it on its line. A refusal that says how to fix its input (edition 11) shows,
+under its words, a `fix <path>` part for each place (what it wants, and an
+example) and "send instead": the input with every fix applied.
+Each part folds past a dozen lines. A red edge: the event failed the node picked.
 A say is led by "re-said ·" when it came again after a compaction, and by
 "reworded ·" when its node said other words earlier in the context (the
 agent pack's `reworded`); what a run heard and was told changed is the
 node "Changed since heard" (`words/changed`).
+
+## Spend against estimate ([spend.ts](spend.ts))
+
+With the [budget](../budget/README.md) pack loaded, each run's row in the
+runs list, and the run pane's head, show its measured tokens over its
+task's `tokens_estimated` (`182k / 200k`, read through `budget.spend`, at
+most every five seconds as events come): dim under the estimate, plain past
+it, red past the ratio it is asked at, `⊘` once it was asked (the refusal's mark in the run). The tooltip
+gives the share, what is counted, and the ratio. A run whose task has no
+estimate shows nothing.
 
 ## What the harness gave ([given.ts](given.ts))
 
@@ -350,8 +363,14 @@ the previews (or, one run looked at, beside the tree), under a way back:
 "‹ Agents" (or "× Close", one run looked at). It gives way to them when
 none is picked: that, or a click on the tree's background.
 
-Injects `slot.fill`, `here.*`, `agent.tree`, `exchange.read`,
-`exchange.watch`, `verdict.read`, `action.list`, `action.invoke`,
-`graph.read`, `graph.watch`, `profile.read`. Unloading it removes the three
-fills, its page keys and its styles. The pure parts are tested in
+The Run pane's line under its head (the run's umwelts) ends with the
+`harness.run` slot: other packs' marks on the run shown, each fill given
+its `RunInfo` as `run`. The otel pack's view puts where the run was
+exported there ([otel](../otel/README.md)).
+
+Injects `slot.fill`, `slot.declare`, `slot.read`, `here.*`, `agent.tree`,
+`exchange.read`, `exchange.watch`, `verdict.read`, `action.list`,
+`action.invoke`, `graph.read`, `graph.watch`, `profile.read`. Unloading it
+removes the three fills, the `harness.run` slot, its page keys and its
+styles. The pure parts are tested in
 `test/harness.test.ts`.

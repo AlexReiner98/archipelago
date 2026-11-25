@@ -143,6 +143,15 @@ export interface RunVerdict {
    * The situation came up again, and this time nothing went wrong.
    */
   near: number;
+  /**
+   * A person's last decision in the run after it was said, where it
+   * listens or on the reply (`decision` acts, spec/agent.md editions 3 and
+   * 11): allow (or accept) and deny (or reject). The label its verdict is
+   * checked against.
+   */
+  label?: "allow" | "deny";
+  /** The recorded run this one replays, when it is a replay (packs/replay): judged alike, kept apart. */
+  replay_of?: RunId;
 }
 
 /** A node's record across runs. */
@@ -242,6 +251,19 @@ function deniedBy(e: ExchangeEvent): string | undefined {
   return typeof out.refused === "string" ? out.refused : undefined;
 }
 
+/**
+ * The recorded run a run replays, as its `begin` says (the fact
+ * `replay_of`, which the scripted pack's replay sets): its agent's side is
+ * what happened then, the map's is today's.
+ */
+export function replayOf(events: ExchangeEvent[]): RunId | undefined {
+  const d = events.find((e) => e.kind === "begin")?.detail;
+  if (!d || typeof d !== "object" || Array.isArray(d)) return undefined;
+  const f = d.facts;
+  const v = f && typeof f === "object" && !Array.isArray(f) ? f.replay_of : undefined;
+  return typeof v === "string" && v ? v : undefined;
+}
+
 /** The run's folder, as its `begin` says. */
 export function cwdOf(events: ExchangeEvent[]): string | undefined {
   const d = events.find((e) => e.kind === "begin")?.detail;
@@ -283,6 +305,9 @@ function isNearOf(e: ExchangeEvent, node: string, listener: Listener, cwd?: stri
   return phrases.some((p) => out.includes(p));
 }
 
+/** Whether the event is a person's decision (allow or deny a tool call, accept or reject a reply). */
+const isDecision = (e: ExchangeEvent) => e.kind === "act" && e.act?.kind === "decision" && e.act.by === "person";
+
 /** One run's verdicts, one per node said in it, in the order each was first said. */
 export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listening): RunVerdict[] {
   const sorted = [...events].filter((e) => e.run === run).sort((a, b) => a.seq - b.seq);
@@ -296,6 +321,7 @@ export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listeni
   }
   // A person's last decision on the run's reply judges every node said before it.
   const decided = sorted.filter(isReplyDecision).pop();
+  const of = replayOf(sorted);
   const out: RunVerdict[] = [];
   for (const [node, said] of sayings) {
     const first = said[0]!;
@@ -308,6 +334,10 @@ export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listeni
     const afterList = misses.filter((m) => m.seq > first.seq);
     const after = afterList.length;
     const near = sorted.filter((e) => e.seq > first.seq && isNearOf(e, node, listener, cwd)).length;
+    const labelled = sorted
+      .filter((e) => e.seq > first.seq && isDecision(e))
+      .filter((e) => e.place === REPLY_AT || [...(e.place ? [e.place] : []), ...filePlaces(e.act!.input, cwd)].some((p) => listener.at.some((a) => placeMatches(a, p))))
+      .pop();
     out.push({
       run,
       node,
@@ -319,6 +349,8 @@ export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listeni
       after,
       failed_by: afterList.map((m) => m.seq),
       near,
+      ...(labelled ? { label: labelled.act!.ok === false ? ("deny" as const) : ("allow" as const) } : {}),
+      ...(of ? { replay_of: of } : {}),
     });
   }
   return out;

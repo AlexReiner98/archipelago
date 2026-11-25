@@ -14,6 +14,8 @@ a pack changing data does it through an action too. Types:
 | `action.invoke` | Run one |
 | `action.attest` (11) | Run one on a test's word, at the version of its inputs |
 
+An `action.input` refusal says how to fix the input (11): see below.
+
 ## Declaring one
 
 ```ts
@@ -58,6 +60,25 @@ ctx["action.invoke"].invoke({ action, input, authority, reason })
 - An action that writes nothing makes no change set. Reading is fine.
 - There are no holds. The call applies or is refused, and anything applied
   can be undone.
+
+## A refusal says how to fix it
+
+Edition 11. An input that doesn't fit the action's declared `input` is
+refused with code `action.input`, and its `detail` is an `InputRefusal`:
+
+```ts
+{ fix: [{ path: "/title", expected: "a string", example: "42" }],
+  input: { type: "work", title: "42" } }
+```
+
+- `path` is a JSON Pointer into the input (`""` the input itself,
+  `/links/0/to`); `expected` says in words what the schema wants there
+  (`a string`, `one of todo, done`, `not here: it takes …`); `example` is
+  a value that would pass there, null for a key that should go.
+- `input` is the input given with every fix applied: what a caller can
+  send instead, once any `<placeholder>` is a real value.
+- The message says the same in a line. An agent corrects its next call
+  from it without guessing at the schema.
 
 ## Undo
 

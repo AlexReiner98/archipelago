@@ -9,6 +9,13 @@
  * (failing), when it is said run after run and nothing it is about ever
  * comes up (idle: stale, or too generic to matter), or when another node
  * at its place already says the same (duplicate).
+ *
+ * A replay (a recorded run played again with the node said: packs/replay)
+ * is evidence too, but less: the agent's side is what happened then, and it
+ * never heard the node. So a replayed run counts `replay` of a live one
+ * (default a half) toward held and quiet runs, a promotion still needs one
+ * live held run, and a replayed failure counts toward nothing: the miss came
+ * after the node would have been said, to an agent that didn't hear it.
  */
 import type { Json } from "../../spec/common.ts";
 
@@ -31,9 +38,30 @@ export interface Thresholds {
   idle: number;
   /** Share of words in common with another node at its place that makes it a duplicate (0 to 1). */
   same: number;
+  /** What a replayed run counts toward held and quiet runs, against a live one's 1 (0 to 1; 0: replays count for nothing). */
+  replay: number;
 }
 
-export const DEFAULTS: Thresholds = { promote: 3, fail: 2, idle: 12, same: 0.6 };
+export const DEFAULTS: Thresholds = { promote: 3, fail: 2, idle: 12, same: 0.6, replay: 0.5 };
+
+/** Live and replayed runs, weighed: what the thresholds are held against. */
+export interface Weighed {
+  runs: number;
+  held: number;
+  failed: number;
+  quiet: number;
+}
+
+/** A record with its replays at their weight. Failures are live only. */
+export function weigh(live: Tally | undefined, replayed: Tally | undefined, w: number): Weighed {
+  const l = live ?? { said: 0, runs: 0, held: 0, failed: 0, quiet: 0 };
+  const r = replayed ?? { said: 0, runs: 0, held: 0, failed: 0, quiet: 0 };
+  const k = Math.max(0, Math.min(1, w));
+  return { runs: l.runs + k * (r.held + r.quiet), held: l.held + k * r.held, failed: l.failed, quiet: l.quiet + k * r.quiet };
+}
+
+/** A weighed count in words: whole, or to one decimal. */
+const num = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 export type State = "trial" | "promote" | "retire";
 export type Rule = "held" | "failing" | "idle" | "duplicate";
@@ -78,14 +106,20 @@ export interface Peer {
   kept: boolean;
 }
 
-/** A trial node's standing from its record (undefined: never said) and its peers. */
+/**
+ * A trial node's standing from its live record (undefined: never said), its
+ * replayed one, and its peers.
+ */
 export function standing(
   node: { id: string; at: string[]; words: string },
   record: Tally | undefined,
   peers: Peer[],
   t: Thresholds = DEFAULTS,
+  replayed?: Tally,
 ): Standing {
-  const r = record ?? { said: 0, runs: 0, held: 0, failed: 0, quiet: 0 };
+  const live = record ?? { said: 0, runs: 0, held: 0, failed: 0, quiet: 0 };
+  const r = weigh(live, replayed, t.replay ?? DEFAULTS.replay);
+  const rep = replayed?.runs ? ` (${plural(replayed.runs, "replay")} at ${num(t.replay ?? DEFAULTS.replay)} each)` : "";
   const dup = peers
     .filter((p) => p.id !== node.id && (p.kept || p.id < node.id) && p.at.some((a) => node.at.includes(a)))
     .map((p) => ({ p, share: overlap(node.words, p.words) }))
@@ -95,20 +129,21 @@ export function standing(
     return { state: "retire", rule: "duplicate", of: dup.p.id, why: `says what “${dup.p.title}” says at the same place (${Math.round(dup.share * 100)}% of words in common).` };
   }
   if (r.failed >= t.fail && r.failed > r.held) {
-    return { state: "retire", rule: "failing", why: `its miss came again after it was said, in ${plural(r.failed, "run")} of ${r.runs}.` };
+    return { state: "retire", rule: "failing", why: `its miss came again after it was said, in ${plural(r.failed, "run")} of ${live.runs}.` };
   }
-  if (r.held >= t.promote && r.failed * 3 <= r.held) {
-    return { state: "promote", rule: "held", why: `it held in ${plural(r.held, "run")} of ${r.runs}${r.failed ? `, failed in ${r.failed}` : ", and never failed"}.` };
+  if (r.held >= t.promote && r.failed * 3 <= r.held && live.held >= 1) {
+    return { state: "promote", rule: "held", why: `it held in ${num(r.held)} of ${num(r.runs)} runs${rep}${r.failed ? `, failed in ${r.failed}` : ", and never failed"}.` };
   }
   if (r.runs >= t.idle && r.held === 0 && r.failed === 0) {
-    return { state: "retire", rule: "idle", why: `said ${plural(r.said, "time")} in ${plural(r.runs, "run")}, and what it is about never came up: nothing it prevents, nothing it fixes.` };
+    return { state: "retire", rule: "idle", why: `said ${plural(live.said + (replayed?.said ?? 0), "time")} in ${num(r.runs)} runs${rep}, and what it is about never came up: nothing it prevents, nothing it fixes.` };
   }
   const toPromote = Math.max(0, t.promote - r.held);
   const toIdle = Math.max(0, t.idle - r.runs);
+  const needLive = r.held >= t.promote && r.failed * 3 <= r.held && live.held < 1;
   return {
     state: "trial",
-    why: r.runs
-      ? `held ${r.held}, failed ${r.failed}, quiet ${r.quiet}: ${toPromote ? `${plural(toPromote, "more held run")} to promote` : "fails too often to promote"}${r.held || r.failed ? "" : `; retired as idle after ${plural(toIdle, "more quiet run")}`}.`
+    why: r.runs || replayed?.runs
+      ? `held ${num(r.held)}, failed ${r.failed}, quiet ${num(r.quiet)}${rep}: ${needLive ? "one live held run to promote: replays alone don't" : toPromote ? `${num(toPromote)} more held run${toPromote === 1 ? "" : "s"} to promote` : "fails too often to promote"}${r.held || r.failed ? "" : `; retired as idle after ${num(toIdle)} more quiet run${toIdle === 1 ? "" : "s"}`}.`
       : "never said yet.",
   };
 }

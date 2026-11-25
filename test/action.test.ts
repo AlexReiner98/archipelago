@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ActionAttest, ActionInvoke } from "../spec/action.ts";
 import { attested } from "../spec/action.ts";
+import type { Json } from "../spec/common.ts";
 import type { GraphRead } from "../spec/graph.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
 import action from "../packs/action/index.ts";
+import { check, fixIn, fixLine, message } from "../packs/action/input.ts";
 import graph from "../packs/graph/index.ts";
 import items from "../packs/items/index.ts";
 import links from "../packs/links/index.ts";
@@ -66,4 +68,59 @@ test("an attestation is refused without a test on the graph or a version", async
   } finally {
     await s.stop();
   }
+});
+
+test("an input that doesn't fit its schema is refused with how to fix it, and the input fixed", async () => {
+  const s = await setup();
+  try {
+    const owner = { of: "agent" as const, basis: "a test" };
+    const bad = await s.invoke.invoke({ action: "items.create", input: { type: "work", title: 42 }, authority: owner, reason: "a number for a title" });
+    assert.ok(!bad.ok);
+    assert.equal(bad.refused.code, "action.input");
+    assert.equal(bad.refused.message, "items.create: /title wants a string.");
+    assert.deepEqual(bad.refused.detail, { fix: [{ path: "/title", expected: "a string", example: "42" }], input: { type: "work", title: "42" } });
+
+    const none = await s.invoke.invoke({ action: "items.create", input: { type: "work" }, authority: owner, reason: "no title" });
+    assert.ok(!none.ok);
+    assert.deepEqual(none.refused.detail, { fix: [{ path: "/title", expected: "a string: it is required", example: "<title>" }], input: { type: "work", title: "<title>" } });
+
+    // The input fixed is what passes.
+    const again = await s.invoke.invoke({ action: "items.create", input: (bad.refused.detail as { input: Json }).input, authority: owner, reason: "sent the fix" });
+    assert.ok(again.ok);
+  } finally {
+    await s.stop();
+  }
+});
+
+test("check: kinds, enums, lists, unknown keys and nesting each give a fix at their path", () => {
+  const schema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["id"],
+    properties: {
+      id: { type: "string" },
+      status: { type: "string", enum: ["todo", "done"] },
+      at: { type: "array", items: { type: "string" } },
+      count: { type: "integer" },
+      on: { type: "boolean" },
+      to: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+    },
+  };
+  assert.equal(check(schema, { id: "x", status: "todo", at: ["a"] }), undefined, "an input that fits passes");
+  const r = check(schema, { id: "x", status: "built", at: "file:a", count: "3", on: "true", to: {}, colour: "red" })!;
+  assert.deepEqual(r.fix, [
+    { path: "/status", expected: "one of todo, done", example: "todo" },
+    { path: "/at", expected: "a list, each a string", example: ["file:a"] },
+    { path: "/count", expected: "a whole number", example: 3 },
+    { path: "/on", expected: "true or false", example: true },
+    { path: "/to/id", expected: "a string: it is required", example: "<id>" },
+    { path: "/colour", expected: "not here: it takes id, status, at, count, on, to", example: null },
+  ]);
+  assert.deepEqual(r.input, { id: "x", status: "todo", at: ["file:a"], count: 3, on: true, to: { id: "<id>" } });
+  assert.deepEqual(check(schema, [1])!.fix, [{ path: "", expected: "an object", example: { id: "<id>" } }]);
+  assert.deepEqual(check({ type: "object", properties: { at: { type: "array", items: { type: "string" } } } }, { at: ["a", 2] })!.fix, [{ path: "/at/1", expected: "a string", example: "2" }]);
+  assert.equal(message("x.y", r).startsWith("x.y: /status wants one of todo, done; /at wants"), true);
+  // Written after a refusal's words, and read back by the harness.
+  assert.deepEqual(fixIn(`Refused (action.input): ${message("x.y", r)}\n${fixLine(r)}`), r);
+  assert.equal(fixIn("Refused (items.set): no"), undefined);
 });

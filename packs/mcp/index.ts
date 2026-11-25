@@ -29,7 +29,8 @@
  * reaches the result with the refusal in it, so the node is said there,
  * the verdicts judge it and `words.set` rewords it.
  */
-import type { ActionContext, ActionInvoke, ActionList, ActionRegister } from "../../spec/action.ts";
+import type { ActionContext, ActionInvoke, ActionList, ActionRegister, InputRefusal } from "../../spec/action.ts";
+import { fixLine } from "../action/input.ts";
 import type { Facts, Place, RunInfo } from "../../spec/agent.ts";
 import { PLACES } from "../../spec/agent.ts";
 import type { Committed } from "../../spec/changeset.ts";
@@ -68,7 +69,7 @@ export function refusalWords(code: string): string {
   if (code.startsWith("schema.")) {
     return `The schema held that change (${code}): something in it doesn't fit its type, and its problems are in the refusal. Fix the fields it names and act again; schema.check tries a change without writing it.`;
   }
-  if (code === "action.input") return "That action needs fields it wasn't given; the refusal lists its shape. Send them all in one act.";
+  if (code === "action.input") return "That action's input didn't fit its shape. The refusal's fix line names each path, what it wants there, and the input fixed: send that input, with real values for any <placeholder>, in one act.";
   if (code === "action.unknown") return "That action isn't declared now. The act tool's description lists those that are.";
   return `The map refused that act (${code}). Its reason is in the refusal: change what it names and act again, or tell what stopped you.`;
 }
@@ -90,6 +91,8 @@ export function knownPlace(place: string): boolean {
   return FAMILIES.some((f) => (f.endsWith(":") ? place.startsWith(f) && place.length > f.length : place === f));
 }
 
+/** An `action.input` refusal's detail (spec/action.ts, `InputRefusal`). */
+const isFix = (v: Json | undefined): v is InputRefusal & { [key: string]: Json } => isObject(v) && Array.isArray(v.fix);
 const isObject = (v: Json | undefined): v is { [key: string]: Json } => !!v && typeof v === "object" && !Array.isArray(v);
 const ids = (v: Json | undefined): Id[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : typeof v === "string" ? [v] : []);
 const brief = (r: { id: Id; type: string; fields: Record<string, Json> } | null | undefined) =>
@@ -415,9 +418,10 @@ const mcp: Pack<McpConfig> = {
           });
           if (!out.ok) {
             await refusalNode(out.refused.code);
-            // An input that doesn't fit the action's shape: say the shape.
+            // An input that doesn't fit the action's shape: say the shape, and how to fix it (edition 11).
             const shape = out.refused.code === "action.input" ? ` It takes: ${JSON.stringify(declared.input.properties ?? declared.input)}` : "";
-            return no(`Refused (${out.refused.code}): ${out.refused.message}${shape}`);
+            const fix = out.refused.code === "action.input" && isFix(out.refused.detail) ? `\n${fixLine(out.refused.detail)}` : "";
+            return no(`Refused (${out.refused.code}): ${out.refused.message}${shape}${fix}`);
           }
           return ok({ output: out.output, ...(out.change ? { change: out.change } : {}) });
         },

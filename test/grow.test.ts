@@ -21,6 +21,7 @@ import verdict, { type VerdictRead } from "../packs/verdict/index.ts";
 import words, { TRIAL_MARK } from "../packs/words/index.ts";
 import mcp from "../packs/mcp/index.ts";
 import types from "../packs/types/index.ts";
+import { playAs } from "../packs/scripted/index.ts";
 
 const T = "2026-11-20T15:00:00.000Z";
 const ev = (seq: number, e: Partial<ExchangeEvent>): ExchangeEvent => ({ id: `e${seq}`, run: "r", seq, time: T, direction: "from_agent", kind: "act", ...e });
@@ -166,6 +167,51 @@ test("a miss nothing covers is asked about once; the agent writes a trial node t
   } finally {
     await loader.apply([]);
     await rm(dir, { recursive: true, force: true });
+  }
+});
+
+/** The same loop with the scripted agent: no adapter, no HTTP, the runs played on agent.run. */
+test("scripted: a miss is asked about at the reply, a trial node is written for it, and the next run hears it", async () => {
+  const probe: Pack = { id: "probe", inject: ["agent.run", "action.invoke", "verdict.read"], apply() {} };
+  const rt = new Runtime();
+  const errors: unknown[] = [];
+  rt.onError = (_f, e) => errors.push(e);
+  const modules: Record<string, Pack> = {
+    "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "verdict.ts": verdict,
+    "words.ts": words, "grow.ts": grow, "types.ts": types, "probe.ts": probe,
+  };
+  const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
+  await loader.apply(["graph", "action", "exchange", "agent", "verdict", "words", "grow", "types", "probe"].map((id) => ({ id, pack: `${id}.ts` })));
+  try {
+    const p = loader.fiber("probe")!.ctx;
+    const cwd = "/home/me/repo";
+    const edit = (ok: boolean) => ({ tool: "Edit", input: { file_path: `${cwd}/packs/x.ts`, old_string: "a" }, output: ok ? "ok" : "String to replace not found in file.", ok });
+
+    // Run 1: the Edit fails where nothing listens. The first reply is held back to ask; the second goes through.
+    const one = await playAs(p, { start: { cwd }, steps: [edit(false), { reply: "Done." }, { reply: "Done, again." }] }, { run: "s1" });
+    assert.equal(one.refused.length, 1);
+    assert.deepEqual(one.refused[0]!.places, ["reply_end"]);
+    assert.equal(one.refused[0]!.code, "ask");
+    assert.match(one.refused[0]!.text, /at tool:Edit, file:packs\/x\.ts: String to replace not found/);
+    const seq = Number(/#(\d+)/.exec(one.refused[0]!.text)![1]);
+
+    const out = await p.get<ActionInvoke>("action.invoke").invoke<{ node: string }>({
+      action: "grow.trial",
+      input: { run: "s1", seq, place: "file:packs/x.ts", misses: "String to replace not found in file.", words: "Read packs/x.ts again before you edit it." },
+      authority: { of: "agent", basis: "test" },
+      reason: "the Edit missed",
+    });
+    assert.ok(out.ok, JSON.stringify(out));
+
+    // Run 2: the trial node is said at the Edit's file, the Edit fails again, and nothing more is asked: it is covered.
+    const two = await playAs(p, { start: { cwd }, steps: [edit(false), { reply: "Done." }] }, { run: "s2" });
+    assert.deepEqual(two.said.filter((s) => s.text.includes("Read packs/x.ts again")).map((s) => s.places), [["tool:Edit", "file:packs/x.ts"]]);
+    assert.deepEqual(two.refused, []);
+    const v = await p.get<VerdictRead>("verdict.read").run("s2");
+    assert.equal(v.find((x) => x.node.startsWith("words/"))?.verdict, "failed", "the trial node is judged by the miss it names");
+    assert.deepEqual(errors, []);
+  } finally {
+    await loader.apply([]);
   }
 });
 

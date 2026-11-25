@@ -31,12 +31,14 @@ export interface Reviewed {
   at: string[];
   status: string;
   record?: { said: number; runs: number; held: number; failed: number; quiet: number; last?: string };
+  replayed?: { said: number; runs: number; held: number; failed: number; quiet: number };
+  labels?: { allow: number; deny: number; agree: number; disagree: number };
   standing?: { state: "trial" | "promote" | "retire"; rule?: string; why: string; of?: string };
   checks: string[];
   decided?: { state: "promote" | "retire"; rule?: string; why: string; by: string; at: string; node?: string; record?: { runs: number; held: number; failed: number; quiet: number } };
 }
 export interface Review {
-  thresholds: { promote: number; fail: number; idle: number; same: number };
+  thresholds: { promote: number; fail: number; idle: number; same: number; replay?: number };
   apply: boolean;
   nodes: Reviewed[];
 }
@@ -148,12 +150,17 @@ export function keepParts({ actions, invoke, graphLive, onVerdicts, pick }: Deps
     const by = r.decided ? (r.decided.by === "pack:keep" ? "by record" : "by hand") : "";
     const head =
       r.status === "retired" ? `retired ${by}` : r.status === "trial" ? (s?.state === "trial" ? "trial" : `trial → ${s?.state}${review.apply ? "" : " (apply off)"}`) : `kept ${by}`;
-    const rules = `Promotes at ${t.promote} held runs. Retires at ${t.fail} failed runs, after ${t.idle} runs with nothing held or failed, or as a ${Math.round(t.same * 100)}% duplicate. The keep pack's config.`;
+    const w = t.replay ?? 0.5;
+    const rules = `Promotes at ${t.promote} held runs, one of them live. Retires at ${t.fail} failed live runs, after ${t.idle} runs with nothing held or failed, or as a ${Math.round(t.same * 100)}% duplicate. A replayed run counts ${w} of a live one toward held and quiet, and its failures count toward nothing: the agent never heard the node. The keep pack's config.`;
     const why = s?.why ?? r.decided?.why ?? "";
     const rec = r.record;
+    const rep = r.replayed;
+    const lab = r.labels;
     return html`
       <div class="hv-group" title=${rules}>standing · ${head}</div>
-      ${rec && html`<div class="hv-why" title=${`said ${rec.said} times in ${rec.runs} runs`}>${rec.runs} runs · <span class="m-held">${read(verdictGlyph("held"))} ${rec.held}/${t.promote}</span> · <span class="m-failed">${read(verdictGlyph("failed"))} ${rec.failed}/${t.fail}</span> · <span class="m-quiet">${read(verdictGlyph("quiet"))} ${rec.quiet}/${t.idle}</span></div>`}
+      ${(rec || rep) && html`<div class="hv-why" title=${`Live: runs where an agent heard it${rec ? `, said ${rec.said} times in ${rec.runs}` : ", none yet"}`}>live ${rec?.runs ?? 0} · <span class="m-held">${read(verdictGlyph("held"))} ${rec?.held ?? 0}/${t.promote}</span> · <span class="m-failed">${read(verdictGlyph("failed"))} ${rec?.failed ?? 0}/${t.fail}</span> · <span class="m-quiet">${read(verdictGlyph("quiet"))} ${rec?.quiet ?? 0}/${t.idle}</span></div>`}
+      ${rep && html`<div class="hv-why" title=${`Replayed: recorded runs played again with it said, each counting ${w} of a live run toward held and quiet; a replayed failure counts toward nothing`}>replayed ${rep.runs} × ${w} · <span class="m-held">${read(verdictGlyph("held"))} ${rep.held}</span> · <span class="m-failed">${read(verdictGlyph("failed"))} ${rep.failed}</span> · <span class="m-quiet">${read(verdictGlyph("quiet"))} ${rep.quiet}</span></div>`}
+      ${lab && html`<div class="hv-why" title="A person's allow or deny after it was said, against its verdict there: held with allow and failed with deny agree">labels · allow ${lab.allow} · deny ${lab.deny} · <span class=${lab.disagree ? "m-failed" : "m-held"}>agree ${lab.agree}/${lab.agree + lab.disagree}</span></div>`}
       ${why && html`<div class="hv-why" title=${why}>${why}</div>`}
       ${r.checks.map((c) => html`<div class="hv-check" title=${`Held back from every run: ${c}`}>⊝ ${c}</div>`)}
       ${has(APPLY) && html`<div class="hv-words"><div class="bar">

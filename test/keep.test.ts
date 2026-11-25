@@ -12,7 +12,7 @@ import action from "../packs/action/index.ts";
 import agent from "../packs/agent/index.ts";
 import exchange from "../packs/exchange/index.ts";
 import graph from "../packs/graph/index.ts";
-import keep, { overlap, standing, wordsProblems, type Review } from "../packs/keep/index.ts";
+import keep, { DEFAULTS, overlap, standing, weigh, wordsProblems, type Review } from "../packs/keep/index.ts";
 import verdict from "../packs/verdict/index.ts";
 import words from "../packs/words/index.ts";
 
@@ -226,4 +226,38 @@ test("a node written while the pack loads doesn't trip it", async () => {
   await loader.apply([]);
   await rt.settle();
   assert.deepEqual(errors, []);
+});
+
+test("replays: counted at their weight toward held and quiet, never toward failing; a promotion needs a live held run", () => {
+  const live = rec(1, 1, 0);
+  assert.deepEqual(weigh(live, rec(4, 4, 0), 0.5), { runs: 3, held: 3, failed: 0, quiet: 0 });
+  assert.deepEqual(weigh(undefined, rec(4, 0, 4), 0.5), { runs: 0, held: 0, failed: 0, quiet: 0 }, "a replayed failure counts toward nothing");
+  const up = standing(n, live, [], DEFAULTS, rec(4, 4, 0));
+  assert.deepEqual([up.state, up.rule], ["promote", "held"]);
+  assert.match(up.why, /held in 3 of 3 runs \(4 replays at 0\.5 each\)/);
+  const only = standing(n, undefined, [], DEFAULTS, rec(8, 8, 0));
+  assert.equal(only.state, "trial");
+  assert.match(only.why, /one live held run to promote: replays alone/);
+  assert.equal(standing(n, undefined, [], DEFAULTS, rec(5, 0, 5)).state, "trial", "replayed failures retire nothing");
+  assert.deepEqual([standing(n, rec(6, 0, 0), [], DEFAULTS, rec(12, 0, 0)).rule], ["idle"], "6 live and 12 replayed quiet runs make 12");
+  assert.equal(standing(n, live, [], { ...DEFAULTS, replay: 0 }, rec(4, 4, 0)).state, "trial", "replay: 0, they count for nothing");
+});
+
+test("labels: a person's allow or deny after a node was said is checked against its verdict, and the review says where they disagree", async () => {
+  const { ctx, invoke, trial } = await setup({ apply: false });
+  const id = await trial("Back off on 429.", "server answered 429 empty body");
+  const decide = async (run: string, out: string, ok: boolean, allow: boolean) => {
+    const r = ctx(run).get<AgentRun>("agent.run");
+    await r.begin({ run, agent: { id: "e_agent", kind: "agent" }, harness: "test", reaches: [] });
+    await r.reach({ run, places: ["tool:Bash"], time: T });
+    await r.act({ run, place: "tool:Bash", time: T, kind: "tool", by: "agent", input: { command: "curl x" }, output: out, ok });
+    await r.act({ run, place: "tool:Bash", time: T, kind: "decision", by: "person", input: { command: "curl y" }, output: allow ? "allow" : "deny", ok: allow });
+  };
+  await decide("d1", "server answered 429 empty body", false, false); // failed, denied: agree
+  await decide("d2", "Server answered 429 empty body; waited, fine.", true, true); // held, allowed: agree
+  await decide("d3", "server answered 429 empty body", false, true); // failed, allowed: disagree
+  const r = (await invoke("keep.review", {})).output as Review;
+  assert.deepEqual(r.nodes.find((x) => x.item === id)!.labels, { allow: 2, deny: 1, agree: 2, disagree: 1 });
+  assert.deepEqual([r.labels.allow, r.labels.deny, r.labels.agree, r.labels.disagree], [2, 1, 2, 1]);
+  assert.deepEqual(r.labels.against.map((x) => [x.item, x.state]), [[id, "retire"]], "retired as failing, with an allow");
 });
