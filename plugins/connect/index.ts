@@ -21,13 +21,12 @@
  * gets `{name, token}` (a host's gateway that keeps the tokens).
  * Injects action.register.
  */
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ActionContext, ActionRegister } from "../../spec/action.ts";
 import { Refused } from "../../spec/common.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
-import { FOLDER, setup, type Setup } from "./setup.ts";
+import { setup, type Setup } from "./setup.ts";
 
 export interface ConnectConfig {
   hook?: string;
@@ -42,23 +41,6 @@ export interface ConnectConfig {
 
 export const SETUP = "connect.setup";
 export const MAKE_TOKEN = "connect.token";
-
-const CHECKOUT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-
-/**
- * The checkout's own session command, when it reaches `mcp`: its
- * plugins/claude-code/mcp.json names one address (the dev port's), so on
- * another port, or a server with tokens, there is none.
- */
-export function folderSession(mcp: string, root = CHECKOUT): { here: string; folder: string } | undefined {
-  try {
-    const file = JSON.parse(readFileSync(join(root, "plugins", "claude-code", "mcp.json"), "utf8")) as { mcpServers?: Record<string, { url?: string }> };
-    if (!Object.values(file.mcpServers ?? {}).some((s) => s.url === mcp)) return undefined;
-  } catch {
-    return undefined;
-  }
-  return { here: FOLDER, folder: root };
-}
 
 /** This checkout's hook script, as a hook command for `hook`. */
 export function localCommand(hook: string): string {
@@ -77,9 +59,6 @@ const connect: Plugin = {
     // A token is made by an action (an action name), or by the host in front (a path the page posts to).
     const tokenAt = config.token?.startsWith("/") ? config.token : undefined;
     const made: Setup = setup({ hook, mcp, command: config.command ?? localCommand(hook), token: !!config.token, name: config.name, save: config.save, signin: config.signin, script: config.script, tokenAt });
-    // Run from this checkout, with no token: first, a session from here that changes nobody's settings.
-    const here = !config.token && !config.script && !config.command ? folderSession(mcp) : undefined;
-    if (here) Object.assign(made, here);
 
     register.register({
       name: SETUP,

@@ -5,12 +5,12 @@ import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
 import action from "../plugins/action/index.ts";
 import graph from "../plugins/graph/index.ts";
-import connect, { folderSession, localCommand, MAKE_TOKEN, SETUP } from "../plugins/connect/index.ts";
+import connect, { localCommand, MAKE_TOKEN, SETUP } from "../plugins/connect/index.ts";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { EVENTS, FOLDER, install, setup, TOKEN, withToken, type Setup } from "../plugins/connect/setup.ts";
+import { EVENTS, install, setup, TOKEN, withToken, type Setup } from "../plugins/connect/setup.ts";
 import { runName } from "../plugins/connect/view.ts";
 
 const BASE = "mem:/plugins/";
@@ -90,22 +90,6 @@ test("connect.setup answers what to copy, and with no token action there is no c
   assert.ok(s.hooks.includes("http://127.0.0.1:5281/hook"));
   const none = await call(person, MAKE_TOKEN);
   assert.equal(none.ok, false);
-  // The checkout's own files reach this adapter: a session from here comes first, changing no settings.
-  assert.equal(s.here, FOLDER);
-  assert.ok(s.folder);
-});
-
-test("a session from the checkout is offered only where its mcp.json reaches the server, with no token", async () => {
-  assert.equal(folderSession("http://127.0.0.1:5281/mcp")?.here, FOLDER, "the dev port, as the files name it");
-  assert.equal(folderSession("http://127.0.0.1:5181/mcp"), undefined, "another port: the files would miss it");
-  assert.equal(folderSession("http://127.0.0.1:5281/mcp", join(tmpdir(), "no-such-checkout")), undefined, "no files");
-  const tokened = await setupTree({ hook: "http://127.0.0.1:5281/hook", mcp: "http://127.0.0.1:5281/mcp", token: "tokens.make" });
-  const o = await call(tokened.person, SETUP);
-  assert.ok(o.ok);
-  const s = o.output as unknown as Setup;
-  assert.equal(s.here, undefined, "a server with tokens: the files carry none");
-  // The README and the files say the same command.
-  assert.ok(readFileSync(new URL("../README.md", import.meta.url), "utf8").includes(FOLDER));
 });
 
 test("connect.token makes a token for a person, and refuses an agent", async () => {

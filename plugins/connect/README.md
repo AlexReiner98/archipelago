@@ -1,13 +1,15 @@
 # connect
 
 The first moments of a new map: what to do until the first run lands. On a
-map with no run, Field's empty state shows the next step, connect Claude
-Code, with what to copy for this server. When the first run begins, a line
+hosted map with no run (the server takes a token or serves its hook script),
+Field's empty state shows the next step, connect Claude Code, with what to
+copy for this server and the token only the page can make. A local map shows
+its canvas alone; the README has the command. When the first run begins, a line
 says so, live, and opens it in the harness view.
 
 ```
 no run ─▶ Field: ○ Nothing on the map yet
-            Connect Claude Code   Here · MCP · Hooks (copy) · ○ waiting
+            Connect Claude Code   MCP · Hooks (copy) · ○ waiting
 first run begins ─▶ ◐ First run · <its name>  open ─▶ Harness, on that run
 ```
 
@@ -19,12 +21,6 @@ first run begins ─▶ ◐ First run · <its name>  open ─▶ Harness, on tha
 
 ## What is copied
 
-- **Here**, first, on a server run from this checkout whose
-  `plugins/claude-code/mcp.json` reaches it (the dev port, no token): one
-  line, `claude --settings plugins/claude-code/settings.json --mcp-config
-  plugins/claude-code/mcp.json`, run in the checkout. One session reports to
-  the map and nobody's settings change. The two lines below are for every
-  session.
 - **MCP**: one line for a terminal, `claude mcp add --scope user --transport
   http archipelago <mcp>`, with an `Authorization` header where the server
   takes a token.

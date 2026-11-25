@@ -71,8 +71,9 @@ live, and give the session something to plan:
 
 The steps appear on the **Landscape** as the agent adds them.
 
-To have every session report, a map with no run shows on the **Landscape**
-the lines to copy into `~/.claude/settings.json`;
+To have every session report, add the hooks to `~/.claude/settings.json`
+and the MCP server to your user config
+([plugins/claude-code](plugins/claude-code/README.md));
 [First run](guide/first-run.md) has more.
 
 ## Your data
