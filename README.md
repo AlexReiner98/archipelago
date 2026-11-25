@@ -3,7 +3,7 @@
 **Sculpt the landscape around your agents:** build views into their world, so
 you can decide how they plan, remember, and evolve.
 
-<video src="guide/images/archipelago-intro.mp4" poster="guide/images/archipelago-intro.jpg" controls muted playsinline width="100%" title="Archipelago in 86 seconds: the Landscape, a context filter, a Claude Code session watched live in the context interface, its change undone, and a plugin switched off and back"></video>
+https://github.com/user-attachments/assets/33d78d55-55c4-43cb-be13-d03aef9581a8
 
 ## What it is
 
