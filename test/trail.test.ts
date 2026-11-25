@@ -106,7 +106,21 @@ test("withTrail: the run hangs from its session, turns in order, calls linked to
   assert.ok(added.every((it) => it.id === "session:r1" || Object.values(TRAIL_TYPES).includes(it.type as never)));
   assert.ok(added.every((it) => it.side === 0), "drawn hollow");
   const rel = (type: string) => out.links.filter((l) => l.type === type).map((l) => [l.from, l.to]);
-  assert.deepEqual(rel("next").map(([, to]) => to), ["trail:r1:turn:1", "trail:r1:turn:3", "trail:r1:turn:9"]);
+  // The turns in order, each after the one before; each turn's calls in order under it, each then the one above.
+  assert.deepEqual(rel("after"), [
+    ["trail:r1:turn:1", "session:r1"],
+    ["trail:r1:turn:3", "trail:r1:turn:1"],
+    ["trail:r1:turn:9", "trail:r1:turn:3"],
+  ]);
+  assert.deepEqual(rel("then"), [
+    ["trail:r1:6", "trail:r1:turn:3"],
+    ["trail:r1:7", "trail:r1:6"],
+    ["trail:r1:10", "trail:r1:turn:9"],
+    ["trail:r1:12", "trail:r1:10"],
+  ]);
+  assert.deepEqual(added.filter((it) => it.type === TRAIL_TYPES.call).map((it) => it.title), ["1. act items.create", "2. act items.set ✕", "1. Bash", "2. denied Bash ✕"]);
+  // Said nodes hang from their turn, out of the chain.
+  assert.deepEqual(rel("in_turn").map(([, to]) => to), ["trail:r1:turn:1", "trail:r1:turn:3", "trail:r1:turn:9"]);
   // Only ids on the map are linked: the refused set named an item that is not there.
   assert.deepEqual(rel("touched"), [["trail:r1:6", "i_mx1bbbbbbb"]]);
   // A node item by its id; a node said through a context filter link, that link's item.
@@ -117,6 +131,17 @@ test("withTrail: the run hangs from its session, turns in order, calls linked to
   assert.equal(map.items.length, 3);
   assert.equal(map.links.length, 1);
   assert.ok(!out.links.slice(map.links.length).some((l) => map.items.some((it) => it.id === l.from)));
+});
+
+test("flow reads a trail's turns left to right; its calls are left to stack", async () => {
+  const { ranks } = await import("../plugins/field/behaviours/flow.ts");
+  const { build } = await import("../plugins/field/graph.ts");
+  const out = withTrail(map, trailOf(info, events()), true);
+  const g = build(out, null, []);
+  const r = ranks(g, g.linkKinds.map((t) => t === "after"));
+  const rank = (id: string) => r.rank[g.idIx.get(id)!];
+  assert.deepEqual(["session:r1", "trail:r1:turn:1", "trail:r1:turn:3", "trail:r1:turn:9"].map(rank), [0, 1, 2, 3]);
+  assert.equal(rank("trail:r1:6"), -1, "a call has no column of its own: it hangs under its turn");
 });
 
 test("withTrail: off, or no trail, the map as it was; a live session is not drawn twice", () => {

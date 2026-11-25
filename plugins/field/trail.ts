@@ -22,6 +22,11 @@ export interface TrailIn {
 /** The types a trail is drawn in: none is a type of the map. */
 export const TRAIL_TYPES = { turn: "trail turn", call: "trail call", said: "trail said" } as const;
 
+/** The link that orders a trail's turns: a turn is `after` the one before it, so flow (behaviours/flow.ts) puts the earlier on the left. */
+export const TRAIL_AFTER = "after";
+/** The link that orders a turn's calls: a call is `then` the one above it (the turn, or the call before), so stack (behaviours/stack.ts) hangs them in order below the turn. */
+export const TRAIL_THEN = "then";
+
 const shape = (s: (typeof MARK_SHAPES)[number]) => MARK_SHAPES.indexOf(s);
 
 /** The item a said node is about: a node item is named by its id; a node said through a context filter link (`words/<link>`) is that link's item. */
@@ -47,24 +52,28 @@ export function withTrail(input: FieldIn, trail: TrailIn | null | undefined, on:
   const session = sessionId(trail.run);
   if (!ids.has(session)) items.push({ id: session, title: trail.title, type: "session", status: "past", closed: false, kind: "", base: "session", shape: shape("pentagon"), side: 0 });
 
+  // The turns in order, each `after` the one before (an order link: flow reads them left to right), from the
+  // session; each turn's calls hang under it in order, each `then` the one before (a stacking link: stack
+  // reads them top to bottom).
   let before: Id = session;
+  const next = (id: Id) => (link(TRAIL_AFTER, id, before), (before = id));
   if (trail.earlier) {
     const id = `${base}earlier`;
     mark(id, `${trail.earlier} earlier events`, TRAIL_TYPES.turn, "circle");
-    link("next", before, id);
-    before = id;
+    next(id);
   }
   for (const t of trail.turns) {
     const turn = `${base}turn:${t.seq}`;
     mark(turn, t.title, TRAIL_TYPES.turn, "circle");
-    link("next", before, turn);
-    before = turn;
-    for (const a of t.acts) {
+    next(turn);
+    let above: Id = turn;
+    t.acts.forEach((a, k) => {
       const id = `${base}${a.seq}`;
-      mark(id, a.ok ? a.title : `${a.title} ✕`, TRAIL_TYPES.call, "triangle");
-      link("in_turn", id, turn);
+      mark(id, `${k + 1}. ${a.title}${a.ok ? "" : " ✕"}`, TRAIL_TYPES.call, "triangle");
+      link(TRAIL_THEN, id, above);
+      above = id;
       for (const it of a.ids) if (ids.has(it)) link("touched", id, it);
-    }
+    });
     for (const s of t.says) {
       const id = `${base}say:${t.seq}:${s.kind}:${s.node}`;
       const about = aboutOf(s.node, ids, from);

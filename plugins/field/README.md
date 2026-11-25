@@ -41,7 +41,10 @@ find line has words, only what it finds and what lies near it.
   reach, so gather keeps clusters together), `springs` (length and
   stiffness per link type), `flow` (order links put a plan in columns:
   each item's rank is its longest chain of what it waits on, and what it
-  waits on is to the left) and `collide` (by each shape's edge along the
+  waits on is to the left), `stack` ([stack.ts](behaviours/stack.ts):
+  stacking links, a trail's `then` to start with, hang a chain in a straight
+  column, each particle held to its row under the chain's head, so a long
+  chain never curls) and `collide` (by each shape's edge along the
   line between two particles), and `tree` (while the Landscape is
   arranged into a context filter, plugins/arrange's page key `arrange.tree`, each
   of its items flies from where it stood to its place in that context filter's
@@ -116,9 +119,13 @@ find line has words, only what it finds and what lies near it.
   `sessions` dial turns them off.
 - **The run in focus is drawn as its trail** ([trail.ts](trail.ts)). The
   page key `trail.graph`, set by [plugins/trail](../trail/README.md), hangs
-  from the run's session (drawn here if it is not live): its turns in order,
-  linked `next`, then each turn's tool calls (`trail call`, triangles) and
-  the nodes said in it (`trail said`, diamonds), linked `in_turn`. A call is
+  from the run's session (drawn here if it is not live) in the order things
+  happened. Its turns run left to right, each linked `after` the one before
+  (an order link: flow's dial for it starts on). Each turn's tool calls
+  (`trail call`, triangles, numbered within the turn) hang below it top to
+  bottom, each linked `then` the one above (a stacking link: stack's dial
+  for it starts on). The nodes said in a turn (`trail said`, diamonds) hang
+  from it, linked `in_turn`. A call is
   linked `touched` to each item on the map its input or output named; a said
   node is linked `about` the item whose words it is (a node item by its id, a
   node said through a context filter link by that link's item). Trail marks

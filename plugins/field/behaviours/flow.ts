@@ -7,14 +7,14 @@
  * items its order links reach; up and down are left to the other
  * behaviours. Items no order link touches feel nothing.
  *
- * Which link types order is a dial per type: on for depends_on and
- * waits_on to start with.
+ * Which link types order is a dial per type: on for depends_on,
+ * waits_on and a run trail's after to start with.
  */
 import { weight, type Behaviour } from "../behaviour.ts";
 import type { G, Settings } from "../graph.ts";
 
-/** The link types that order, to start with. */
-const ORDER = new Set(["depends_on", "waits_on"]);
+/** The link types that order, to start with: a run's trail is in time order too (field/trail.ts `after`). */
+const ORDER = new Set(["depends_on", "waits_on", "after"]);
 
 export const flowKey = (type: string) => `flow_${type}`;
 

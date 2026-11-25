@@ -92,6 +92,25 @@ test("the rule: every behaviour's push is its energy's slope, and the energy onl
   assert.equal(descends(spin, g, S, gather).ok, false, "a push that is no energy's slope fails");
 });
 
+test("stack keeps the rule too, and hangs a chain in a column under its first", () => {
+  const S = { ...settings(), stack_about: 1 };
+  const g = build(sample(200, 8), null);
+  seed(g, S);
+  for (let k = 0; k < 30; k++) step(g, S);
+  const gather = BEHAVIOURS.find((b) => b.name === "gather")!;
+  const stack = BEHAVIOURS.find((b) => b.name === "stack")!;
+  const v = descends(stack, g, S, gather);
+  assert.ok(v.slope <= CHECK.slope_off, `stack: off its energy's slope by ${(v.slope * 100).toFixed(1)}%`);
+  assert.equal(v.rises, 0, "stack: its energy never rose");
+  assert.ok(v.to < v.from, "stack: its energy fell");
+  // A chain of three under a head: each settles a row below the one before, in the head's column.
+  const chain = { items: ["h", "a", "b"].map((id) => ({ id, title: id, type: "work", status: "todo", closed: false })), links: [{ id: "l1", type: "then", from: "a", to: "h" }, { id: "l2", type: "then", from: "b", to: "a" }] } as unknown as FieldIn;
+  const { g: c } = settle(chain);
+  const at = (id: string) => c.idIx.get(id)!;
+  assert.ok(c.y[at("h")]! < c.y[at("a")]! && c.y[at("a")]! < c.y[at("b")]!, "top to bottom in order");
+  assert.ok(Math.abs(c.x[at("a")]! - c.x[at("h")]!) < Math.abs(c.y[at("a")]! - c.y[at("h")]!), "under, not beside");
+});
+
 test("collide leaves no particle on another, and part_of keeps a tree together", () => {
   const { g } = big();
   let overlaps = 0;
