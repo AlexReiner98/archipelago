@@ -91,6 +91,8 @@ test("asText: strings as they are, values as indented JSON", () => {
   assert.equal(asText("a\nb"), "a\nb");
   assert.equal(asText({ a: 1 }), '{\n  "a": 1\n}');
   assert.equal(asText(undefined), "");
+  assert.equal(asText([["+", "i_a", "title", "A"], ["-", "i_a", "size", 2]]), '[\n  ["+","i_a","title","A"],\n  ["-","i_a","size",2]\n]', "facts a row a line");
+  assert.equal(asText([["+", "i_a", "fields", { a: 1 }]]), JSON.stringify([["+", "i_a", "fields", { a: 1 }]], null, 2), "a row holding an object stays indented");
 });
 
 // ---------- the tree (layout.ts) ----------

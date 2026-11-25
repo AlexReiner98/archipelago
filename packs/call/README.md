@@ -33,6 +33,12 @@ the domain's own context never reaches the exchange. A throw is a failed
 reply (`ok: false`, the error's words) and is thrown on. The run always
 ends.
 
+An answer may name an item it made (`follow: {item, version}`), for a call
+whose item didn't exist when it began: the run begins again before it
+ends, its facts naming the item and version, and it is followed from then
+on, as a `start.follow` is (below). A call that follows an item from its
+start keeps that one.
+
 ## Decisions
 
 A call that follows an item is followed: when the item's `decision`
@@ -54,4 +60,7 @@ the last one: rejected fails them, accepted holds them. On load, the newest
 The [context](../context/README.md) pack counts a call's subject as a
 source of its own (`subject`, one part per type, its tokens as given), and,
 with no transcript, the answer's `usage` as the model's own total.
+A [typed call](../typed/README.md) is a call whose answer is held to the
+map's types: its attempts and checks are acts in the same run.
+
 Tested in `test/call.test.ts`.

@@ -47,6 +47,8 @@ export interface Reply {
   subject?: Subject;
   /** The model's own count, when the domain has it. */
   usage?: { input: number; output: number; model?: string };
+  /** An item the answer made, whose decision at this version judges the call from now on, as `start.follow` does. */
+  follow?: { item: Id; version: string };
 }
 
 export interface CallStart {
@@ -163,6 +165,13 @@ const call: Pack = {
             ...(reply.subject ? { input: { subject: { type: reply.subject.type, tokens: reply.subject.tokens } } } : {}),
             output: { text: reply.text, ...(reply.usage ? { usage: reply.usage as unknown as Json } : {}) },
           });
+          // An item the answer made: the run says more about itself (its facts name the item), and is followed.
+          if (reply.follow && !start.follow) {
+            const { started: _s, ended: _e, last: _l, ...again } = info;
+            const more = await agentRun.begin({ ...again, facts: { ...(info.facts ?? {}), item: reply.follow.item, version: reply.follow.version } });
+            begun.set(run, more);
+            follow(reply.follow.item, run, reply.follow.version);
+          }
           return { ...reply, run };
         } finally {
           await agentRun.end(run, now());

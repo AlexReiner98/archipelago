@@ -41,6 +41,8 @@ export function actLine(e: ExchangeEvent, cwd?: string): string {
   const a = e.act;
   if (!a) return "";
   const i = (a.input ?? {}) as Record<string, Json>;
+  // An act that says what it is (a typed call's attempt, its check): its own words.
+  if (typeof i.description === "string" && a.kind !== "tool") return short(i.description);
   if (a.kind === "prompt") return short(typeof a.input === "string" ? a.input : (i.prompt ?? a.input));
   if (a.kind === "reply") return short(a.input ?? a.output);
   if (a.kind === "notice") return `waits on the person (${String(i.type ?? "notice")}): ${short(i.message ?? "")}`;

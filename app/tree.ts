@@ -107,6 +107,8 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
     { id: "transcript", pack: "packs/transcript/index.ts" },
     { id: "context", pack: "packs/context/index.ts" },
     { id: "call", pack: "packs/call/index.ts" },
+    // A typed call's model: ARCHIPELAGO_MODEL names one (`anthropic:<model>`, `openai:<model>`, `claude[:<model>]`); its key stays in the environment.
+    { id: "typed", pack: "packs/typed/index.ts", config: { model: process.env.ARCHIPELAGO_MODEL || undefined } },
     { id: "profile", pack: "packs/profile/index.ts" },
     { id: "used", pack: "packs/used/index.ts" },
     { id: "lean", pack: "packs/lean/index.ts" },
