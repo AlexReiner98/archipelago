@@ -114,6 +114,17 @@ find line has words, only what it finds and what lies near it.
   or going is a change to the map, not a new find, so the view is not
   fitted again for it. The
   `sessions` dial turns them off.
+- **The run in focus is drawn as its trail** ([trail.ts](trail.ts)). The
+  page key `trail.graph`, set by [plugins/trail](../trail/README.md), hangs
+  from the run's session (drawn here if it is not live): its turns in order,
+  linked `next`, then each turn's tool calls (`trail call`, triangles) and
+  the nodes said in it (`trail said`, diamonds), linked `in_turn`. A call is
+  linked `touched` to each item on the map its input or output named; a said
+  node is linked `about` the item whose words it is (a node item by its id, a
+  node said through a context filter link by that link's item). Trail marks
+  are ghosts: hollow, all in the style's muted ink, never items. Nothing on
+  the map links to them, the find line doesn't find them, and nothing is
+  written. The `trails` dial turns them off.
 - **The legend is the filter, and holds the dials** ([legend.ts](legend.ts),
   [panel.ts](panel.ts)). Closed, one line: the count and two tabs.
   `filter` opens each type (its mark in its colour and shape), each of a
