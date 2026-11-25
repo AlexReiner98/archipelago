@@ -8,33 +8,33 @@ import type { AgentNode, AgentRun, AgentTree } from "../spec/agent.ts";
 import type { Dispose } from "../spec/common.ts";
 import type { ExchangeRead } from "../spec/exchange.ts";
 import type { GraphRead } from "../spec/graph.ts";
-import { Runtime, type Context, type Pack } from "../runtime/core.ts";
+import { Runtime, type Context, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import actor from "../packs/actor/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import history from "../packs/history/index.ts";
-import items from "../packs/items/index.ts";
-import links from "../packs/links/index.ts";
-import mcp, { DESCRIPTIONS } from "../packs/mcp/index.ts";
-import type { McpHost, ToolDef } from "../packs/mcp/host.ts";
-import question from "../packs/question/index.ts";
-import record from "../packs/record/index.ts";
-import schema from "../packs/schema/index.ts";
-import types from "../packs/types/index.ts";
-import words from "../packs/words/index.ts";
-import interchange from "../packs/interchange/index.ts";
-import work from "../packs/work/index.ts";
-import { fixIn } from "../packs/action/input.ts";
+import action from "../plugins/action/index.ts";
+import actor from "../plugins/actor/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import history from "../plugins/history/index.ts";
+import items from "../plugins/items/index.ts";
+import links from "../plugins/links/index.ts";
+import mcp, { DESCRIPTIONS } from "../plugins/mcp/index.ts";
+import type { McpHost, ToolDef } from "../plugins/mcp/host.ts";
+import question from "../plugins/question/index.ts";
+import record from "../plugins/record/index.ts";
+import schema from "../plugins/schema/index.ts";
+import types from "../plugins/types/index.ts";
+import words from "../plugins/words/index.ts";
+import interchange from "../plugins/interchange/index.ts";
+import work from "../plugins/work/index.ts";
+import { fixIn } from "../plugins/action/input.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 const RUN = "run-1";
 const AGENT = { id: "claude-code", kind: "agent" as const };
 
 /** A host as an adapter would be: it serves what is added, and gives each call the run. */
-function hostPack(served: Map<string, ToolDef>): Pack {
+function hostPlugin(served: Map<string, ToolDef>): Plugin {
   return {
     id: "host",
     inject: ["agent.run", "action.invoke"],
@@ -53,20 +53,20 @@ function hostPack(served: Map<string, ToolDef>): Pack {
   };
 }
 
-const probe: Pack = { id: "probe", inject: ["graph.read", "exchange.read", "agent.tree", "agent.node", "action.invoke"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["graph.read", "exchange.read", "agent.tree", "agent.node", "action.invoke"], apply() {} };
 
 async function setup() {
   const dir = await mkdtemp(join(tmpdir(), "mcp-"));
   const served = new Map<string, ToolDef>();
-  const modules: Record<string, Pack> = {
-    graph, action, types, work, question, record, actor, links, items, schema, history, exchange, agent, words, host: hostPack(served), mcp, probe, interchange,
+  const modules: Record<string, Plugin> = {
+    graph, action, types, work, question, record, actor, links, items, schema, history, exchange, agent, words, host: hostPlugin(served), mcp, probe, interchange,
   };
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length, -3)] }) });
   const tree: Entry[] = ["graph", "action", "types", "work", "question", "record", "actor", "links", "items", "schema", "history", "exchange", "agent", "words", "host", "mcp", "probe", "interchange"].map(
-    (id) => ({ id, pack: `${id}.ts`, ...(id === "history" ? { config: { db: join(dir, "history.sqlite") } } : {}) }),
+    (id) => ({ id, plugin: `${id}.ts`, ...(id === "history" ? { config: { db: join(dir, "history.sqlite") } } : {}) }),
   );
   await loader.apply(tree);
   await rt.settle();
@@ -100,7 +100,7 @@ async function setup() {
   };
 }
 
-test("six tools, each described by a node at its place that the words pack says and words.set refines", async () => {
+test("six tools, each described by a node at its place that the words plugin says and words.set refines", async () => {
   const s = await setup();
   try {
     assert.deepEqual([...s.served.keys()], ["hear", "act", "get", "query", "tell", "run"]);
@@ -120,7 +120,7 @@ test("six tools, each described by a node at its place that the words pack says 
     assert.equal(heard.text, "Items by id.");
 
     // Loaded again, it finds its nodes rather than making more.
-    const tree = s.loader.status().map((e) => ({ id: e.id, pack: `${e.id}.ts` }));
+    const tree = s.loader.status().map((e) => ({ id: e.id, plugin: `${e.id}.ts` }));
     await s.loader.apply(tree.filter((e) => e.id !== "mcp"));
     assert.equal(s.served.size, 0, "its tools go when it unloads");
     await s.loader.apply(tree);

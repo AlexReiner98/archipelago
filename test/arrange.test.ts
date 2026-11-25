@@ -1,9 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { arrange, contextTerm } from "../packs/arrange/arrange.ts";
+import { arrange, contextTerm } from "../plugins/arrange/arrange.ts";
 import type { NodeInfo } from "../spec/agent.ts";
 
-const node = (id: string, title: string, at: string[], source?: string) => ({ id, title, at, kind: "instruction", pack: "words", ...(source ? { source } : {}) }) as unknown as NodeInfo;
+const node = (id: string, title: string, at: string[], source?: string) => ({ id, title, at, kind: "instruction", plugin: "words", ...(source ? { source } : {}) }) as unknown as NodeInfo;
 
 test("contextTerm: the context filter a find line names, underscores as spaces; none, undefined", () => {
   assert.equal(contextTerm("context:Copy"), "Copy");
@@ -39,7 +39,7 @@ test("arrange: an item not on the map is a ghost, not a place", () => {
 
 test("arrange: a node said through a context filter link flies the item the link brings", () => {
   const links: Record<string, string> = { l_rule: "r_rule" };
-  const a = arrange("Archipelago", [node("words/l_rule", "No pills", ["file:packs/map/**"], "l_rule")], (source) => links[source]);
+  const a = arrange("Archipelago", [node("words/l_rule", "No pills", ["file:plugins/map/**"], "l_rule")], (source) => links[source]);
   assert.deepEqual(Object.keys(a.items), ["r_rule"]);
   assert.deepEqual(a.ghosts, []);
 });

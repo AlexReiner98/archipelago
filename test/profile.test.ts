@@ -7,25 +7,25 @@ import type { AgentRun, AgentTree, NodeInfo } from "../spec/agent.ts";
 import type { ExchangeRead } from "../spec/exchange.ts";
 import type { GraphRead } from "../spec/graph.ts";
 import type { ProfileRead } from "../spec/profile.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import types from "../packs/types/index.ts";
-import record from "../packs/record/index.ts";
-import links from "../packs/links/index.ts";
-import items from "../packs/items/index.ts";
-import words, { TRIAL_MARK } from "../packs/words/index.ts";
-import profile from "../packs/profile/index.ts";
-import { hearing, matchFacts, matchNode, placing, runProfiles, type Model, type Profile } from "../packs/profile/model.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import types from "../plugins/types/index.ts";
+import record from "../plugins/record/index.ts";
+import links from "../plugins/links/index.ts";
+import items from "../plugins/items/index.ts";
+import words, { TRIAL_MARK } from "../plugins/words/index.ts";
+import profile from "../plugins/profile/index.ts";
+import { hearing, matchFacts, matchNode, placing, runProfiles, type Model, type Profile } from "../plugins/profile/model.ts";
 
 const T = "2026-11-20T14:00:00.000Z";
 
 // --- The rules, pure ---
 
-const node = (id: string, at: string[], source?: string, kind = "instruction"): NodeInfo => ({ id, name: id, kind, title: id, at, pack: "words", ...(source ? { source } : {}) });
+const node = (id: string, at: string[], source?: string, kind = "instruction"): NodeInfo => ({ id, name: id, kind, title: id, at, plugin: "words", ...(source ? { source } : {}) });
 const prof = (p: Partial<Profile> & { id: string }): Profile => ({ title: p.id, state: "on", parts: [], places: [], holds: [], drops: [], ...p });
 const modelOf = (...ps: Profile[]): Model => ({ profiles: new Map(ps.map((p) => [p.id, p])) });
 
@@ -36,10 +36,10 @@ test("match lines read facts by name, globbed; members read a node's places, kin
   assert.ok(matchFacts("hub:e_2", facts));
   assert.ok(!matchFacts("remote:*/archipelago*", facts));
   assert.ok(!matchFacts("", facts), "an empty match matches nothing");
-  const ui = node("words/ui", ["file:packs/map/**", "file:packs/harness/**"]);
-  assert.ok(matchNode("at:file:packs/**", ui));
-  assert.ok(matchNode("at:file:spec/** at:file:packs/**", ui), "same key: any");
-  assert.ok(!matchNode("at:file:packs/** kind:skill", ui), "different keys: all");
+  const ui = node("words/ui", ["file:plugins/map/**", "file:plugins/harness/**"]);
+  assert.ok(matchNode("at:file:plugins/**", ui));
+  assert.ok(matchNode("at:file:spec/** at:file:plugins/**", ui), "same key: any");
+  assert.ok(!matchNode("at:file:plugins/** kind:skill", ui), "different keys: all");
   assert.ok(matchNode("at:skill:rhino*", node("words/r", ["skill:rhinocommon"], undefined, "skill")));
   assert.ok(!matchNode("", ui));
 });
@@ -78,10 +78,10 @@ test("a run nothing places is in the fallback profile and what it is part of; a 
 });
 
 test("hearing: a node in no profile, or a run in no profile, hears; an exclusion wins; a shadow only records", () => {
-  const m = modelOf(prof({ id: "studio", title: "Studio", places: ["r_ap"], holds: ["n_rhino"] }), prof({ id: "arch", title: "Archipelago", places: ["r_arch"], members: "at:file:packs/**", drops: ["n_pills"] }), prof({ id: "biz", title: "Business", state: "shadow", holds: ["n_art"] }));
+  const m = modelOf(prof({ id: "studio", title: "Studio", places: ["r_ap"], holds: ["n_rhino"] }), prof({ id: "arch", title: "Archipelago", places: ["r_arch"], members: "at:file:plugins/**", drops: ["n_pills"] }), prof({ id: "biz", title: "Business", state: "shadow", holds: ["n_art"] }));
   const rhino = node("words/n_rhino", ["skill:rhinocommon"], "n_rhino");
-  const ui = node("words/n_ui", ["file:packs/map/**"], "n_ui");
-  const pills = node("words/n_pills", ["file:packs/map/**"], "n_pills");
+  const ui = node("words/n_ui", ["file:plugins/map/**"], "n_ui");
+  const pills = node("words/n_pills", ["file:plugins/map/**"], "n_pills");
   const art = node("words/n_art", ["session_start"], "n_art");
   const plain = node("words/n_plain", ["session_start"], "n_plain");
   const inArch = { repo: "r_arch" };
@@ -105,10 +105,10 @@ test("placing a run in one profile names it and drops every other it matches, ea
 
 // --- On the map, through the agent ---
 
-const probe: Pack = { id: "probe", inject: ["agent.run", "agent.tree", "action.invoke", "graph.read", "exchange.read", "profile.read"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["agent.run", "agent.tree", "action.invoke", "graph.read", "exchange.read", "profile.read"], apply() {} };
 
-/** Writes facts as they are, before the profile pack loads: what the map held before context filter. */
-const seeding = (facts: Fact[]): Pack => ({
+/** Writes facts as they are, before the profile plugin loads: what the map held before context filter. */
+const seeding = (facts: Fact[]): Plugin => ({
   id: "seed",
   inject: ["action.register", "action.invoke"],
   async apply(ctx) {
@@ -124,11 +124,11 @@ async function setup(seed?: Fact[]) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { graph, action, types, record, links, items, exchange, agent, words: words as Pack, profile, probe, seed: seeding(seed ?? []) } as Record<string, Pack>;
-  const BASE = "mem:/packs/";
+  const modules: Record<string, Plugin> = { graph, action, types, record, links, items, exchange, agent, words: words as Plugin, profile, probe, seed: seeding(seed ?? []) } as Record<string, Plugin>;
+  const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
-  const tree: Entry[] = ["graph", "action", "types", "record", "links", "items", "exchange", "agent", "words", ...(seed ? ["seed"] : []), "profile", "probe"].map((id) => ({ id, pack: id }));
-  // Packs load side by side: what was on the map is written first, as on a server that starts with it.
+  const tree: Entry[] = ["graph", "action", "types", "record", "links", "items", "exchange", "agent", "words", ...(seed ? ["seed"] : []), "profile", "probe"].map((id) => ({ id, plugin: id }));
+  // Plugins load side by side: what was on the map is written first, as on a server that starts with it.
   if (seed) await loader.apply(tree.filter((e) => e.id !== "profile" && e.id !== "probe"));
   await loader.apply(tree);
   await rt.settle();
@@ -308,14 +308,14 @@ test("a node a run heard, moved to a record said by its context filter link, isn
   assert.deepEqual(errors, []);
 });
 
-test("hearing: a strict profile gives its runs only what it holds of the map; the packs' own nodes still reach them", () => {
+test("hearing: a strict profile gives its runs only what it holds of the map; the plugins' own nodes still reach them", () => {
   const m = modelOf(prof({ id: "front", title: "Front end", places: ["r_front"], holds: ["n_html"], strict: true }), prof({ id: "open", title: "Open", places: ["r_open"] }));
   const html = node("words/n_html", ["file:*.html"], "n_html");
   const merge = node("words/n_merge", ["session_start"], "n_merge");
-  const tools: NodeInfo = { id: "mcp/query", name: "query", kind: "instruction", title: "The query tool", at: ["session_start"], pack: "mcp" };
+  const tools: NodeInfo = { id: "mcp/query", name: "query", kind: "instruction", title: "The query tool", at: ["session_start"], plugin: "mcp" };
   assert.deepEqual(hearing(m, { repo: "r_front" }, html), { hears: true });
   assert.deepEqual(hearing(m, { repo: "r_front" }, merge), { hears: false, why: "Not held by Front end, which gives its runs only what it holds." });
-  assert.deepEqual(hearing(m, { repo: "r_front" }, tools), { hears: true }, "a pack's own node is no profile's to hold back");
+  assert.deepEqual(hearing(m, { repo: "r_front" }, tools), { hears: true }, "a plugin's own node is no profile's to hold back");
   assert.deepEqual(hearing(m, { repo: "r_open" }, merge), { hears: true }, "an open profile: what no profile holds is every run's");
   assert.deepEqual(hearing(m, { repo: "r_none" }, merge), { hears: true }, "a run in no profile hears it");
   const fall = modelOf(prof({ id: "home", title: "Home", fallback: true, strict: true, holds: ["n_html"] }));

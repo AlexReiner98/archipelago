@@ -1,0 +1,255 @@
+/**
+ * What the harness gave an agent, beside what the map says: read-only nodes
+ * from a transcript plugin's `transcript.given` (plugins/transcript), hung into
+ * each agent's tree at their places, and their text in the node pane from
+ * `transcript.text`. Without that plugin the view shows none, and the ⋯
+ * menu's toggle is gone.
+ *
+ * A given node's id is `transcript/<run>#<name>`: one per run, so picking
+ * one in an agent's tree picks it there alone. Its kind is `given`, it is
+ * orange (the `harness` token), its name plain: you can see it, not edit it.
+ */
+import { h } from "preact";
+import { useEffect, useRef, useState } from "preact/hooks";
+import htm from "htm";
+import type { ActionInvoke } from "../../spec/action.ts";
+import type { NodeInfo } from "../../spec/agent.ts";
+import { LIMIT_MAX } from "../../spec/graph.ts";
+import { channelDoc, channelOf } from "./channels.ts";
+import { PartRow } from "./events.ts";
+import type { Tree, TreeNode } from "./layout.ts";
+import { NodeWindowPart, useNodeWindow } from "./trend.ts";
+import { sure } from "./windowbar.ts";
+import { outOf, readExtras, USE_MS, useOf, UseRows, type Extras, type Out, type Use } from "./use.ts";
+
+const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
+
+export const GIVEN = "transcript.given";
+export const GIVEN_TEXT = "transcript.text";
+/** A given node's kind. */
+export const KIND = "given";
+const PLUGIN = "transcript";
+/** How long a run's nodes are kept before they are read again, as it goes on. */
+const AGAIN_MS = 4000;
+
+/** What `transcript.given` lists. */
+export interface GivenRow {
+  name: string;
+  title: string;
+  by: string;
+  at: string;
+  count: number;
+  size: number;
+  /** The conversation's (`talk:*`): tokens, and those after the last compaction. */
+  tokens?: number;
+  window?: number;
+  /** Of `tokens`, fitted to the model's real counts. */
+  fitted?: number;
+  /** From what the session's hook sent: its words stay on the machine the run ran on. */
+  elsewhere?: true;
+}
+
+/** A given node: a node of the tree, with who said it. */
+export interface GivenInfo extends NodeInfo {
+  by: string;
+  count: number;
+  size: number;
+  tokens?: number;
+  window?: number;
+  fitted?: number;
+  /** Its words stay on the machine the run ran on: only their sizes came (transcript.take). */
+  elsewhere?: true;
+  /** A tool or server: in how many runs it was given and used (use.ts). */
+  use?: Use;
+  /** An MCP tool's server's use. */
+  server?: Use & { name: string };
+  /** A profile the run is in would leave it out. */
+  out?: Out;
+}
+
+export const givenId = (run: string, name: string) => `${PLUGIN}/${run}#${name}`;
+
+/** The run and name a given node's id holds, or nothing: not a given node. */
+export function parseGiven(id: string | undefined): { run: string; name: string } | undefined {
+  if (!id?.startsWith(`${PLUGIN}/`)) return undefined;
+  const rest = id.slice(PLUGIN.length + 1);
+  const hash = rest.indexOf("#");
+  return hash > 0 ? { run: rest.slice(0, hash), name: rest.slice(hash + 1) } : undefined;
+}
+
+export const isGiven = (n: NodeInfo | undefined): n is GivenInfo => n?.kind === KIND && n.plugin === PLUGIN;
+
+/**
+ * What is the harness's alone, by tree id: each given node, and each bough
+ * every leaf under which is given. Drawn grey, so what the map says (and the
+ * boughs that lead to it) keeps its colour. The root is never in it.
+ */
+export function givenOnly(tree: Tree): Set<string> {
+  const out = new Set<string>();
+  const walk = (t: TreeNode): boolean => {
+    if (!t.kids.length) {
+      const theirs = isGiven(t.node);
+      if (theirs) out.add(t.id);
+      return theirs;
+    }
+    let all = true;
+    for (const k of t.kids) all = walk(k) && all;
+    if (all && t.parent) out.add(t.id);
+    return all;
+  };
+  walk(tree.root);
+  return out;
+}
+
+/**
+ * Each row as a node of the run's tree. Its name says who said it, except a
+ * tool's definition: the tool's bough says whose it is (the MCP server's,
+ * or the harness's own), and its orange says it was given.
+ */
+export function givenNodes(run: string, rows: GivenRow[], extras?: Extras): GivenInfo[] {
+  return rows.map((r) => ({
+    id: givenId(run, r.name),
+    name: `${run}#${r.name}`,
+    plugin: PLUGIN,
+    kind: KIND,
+    title: r.name.startsWith("tool:") || r.name.startsWith("talk:") || r.title.includes(r.by) ? r.title : `${r.title} · ${r.by}`,
+    at: [r.at],
+    by: r.by,
+    count: r.count,
+    size: r.size,
+    ...(r.tokens !== undefined ? { tokens: r.tokens } : {}),
+    ...(r.window !== undefined ? { window: r.window } : {}),
+    ...(r.fitted !== undefined ? { fitted: r.fitted } : {}),
+    ...(r.elsewhere ? { elsewhere: true as const } : {}),
+    ...useOf(extras, r.name),
+    ...(outOf(extras, r.name) ? { out: outOf(extras, r.name)! } : {}),
+  }));
+}
+
+/**
+ * The given nodes of each run, read through `transcript.given` a page at a
+ * time, and again as `tick` moves (the run's events), at most every few
+ * seconds. Empty when nothing provides the action, or `on` is false.
+ */
+export function useGiven(invoke: ActionInvoke, has: boolean, on: boolean, runs: string[], tick: unknown): Map<string, GivenInfo[]> {
+  const [got, setGot] = useState<Map<string, GivenInfo[]>>(new Map());
+  const last = useRef(new Map<string, number>());
+  const extras = useRef(new Map<string, { at: number; extras: Extras }>());
+  const alive = useRef(true);
+  useEffect(() => () => void (alive.current = false), []);
+  const key = runs.join(",");
+  useEffect(() => {
+    if (!has || !on || !runs.length) return;
+    let gone = false;
+    const read = async (run: string) => {
+      const rows: GivenRow[] = [];
+      let after: string | undefined;
+      for (let i = 0; i < 20; i++) {
+        const out = await invoke.invoke({
+          action: GIVEN,
+          input: { run, limit: LIMIT_MAX, ...(after ? { after } : {}) },
+          authority: { of: "human", basis: "read in the context interface" },
+          reason: "Show what the harness gave the agent",
+        });
+        if (!out.ok) return undefined;
+        const o = out.output as { nodes?: GivenRow[]; next?: string; reading?: boolean; elsewhere?: boolean };
+        rows.push(...(o.nodes ?? []).map((r) => (o.elsewhere ? { ...r, elsewhere: true as const } : r)));
+        if (!o.next) return { rows, reading: !!o.reading };
+        after = o.next;
+      }
+      return { rows, reading: false };
+    };
+    const load = async () => {
+      for (const run of runs) {
+        const at = last.current.get(run) ?? 0;
+        if (Date.now() - at < AGAIN_MS) continue;
+        last.current.set(run, Date.now());
+        const r = await read(run).catch(() => undefined);
+        // A read that failed is asked again next time. One that lands after the effect moved on (an event came,
+        // the plugin reloaded) still counts: dropping it, with the run marked read, left an ended run empty.
+        if (!r) {
+          last.current.set(run, 0);
+          continue;
+        }
+        // Which tools runs use and what a lean profile leaves out: asked again less often (use.ts).
+        let x = extras.current.get(run);
+        if (!x || Date.now() - x.at > USE_MS) {
+          const got = await readExtras(invoke, run, r.rows.map((row) => row.name)).catch(() => undefined);
+          if (got) extras.current.set(run, (x = { at: Date.now(), extras: got }));
+        }
+        if (!alive.current) return;
+        setGot((m) => new Map(m).set(run, givenNodes(run, r.rows, x?.extras)));
+        // Still reading a long transcript: go on soon.
+        if (r.reading) setTimeout(() => !gone && (last.current.set(run, 0), void load()), 300);
+      }
+    };
+    const timer = setTimeout(() => void load(), 0);
+    return () => {
+      gone = true;
+      clearTimeout(timer);
+    };
+  }, [has, on, key, tick]);
+  return has && on ? got : new Map();
+}
+
+/** How long a text read may take before the pane says it got no answer. */
+const READ_MS = 15_000;
+
+/** The node pane for a given node: who said it, where, and its text, read only. */
+export function GivenPane({ invoke, id, info, hasWindow, playhead }: { invoke: ActionInvoke; id: string; info?: GivenInfo; hasWindow?: boolean; playhead?: string }) {
+  const at = parseGiven(id);
+  const win = useNodeWindow(invoke, !!hasWindow, at?.run, id, playhead, info?.count);
+  const [text, setText] = useState<{ text?: string; error?: string; cut?: boolean }>({});
+  const [tries, setTries] = useState(0);
+  const away = !!info?.elsewhere;
+  useEffect(() => {
+    setText({});
+    // Its words stay where the run ran: nothing to read here.
+    if (!at || away) return;
+    let gone = false;
+    // A server that is down never answers: say so after a while, never "reading…" for good.
+    const late = setTimeout(() => !gone && setText({ error: "no answer from the server" }), READ_MS);
+    void invoke
+      .invoke({ action: GIVEN_TEXT, input: { run: at.run, name: at.name }, authority: { of: "human", basis: "read in the context interface" }, reason: "Read what the harness gave the agent" })
+      .then(
+        (out) => {
+          if (gone) return;
+          clearTimeout(late);
+          if (out.ok) {
+            const o = out.output as { text?: string; cut?: boolean };
+            setText({ text: o.text ?? "", ...(o.cut ? { cut: true } : {}) });
+          } else setText({ error: out.refused.message });
+        },
+        (e: unknown) => {
+          if (gone) return;
+          clearTimeout(late);
+          setText({ error: e instanceof Error ? e.message : String(e) });
+        },
+      );
+    return () => {
+      gone = true;
+      clearTimeout(late);
+    };
+  }, [id, tries, away]);
+  const title = info?.title ?? at?.name ?? id;
+  return html`
+    <div class="hv-pane">
+      <div class="hv-head"><span class="t hv-cut" title=${title}>${title}</span><span class="sp"></span><span class="hv-dim" title="Given by the harness, read from the run's transcript: you can see it, not edit it">read only</span></div>
+      <div class="hv-body">
+        <div class="hv-kv"><span class="k">by</span><span class="v">${info?.by ?? "—"}</span></div>
+        <div class="hv-kv"><span class="k">channel</span><span class="v" title=${info ? channelDoc(channelOf(info)) : ""}>${info ? channelOf(info) : "—"}</span></div>
+        <div class="hv-kv"><span class="k">place</span><span class="v">${info?.at.join(", ") ?? "—"}</span></div>
+        ${info?.tokens !== undefined && info.window !== undefined
+          ? html`<div class="hv-kv"><span class="k">said</span><span class="v" title=${sure(info.tokens, info.fitted ?? 0).tip}>${`${info.count} piece${info.count === 1 ? "" : "s"} · ${sure(info.tokens, info.fitted ?? 0).text} tokens`}</span></div>
+              <div class="hv-kv"><span class="k">window</span><span class="v" title="What came after the last compaction: the rest was summed up">${info.window === info.tokens ? "all in it" : `${(info.window ?? 0).toLocaleString()} in it, ${(info.tokens - (info.window ?? 0)).toLocaleString()} dropped`}</span></div>`
+          : html`<div class="hv-kv"><span class="k">given</span><span class="v">${info ? `${info.count} time${info.count === 1 ? "" : "s"} · ${info.size.toLocaleString()} letters` : "—"}</span></div>`}
+        <${NodeWindowPart} got=${win} colour="var(--harness)" />
+        <${UseRows} invoke=${invoke} use=${info?.use} server=${info?.server} out=${info?.out} canSet=${!!info?.out} />
+        <div class="hv-given">
+          ${away
+            ? html`<div class="hv-kv"><span class="k">words</span><span class="v" title="Its words stay on the machine the run ran on: its hook sent only their sizes, times and counts">⌂ on its machine</span></div>`
+            : text.error ? html`<div class="hv-empty">Not read: ${text.error} <button class="hv-fold" onClick=${() => setTries((n) => n + 1)}>try again</button></div>` : text.text === undefined ? html`<div class="hv-empty">reading…</div>` : html`<${PartRow} p=${{ label: text.cut ? "text, cut: the rest is in the transcript" : info?.tokens !== undefined && info.count > 20 ? "the latest 20" : "text", text: text.text || "empty" }} />`}
+        </div>
+      </div>
+    </div>`;
+}

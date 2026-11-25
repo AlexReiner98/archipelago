@@ -5,22 +5,22 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { ActionInvoke, ActionRegister } from "../spec/action.ts";
 import type { AgentRun } from "../spec/agent.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import types from "../packs/types/index.ts";
-import record from "../packs/record/index.ts";
-import links from "../packs/links/index.ts";
-import items from "../packs/items/index.ts";
-import history from "../packs/history/index.ts";
-import profile from "../packs/profile/index.ts";
-import used from "../packs/used/index.ts";
-import lean from "../packs/lean/index.ts";
-import leanWrite, { safeFolder } from "../packs/lean/write.ts";
-import { entriesOf, kept, leaveOut, reconcile } from "../packs/lean/plan.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import types from "../plugins/types/index.ts";
+import record from "../plugins/record/index.ts";
+import links from "../plugins/links/index.ts";
+import items from "../plugins/items/index.ts";
+import history from "../plugins/history/index.ts";
+import profile from "../plugins/profile/index.ts";
+import used from "../plugins/used/index.ts";
+import lean from "../plugins/lean/index.ts";
+import leanWrite, { safeFolder } from "../plugins/lean/write.ts";
+import { entriesOf, kept, leaveOut, reconcile } from "../plugins/lean/plan.ts";
 
 const T = "2026-11-22T10:00:00.000Z";
 
@@ -79,13 +79,13 @@ test("safeFolder: never the home folder, above it, under ~/.claude, a root, or a
   }
 });
 
-/** Stands in for the transcript pack: what each run was given. */
+/** Stands in for the transcript plugin: what each run was given. */
 const GIVEN: Record<string, { name: string; size: number }[]> = {
   r1: [{ name: "tool:Bash", size: 900 }, { name: "tool:Artifact", size: 37000 }, { name: "tool:mcp__y__a", size: 300 }, { name: "mcp:y", size: 100 }],
   r2: [{ name: "tool:Bash", size: 900 }, { name: "tool:Artifact", size: 37000 }, { name: "tool:mcp__y__a", size: 300 }],
   r3: [{ name: "tool:Bash", size: 900 }, { name: "tool:Artifact", size: 37000 }],
 };
-const fakeTranscript: Pack = {
+const fakeTranscript: Plugin = {
   id: "transcript",
   inject: ["action.register"],
   apply(ctx) {
@@ -99,7 +99,7 @@ const fakeTranscript: Pack = {
     });
   },
 };
-const probe: Pack = { id: "probe", inject: ["agent.run", "action.invoke"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["agent.run", "action.invoke"], apply() {} };
 const wait = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 
 test("a lean profile: planned always; set as a change set; written into its runs' project settings only while on, taken out by undo and by unloading", async () => {
@@ -114,10 +114,10 @@ test("a lean profile: planned always; set as a change set; written into its runs
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { graph, action, types, record, links, items, history, exchange, agent, profile, transcript: fakeTranscript, used, lean, "lean-write": leanWrite as Pack, probe } as Record<string, Pack>;
-  const BASE = "mem:/packs/";
+  const modules: Record<string, Plugin> = { graph, action, types, record, links, items, history, exchange, agent, profile, transcript: fakeTranscript, used, lean, "lean-write": leanWrite as Plugin, probe } as Record<string, Plugin>;
+  const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
-  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, pack: id, ...(id === "lean-write" ? { config: { home, ledger: join(dir, "data", "lean.json") } } : {}) }));
+  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, plugin: id, ...(id === "lean-write" ? { config: { home, ledger: join(dir, "data", "lean.json") } } : {}) }));
   await loader.apply(tree);
   await rt.settle();
   const ctx = (run: string) => loader.fiber("probe")!.ctx.intercept({ actor: { id: "e_agent", kind: "agent" }, run });

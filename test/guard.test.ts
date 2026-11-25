@@ -9,11 +9,11 @@ import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
 import { serve } from "../runtime/serve.ts";
-import claudeCode from "../packs/claude-code/index.ts";
-import bridge, { KEYS } from "../packs/bridge/server.ts";
+import claudeCode from "../plugins/claude-code/index.ts";
+import bridge, { KEYS } from "../plugins/bridge/server.ts";
 import { serverTree } from "../app/tree.ts";
 
 const PAGE = "http://localhost:5999";
@@ -65,9 +65,9 @@ test("the page server refuses a foreign Host or Origin, and serves the rest", as
   assert.equal((await call(port, "/index.html", {})).body, "<p>hi</p>");
 });
 
-/** Loads one pack over stand-ins for every key it injects. */
-async function load(pack: Pack, keys: readonly string[], config: Record<string, unknown>) {
-  const stub: Pack = {
+/** Loads one plugin over stand-ins for every key it injects. */
+async function load(plugin: Plugin, keys: readonly string[], config: Record<string, unknown>) {
+  const stub: Plugin = {
     id: "stub",
     apply(ctx) {
       for (const k of keys) ctx.provide(k, () => ({}));
@@ -75,12 +75,12 @@ async function load(pack: Pack, keys: readonly string[], config: Record<string, 
   };
   let port = 0;
   const rt = new Runtime();
-  const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: url.endsWith("stub.ts") ? stub : pack }) });
+  const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: url.endsWith("stub.ts") ? stub : plugin }) });
   await loader.apply([
-    { id: "stub", pack: "stub.ts" },
-    { id: pack.id, pack: "pack.ts", config: { ...config, port: 0, onListen: (p: number) => (port = p) } },
+    { id: "stub", plugin: "stub.ts" },
+    { id: plugin.id, plugin: "plugin.ts", config: { ...config, port: 0, onListen: (p: number) => (port = p) } },
   ]);
-  assert.ok(port > 0, `${pack.id} listens`);
+  assert.ok(port > 0, `${plugin.id} listens`);
   return { port, close: () => loader.apply([]) };
 }
 

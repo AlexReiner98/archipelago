@@ -2,8 +2,8 @@
  * profile: which runs a node is for. See profile.md.
  *
  * Edition 5 (20 Nov 2026). The spec owns only the read side, so the
- * pack that keeps profiles can be replaced: what a profile is on the map,
- * its links and the terms it matches with are that pack's.
+ * plugin that keeps profiles can be replaced: what a profile is on the map,
+ * its links and the terms it matches with are that plugin's.
  */
 import type { NodeInfo, RunInfo } from "./agent.ts";
 import type { Capability, Dispose, Id } from "./common.ts";
@@ -34,7 +34,7 @@ export interface ProfileRead {
   of(run: RunInfo): Promise<ProfileInfo[]>;
   /** Whether a run hears a node. A node in no profile is heard by every run. */
   hears(run: RunInfo, node: NodeInfo): Promise<Hearing>;
-  /** The nodes loaded now that a profile holds, and those it takes out, by node id (`pack/name`); its parts' not included. */
+  /** The nodes loaded now that a profile holds, and those it takes out, by node id (`plugin/name`); its parts' not included. */
   nodes(profile: Id): Promise<{ in: string[]; out: string[] }>;
   /** Calls `on` when profiles, or what they hold, change. */
   watch(on: () => void): Dispose;

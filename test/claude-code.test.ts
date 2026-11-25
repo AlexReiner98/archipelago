@@ -5,20 +5,20 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { Act, AgentNode, AgentRun, Answer, Moment, RunStart } from "../spec/agent.ts";
 import type { ExchangeRead } from "../spec/exchange.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import graph from "../packs/graph/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import claudeCode from "../packs/claude-code/index.ts";
-import { handle, lastAssistantText, promptTitle, relativePath, toolPlaces, transcriptPath, unseenFailures, type HookInput, type RunPort } from "../packs/claude-code/mapping.ts";
-import { rpc } from "../packs/claude-code/mcp.ts";
-import { withRemote } from "../packs/claude-code/hook.ts";
-import { ordered, tagOf, taggedText, told, type Speakers } from "../packs/claude-code/context.ts";
-import mcpPack from "../packs/mcp/index.ts";
-import types from "../packs/types/index.ts";
-import type { ToolDef } from "../packs/mcp/host.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import graph from "../plugins/graph/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import claudeCode from "../plugins/claude-code/index.ts";
+import { handle, lastAssistantText, promptTitle, relativePath, toolPlaces, transcriptPath, unseenFailures, type HookInput, type RunPort } from "../plugins/claude-code/mapping.ts";
+import { rpc } from "../plugins/claude-code/mcp.ts";
+import { withRemote } from "../plugins/claude-code/hook.ts";
+import { ordered, tagOf, taggedText, told, type Speakers } from "../plugins/claude-code/context.ts";
+import mcpPlugin from "../plugins/mcp/index.ts";
+import types from "../plugins/types/index.ts";
+import type { ToolDef } from "../plugins/mcp/host.ts";
 
 const T = "2026-11-20T15:00:00.000Z";
 const actor = { id: "claude-code", kind: "agent" as const };
@@ -52,7 +52,7 @@ test("paths become places relative to the run's folder, with /", () => {
   assert.equal(relativePath("C:\\work\\repo\\spec\\agent.ts", "C:\\work\\repo"), "spec/agent.ts");
   assert.equal(relativePath("c:/work/repo/a.ts", "C:\\work\\repo\\"), "a.ts");
   assert.equal(relativePath("/home/x/b.ts", "/home/y"), "/home/x/b.ts");
-  assert.deepEqual(toolPlaces("Edit", { file_path: "C:\\work\\repo\\packs\\a.ts", old_string: "x" }, "C:\\work\\repo"), ["tool:Edit", "file:packs/a.ts"]);
+  assert.deepEqual(toolPlaces("Edit", { file_path: "C:\\work\\repo\\plugins\\a.ts", old_string: "x" }, "C:\\work\\repo"), ["tool:Edit", "file:plugins/a.ts"]);
   assert.deepEqual(toolPlaces("NotebookEdit", { notebook_path: "/r/n.ipynb" }, "/r"), ["tool:NotebookEdit", "file:n.ipynb"]);
   assert.deepEqual(toolPlaces("Bash", { command: "ls" }), ["tool:Bash"]);
 });
@@ -300,7 +300,7 @@ test("the reply is read from the transcript when the hook doesn't carry it", () 
   assert.equal(lastAssistantText(""), undefined);
 });
 
-test("the MCP server lists the tools packs added and hands each call its run", async () => {
+test("the MCP server lists the tools plugins added and hands each call its run", async () => {
   const { port } = fake();
   const seen: unknown[] = [];
   const echo: ToolDef = {
@@ -329,12 +329,12 @@ test("the MCP server lists the tools packs added and hands each call its run", a
   assert.equal(none.error.code, -32602);
 });
 
-/** The real packs, through the loader, over HTTP. */
-test("hooks and MCP over HTTP reach the agent pack and land on the exchange, both ways", async () => {
+/** The real plugins, through the loader, over HTTP. */
+test("hooks and MCP over HTTP reach the agent plugin and land on the exchange, both ways", async () => {
   const dir = await mkdtemp(join(tmpdir(), "cc-"));
   const transcript = join(dir, "t.jsonl");
   await writeFile(transcript, JSON.stringify({ type: "assistant", message: { content: [{ type: "text", text: "Finished." }] } }) + "\n");
-  const nodes: Pack = {
+  const nodes: Plugin = {
     id: "nodes",
     inject: ["agent.node"],
     apply(ctx) {
@@ -344,27 +344,27 @@ test("hooks and MCP over HTTP reach the agent pack and land on the exchange, bot
       n.node({ name: "spec", kind: "reflex", title: "spec", at: ["file:spec/*"], speak: () => ({ say: "The spec is versioned." }) });
     },
   };
-  const probe: Pack = { id: "probe", inject: ["exchange.read"], apply() {} };
+  const probe: Plugin = { id: "probe", inject: ["exchange.read"], apply() {} };
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
   let port = 0;
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe, "types.ts": types, "mcp.ts": mcpPack };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe, "types.ts": types, "mcp.ts": mcpPlugin };
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   await loader.apply([
-    { id: "graph", pack: "graph.ts" },
-    { id: "action", pack: "action.ts" },
-    { id: "exchange", pack: "exchange.ts" },
-    { id: "agent", pack: "agent.ts" },
-    { id: "nodes", pack: "nodes.ts" },
-    { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
-    { id: "types", pack: "types.ts" },
-    { id: "mcp", pack: "mcp.ts" },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts" },
+    { id: "action", plugin: "action.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "nodes", plugin: "nodes.ts" },
+    { id: "claude-code", plugin: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "types", plugin: "types.ts" },
+    { id: "mcp", plugin: "mcp.ts" },
+    { id: "probe", plugin: "probe.ts" },
   ]);
   try {
     assert.ok(port > 0, "the adapter listens");
-    assert.equal(loader.fiber("mcp")?.state, "active", "the mcp pack serves its tools on the adapter");
+    assert.equal(loader.fiber("mcp")?.state, "active", "the mcp plugin serves its tools on the adapter");
     const post = async (path: string, body: unknown) => {
       const r = await fetch(`http://127.0.0.1:${port}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       return { status: r.status, json: r.status === 202 ? undefined : await r.json() };
@@ -415,8 +415,8 @@ test("hooks and MCP over HTTP reach the agent pack and land on the exchange, bot
     assert.equal(events.find((e) => e.act?.kind === "reply")!.act!.output, "Finished.");
     assert.deepEqual(errors, []);
 
-    // Unloading the pack closes its server.
-    await loader.apply([{ id: "graph", pack: "graph.ts" }, { id: "action", pack: "action.ts" }, { id: "exchange", pack: "exchange.ts" }, { id: "agent", pack: "agent.ts" }]);
+    // Unloading the plugin closes its server.
+    await loader.apply([{ id: "graph", plugin: "graph.ts" }, { id: "action", plugin: "action.ts" }, { id: "exchange", plugin: "exchange.ts" }, { id: "agent", plugin: "agent.ts" }]);
     await assert.rejects(fetch(`http://127.0.0.1:${port}/health`));
   } finally {
     await loader.apply([]);
@@ -449,7 +449,7 @@ test("the command forwarder prints the adapter's answer, and nothing when it is 
   await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
   const port = (server.address() as { port: number }).port;
   const forward = async (url: string, cwd?: string) => {
-    const child = spawn(process.execPath, ["packs/claude-code/hook.ts", url]);
+    const child = spawn(process.execPath, ["plugins/claude-code/hook.ts", url]);
     let out = "";
     child.stdout.on("data", (c) => (out += c));
     child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart", session_id: "s", ...(cwd ? { cwd } : {}) }));
@@ -545,16 +545,16 @@ test("a restart mid-turn records each call once: Stop reads back what is on the 
       line({ type: "assistant", message: { content: [{ type: "text", text: "Done." }] } }),
     ].join("\n") + "\n",
   );
-  const probe: Pack = { id: "probe", inject: ["exchange.read"], apply() {} };
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "cc.ts": claudeCode, "probe.ts": probe };
+  const probe: Plugin = { id: "probe", inject: ["exchange.read"], apply() {} };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "cc.ts": claudeCode, "probe.ts": probe };
   let port = 0;
   const tree = [
-    { id: "graph", pack: "graph.ts" },
-    { id: "action", pack: "action.ts" },
-    { id: "exchange", pack: "exchange.ts", config: { journal } },
-    { id: "agent", pack: "agent.ts" },
-    { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts" },
+    { id: "action", plugin: "action.ts" },
+    { id: "exchange", plugin: "exchange.ts", config: { journal } },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "claude-code", plugin: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "probe", plugin: "probe.ts" },
   ];
   const start = async () => {
     const rt = new Runtime();
@@ -599,7 +599,7 @@ test("a restart mid-turn records each call once: Stop reads back what is on the 
 
 /** A client without hooks (claude.ai, a desktop chat): its MCP session is a run of its own. */
 test("an MCP client without hooks gets a session, and the session is its own recorded run", async () => {
-  const nodes: Pack = {
+  const nodes: Plugin = {
     id: "nodes",
     inject: ["agent.node"],
     apply(ctx) {
@@ -608,21 +608,21 @@ test("an MCP client without hooks gets a session, and the session is its own rec
       n.node({ name: "heard", kind: "reflex", title: "heard", at: ["tool_result:mcp__archipelago__hear"], speak: () => ({ say: "Heard it." }) });
     },
   };
-  const probe: Pack = { id: "probe", inject: ["exchange.read"], apply() {} };
+  const probe: Plugin = { id: "probe", inject: ["exchange.read"], apply() {} };
   const rt = new Runtime();
   let port = 0;
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe, "types.ts": types, "mcp.ts": mcpPack };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe, "types.ts": types, "mcp.ts": mcpPlugin };
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   await loader.apply([
-    { id: "graph", pack: "graph.ts" },
-    { id: "action", pack: "action.ts" },
-    { id: "exchange", pack: "exchange.ts" },
-    { id: "agent", pack: "agent.ts" },
-    { id: "nodes", pack: "nodes.ts" },
-    { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
-    { id: "types", pack: "types.ts" },
-    { id: "mcp", pack: "mcp.ts" },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts" },
+    { id: "action", plugin: "action.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "nodes", plugin: "nodes.ts" },
+    { id: "claude-code", plugin: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "types", plugin: "types.ts" },
+    { id: "mcp", plugin: "mcp.ts" },
+    { id: "probe", plugin: "probe.ts" },
   ]);
   try {
     const post = async (body: unknown, session?: string) => {
@@ -692,9 +692,9 @@ test("each node's words come under a short tag naming it: its title, never a pat
   assert.equal(told([], kinds), undefined);
 });
 
-test("two runs with the same nodes get the same leading text at session_start, whatever order the packs loaded in", async () => {
-  /** A pack of standing words, and one that says what changes per run. */
-  const standing = (id: string, names: string[]): Pack => ({
+test("two runs with the same nodes get the same leading text at session_start, whatever order the plugins loaded in", async () => {
+  /** A plugin of standing words, and one that says what changes per run. */
+  const standing = (id: string, names: string[]): Plugin => ({
     id,
     inject: ["agent.node"],
     apply(ctx) {
@@ -703,7 +703,7 @@ test("two runs with the same nodes get the same leading text at session_start, w
     },
   });
   let runs = 0;
-  const changing: Pack = {
+  const changing: Plugin = {
     id: "changing",
     inject: ["agent.node"],
     apply(ctx) {
@@ -713,15 +713,15 @@ test("two runs with the same nodes get the same leading text at session_start, w
   const start = async (order: string[], session: string): Promise<string> => {
     const rt = new Runtime();
     let port = 0;
-    const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "cc.ts": claudeCode, "one.ts": standing("one", ["b", "a"]), "two.ts": standing("two", ["c"]), "changing.ts": changing };
+    const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "cc.ts": claudeCode, "one.ts": standing("one", ["b", "a"]), "two.ts": standing("two", ["c"]), "changing.ts": changing };
     const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
     await loader.apply([
-      { id: "graph", pack: "graph.ts" },
-      { id: "action", pack: "action.ts" },
-      { id: "exchange", pack: "exchange.ts" },
-      { id: "agent", pack: "agent.ts" },
-      ...order.map((id) => ({ id, pack: `${id}.ts` })),
-      { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+      { id: "graph", plugin: "graph.ts" },
+      { id: "action", plugin: "action.ts" },
+      { id: "exchange", plugin: "exchange.ts" },
+      { id: "agent", plugin: "agent.ts" },
+      ...order.map((id) => ({ id, plugin: `${id}.ts` })),
+      { id: "claude-code", plugin: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
     ]);
     try {
       const r = await fetch(`http://127.0.0.1:${port}/hook`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hook_event_name: "SessionStart", session_id: session, source: "startup" }) });
@@ -740,8 +740,8 @@ test("two runs with the same nodes get the same leading text at session_start, w
 });
 
 test("the hook's transcript, as numbers: no text, no path; a page at a time from a cursor it holds; the server's word moves it", async () => {
-  const { slim, contextsIn, contextPrint, pageFrom, TRANSCRIPT_FIELD } = await import("../packs/claude-code/slim.ts");
-  const { holdCursor, nextCursor, withTranscript } = await import("../packs/claude-code/hook.ts");
+  const { slim, contextsIn, contextPrint, pageFrom, TRANSCRIPT_FIELD } = await import("../plugins/claude-code/slim.ts");
+  const { holdCursor, nextCursor, withTranscript } = await import("../plugins/claude-code/hook.ts");
   const secret = "Secret words: pat@example.org in C:/Users/pat/proj";
   const recs = [
     { type: "attachment", timestamp: "2026-11-01T10:00:00Z", attachment: { type: "hook_success", hookEvent: "SessionStart", command: 'node "C:/Users/pat/.claude/hooks/guard.mjs"', stdout: JSON.stringify({ hookSpecificOutput: { additionalContext: secret } }) } },

@@ -4,16 +4,16 @@ import type { ActionContext, ActionInvoke, ActionRegister } from "../spec/action
 import type { AgentNode, NodeDef } from "../spec/agent.ts";
 import type { Fact } from "../spec/changeset.ts";
 import type { ExchangeEvent, ExchangeRead } from "../spec/exchange.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import call, { callFacts, decisionOf, type CallAsk } from "../packs/call/index.ts";
-import context from "../packs/context/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import verdict, { type VerdictRead } from "../packs/verdict/index.ts";
-import { judgeRun, listeningOf } from "../packs/verdict/judge.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import call, { callFacts, decisionOf, type CallAsk } from "../plugins/call/index.ts";
+import context from "../plugins/context/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import verdict, { type VerdictRead } from "../plugins/verdict/index.ts";
+import { judgeRun, listeningOf } from "../plugins/verdict/judge.ts";
 
 // ---------- apart from the runtime ----------
 
@@ -45,7 +45,7 @@ test("verdict: a rejected answer fails every node said to it, an accepted one ho
 
 // ---------- through the runtime ----------
 
-const nodes: Pack = {
+const nodes: Plugin = {
   id: "nodes",
   inject: ["agent.node"],
   apply(ctx) {
@@ -58,9 +58,9 @@ const nodes: Pack = {
 };
 
 /** A domain: its judge asks through call.ask. */
-const domain: Pack = { id: "domain", inject: ["call.ask"], apply() {} };
-const probe: Pack = { id: "probe", inject: ["exchange.read", "verdict.read", "action.invoke"], apply() {} };
-const seed: Pack = {
+const domain: Plugin = { id: "domain", inject: ["call.ask"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["exchange.read", "verdict.read", "action.invoke"], apply() {} };
+const seed: Plugin = {
   id: "seed",
   inject: ["action.register"],
   apply(ctx) {
@@ -72,10 +72,10 @@ async function setup() {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { graph, action, exchange, agent, nodes, call, verdict, context, domain, probe, seed };
-  const BASE = "mem:/packs/";
+  const modules: Record<string, Plugin> = { graph, action, exchange, agent, nodes, call, verdict, context, domain, probe, seed };
+  const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)]! }) });
-  const tree: Entry[] = ["graph", "action", "exchange", "agent", "nodes", "call", "verdict", "context", "domain", "probe", "seed"].map((id) => ({ id, pack: id }));
+  const tree: Entry[] = ["graph", "action", "exchange", "agent", "nodes", "call", "verdict", "context", "domain", "probe", "seed"].map((id) => ({ id, plugin: id }));
   await loader.apply(tree);
   await rt.settle();
   const ask = loader.fiber("domain")!.ctx.get<CallAsk>("call.ask");
@@ -122,7 +122,7 @@ test("the window of a call: the map's words, the subject by its size, the answer
   assert.deepEqual(errors, []);
 });
 
-test("without a parent, a pack's calls go under its own run of calls", async () => {
+test("without a parent, a plugin's calls go under its own run of calls", async () => {
   const { ask, read } = await setup();
   const a = await ask.ask({ title: "a", places: ["finding"] }, async () => ({ text: "a" }));
   const b = await ask.ask({ title: "b", places: ["finding"] }, async () => ({ text: "b" }));

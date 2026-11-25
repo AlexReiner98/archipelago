@@ -1,9 +1,9 @@
 /**
  * The app, page side: the browser runtime and its config tree. The bridge
  * provides the server's capabilities here; the style, renderer, here, frame, views (the picker),
- * harness, activity, find, command, field (home), connect (a new map's first step), gate (a host's sign-in, drawn over the map), item, docs (the Packs view), guide (the Guide) and switch (its on/off switches) packs make the page. The bridge is two ports above the page
+ * harness, activity, find, command, field (home), connect (a new map's first step), gate (a host's sign-in, drawn over the map), item, docs (the Plugins view), guide (the Guide) and switch (its on/off switches) plugins make the page. The bridge is two ports above the page
  * (5180 serves the page and 5182 the bridge, 5280 and 5282 for dev), or at
- * `/bridge/` on the page's own origin when a host in front serves both. `host` is on window, so a pack can be turned
+ * `/bridge/` on the page's own origin when a host in front serves both. `host` is on window, so a plugin can be turned
  * off from the console: `host.loader.edit(t => (t.find(e => e.id === "harness").disabled = true, t))`.
  */
 import { startBrowser } from "../runtime/browser.ts";
@@ -26,39 +26,39 @@ async function bridgeUrl(): Promise<string> {
 const host = await startBrowser({
   base: new URL("../", location.href).href,
   tree: [
-    { id: "bridge", pack: "packs/bridge/client.ts", config: { url: await bridgeUrl() } },
-    { id: "here", pack: "packs/here/index.ts" },
-    { id: "style", pack: "packs/style/index.ts" },
-    { id: "renderer", pack: "packs/renderer/index.ts", config: { mount: "#app" } },
-    { id: "frame", pack: "packs/frame/index.ts", config: { folded: ["harness/run"], wait: true } },
-    { id: "views", pack: "packs/views/view.ts", config: { home: "field" } },
-    { id: "harness", pack: "packs/harness/index.ts" },
-    { id: "activity", pack: "packs/activity/index.ts" },
+    { id: "bridge", plugin: "plugins/bridge/client.ts", config: { url: await bridgeUrl() } },
+    { id: "here", plugin: "plugins/here/index.ts" },
+    { id: "style", plugin: "plugins/style/index.ts" },
+    { id: "renderer", plugin: "plugins/renderer/index.ts", config: { mount: "#app" } },
+    { id: "frame", plugin: "plugins/frame/index.ts", config: { folded: ["harness/run"], wait: true } },
+    { id: "views", plugin: "plugins/views/view.ts", config: { home: "field" } },
+    { id: "harness", plugin: "plugins/harness/index.ts" },
+    { id: "activity", plugin: "plugins/activity/index.ts" },
     // On the run pane: whether the run was exported as OpenTelemetry spans, and where (nothing while the server's otel is off).
-    { id: "otel", pack: "packs/otel/view.ts" },
-    { id: "find", pack: "packs/find/index.ts" },
-    { id: "command", pack: "packs/command/index.ts" },
-    { id: "page", pack: "packs/page/view.ts" },
-    { id: "field", pack: "packs/field/index.ts" },
-    { id: "arrange", pack: "packs/arrange/index.ts" },
-    { id: "sessions", pack: "packs/sessions/index.ts" },
-    { id: "connect", pack: "packs/connect/view.ts" },
-    { id: "gate", pack: "packs/gate/view.ts" },
-    // Map (packs/map) and its legend (packs/legend) are kept but not loaded, so no one sees them
+    { id: "otel", plugin: "plugins/otel/view.ts" },
+    { id: "find", plugin: "plugins/find/index.ts" },
+    { id: "command", plugin: "plugins/command/index.ts" },
+    { id: "page", plugin: "plugins/page/view.ts" },
+    { id: "field", plugin: "plugins/field/index.ts" },
+    { id: "arrange", plugin: "plugins/arrange/index.ts" },
+    { id: "sessions", plugin: "plugins/sessions/index.ts" },
+    { id: "connect", plugin: "plugins/connect/view.ts" },
+    { id: "gate", plugin: "plugins/gate/view.ts" },
+    // Map (plugins/map) and its legend (plugins/legend) are kept but not loaded, so no one sees them
     // (21 Nov 2026: Field, now Landscape, is home). To use them, add:
-    //   { id: "map", pack: "packs/map/index.ts" }, { id: "legend", pack: "packs/legend/index.ts" },
-    // Examples to copy, off until turned on (packs/examples): a panel, and a frame of your own.
-    { id: "today", pack: "packs/examples/today.ts", disabled: true },
-    { id: "column", pack: "packs/examples/column.ts", disabled: true },
-    // The Checks view (packs/checks/view.ts), off until a server runs the checks pack: page.set { pack: "checks", on: true }.
-    { id: "checks", pack: "packs/checks/view.ts", disabled: true },
-    { id: "document", pack: "packs/document/index.ts" },
-    { id: "item", pack: "packs/item/index.ts" },
-    { id: "style-view", pack: "packs/style/view.ts" },
-    { id: "docs", pack: "packs/docs/view.ts" },
-    { id: "guide", pack: "packs/docs/guide.ts" },
-    { id: "switch", pack: "packs/switch/view.ts" },
+    //   { id: "map", plugin: "plugins/map/index.ts" }, { id: "legend", plugin: "plugins/legend/index.ts" },
+    // Examples to copy, off until turned on (plugins/examples): a panel, and a frame of your own.
+    { id: "today", plugin: "plugins/examples/today.ts", disabled: true },
+    { id: "column", plugin: "plugins/examples/column.ts", disabled: true },
+    // The Checks view (plugins/checks/view.ts), off until a server runs the checks plugin: page.set { plugin: "checks", on: true }.
+    { id: "checks", plugin: "plugins/checks/view.ts", disabled: true },
+    { id: "document", plugin: "plugins/document/index.ts" },
+    { id: "item", plugin: "plugins/item/index.ts" },
+    { id: "style-view", plugin: "plugins/style/view.ts" },
+    { id: "docs", plugin: "plugins/docs/view.ts" },
+    { id: "guide", plugin: "plugins/docs/guide.ts" },
+    { id: "switch", plugin: "plugins/switch/view.ts" },
   ],
 });
-host.runtime.onError = (fiber, error) => console.error(`[${fiber.pack.id}]`, error);
+host.runtime.onError = (fiber, error) => console.error(`[${fiber.plugin.id}]`, error);
 (globalThis as { host?: unknown }).host = host;

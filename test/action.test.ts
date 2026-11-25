@@ -4,20 +4,20 @@ import type { ActionAttest, ActionInvoke } from "../spec/action.ts";
 import { attested } from "../spec/action.ts";
 import type { Json } from "../spec/common.ts";
 import type { GraphRead } from "../spec/graph.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import { check, fixIn, fixLine, message } from "../packs/action/input.ts";
-import graph from "../packs/graph/index.ts";
-import items from "../packs/items/index.ts";
-import links from "../packs/links/index.ts";
-import types from "../packs/types/index.ts";
-import work from "../packs/work/index.ts";
+import action from "../plugins/action/index.ts";
+import { check, fixIn, fixLine, message } from "../plugins/action/input.ts";
+import graph from "../plugins/graph/index.ts";
+import items from "../plugins/items/index.ts";
+import links from "../plugins/links/index.ts";
+import types from "../plugins/types/index.ts";
+import work from "../plugins/work/index.ts";
 
-const BASE = "mem:/packs/";
-const probe: Pack = { id: "probe", inject: ["action.invoke", "action.attest", "graph.read"], apply() {} };
-const modules: Record<string, Pack> = { graph, action, types, work, links, items, probe };
-const TREE: Entry[] = ["graph", "action", "types", "work", "links", "items", "probe"].map((id) => ({ id, pack: `${id}.ts` }));
+const BASE = "mem:/plugins/";
+const probe: Plugin = { id: "probe", inject: ["action.invoke", "action.attest", "graph.read"], apply() {} };
+const modules: Record<string, Plugin> = { graph, action, types, work, links, items, probe };
+const TREE: Entry[] = ["graph", "action", "types", "work", "links", "items", "probe"].map((id) => ({ id, plugin: `${id}.ts` }));
 
 async function setup() {
   const rt = new Runtime();

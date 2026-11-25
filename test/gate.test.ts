@@ -1,25 +1,25 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ActionInvoke } from "../spec/action.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import graph from "../packs/graph/index.ts";
-import gate, { SETUP } from "../packs/gate/index.ts";
-import { goOf, offerOf, screenOf } from "../packs/gate/offer.ts";
+import action from "../plugins/action/index.ts";
+import graph from "../plugins/graph/index.ts";
+import gate, { SETUP } from "../plugins/gate/index.ts";
+import { goOf, offerOf, screenOf } from "../plugins/gate/offer.ts";
 
-const BASE = "mem:/packs/";
-const probe: Pack = { id: "probe", inject: ["action.invoke"], apply() {} };
+const BASE = "mem:/plugins/";
+const probe: Plugin = { id: "probe", inject: ["action.invoke"], apply() {} };
 
 async function setupOf(config?: Record<string, unknown>) {
   const rt = new Runtime();
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "gate.ts": gate, "probe.ts": probe };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "gate.ts": gate, "probe.ts": probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const tree: Entry[] = [
-    { id: "graph", pack: "graph.ts" },
-    { id: "action", pack: "action.ts" },
-    { id: "gate", pack: "gate.ts", ...(config ? { config } : {}) },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts" },
+    { id: "action", plugin: "action.ts" },
+    { id: "gate", plugin: "gate.ts", ...(config ? { config } : {}) },
+    { id: "probe", plugin: "probe.ts" },
   ];
   await loader.apply(tree);
   await rt.settle();

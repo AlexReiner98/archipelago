@@ -2,15 +2,15 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Caller, Dispose } from "../spec/common.ts";
 import { byPosition } from "../spec/common.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 
-/** A broker in the smallest form: packs add items, a reader lists them in tree order. */
+/** A broker in the smallest form: plugins add items, a reader lists them in tree order. */
 interface List {
   add(item: string): Dispose;
   items(): string[];
 }
 
-function listProvider(log: string[] = []): Pack {
+function listProvider(log: string[] = []): Plugin {
   return {
     id: "list",
     apply(ctx) {
@@ -33,7 +33,7 @@ function listProvider(log: string[] = []): Pack {
   };
 }
 
-function contributor(id: string, items: string[], log: string[] = []): Pack {
+function contributor(id: string, items: string[], log: string[] = []): Plugin {
   return {
     id,
     inject: ["demo.list"],
@@ -46,7 +46,7 @@ function contributor(id: string, items: string[], log: string[] = []): Pack {
   };
 }
 
-test("an effect is reverted when its pack unloads, and dispose is idempotent", async () => {
+test("an effect is reverted when its plugin unloads, and dispose is idempotent", async () => {
   const rt = new Runtime();
   const world = new Set<string>();
   let early: Dispose = () => {};
@@ -99,7 +99,7 @@ test("a consumer waits for its provider, leaves before it, and comes back with i
   assert.deepEqual(rt.root.get<List>("demo.list").items(), ["x"]);
 });
 
-test("what a pack registers through a provider goes when the pack unloads", async () => {
+test("what a plugin registers through a provider goes when the plugin unloads", async () => {
   const rt = new Runtime();
   rt.root.plugin(listProvider());
   const a = rt.root.plugin(contributor("a", ["a1", "a2"]));
@@ -122,7 +122,7 @@ test("a key not injected is refused, and a key not provided is inactive", async 
   assert.match(String(errors[0]), /was not injected/);
 });
 
-test("the provider is told who calls: pack, actor and run, position", async () => {
+test("the provider is told who calls: plugin, actor and run, position", async () => {
   const rt = new Runtime();
   const seen: Caller[] = [];
   rt.root.plugin({
@@ -142,12 +142,12 @@ test("the provider is told who calls: pack, actor and run, position", async () =
   });
   await rt.settle();
   assert.deepEqual(seen, [
-    { pack: "asker", actor: undefined, run: undefined, position: [1] },
-    { pack: "asker", actor: { id: "e_agent", kind: "agent" }, run: "e_run1", position: [1] },
+    { plugin: "asker", actor: undefined, run: undefined, position: [1] },
+    { plugin: "asker", actor: { id: "e_agent", kind: "agent" }, run: "e_run1", position: [1] },
   ]);
 });
 
-test("a failing pack takes back what it registered and stays failed until its target moves", async () => {
+test("a failing plugin takes back what it registered and stays failed until its target moves", async () => {
   const rt = new Runtime();
   rt.onError = () => {};
   const world = new Set<string>();
@@ -186,10 +186,10 @@ test("an apply that is a generator yields inverses, run last first", async () =>
   assert.deepEqual(log, ["one", "two", "undo two", "undo one"]);
 });
 
-test("unloading a parent unloads the packs it plugged in", async () => {
+test("unloading a parent unloads the plugins it plugged in", async () => {
   const rt = new Runtime();
   const world = new Set<string>();
-  const child: Pack = {
+  const child: Plugin = {
     id: "child",
     apply(ctx) {
       ctx.effect(() => {
@@ -201,7 +201,7 @@ test("unloading a parent unloads the packs it plugged in", async () => {
   const parent = rt.root.plugin({ id: "parent", apply: (ctx) => void ctx.plugin(child) });
   await rt.settle();
   assert.deepEqual([...world], ["child"]);
-  const [inner] = [...rt.fibers].filter((f) => f.pack.id === "child");
+  const [inner] = [...rt.fibers].filter((f) => f.plugin.id === "child");
   assert.deepEqual(inner!.position(), [0, 0]);
   await parent.dispose();
   assert.deepEqual([...world], []);
@@ -212,7 +212,7 @@ test("a provider leaves even when a consumer's teardown hangs; the hang is repor
   const rt = new Runtime();
   rt.teardownLimit = 50;
   const errors: string[] = [];
-  rt.onError = (f, e) => errors.push(`${f.pack.id}: ${(e as Error).message}`);
+  rt.onError = (f, e) => errors.push(`${f.plugin.id}: ${(e as Error).message}`);
   const provider = rt.root.plugin(listProvider());
   const stuck = rt.root.plugin({
     id: "stuck",

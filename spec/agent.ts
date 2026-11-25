@@ -8,10 +8,10 @@
  * and the person's acts, `decision` and `notice`. Edition 4 (20 Nov
  * 2026) adds a node's `repeat` and a moment's `again`: the same words are
  * said once per context. Edition 5 (20 Nov 2026) adds a run's
- * `facts`, which any pack can add to (`agent.facts`), and a gate where a
- * pack says "not this node for this run" (`agent.gate`).
+ * `facts`, which any plugin can add to (`agent.facts`), and a gate where a
+ * plugin says "not this node for this run" (`agent.gate`).
  */
-import type { Actor, Capability, Dispose, Id, Json, PackId, Term, Time } from "./common.ts";
+import type { Actor, Capability, Dispose, Id, Json, PluginId, Term, Time } from "./common.ts";
 
 /** One agent session, from its start to its end. */
 export type RunId = string;
@@ -81,10 +81,10 @@ export type Utterance = { say: string } | { refuse: string; code?: string };
 
 /**
  * Anything said at a place. Registering one is a revertible effect. A node
- * that reads the map has its pack inject `graph.read`; it is handed nothing.
+ * that reads the map has its plugin inject `graph.read`; it is handed nothing.
  */
 export interface NodeDef {
-  /** Unique within the pack, stable across reloads. */
+  /** Unique within the plugin, stable across reloads. */
   name: string;
   kind: string;
   title: string;
@@ -104,10 +104,10 @@ export interface NodeDef {
 
 /** A node without its code. The harness view's tree is these. */
 export interface NodeInfo extends Omit<NodeDef, "speak"> {
-  /** `pack/name`: what exchange events and verdicts point at. */
+  /** `plugin/name`: what exchange events and verdicts point at. */
   id: string;
-  /** The pack that registered it, from its context. */
-  pack: PackId;
+  /** The plugin that registered it, from its context. */
+  plugin: PluginId;
 }
 
 /**
@@ -148,13 +148,13 @@ export interface RunInfo extends RunStart {
 }
 
 /**
- * Edition 5: what is so about a run, by name. Open-ended: any pack can add
- * a fact (a git pack reads `remote` from `cwd`), and whatever reads them
+ * Edition 5: what is so about a run, by name. Open-ended: any plugin can add
+ * a fact (a git plugin reads `remote` from `cwd`), and whatever reads them
  * matches on names, never on fixed fields. A value is text or a list of it.
  */
 export type Facts = Record<string, string | string[]>;
 
-/** The facts the spec's own packs name. Open vocabulary, like places. */
+/** The facts the spec's own plugins name. Open vocabulary, like places. */
 export const FACTS: Term[] = [
   { term: "harness", since: 5, doc: "Which harness: `claude-code`." },
   { term: "cwd", since: 5, doc: "The folder the run works in, as the harness gives it." },
@@ -172,17 +172,17 @@ export const FACTS: Term[] = [
 ];
 
 /**
- * Edition 5: a pack's way to add facts to a run. Registering one is a
+ * Edition 5: a plugin's way to add facts to a run. Registering one is a
  * revertible effect. Asked at each `begin`; nothing (or a throw, recorded
  * as a miss) adds nothing.
  */
 export interface FactSource {
-  /** Unique within the pack. */
+  /** Unique within the plugin. */
   name: string;
   facts(run: RunInfo): Facts | null | Promise<Facts | null>;
 }
 
-/** `agent.facts`: add a fact source, as the calling pack's. */
+/** `agent.facts`: add a fact source, as the calling plugin's. */
 export interface AgentFacts {
   source(def: FactSource): Dispose;
 }
@@ -192,10 +192,10 @@ export interface AgentFacts {
  * asked. Registering one is a revertible effect, like a node. At each
  * `reach`, every gate is asked about every node listening there, in
  * config-tree order; the first that answers holds the node back, and the
- * node isn't asked. The gate doesn't choose which packs are loaded.
+ * node isn't asked. The gate doesn't choose which plugins are loaded.
  */
 export interface GateDef {
-  /** Unique within the pack. */
+  /** Unique within the plugin. */
   name: string;
   title: string;
   /** Why the node is held back from this run, or nothing: it may speak. */
@@ -209,7 +209,7 @@ export interface GateDef {
  */
 export type Hold = string | { why: string; trial?: boolean };
 
-/** `agent.gate`: add a gate, as the calling pack's. */
+/** `agent.gate`: add a gate, as the calling plugin's. */
 export interface AgentGate {
   gate(def: GateDef): Dispose;
 }
@@ -218,7 +218,7 @@ export interface AgentGate {
 export interface Answer {
   /**
    * Everything said, for the adapter to hand to the agent, in config-tree
-   * order of the nodes' packs, then the order each pack registered them.
+   * order of the nodes' plugins, then the order each plugin registered them.
    */
   said: { node: string; text: string }[];
   /** The first refusal from a node, if any; the adapter stops the step. */
@@ -243,7 +243,7 @@ export interface Act {
   ok?: boolean;
 }
 
-/** `agent.node`: add a node, as the calling pack's. */
+/** `agent.node`: add a node, as the calling plugin's. */
 export interface AgentNode {
   node(def: NodeDef): Dispose;
 }

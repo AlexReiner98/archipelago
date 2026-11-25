@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sessionsOf } from "../packs/sessions/index.ts";
-import { sessionId, withFoundSessions, withSessions } from "../packs/field/sessions.ts";
-import type { FieldIn } from "../packs/field/graph.ts";
+import { sessionsOf } from "../plugins/sessions/index.ts";
+import { sessionId, withFoundSessions, withSessions } from "../plugins/field/sessions.ts";
+import type { FieldIn } from "../plugins/field/graph.ts";
 import type { RunInfo } from "../spec/agent.ts";
 import type { ProfileInfo } from "../spec/profile.ts";
 
@@ -54,7 +54,7 @@ test("withFoundSessions: a session comes with a filter the find line found", () 
 });
 
 test("a session coming leaves every type's colour on the map as it was", async () => {
-  const { inputColours } = await import("../packs/field/graph.ts");
+  const { inputColours } = await import("../plugins/field/graph.ts");
   const typed = { ...map, types: ["record", "umwelt"] } as unknown as FieldIn;
   const before = new Map(inputColours(typed).map((t) => [t.name, t.colour]));
   const after = new Map(inputColours(withSessions(typed, [{ run: "r1", title: "a", filters: ["f1"] }], true)).map((t) => [t.name, t.colour]));
@@ -63,8 +63,8 @@ test("a session coming leaves every type's colour on the map as it was", async (
 });
 
 test("marksOf: each type's colour and the shape its items are drawn in, for other views to draw an item the same", async () => {
-  const { marksOf } = await import("../packs/field/index.ts");
-  const { inputColours } = await import("../packs/field/graph.ts");
+  const { marksOf } = await import("../plugins/field/index.ts");
+  const { inputColours } = await import("../plugins/field/graph.ts");
   const shaped = { items: [{ id: "f1", title: "Frontend", type: "context_filter", status: "", closed: false, shape: 5 }, { id: "n1", title: "x", type: "record", status: "", closed: false }], links: [] } as unknown as FieldIn;
   const marks = marksOf(shaped, []);
   assert.equal(marks.context_filter!.shape, "hexagon");

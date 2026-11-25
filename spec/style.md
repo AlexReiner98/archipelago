@@ -6,7 +6,7 @@ the marks for states. Edition 6. Types and names: [style.ts](style.ts).
 ## Tokens, not a capability
 
 A token is a CSS custom property on the page's root: `--fg`, `--text-s`,
-`--glyph-circle-moving`. A style pack sets them; views only refer to them.
+`--glyph-circle-moving`. A style plugin sets them; views only refer to them.
 There is nothing to inject, so a view never waits for a style: with none
 loaded each token is its plain value (`TOKENS`), the system's own colours
 and font, and the page still reads.
@@ -15,7 +15,7 @@ and font, and the page still reads.
   of a token its plain fallback. In a style attribute, `v(name)` does the
   same.
 - A view that draws without CSS (a canvas, a glyph in SVG text) reads a
-  token with `read(name)`, and again on `onStyle`: the style pack fires
+  token with `read(name)`, and again on `onStyle`: the style plugin fires
   `style:changed` on `document` when its tokens come or go.
 - A view may read only the tokens named here, and keeps no colours of its
   own. A new token is a new edition.
@@ -29,7 +29,7 @@ and font, and the page still reads.
 | Items' marks | `mark-fresh` `mark-moving` `mark-done` `mark-gone` |
 | Exchange | `say` `write` `fire` |
 | Words' sources | `owner` `learned` `schema` `harness` (edition 9: what the harness gave the agent, not the map) |
-| Packs | `hue-1` … `hue-6` |
+| Plugins | `hue-1` … `hue-6` |
 | Controls | `control` `control-fg` `control-line` |
 | Type | `font` `mono` `text-xs` `text-s` `text-m` `text` `text-l` `leading` `bold` |
 | Space | `space-1` … `space-5` `radius` |
@@ -39,7 +39,7 @@ and font, and the page still reads.
 ## Marks
 
 An item's mark comes from its base and where its status sits, never its
-type's name. Its shape is its base's (edition 10, `markShape`): the pack
+type's name. Its shape is its base's (edition 10, `markShape`): the plugin
 that defines a base names its shape with `types.mark`
 ([types](types.md)), from `MARK_SHAPES` (square, diamond, circle,
 triangle, pentagon, hexagon), and a base none names takes the first shape

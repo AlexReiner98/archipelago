@@ -5,17 +5,17 @@ import { join } from "node:path";
 import { test } from "node:test";
 import type { ActionInvoke } from "../spec/action.ts";
 import type { AgentNode } from "../spec/agent.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import claudeCode from "../packs/claude-code/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import transcript, { transcriptOf } from "../packs/transcript/index.ts";
-import { GivenIndex, hookPlace, hookWho, isOurs, partOf, readLine, readPage, shown, slim, TokenIndex, tokensPage, windowOf, type Line } from "../packs/transcript/read.ts";
-import { givenNodes, givenOnly, isGiven, parseGiven } from "../packs/harness/given.ts";
-import { treeOf } from "../packs/harness/layout.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import claudeCode from "../plugins/claude-code/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import transcript, { transcriptOf } from "../plugins/transcript/index.ts";
+import { GivenIndex, hookPlace, hookWho, isOurs, partOf, readLine, readPage, shown, slim, TokenIndex, tokensPage, windowOf, type Line } from "../plugins/transcript/read.ts";
+import { givenNodes, givenOnly, isGiven, parseGiven } from "../plugins/harness/given.ts";
+import { treeOf } from "../plugins/harness/layout.ts";
 
 const line = (o: object) => JSON.stringify(o);
 const att = (attachment: object) => line({ type: "attachment", attachment });
@@ -27,7 +27,7 @@ const FIXTURE = [
   att({ type: "environment", snapshot: { workingDirectory: "C:\\Users\\me\\proj" } }),
   att({ type: "hook_success", hookName: "SessionStart:startup", toolUseID: "ss", hookEvent: "SessionStart", stdout: '{"hookSpecificOutput":{"additionalContext":"Stay on the branch."}}', command: 'node "C:/Users/me/.claude/plugins/cache/mkt/guard-plugin/1.0/start.mjs"' }),
   att({ type: "hook_additional_context", hookName: "SessionStart", toolUseID: "ss", hookEvent: "SessionStart", content: ["Stay on the branch."] }),
-  att({ type: "hook_success", hookName: "PreToolUse:Bash", toolUseID: "t1", hookEvent: "PreToolUse", stdout: '{"hookSpecificOutput":{"additionalContext":"The map says hello."}}', command: 'node "C:/x/archipelago-next/packs/claude-code/hook.ts" http://127.0.0.1:5281/hook' }),
+  att({ type: "hook_success", hookName: "PreToolUse:Bash", toolUseID: "t1", hookEvent: "PreToolUse", stdout: '{"hookSpecificOutput":{"additionalContext":"The map says hello."}}', command: 'node "C:/x/archipelago-next/plugins/claude-code/hook.ts" http://127.0.0.1:5281/hook' }),
   att({ type: "hook_additional_context", hookName: "PreToolUse:Bash", toolUseID: "t1", hookEvent: "PreToolUse", content: ["The map says hello."] }),
   att({ type: "hook_success", hookName: "PreToolUse:Bash", toolUseID: "t2", hookEvent: "PreToolUse", stdout: '{"hookSpecificOutput":{"additionalContext":"Quote paths."}}', command: "node C:/Users/me/.claude/hooks/output-guard.mjs" }),
   att({ type: "hook_additional_context", hookName: "PreToolUse:Bash", toolUseID: "t2", hookEvent: "PreToolUse", content: ["Quote paths."] }),
@@ -127,7 +127,7 @@ test("who a hook is and where it is given, from its command and event", () => {
   assert.equal(hookWho("python3 /home/me/hooks/guard.py --x"), "guard");
   assert.equal(hookWho("my-hook --flag"), "my-hook");
   assert.equal(hookWho(undefined), "unnamed");
-  assert.ok(isOurs('node "$CLAUDE_PROJECT_DIR/packs/claude-code/hook.ts" http://127.0.0.1:5281/hook'));
+  assert.ok(isOurs('node "$CLAUDE_PROJECT_DIR/plugins/claude-code/hook.ts" http://127.0.0.1:5281/hook'));
   assert.ok(isOurs('node "C:/x/my-host/hook.ts" https://app.example.tools/hook'));
   assert.ok(!isOurs("node C:/x/other/hook.ts"));
   assert.deepEqual(
@@ -162,7 +162,7 @@ test("the context interface hangs given nodes at their places, a run's own, mark
   assert.equal(pathOf(nodes[2]!.id), "tool / archipelago", "a server's instructions hang beside its tools");
   assert.equal(pathOf(nodes[3]!.id), "tool / Bash", "a hook's context at the hook's place");
   // Grey: what the harness gave, and the boughs holding nothing else; a bough the map speaks on too keeps its colour.
-  const map = { id: "words/w1", name: "w1", pack: "words", kind: "instruction", title: "Quote paths", at: ["tool:Bash"] };
+  const map = { id: "words/w1", name: "w1", plugin: "words", kind: "instruction", title: "Quote paths", at: ["tool:Bash"] };
   const mixed = treeOf([...nodes, map]);
   const grey = givenOnly(mixed);
   assert.ok(nodes.every((n) => grey.has(n.id)));
@@ -171,34 +171,34 @@ test("the context interface hangs given nodes at their places, a run's own, mark
   assert.ok(!grey.has("~:tool:Bash") && !grey.has("~:tool") && !grey.has("~root"));
 });
 
-test("the pack: a run's transcript fact from the adapter, read on demand, nothing written, the map's words left out", async () => {
+test("the plugin: a run's transcript fact from the adapter, read on demand, nothing written, the map's words left out", async () => {
   const dir = await mkdtemp(join(tmpdir(), "transcript-"));
   const path = join(dir, "sess.jsonl");
   await writeFile(path, "");
   // A node of the map's that speaks at session_start: its words come back in a hook's context.
-  const said: Pack = {
+  const said: Plugin = {
     id: "said",
     inject: ["agent.node"],
     apply(ctx) {
       ctx.get<AgentNode>("agent.node").node({ name: "hello", kind: "instruction", title: "Hello", at: ["session_start"], speak: () => ({ say: "The map's own standing words for every run." }) });
     },
   };
-  const probe: Pack = { id: "probe", inject: ["action.invoke"], apply() {} };
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "transcript.ts": transcript, "cc.ts": claudeCode, "said.ts": said, "probe.ts": probe };
+  const probe: Plugin = { id: "probe", inject: ["action.invoke"], apply() {} };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "transcript.ts": transcript, "cc.ts": claudeCode, "said.ts": said, "probe.ts": probe };
   let port = 0;
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   await loader.apply([
-    { id: "graph", pack: "graph.ts", config: { db: join(dir, "graph.sqlite") } },
-    { id: "action", pack: "action.ts" },
-    { id: "exchange", pack: "exchange.ts", config: { journal: join(dir, "exchange.jsonl") } },
-    { id: "agent", pack: "agent.ts" },
-    { id: "said", pack: "said.ts" },
-    { id: "transcript", pack: "transcript.ts" },
-    { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts", config: { db: join(dir, "graph.sqlite") } },
+    { id: "action", plugin: "action.ts" },
+    { id: "exchange", plugin: "exchange.ts", config: { journal: join(dir, "exchange.jsonl") } },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "said", plugin: "said.ts" },
+    { id: "transcript", plugin: "transcript.ts" },
+    { id: "claude-code", plugin: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "probe", plugin: "probe.ts" },
   ]);
   const hook = (event: string, more: object = {}) =>
     fetch(`http://127.0.0.1:${port}/hook`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hook_event_name: event, session_id: "sess-t", cwd: dir, transcript_path: path, ...more }) }).then((r) => r.json());
@@ -292,7 +292,7 @@ test("tokens: each message's usage once, compactions with their numbers, a page 
 });
 
 test("talk: the conversation as nodes at their places, counted as of a moment, what came before a compaction apart", async () => {
-  const { TalkIndex, imageTokens, talkOf, IMAGE_TOKENS } = await import("../packs/transcript/talk.ts");
+  const { TalkIndex, imageTokens, talkOf, IMAGE_TOKENS } = await import("../plugins/transcript/talk.ts");
   const T = (min: number) => new Date(Date.UTC(2026, 10, 1, 10, min)).toISOString();
   // A PNG's header, 1000 × 750: its pixels / 750 tokens.
   const png = Buffer.alloc(24);
@@ -360,7 +360,7 @@ test("talk: the conversation as nodes at their places, counted as of a moment, w
 });
 
 test("talk sums to the model's own count: thinking from its real output, what reached it scaled to the window's growth", async () => {
-  const { TalkIndex } = await import("../packs/transcript/talk.ts");
+  const { TalkIndex } = await import("../plugins/transcript/talk.ts");
   const T = (s: number) => new Date(Date.UTC(2026, 10, 1, 10, 0, s)).toISOString();
   const recs = [
     { type: "attachment", timestamp: T(0), attachment: { type: "skill_listing" }, rendered: [{ content: "s".repeat(80) }] },
@@ -390,8 +390,8 @@ test("a server elsewhere: the hook sends its transcript as numbers, the tree has
   const dir = await mkdtemp(join(tmpdir(), "transcript-sent-"));
   const path = join(dir, "sess.jsonl");
   await writeFile(path, "");
-  const probe: Pack = { id: "probe", inject: ["action.invoke"], apply() {} };
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "transcript.ts": transcript, "cc.ts": claudeCode, "probe.ts": probe };
+  const probe: Plugin = { id: "probe", inject: ["action.invoke"], apply() {} };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "transcript.ts": transcript, "cc.ts": claudeCode, "probe.ts": probe };
   let port = 0;
   const rt = new Runtime();
   const errors: unknown[] = [];
@@ -399,18 +399,18 @@ test("a server elsewhere: the hook sends its transcript as numbers, the tree has
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   // A server elsewhere: it never opens a path a hook names, even one on its own disk.
   await loader.apply([
-    { id: "graph", pack: "graph.ts", config: { db: join(dir, "graph.sqlite") } },
-    { id: "action", pack: "action.ts" },
-    { id: "exchange", pack: "exchange.ts", config: { journal: join(dir, "exchange.jsonl") } },
-    { id: "agent", pack: "agent.ts" },
-    { id: "transcript", pack: "transcript.ts", config: { files: false } },
-    { id: "claude-code", pack: "cc.ts", config: { port: 0, files: false, onListen: (p: number) => (port = p) } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts", config: { db: join(dir, "graph.sqlite") } },
+    { id: "action", plugin: "action.ts" },
+    { id: "exchange", plugin: "exchange.ts", config: { journal: join(dir, "exchange.jsonl") } },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "transcript", plugin: "transcript.ts", config: { files: false } },
+    { id: "claude-code", plugin: "cc.ts", config: { port: 0, files: false, onListen: (p: number) => (port = p) } },
+    { id: "probe", plugin: "probe.ts" },
   ]);
   const env: Record<string, string | undefined> = { ...process.env, ARCHIPELAGO_HOOK_STATE: join(dir, "state"), ARCHIPELAGO_TOKEN_FILE: join(dir, "no-token") };
   delete env.ARCHIPELAGO_TOKEN;
   const hook = async (event: string) => {
-    const child = spawn(process.execPath, ["packs/claude-code/hook.ts", `http://127.0.0.1:${port}/hook`], { env });
+    const child = spawn(process.execPath, ["plugins/claude-code/hook.ts", `http://127.0.0.1:${port}/hook`], { env });
     child.stdin.end(JSON.stringify({ hook_event_name: event, session_id: "sess-far", cwd: dir, transcript_path: path, source: "startup" }));
     return new Promise((ok) => child.on("close", ok));
   };

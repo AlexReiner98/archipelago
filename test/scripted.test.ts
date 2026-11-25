@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AgentNode, NodeDef } from "../spec/agent.ts";
 import type { ExchangeEvent, ExchangeRead } from "../spec/exchange.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import verdict, { type VerdictRead } from "../packs/verdict/index.ts";
-import scripted, { eventsOf, playAs, scriptOf, type ScriptedPlay, type Script } from "../packs/scripted/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import verdict, { type VerdictRead } from "../plugins/verdict/index.ts";
+import scripted, { eventsOf, playAs, scriptOf, type ScriptedPlay, type Script } from "../plugins/scripted/index.ts";
 
 const T = (s: number) => `2026-11-24T10:00:${String(s).padStart(2, "0")}.000Z`;
 const CWD = "C:\\Users\\me\\repo";
@@ -20,7 +20,7 @@ interface NodeSpec {
   refuse?: string;
 }
 
-const nodesPack = (id: string): Pack<{ nodes: NodeSpec[] }> => ({
+const nodesPlugin = (id: string): Plugin<{ nodes: NodeSpec[] }> => ({
   id,
   inject: ["agent.node"],
   apply(ctx, config) {
@@ -32,11 +32,11 @@ const nodesPack = (id: string): Pack<{ nodes: NodeSpec[] }> => ({
   },
 });
 
-const probe: Pack = { id: "probe", inject: ["agent.run", "exchange.read", "verdict.read", "scripted.play"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["agent.run", "exchange.read", "verdict.read", "scripted.play"], apply() {} };
 
 const NODES: NodeSpec[] = [
   { name: "brief", at: ["session_start"], say: "Read the brief." },
-  { name: "trap", at: ["file:packs/*/page/*.js"], say: "Restart the server after adding a page module." },
+  { name: "trap", at: ["file:plugins/*/page/*.js"], say: "Restart the server after adding a page module." },
   { name: "curl", at: ["tool:Bash"], refuse: "Use the change tool, not curl." },
   { name: "check", at: ["reply_end"], say: "Did you run the checks?" },
 ];
@@ -45,20 +45,20 @@ async function setup(extra: NodeSpec[] = []) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack<any>> = {
-    "graph.ts": graph, "exchange.ts": exchange, "agent.ts": agent, "nodes.ts": nodesPack("nodes"), "later.ts": nodesPack("later"),
+  const modules: Record<string, Plugin<any>> = {
+    "graph.ts": graph, "exchange.ts": exchange, "agent.ts": agent, "nodes.ts": nodesPlugin("nodes"), "later.ts": nodesPlugin("later"),
     "verdict.ts": verdict, "scripted.ts": scripted, "probe.ts": probe,
   };
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   const entries = (more: NodeSpec[]): Entry[] => [
-    { id: "graph", pack: "graph.ts" },
-    { id: "exchange", pack: "exchange.ts" },
-    { id: "agent", pack: "agent.ts" },
-    { id: "nodes", pack: "nodes.ts", config: { nodes: NODES } },
-    ...(more.length ? [{ id: "later", pack: "later.ts", config: { nodes: more } }] : []),
-    { id: "verdict", pack: "verdict.ts" },
-    { id: "scripted", pack: "scripted.ts" },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts" },
+    { id: "exchange", plugin: "exchange.ts" },
+    { id: "agent", plugin: "agent.ts" },
+    { id: "nodes", plugin: "nodes.ts", config: { nodes: NODES } },
+    ...(more.length ? [{ id: "later", plugin: "later.ts", config: { nodes: more } }] : []),
+    { id: "verdict", plugin: "verdict.ts" },
+    { id: "scripted", plugin: "scripted.ts" },
+    { id: "probe", plugin: "probe.ts" },
   ];
   await loader.apply(entries(extra));
   const p = () => loader.fiber("probe")!.ctx;
@@ -75,7 +75,7 @@ const SCRIPT: Script = {
   start: { title: "Edit a page", cwd: CWD },
   steps: [
     { prompt: "Add a page module.", time: T(1) },
-    { tool: "Edit", input: { file_path: `${CWD}\\packs\\x\\page\\a.js`, old_string: "a" }, output: "String to replace not found in file.", ok: false, time: T(2) },
+    { tool: "Edit", input: { file_path: `${CWD}\\plugins\\x\\page\\a.js`, old_string: "a" }, output: "String to replace not found in file.", ok: false, time: T(2) },
     { tool: "Bash", input: { command: "curl -X POST https://example.test/map" }, time: T(3) },
     { tool: "Read", input: { file_path: `${CWD}\\spec\\agent.ts` }, output: "…", time: T(4) },
     { tool: "Write", input: { file_path: `${CWD}\\docs\\a.md` }, output: "EACCES: permission denied", ok: false, time: T(4) },
@@ -93,7 +93,7 @@ test("a script plays a whole run on agent.run: what was said, refused and judged
   assert.equal(played.info.harness, "scripted");
   assert.deepEqual(played.said.map((s) => [s.places, s.node]), [
     [["session_start"], "nodes/brief"],
-    [["tool:Edit", "file:packs/x/page/a.js"], "nodes/trap"],
+    [["tool:Edit", "file:plugins/x/page/a.js"], "nodes/trap"],
     [["reply_end"], "nodes/check"],
   ]);
   assert.deepEqual(played.refused.map((r) => [r.places, r.node, r.text]), [[["tool:Bash"], "nodes/curl", "Use the change tool, not curl."]]);
@@ -103,7 +103,7 @@ test("a script plays a whole run on agent.run: what was said, refused and judged
   assert.deepEqual(events.map((e) => `${e.kind} ${e.place ?? ""}`.trim()), [
     "begin", "say session_start",
     "act prompt",
-    "say file:packs/x/page/a.js", "act tool:Edit",
+    "say file:plugins/x/page/a.js", "act tool:Edit",
     "refuse tool:Bash", "act tool:Bash",
     "act tool:Read",
     "act tool:Write",

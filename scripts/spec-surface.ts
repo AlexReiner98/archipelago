@@ -10,7 +10,8 @@
  * `test/spec-frozen.test.ts` holds every accepted entry to its text in
  * `test/spec-frozen.json`. `node scripts/spec-surface.ts --accept` adds the
  * entries not frozen yet when an edition is accepted, and never rewrites
- * one that is.
+ * one that is. A word the spec renamed (RENAMED in spec/common.ts) is read
+ * renamed in the frozen entries (`asNow`), so a rename changes no entry.
  */
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -106,6 +107,19 @@ export function readFrozen(): Frozen {
   return JSON.parse(readFileSync(FROZEN, "utf8")) as Frozen;
 }
 
+/** A rename's own entry keeps its old word: it is what says the word moved. */
+const isRename = (key: string) => key.startsWith("common.ts:RENAMED[");
+
+/**
+ * The frozen entries as they read now: every word the spec renamed
+ * (RENAMED in spec/common.ts) read renamed, in keys and text alike. The
+ * entries stay as they were accepted; the rename is itself an entry.
+ */
+export async function asNow(frozen: Frozen): Promise<Record<string, string>> {
+  const { renamed } = await import("../spec/common.ts");
+  return Object.fromEntries(Object.entries(frozen.entries).map(([k, v]) => (isRename(k) ? [k, v] : [renamed(k), renamed(v)])));
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1] && process.argv.includes("--accept")) {
   const { EDITION } = await import("../spec/common.ts");
   let frozen: Frozen = { accepted: 0, entries: {} };
@@ -113,7 +127,8 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1] && pro
     frozen = readFrozen();
   } catch {}
   const now = surface();
-  const added = Object.keys(now).filter((k) => !(k in frozen.entries));
+  const read = await asNow(frozen);
+  const added = Object.keys(now).filter((k) => !(k in read));
   for (const k of added) frozen.entries[k] = now[k]!;
   const sorted = Object.fromEntries(Object.entries(frozen.entries).sort(([a], [b]) => a.localeCompare(b)));
   writeFileSync(FROZEN, `${JSON.stringify({ accepted: EDITION, entries: sorted }, null, 2)}\n`);

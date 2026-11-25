@@ -12,15 +12,15 @@ export type Json =
   | Json[]
   | { [key: string]: Json };
 
-/** An id of an item or link in the graph. Opaque to everyone but the graph pack. */
+/** An id of an item or link in the graph. Opaque to everyone but the graph plugin. */
 export type Id = string;
 
-/** A pack's id, as its manifest names it: `exchange`, `verdict`, `claude-code`. */
-export type PackId = string;
+/** A plugin's id, as its manifest names it: `exchange`, `verdict`, `claude-code`. */
+export type PluginId = string;
 
-/** A pack and the exact version that did something. */
-export interface PackRef {
-  id: PackId;
+/** A plugin and the exact version that did something. */
+export interface PluginRef {
+  id: PluginId;
   version: string;
 }
 
@@ -30,18 +30,18 @@ export interface PackRef {
  * runtime" in spec/README.md). Callers can't claim to be someone else.
  */
 export interface Caller {
-  /** The pack whose context made the call. */
-  pack: PackId;
+  /** The plugin whose context made the call. */
+  plugin: PluginId;
   /**
    * Who is acting through that context, set by interception (Cordis
    * `ctx.intercept`) where a person or agent comes in: sign-in for a
-   * person's page, the harness adapter for a run. Absent: the pack itself.
+   * person's page, the harness adapter for a run. Absent: the plugin itself.
    */
   actor?: Actor;
   /** The run the call belongs to, set the same way. */
   run?: string;
   /**
-   * The calling pack's place in the config tree, as the path of entry
+   * The calling plugin's place in the config tree, as the path of entry
    * indices from the root. Contributions are ordered by it: see Order.
    */
   position: number[];
@@ -54,9 +54,9 @@ export interface Caller {
 export const META = { actor: "actor", run: "run" } as const;
 
 /**
- * How every broker orders what packs contribute (stages, nodes, fills):
- * by the contributing pack's `position` in the config tree, depth first,
- * then by the order the pack registered them in. No ranks or priorities:
+ * How every broker orders what plugins contribute (stages, nodes, fills):
+ * by the contributing plugin's `position` in the config tree, depth first,
+ * then by the order the plugin registered them in. No ranks or priorities:
  * to change an order, move the entry in the config tree.
  */
 export function byPosition(a: Caller, b: Caller): number {
@@ -90,14 +90,14 @@ export interface Authority {
 /**
  * Undoes what a registration did. Every call in these contracts that adds
  * something to the system (a node, an action, a watcher, a slot fill)
- * returns one. The runtime ties it to the calling pack, so when the pack
+ * returns one. The runtime ties it to the calling plugin, so when the plugin
  * unloads everything it registered goes, and calling it twice is harmless.
  * It is the inverse of a Cordis effect (`ctx.effect` returns it), and like
  * one it may be async.
  */
 export type Dispose = () => void | Promise<void>;
 
-/** An opaque position to read on from. Only the pack that gave it reads it. */
+/** An opaque position to read on from. Only the plugin that gave it reads it. */
 export type Cursor = string;
 
 /** A bounded page. `next` is absent on the last page. */
@@ -120,8 +120,8 @@ export interface PageRequest {
 export interface Refusal {
   code: string;
   message: string;
-  /** Who refused: the pack, and the node or rule inside it if there is one. */
-  by: { pack: PackId; node?: string };
+  /** Who refused: the plugin, and the node or rule inside it if there is one. */
+  by: { plugin: PluginId; node?: string };
   detail?: Json;
 }
 
@@ -137,7 +137,7 @@ export class Refused extends Error {
 
 /**
  * An edition of the spec: 1, 2, 3… The spec as a whole is versioned, not
- * the packs that use it. An edition adds capabilities or vocabulary, or
+ * the plugins that use it. An edition adds capabilities or vocabulary, or
  * retires capabilities; it never changes what one means.
  */
 export type Edition = number;
@@ -149,9 +149,9 @@ export const EDITION: Edition = 11;
 export const ACCEPTED: Edition = 10;
 
 /**
- * A capability: one key in the Cordis context, and what it means. A pack
- * asks for capabilities (its `inject`), never for a version of a pack, and
- * whichever pack provides the key now satisfies it. Once an edition is
+ * A capability: one key in the Cordis context, and what it means. A plugin
+ * asks for capabilities (its `inject`), never for a version of a plugin, and
+ * whichever plugin provides the key now satisfies it. Once an edition is
  * accepted, a capability's meaning is fixed for good. A change that old
  * users couldn't ignore is a new capability with a new key, and the old one
  * is retired, not altered. See spec/README.md.
@@ -176,4 +176,41 @@ export interface Term {
   term: string;
   doc: string;
   since: Edition;
+}
+
+/**
+ * A word the spec renamed: in every type, key, name and doc from the edition
+ * `in` on, `term` reads `to`, its case kept (`Term` → `To`, `TERM` → `TO`).
+ * The meaning is the one that was accepted; only the word moves. An accepted
+ * entry is compared with the rename applied (test/spec-frozen.test.ts), so
+ * the frozen surface is never rewritten.
+ */
+export interface Rename {
+  term: string;
+  to: string;
+  in: Edition;
+  doc: string;
+}
+
+/** Every rename, in the edition order. */
+export const RENAMED: Rename[] = [
+  {
+    term: "pack",
+    to: "plugin",
+    in: 11,
+    doc: "A unit of code the loader loads is a plugin, as people know the word from other apps: PluginId, PluginRef, and every field named for it (Caller, Header, Refusal, ActionInfo, NodeInfo, ExchangeEvent and ExchangeFilter, Change, LoaderEntry and LoaderStatus, FillInfo and slots, TypeInfo, LinkInfo).",
+  },
+];
+
+/**
+ * A text with every rename applied, case kept: how an accepted entry reads
+ * now. A term is renamed where it starts a word part (`pack`, `packs`,
+ * `PackId`, `fieldPack`), never inside another word (`package`).
+ */
+export function renamed(text: string): string {
+  for (const r of RENAMED) {
+    const to = (m: string) => (m === m.toUpperCase() ? r.to.toUpperCase() : m[0] === m[0]!.toUpperCase() ? r.to[0]!.toUpperCase() + r.to.slice(1) : r.to);
+    text = text.replace(new RegExp(`${r.term}(?!age)`, "gi"), to);
+  }
+  return text;
 }

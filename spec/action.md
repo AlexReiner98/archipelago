@@ -2,7 +2,7 @@
 
 Every change goes through a declared action, whether a person or an agent
 makes it. A UI never writes directly; a tool an agent calls is an action;
-a pack changing data does it through an action too. Types:
+a plugin changing data does it through an action too. Types:
 [action.ts](action.ts).
 
 ## Capabilities
@@ -19,7 +19,7 @@ An `action.input` refusal says how to fix the input (11): see below.
 ## Declaring one
 
 ```ts
-// the verdict pack injects action.register and exchange.read
+// the verdict plugin injects action.register and exchange.read
 ctx["action.register"].register({
   name: "verdict.judge",
   title: "Record whether each node held in a run",
@@ -32,15 +32,15 @@ ctx["action.register"].register({
 });
 ```
 
-- `name` starts with the pack's id. A second registration of a taken name
+- `name` starts with the plugin's id. A second registration of a taken name
   is refused, never silently replaced. Actions have no versions: one whose
   input or output must change incompatibly gets a new name, and the old one
   is retired.
-- The call context grants nothing. What the action reads, its pack
+- The call context grants nothing. What the action reads, its plugin
   injected.
 - `input` and `output` are JSON Schema, so the same declaration gives a
   UI its form and an agent its tool.
-- `register` returns a disposer; the action goes when its pack unloads.
+- `register` returns a disposer; the action goes when its plugin unloads.
 
 ## Calling one
 
@@ -53,7 +53,7 @@ ctx["action.invoke"].invoke({ action, input, authority, reason })
   it `call`s, becomes **one** change set, applied when the outermost action
   returns, all or nothing. Its header names the actor and run (from the
   calling context), the authority and reason (from the call), the
-  outermost action, and the pack that registered it (from its context).
+  outermost action, and the plugin that registered it (from its context).
 - The set goes down the graph's write chain (schema, history, store). A
   refusal anywhere comes back as `{ ok: false, refused }`, saying what
   would pass.
@@ -82,25 +82,25 @@ refused with code `action.input`, and its `detail` is an `InputRefusal`:
 
 ## Undo
 
-`history.undo` is the one name the spec reserves. The history pack
+`history.undo` is the one name the spec reserves. The history plugin
 provides it: given a change set id, it writes that set's inverse as a new
 change set with `undoes` set. See [changeset](changeset.md).
 
 ## Who is calling
 
-A caller never says who it is. The action pack reads it from the calling
-context (`Caller` in common.ts): the pack is the context's own, and the
+A caller never says who it is. The action plugin reads it from the calling
+context (`Caller` in common.ts): the plugin is the context's own, and the
 actor and run are metadata that interception set where the person or
 agent came in. Sign-in intercepts a person's page with them as actor; the
 Claude Code adapter makes one child context per run with the agent and the
-run. A pack can't pass itself off as another or put words in a person's
+run. A plugin can't pass itself off as another or put words in a person's
 mouth through the call. Only the authority and the reason vary call by
 call, so only they are said.
 
 ## On a test's word
 
 Edition 11. Some changes are neither a person's word nor an agent's
-judgement: a check's result, written by the pack that runs it. A pack that
+judgement: a check's result, written by the plugin that runs it. A plugin that
 injects `action.attest` runs an action on a test's word:
 
 ```ts

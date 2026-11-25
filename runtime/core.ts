@@ -1,28 +1,28 @@
 /**
  * The kernel: a small Cordis runtime (arXiv 2608.25512, §3 and §5.1).
  *
- * - Effects (Algorithm 1). Every change a pack makes goes through
- *   `ctx.effect`, which records its inverse on the pack's fiber. Unloading
+ * - Effects (Algorithm 1). Every change a plugin makes goes through
+ *   `ctx.effect`, which records its inverse on the plugin's fiber. Unloading
  *   the fiber runs the inverses, last first.
- * - Coeffects (Algorithms 2, 3, 6). A pack `provide`s capability keys and
+ * - Coeffects (Algorithms 2, 3, 6). A plugin `provide`s capability keys and
  *   `inject`s the keys it needs. It stays inactive until every key it
  *   injects is provided by an active fiber, and goes inactive again when a
  *   provider leaves. There are no version checks: a key is its meaning.
  * - The lifecycle (Algorithm 5). Load and unload are inertial: a transition
  *   runs to its end, then the fiber compares its target again.
  * - The Caller. A provider is served once per calling context and told who
- *   is calling: the pack, the actor and run from interception, and the
- *   pack's place in the config tree. No call passes identity.
+ *   is calling: the plugin, the actor and run from interception, and the
+ *   plugin's place in the config tree. No call passes identity.
  *
  * Isomorphic: no Node or DOM imports, so the browser runs the same file.
  */
-import type { Actor, Caller, Dispose, PackId } from "../spec/common.ts";
+import type { Actor, Caller, Dispose, PluginId } from "../spec/common.ts";
 import { META, byPosition } from "../spec/common.ts";
 
-/** What a pack module exports (as its default export, or as the module). */
-export interface Pack<C = any> {
-  /** The pack's id, as its manifest names it. */
-  id: PackId;
+/** What a plugin module exports (as its default export, or as the module). */
+export interface Plugin<C = any> {
+  /** The plugin's id, as its manifest names it. */
+  id: PluginId;
   /** What it is for, in one plain sentence: what a person reads about it. */
   about?: string;
   /** The capability keys it needs. Until each is provided, it stays inactive. */
@@ -31,7 +31,7 @@ export interface Pack<C = any> {
    * Runs when every injected key is provided. Whatever it registers through
    * `ctx` is its effect and goes when it unloads. It may be async, or a
    * generator that yields inverses (Definition 17): the runtime stops
-   * iterating if the pack's target changes between steps.
+   * iterating if the plugin's target changes between steps.
    */
   apply(ctx: Context, config: C): unknown;
 }
@@ -43,7 +43,7 @@ export interface Pack<C = any> {
  */
 export type Serve<T = unknown> = (caller: Caller, from: Context) => T;
 
-/** Interception metadata: `actor` and `run` (META), and anything a pack adds. */
+/** Interception metadata: `actor` and `run` (META), and anything a plugin adds. */
 export type Meta = Record<string, unknown>;
 
 export type State = "inactive" | "loading" | "active" | "unloading" | "failed";
@@ -122,9 +122,9 @@ async function execute(result: EffectResult, guard: () => boolean): Promise<Undo
 }
 
 /**
- * A context: the handle a pack works through. Each fiber has one; an
+ * A context: the handle a plugin works through. Each fiber has one; an
  * intercepted context is a child of it that shares its fiber (its effects
- * are the same pack's) and carries more metadata.
+ * are the same plugin's) and carries more metadata.
  */
 export class Context {
   readonly runtime: Runtime;
@@ -150,7 +150,7 @@ export class Context {
   effect(callback: () => EffectResult): Dispose {
     const fiber = this.fiber;
     if (!fiber.accepting()) {
-      throw new Error(`${fiber.pack.id}: effect on a context that is ${fiber.state}`);
+      throw new Error(`${fiber.plugin.id}: effect on a context that is ${fiber.state}`);
     }
     let armed = true;
     const result = callback();
@@ -192,17 +192,17 @@ export class Context {
   }
 
   /**
-   * A capability this pack injected, as its provider serves it to this
-   * context (Algorithm 6). Reads the fiber's committed view, so a pack keeps
+   * A capability this plugin injected, as its provider serves it to this
+   * context (Algorithm 6). Reads the fiber's committed view, so a plugin keeps
    * what it was loaded with through its own teardown. Throws for a key the
-   * pack didn't inject: a capability it didn't ask for, it doesn't get.
+   * plugin didn't inject: a capability it didn't ask for, it doesn't get.
    */
   get<T = unknown>(key: string): T {
     let f: Fiber | null = this.fiber;
     while (f) {
       const b = f.committed?.get(key);
       if (b) return this.serve(b) as T;
-      if (f.inject.includes(key)) throw new Error(`${this.fiber.pack.id}: ${key} is not provided`);
+      if (f.inject.includes(key)) throw new Error(`${this.fiber.plugin.id}: ${key} is not provided`);
       if (!f.parent) break;
       f = f.parent;
     }
@@ -211,7 +211,7 @@ export class Context {
       if (b) return this.serve(b) as T;
       throw new Error(`${key} is not provided`);
     }
-    throw new Error(`${this.fiber.pack.id}: ${key} was not injected`);
+    throw new Error(`${this.fiber.plugin.id}: ${key} was not injected`);
   }
 
   private serve(b: Binding): unknown {
@@ -231,7 +231,7 @@ export class Context {
       return ctx.meta.all[name];
     };
     return {
-      pack: ctx.fiber.pack.id,
+      plugin: ctx.fiber.plugin.id,
       get actor() {
         return read(META.actor) as Actor | undefined;
       },
@@ -247,7 +247,7 @@ export class Context {
   /**
    * A child context with more metadata (Cordis `ctx.intercept`), for every
    * key or for one. It shares this fiber: what it registers is the same
-   * pack's. The adapter makes one per run with the agent and the run.
+   * plugin's. The adapter makes one per run with the agent and the run.
    */
   intercept(meta: Meta, key?: string): Context {
     const next = { all: { ...this.meta.all }, keys: { ...this.meta.keys } };
@@ -257,13 +257,13 @@ export class Context {
   }
 
   /**
-   * Instantiates a pack as a child fiber (Algorithm 4, `use`). The child is
+   * Instantiates a plugin as a child fiber (Algorithm 4, `use`). The child is
    * an effect of this fiber, so unloading this one unloads it.
    */
-  plugin<C>(pack: Pack<C>, config?: C, options: { position?: () => number[]; disabled?: boolean; source?: string } = {}): Fiber {
+  plugin<C>(plugin: Plugin<C>, config?: C, options: { position?: () => number[]; disabled?: boolean; source?: string } = {}): Fiber {
     const parent = this.fiber;
     const index = parent.childCount++;
-    const fiber = new Fiber(this.runtime, pack, config, parent, this.meta, () =>
+    const fiber = new Fiber(this.runtime, plugin, config, parent, this.meta, () =>
       options.position ? options.position() : [...parent.position(), index],
     );
     fiber.disabled = !!options.disabled;
@@ -277,17 +277,17 @@ export class Context {
   }
 }
 
-/** The instantiation of one pack (§5.1.3). */
+/** The instantiation of one plugin (§5.1.3). */
 export class Fiber {
   readonly uid: number;
   readonly runtime: Runtime;
-  readonly pack: Pack;
+  readonly plugin: Plugin;
   readonly parent: Fiber | null;
   readonly inject: readonly string[];
   readonly ctx: Context;
   readonly position: () => number[];
   config: unknown;
-  /** The module URL the loader imported its pack from, when it was loaded from one. */
+  /** The module URL the loader imported its plugin from, when it was loaded from one. */
   source?: string;
   state: State = "inactive";
   /** The bindings it was loaded with; ⊥ (null) while not loaded. */
@@ -308,7 +308,7 @@ export class Fiber {
 
   constructor(
     runtime: Runtime,
-    pack: Pack,
+    plugin: Plugin,
     config: unknown,
     parent: Fiber | null,
     meta: Context["meta"] | undefined,
@@ -316,10 +316,10 @@ export class Fiber {
   ) {
     this.uid = runtime.nextId();
     this.runtime = runtime;
-    this.pack = pack;
+    this.plugin = plugin;
     this.config = config;
     this.parent = parent;
-    this.inject = [...(pack.inject ?? [])];
+    this.inject = [...(plugin.inject ?? [])];
     this.position = position;
     this.ctx = new Context(runtime, this, meta && { all: { ...meta.all }, keys: { ...meta.keys } });
   }
@@ -329,7 +329,7 @@ export class Fiber {
     return this.state === "loading" || this.state === "active" || this === this.runtime.rootFiber;
   }
 
-  /** The injected keys no active pack provides now: what it waits for. */
+  /** The injected keys no active plugin provides now: what it waits for. */
   missing(): string[] {
     return this.inject.filter((key) => !this.runtime.resolve(key, this));
   }
@@ -378,7 +378,7 @@ export class Fiber {
     }
     let failed = false;
     try {
-      const result = this.pack.apply(this.ctx, this.config) as EffectResult;
+      const result = this.plugin.apply(this.ctx, this.config) as EffectResult;
       const inverses = await execute(result, () => this.target === target0);
       // Yielded inverses join the fiber's own, after what apply registered.
       for (const inv of inverses) this.disposables.add(inv as Dispose);
@@ -422,7 +422,7 @@ export class Fiber {
     await Promise.all(
       dependents.map(async (f) => {
         if (!(await within(f.settled(), limit))) {
-          this.runtime.report(f, new Error(`${f.pack.id}: teardown took over ${limit}ms; ${this.pack.id} unloads without it`));
+          this.runtime.report(f, new Error(`${f.plugin.id}: teardown took over ${limit}ms; ${this.plugin.id} unloads without it`));
         }
       }),
     );
@@ -445,7 +445,7 @@ export class Fiber {
     for (let i = all.length - 1; i >= 0; i--) {
       try {
         if (!(await within(all[i]!(), this.runtime.teardownLimit))) {
-          this.runtime.report(this, new Error(`${this.pack.id}: an undo took over ${this.runtime.teardownLimit}ms; skipped`));
+          this.runtime.report(this, new Error(`${this.plugin.id}: an undo took over ${this.runtime.teardownLimit}ms; skipped`));
         }
       } catch (e) {
         this.runtime.report(this, e);
@@ -490,7 +490,7 @@ export class Runtime {
   readonly root: Context;
   /** Where load errors go. Tests and hosts replace it. */
   onError: (fiber: Fiber, error: unknown) => void = (fiber, error) => {
-    console.error(`[${fiber.pack.id}]`, error);
+    console.error(`[${fiber.plugin.id}]`, error);
   };
   /** How long one undo, or a dependent's whole teardown, may take (ms). */
   teardownLimit = 5000;

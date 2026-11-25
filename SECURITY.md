@@ -8,7 +8,7 @@ for it.
 
 - Archipelago runs on one machine for one person. Its servers listen on
   127.0.0.1 only.
-- Packs are code, and they run with the server's rights: they can read and
+- Plugins are code, and they run with the server's rights: they can read and
   write what your user account can. They are not sandboxed, so only load
-  packs you trust.
+  plugins you trust.
 - Data lives in the ignored `.data/` folder, never in the repository.

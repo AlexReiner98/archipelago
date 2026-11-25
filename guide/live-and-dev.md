@@ -15,7 +15,7 @@ sessions report to:
 | Page, adapter, bridge | 5180, 5181, 5182 | 5280, 5281, 5282 |
 | Data | `<worktree>/app/.data/`, the real one | `app/.data/` here, copied from live on demand |
 | Writes skill and memory files | yes | no (`--no-write`) |
-| Who reports to it | every session, through the user-level hooks and MCP server | sessions started with `packs/claude-code/settings.json` |
+| Who reports to it | every session, through the user-level hooks and MCP server | sessions started with `plugins/claude-code/settings.json` |
 
 ## Live
 
@@ -26,8 +26,8 @@ npm run live:start        # also live:stop, live:status
 ```
 
 Open http://127.0.0.1:5180/app/. Point the user-level hooks and MCP server
-at it ([packs/claude-code/README.md](../packs/claude-code/README.md), "Every
-session"): the hook command runs the worktree's `packs/claude-code/hook.ts`,
+at it ([plugins/claude-code/README.md](../plugins/claude-code/README.md), "Every
+session"): the hook command runs the worktree's `plugins/claude-code/hook.ts`,
 not this checkout's.
 
 ## Moving live
@@ -56,7 +56,7 @@ npm run serve             # or in this terminal
 Open http://127.0.0.1:5280/app/ and start Claude Code against it:
 
 ```
-claude --settings packs/claude-code/settings.json --mcp-config packs/claude-code/mcp.json
+claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json
 ```
 
 That session reports to dev as well as to live, through the user-level

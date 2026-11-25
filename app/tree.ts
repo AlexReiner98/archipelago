@@ -1,12 +1,12 @@
 /**
  * The server's config tree and the words it seeds: what app/server.ts runs.
  * Kept apart from the server so a host can start from it (`serverTree`) and
- * add its own packs, through the same loader.
+ * add its own plugins, through the same loader.
  */
 import { join } from "node:path";
 import type { Entry } from "../runtime/loader.ts";
 import { localOrigins } from "../runtime/guard.ts";
-import type { OtelConfig } from "../packs/otel/index.ts";
+import type { OtelConfig } from "../plugins/otel/index.ts";
 
 /**
  * What a fresh map says before anyone has written a node: only what fits
@@ -32,22 +32,22 @@ export const SEED = [
 
 
 export interface TreeOptions {
-  /** Where the packs keep their data. */
+  /** Where the plugins keep their data. */
   data: string;
   /** The page's port: the adapter listens one above it, the bridge two. */
   port: number;
-  /** Whether the written pack writes skill and memory files. */
+  /** Whether the written plugin writes skill and memory files. */
   write: boolean;
   /** More origins the page, the adapter and the bridge answer, besides the page's own (a host in front of them). */
   origins?: string[];
   /** More Host values they answer (a proxy in front that keeps its own). */
   hosts?: string[];
-  /** Where the otel pack sends the exchange as spans (packs/otel). Absent: it sends nothing. */
+  /** Where the otel plugin sends the exchange as spans (plugins/otel). Absent: it sends nothing. */
   otel?: OtelConfig;
 }
 
 /**
- * The otel pack's config from the environment: the standard
+ * The otel plugin's config from the environment: the standard
  * `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT`, its
  * `OTEL_EXPORTER_OTLP_HEADERS` (`k=v,k=v`) and `OTEL_SERVICE_NAME`; the words
  * go only with `ARCHIPELAGO_OTEL_CONTENT=1`.
@@ -75,71 +75,71 @@ export function pageAccess({ port: PAGE, origins = [], hosts = [] }: Pick<TreeOp
 
 /**
  * The server's config tree. A host that runs the server its own way (more
- * packs, another front) starts from this tree and adds to it.
+ * plugins, another front) starts from this tree and adds to it.
  */
 export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], otel = {} }: TreeOptions): Entry[] {
   // The app's own origin is the page's: the adapter and the bridge answer it, and a host's in front.
   const access = pageAccess({ port: PAGE, origins, hosts });
   return [
-    { id: "graph", pack: "packs/graph/index.ts", config: { db: join(data, "graph.sqlite") } },
-    { id: "action", pack: "packs/action/index.ts" },
-    { id: "types", pack: "packs/types/index.ts" },
-    { id: "work", pack: "packs/work/index.ts" },
-    { id: "question", pack: "packs/question/index.ts" },
-    { id: "record", pack: "packs/record/index.ts" },
-    { id: "actor", pack: "packs/actor/index.ts" },
-    { id: "links", pack: "packs/links/index.ts" },
-    { id: "branch", pack: "packs/branch/index.ts" },
-    { id: "items", pack: "packs/items/index.ts" },
-    { id: "page", pack: "packs/page/index.ts" },
-    { id: "views", pack: "packs/views/index.ts" },
-    { id: "switch", pack: "packs/switch/server.ts" },
-    { id: "schema", pack: "packs/schema/index.ts", config: { db: join(data, "schema.sqlite") } },
-    { id: "history", pack: "packs/history/index.ts", config: { db: join(data, "history.sqlite") } },
-    { id: "interchange", pack: "packs/interchange/index.ts" },
-    { id: "exchange", pack: "packs/exchange/index.ts", config: { journal: join(data, "exchange.jsonl") } },
-    { id: "agent", pack: "packs/agent/index.ts" },
-    { id: "git", pack: "packs/git/index.ts" },
-    { id: "hub", pack: "packs/hub/index.ts" },
-    { id: "verdict", pack: "packs/verdict/index.ts" },
-    { id: "words", pack: "packs/words/index.ts", config: { seed: SEED } },
-    { id: "loaded", pack: "packs/loaded/index.ts" },
-    { id: "transcript", pack: "packs/transcript/index.ts" },
-    { id: "context", pack: "packs/context/index.ts" },
-    { id: "call", pack: "packs/call/index.ts" },
+    { id: "graph", plugin: "plugins/graph/index.ts", config: { db: join(data, "graph.sqlite") } },
+    { id: "action", plugin: "plugins/action/index.ts" },
+    { id: "types", plugin: "plugins/types/index.ts" },
+    { id: "work", plugin: "plugins/work/index.ts" },
+    { id: "question", plugin: "plugins/question/index.ts" },
+    { id: "record", plugin: "plugins/record/index.ts" },
+    { id: "actor", plugin: "plugins/actor/index.ts" },
+    { id: "links", plugin: "plugins/links/index.ts" },
+    { id: "branch", plugin: "plugins/branch/index.ts" },
+    { id: "items", plugin: "plugins/items/index.ts" },
+    { id: "page", plugin: "plugins/page/index.ts" },
+    { id: "views", plugin: "plugins/views/index.ts" },
+    { id: "switch", plugin: "plugins/switch/server.ts" },
+    { id: "schema", plugin: "plugins/schema/index.ts", config: { db: join(data, "schema.sqlite") } },
+    { id: "history", plugin: "plugins/history/index.ts", config: { db: join(data, "history.sqlite") } },
+    { id: "interchange", plugin: "plugins/interchange/index.ts" },
+    { id: "exchange", plugin: "plugins/exchange/index.ts", config: { journal: join(data, "exchange.jsonl") } },
+    { id: "agent", plugin: "plugins/agent/index.ts" },
+    { id: "git", plugin: "plugins/git/index.ts" },
+    { id: "hub", plugin: "plugins/hub/index.ts" },
+    { id: "verdict", plugin: "plugins/verdict/index.ts" },
+    { id: "words", plugin: "plugins/words/index.ts", config: { seed: SEED } },
+    { id: "loaded", plugin: "plugins/loaded/index.ts" },
+    { id: "transcript", plugin: "plugins/transcript/index.ts" },
+    { id: "context", plugin: "plugins/context/index.ts" },
+    { id: "call", plugin: "plugins/call/index.ts" },
     // A typed call's model: ARCHIPELAGO_MODEL names one (`anthropic:<model>`, `openai:<model>`, `claude[:<model>]`); its key stays in the environment.
-    { id: "typed", pack: "packs/typed/index.ts", config: { model: process.env.ARCHIPELAGO_MODEL || undefined } },
-    { id: "profile", pack: "packs/profile/index.ts" },
-    { id: "used", pack: "packs/used/index.ts" },
-    { id: "lean", pack: "packs/lean/index.ts" },
-    { id: "lean-write", pack: "packs/lean/write.ts", config: { ledger: join(data, "lean.json") }, disabled: !write },
-    { id: "written", pack: "packs/written/index.ts", disabled: !write },
-    { id: "placed", pack: "packs/placed/index.ts", disabled: !write },
-    { id: "grow", pack: "packs/grow/index.ts" },
-    { id: "budget", pack: "packs/budget/index.ts" },
-    { id: "keep", pack: "packs/keep/index.ts" },
-    { id: "scripted", pack: "packs/scripted/index.ts" },
-    { id: "replay", pack: "packs/replay/index.ts" },
-    { id: "since", pack: "packs/since/index.ts" },
+    { id: "typed", plugin: "plugins/typed/index.ts", config: { model: process.env.ARCHIPELAGO_MODEL || undefined } },
+    { id: "profile", plugin: "plugins/profile/index.ts" },
+    { id: "used", plugin: "plugins/used/index.ts" },
+    { id: "lean", plugin: "plugins/lean/index.ts" },
+    { id: "lean-write", plugin: "plugins/lean/write.ts", config: { ledger: join(data, "lean.json") }, disabled: !write },
+    { id: "written", plugin: "plugins/written/index.ts", disabled: !write },
+    { id: "placed", plugin: "plugins/placed/index.ts", disabled: !write },
+    { id: "grow", plugin: "plugins/grow/index.ts" },
+    { id: "budget", plugin: "plugins/budget/index.ts" },
+    { id: "keep", plugin: "plugins/keep/index.ts" },
+    { id: "scripted", plugin: "plugins/scripted/index.ts" },
+    { id: "replay", plugin: "plugins/replay/index.ts" },
+    { id: "since", plugin: "plugins/since/index.ts" },
     // The exchange as OpenTelemetry spans to a collector: off until `otel.endpoint` names one (otelFromEnv).
-    { id: "otel", pack: "packs/otel/index.ts", config: otel },
+    { id: "otel", plugin: "plugins/otel/index.ts", config: otel },
     {
       id: "claude-code",
-      pack: "packs/claude-code/index.ts",
+      plugin: "plugins/claude-code/index.ts",
       config: { port: PAGE + 1, ...access, onListen: (p: number) => console.log(`claude-code adapter on http://127.0.0.1:${p}`) },
     },
-    { id: "mcp", pack: "packs/mcp/index.ts" },
+    { id: "mcp", plugin: "plugins/mcp/index.ts" },
     // What a person copies to connect Claude Code: the adapter as this machine reaches it. A host in front sets its own.
-    { id: "connect", pack: "packs/connect/index.ts", config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp` } },
-    // A host's way in to its maps (packs/gate): off until a host in front names where it answers (`at`).
-    { id: "gate", pack: "packs/gate/index.ts" },
-    { id: "docs", pack: "packs/docs/index.ts" },
-    { id: "docs-tool", pack: "packs/docs/tool.ts" },
-    { id: "words-tool", pack: "packs/words/tool.ts" },
-    { id: "archive", pack: "packs/archive/index.ts", config: { dir: join(data, "archives") } },
+    { id: "connect", plugin: "plugins/connect/index.ts", config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp` } },
+    // A host's way in to its maps (plugins/gate): off until a host in front names where it answers (`at`).
+    { id: "gate", plugin: "plugins/gate/index.ts" },
+    { id: "docs", plugin: "plugins/docs/index.ts" },
+    { id: "docs-tool", plugin: "plugins/docs/tool.ts" },
+    { id: "words-tool", plugin: "plugins/words/tool.ts" },
+    { id: "archive", plugin: "plugins/archive/index.ts", config: { dir: join(data, "archives") } },
     {
       id: "bridge",
-      pack: "packs/bridge/server.ts",
+      plugin: "plugins/bridge/server.ts",
       config: {
         port: PAGE + 2,
         actor: { id: "person:owner", kind: "person" },

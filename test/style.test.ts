@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { COMMON, type TypeInfo } from "../spec/types.ts";
 import { glyph, read, shape, side, sheet, SHAPES, SIDES, TOKENS, v, VERDICTS, verdictGlyph } from "../spec/style.ts";
-import { css, DARK, DERIVED, LIGHT, MARKS, SPACE, TYPE } from "../packs/style/tokens.ts";
+import { css, DARK, DERIVED, LIGHT, MARKS, SPACE, TYPE } from "../plugins/style/tokens.ts";
 
-const work: TypeInfo = { name: "work", base: "work", statuses: { open: ["todo", "doing"], closed: ["done", "dropped"] }, fields: COMMON, trial: false, pack: "work" };
+const work: TypeInfo = { name: "work", base: "work", statuses: { open: ["todo", "doing"], closed: ["done", "dropped"] }, fields: COMMON, trial: false, plugin: "work" };
 
 test("the style sets every token the spec names, and only those", () => {
   const set = { ...LIGHT, ...DERIVED, ...TYPE, ...SPACE, ...MARKS };

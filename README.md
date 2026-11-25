@@ -42,7 +42,7 @@ In the same folder, start a session that reports to your map, without
 touching your own settings:
 
 ```
-claude --settings packs/claude-code/settings.json --mcp-config packs/claude-code/mcp.json
+claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-code/mcp.json
 ```
 
 Its hooks report each prompt, tool call and answer, and its MCP server gives
@@ -58,27 +58,27 @@ lines to copy into `~/.claude/settings.json`;
 - It gives each agent what it needs and the actions it can take, and records
   both, with everything the agent does.
 - What works is kept. What doesn't is retired.
-- Its types, rules, views and interface are packs, added and removed while
+- Its types, rules, views and interface are plugins, added and removed while
   it runs, without residue.
 - Every part sits behind a versioned contract ([spec/](spec/README.md)) and
   can be replaced.
 
-One process ([app/server.ts](app/server.ts)) runs the server's packs and the
-page's dev server; the page's own packs are in [app/boot.ts](app/boot.ts).
+One process ([app/server.ts](app/server.ts)) runs the server's plugins and the
+page's dev server; the page's own plugins are in [app/boot.ts](app/boot.ts).
 The [guide](guide/README.md) walks through the concepts and how to write a
-pack. To work on Archipelago while your own sessions report to it, see
+plugin. To work on Archipelago while your own sessions report to it, see
 [Live and dev](guide/live-and-dev.md).
 
 ## Status
 
 Early. The first build is a live **harness view** for Claude Code sessions:
-what is said to the agent, where it was said, by which pack, and whether it
+what is said to the agent, where it was said, by which plugin, and whether it
 worked.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Packs are code that runs with the
-server's rights, so only load packs you trust; security reports go through
+See [CONTRIBUTING.md](CONTRIBUTING.md). Plugins are code that runs with the
+server's rights, so only load plugins you trust; security reports go through
 [SECURITY.md](SECURITY.md).
 
 ## Licence

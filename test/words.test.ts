@@ -8,21 +8,21 @@ import type { AgentRun, AgentTree } from "../spec/agent.ts";
 import type { ExchangeRead } from "../spec/exchange.ts";
 import type { GraphRead, GraphWatch } from "../spec/graph.ts";
 import type { Committed } from "../spec/changeset.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import words from "../packs/words/index.ts";
-import wordsTool from "../packs/words/tool.ts";
-import type { McpHost, ToolDef } from "../packs/mcp/host.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import words from "../plugins/words/index.ts";
+import wordsTool from "../plugins/words/tool.ts";
+import type { McpHost, ToolDef } from "../plugins/mcp/host.ts";
 import type { Context } from "../runtime/core.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 const T = "2026-11-20T14:00:00.000Z";
 
-const probe: Pack = {
+const probe: Plugin = {
   id: "probe",
   inject: ["agent.run", "agent.tree", "action.invoke", "action.list", "action.register", "graph.read", "graph.watch", "exchange.read"],
   apply() {},
@@ -32,7 +32,7 @@ function setup() {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "words.ts": words, "probe.ts": probe };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "words.ts": words, "probe.ts": probe };
   const loader = new Loader(rt, {
     base: BASE,
     import: async (url) => ({ default: modules[url.slice(BASE.length)] }),
@@ -55,12 +55,12 @@ function setup() {
 }
 
 const tree = (file?: string, seed = [{ title: "Spec", kind: "reflex", at: ["file:spec/**"], words: "Ask Owner first." }]): Entry[] => [
-  { id: "graph", pack: "graph.ts", config: { db: file } },
-  { id: "action", pack: "action.ts" },
-  { id: "exchange", pack: "exchange.ts" },
-  { id: "agent", pack: "agent.ts" },
-  { id: "words", pack: "words.ts", config: { seed } },
-  { id: "probe", pack: "probe.ts" },
+  { id: "graph", plugin: "graph.ts", config: { db: file } },
+  { id: "action", plugin: "action.ts" },
+  { id: "exchange", plugin: "exchange.ts" },
+  { id: "agent", plugin: "agent.ts" },
+  { id: "words", plugin: "words.ts", config: { seed } },
+  { id: "probe", plugin: "probe.ts" },
 ];
 
 test("a seeded node speaks its words; an edit through words.set is what the next say uses", async () => {
@@ -82,7 +82,7 @@ test("a seeded node speaks its words; an edit through words.set is what the next
   assert.ok(out.ok && out.committed);
   if (out.ok) {
     assert.deepEqual(out.committed!.header.actor, { id: "person:owner", kind: "person" });
-    assert.equal(out.committed!.header.pack.id, "words");
+    assert.equal(out.committed!.header.plugin.id, "words");
     assert.equal(out.committed!.header.action, "words.set");
     assert.deepEqual(out.committed!.facts, [["-", node.source, "words", "Ask Owner first."], ["+", node.source, "words", "spec/ is Owner's."]]);
   }
@@ -160,7 +160,7 @@ test("the graph refuses a retraction of a value it doesn't hold, whole", async (
   assert.equal(bad.ok, false);
   assert.equal(!bad.ok && bad.refused.code, "graph.conflict");
   assert.deepEqual(await p.read.get(["e_new"]), [null]);
-  // An action named outside the caller's pack is refused.
+  // An action named outside the caller's plugin is refused.
   assert.throws(() => p.register.register({ name: "words.fake", title: "", input: {}, run: async () => null }), /only register actions named probe/);
   await loader.apply([]);
 });
@@ -193,7 +193,7 @@ test("the graph is kept on disk and read back; watchers hear each change set", a
   }
 });
 
-test("unloading the words pack takes its nodes and actions", async () => {
+test("unloading the words plugin takes its nodes and actions", async () => {
   const { rt, loader, as } = setup();
   await loader.apply(tree());
   await rt.settle();
@@ -294,7 +294,7 @@ test("reworded where the run hears it before a prompt: the node's new words, rec
 
 test("the words tool: a node's whole words by id or title, the listed ones without input; the run then counts as having heard them", async () => {
   const served = new Map<string, ToolDef>();
-  const host: Pack = {
+  const host: Plugin = {
     id: "host",
     apply(ctx: Context) {
       ctx.provide<McpHost>("mcp.host", (_c, from) => ({
@@ -307,12 +307,12 @@ test("the words tool: a node's whole words by id or title, the listed ones witho
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "words.ts": words, "host.ts": host, "tool.ts": wordsTool, "probe.ts": probe };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "words.ts": words, "host.ts": host, "tool.ts": wordsTool, "probe.ts": probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   await loader.apply([
     ...tree(undefined, [{ ...STANDING, say: "listed" } as never, { title: "Bash", kind: "reflex", at: ["tool:Bash"], words: "Prefer Read." }]),
-    { id: "host", pack: "host.ts" },
-    { id: "words-tool", pack: "tool.ts" },
+    { id: "host", plugin: "host.ts" },
+    { id: "words-tool", plugin: "tool.ts" },
   ]);
   await rt.settle();
   const ctx = loader.fiber("probe")!.ctx.intercept({ actor: { id: "e_agent", kind: "agent" }, run: "r1" });
@@ -337,7 +337,7 @@ test("the words tool: a node's whole words by id or title, the listed ones witho
 });
 
 test("a node heard while the change node was reading (said at the same moment) is not told as retired", async () => {
-  const { changes } = await import("../packs/words/heard.ts");
+  const { changes } = await import("../plugins/words/heard.ts");
   const heard = new Map([
     ["n_a", { text: "Old words.", title: "A", listed: false }],
     ["n_b", { text: "Just said.", title: "B", listed: false }],

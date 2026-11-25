@@ -1,10 +1,10 @@
 /**
- * The light carried from graph to graph (packs/field/carry.ts): a new graph renumbers the particles, and what
+ * The light carried from graph to graph (plugins/field/carry.ts): a new graph renumbers the particles, and what
  * the pointer lit stays on the same items. Input in, the renumbered light out.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { carryIndex, carryLight } from "../packs/field/carry.ts";
+import { carryIndex, carryLight } from "../plugins/field/carry.ts";
 
 const last = { id: ["a", "b", "c"] };
 // A session came first: every item moves one place on, and c is gone.

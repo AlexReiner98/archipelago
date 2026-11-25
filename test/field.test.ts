@@ -5,11 +5,11 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { build, seed, type FieldIn } from "../packs/field/graph.ts";
-import { BEHAVIOURS, RUN, defaults, step } from "../packs/field/step.ts";
-import { DRAW } from "../packs/field/paint.ts";
-import { CHECK, descends } from "../packs/field/descends.ts";
-import { FIND } from "../packs/field/filter.ts";
+import { build, seed, type FieldIn } from "../plugins/field/graph.ts";
+import { BEHAVIOURS, RUN, defaults, step } from "../plugins/field/step.ts";
+import { DRAW } from "../plugins/field/paint.ts";
+import { CHECK, descends } from "../plugins/field/descends.ts";
+import { FIND } from "../plugins/field/filter.ts";
 
 /** A seeded random, so the map is the same each run. */
 function rand(s: number) {
@@ -105,7 +105,7 @@ test("collide leaves no particle on another, and part_of keeps a tree together",
 });
 
 test("the legend's filter: what it hides, and how it counts", async () => {
-  const { shown, facets, toggle } = await import("../packs/field/filter.ts");
+  const { shown, facets, toggle } = await import("../plugins/field/filter.ts");
   const input: FieldIn = {
     items: [
       { id: "a", title: "a", type: "work", status: "todo", closed: false, kind: "feature" },
@@ -138,7 +138,7 @@ test("the legend's filter: what it hides, and how it counts", async () => {
 });
 
 test("titles: no two overlap, none leaves the view, none covers a particle, the budget holds", async () => {
-  const { place } = await import("../packs/field/labels.ts");
+  const { place } = await import("../plugins/field/labels.ts");
   // A crowd of particles on a 400 x 300 view, each wanting a 80 x 14 title.
   const r = rand(3);
   const dots = Array.from({ length: 120 }, (_, i) => ({ i, x: 20 + r() * 360, y: 20 + r() * 260, r: 3 }));
@@ -173,7 +173,7 @@ test("titles: no two overlap, none leaves the view, none covers a particle, the 
 });
 
 test("hubs: the most linked, from a least, and the set holds still", async () => {
-  const { hubSet } = await import("../packs/field/labels.ts");
+  const { hubSet } = await import("../plugins/field/labels.ts");
   const ids = ["a", "b", "c", "d", "e"];
   // Two hubs from three links up: d and b; e has too few.
   assert.deepEqual([...hubSet(ids, [5, 9, 4, 12, 2], new Set(), 2, 3, 0)].sort(), ["b", "d"]);
@@ -186,7 +186,7 @@ test("hubs: the most linked, from a least, and the set holds still", async () =>
 });
 
 test("a type keeps its colour whatever the filter hides", async () => {
-  const { facets } = await import("../packs/field/filter.ts");
+  const { facets } = await import("../plugins/field/filter.ts");
   const item = (id: string, type: string) => ({ id, title: id, type, status: "", closed: false });
   const whole: FieldIn = { items: [item("a", "actor"), item("b", "branch"), item("w", "work")], links: [], types: ["actor", "branch", "work"] };
   const pal = ["red", "blue", "yellow"];
@@ -202,7 +202,7 @@ test("a type keeps its colour whatever the filter hides", async () => {
 });
 
 test("find keeps what it finds, the next steps in full, then a faint edge", async () => {
-  const { around, FOUND, NEAR, FAINT } = await import("../packs/field/filter.ts");
+  const { around, FOUND, NEAR, FAINT } = await import("../plugins/field/filter.ts");
   // A chain a - b - c - d - e, and f alone.
   const item = (id: string) => ({ id, title: id, type: "work", status: "", closed: false });
   const input: FieldIn = {
@@ -217,7 +217,7 @@ test("find keeps what it finds, the next steps in full, then a faint edge", asyn
 });
 
 test("shapes: each has the area of its circle, and its edge is where it reaches", async () => {
-  const { edge, reach, edgeSlope, CIRCLE } = await import("../packs/field/shapes.ts");
+  const { edge, reach, edgeSlope, CIRCLE } = await import("../plugins/field/shapes.ts");
   const { SHAPES } = await import("../spec/style.ts");
   for (let s = 0; s < SHAPES.length; s++) {
     // The area under the edge, all the way round, is π (a unit circle's).
@@ -239,7 +239,7 @@ test("shapes: each has the area of its circle, and its edge is where it reaches"
 });
 
 test("flow: what an item waits on is ranked before it, and a plan settles left to right", async () => {
-  const { ranks } = await import("../packs/field/behaviours/flow.ts");
+  const { ranks } = await import("../plugins/field/behaviours/flow.ts");
   const item = (id: string) => ({ id, title: id, type: "work", status: "todo", closed: false });
   // d waits on c and b; c and b wait on a; x waits on itself through y (a loop).
   const dep = (from: string, to: string, k: number) => ({ id: `d${k}`, type: "depends_on", from, to });
@@ -259,7 +259,7 @@ test("flow: what an item waits on is ranked before it, and a plan settles left t
 });
 
 test("link names: none over a title or each other, the lit first, upright", async () => {
-  const { placeWires, arrow, wireName } = await import("../packs/field/wires.ts");
+  const { placeWires, arrow, wireName } = await import("../plugins/field/wires.ts");
   const w = (e: number, x1: number, y1: number, x2: number, y2: number, lit = false) => ({ e, x1, y1, x2, y2, w: 50, h: 11, lit });
   const at = { width: 400, height: 300, from: 60, most: 10, ends: 10, taken: [[150, 140, 250, 160]] as [number, number, number, number][] };
   const placed = placeWires([w(0, 0, 50, 300, 50), w(1, 0, 52, 300, 52), w(2, 100, 150, 300, 150), w(3, 10, 200, 40, 200), w(4, 300, 250, 100, 250, true)], at);
@@ -276,7 +276,7 @@ test("link names: none over a title or each other, the lit first, upright", asyn
 });
 
 test("link names grow with the zoom between a least and a most, and fade in and out instead of popping", async () => {
-  const { wireSize, easeWires } = await import("../packs/field/wires.ts");
+  const { wireSize, easeWires } = await import("../plugins/field/wires.ts");
   assert.equal(wireSize(9, 1, 6, 22), 9);
   assert.equal(wireSize(9, 2, 6, 22), 18, "twice the zoom, twice the size");
   assert.equal(wireSize(9, 4, 6, 22), 22, "stops growing at the most");
@@ -292,8 +292,8 @@ test("link names grow with the zoom between a least and a most, and fade in and 
 });
 
 test("the legend's keys: each base by its shape, each status by how full it is drawn", async () => {
-  const { facets } = await import("../packs/field/filter.ts");
-  const { markPath } = await import("../packs/field/shapes.ts");
+  const { facets } = await import("../plugins/field/filter.ts");
+  const { markPath } = await import("../plugins/field/shapes.ts");
   // task and bug share the base work (square, 0); question is its own base (diamond, 1). Sides: 0 fresh, 1 moving, 2 done.
   const input: FieldIn = {
     items: [
@@ -324,7 +324,7 @@ test("the legend's keys: each base by its shape, each status by how full it is d
 });
 
 test("the legend's fill switches hide open items by how full they are drawn", async () => {
-  const { shown, toggle } = await import("../packs/field/filter.ts");
+  const { shown, toggle } = await import("../plugins/field/filter.ts");
   const input: FieldIn = {
     items: [
       { id: "a", title: "a", type: "task", status: "todo", closed: false, side: 0 },
@@ -341,7 +341,7 @@ test("the legend's fill switches hide open items by how full they are drawn", as
 });
 
 test("an item that leaves the map fades out where it stood over gone_ms, closed ones from their faintness", async () => {
-  const { goneOf, ghostFade } = await import("../packs/field/gone.ts");
+  const { goneOf, ghostFade } = await import("../plugins/field/gone.ts");
   const item = (id: string, closed = false) => ({ id, title: id, type: "work", status: "", closed });
   const whole: FieldIn = { items: [item("a"), item("b", true), item("c")], links: [], types: ["work"] };
   const S = { ...settings(), gone_ms: 600, closed_fade: 0.28, shapes: 0 };
@@ -353,7 +353,7 @@ test("an item that leaves the map fades out where it stood over gone_ms, closed 
   assert.deepEqual(ghosts.map((q) => [q.x, q.y, q.alpha, q.at]), [[...at("b"), 0.28, 1000], [...at("c"), 1, 1000]], "b and c left, each where it stood; b closed, so as faint as it was drawn");
   assert.deepEqual(goneOf(all, less, 1000, { ...S, gone_ms: 0 }), [], "0: they vanish at once, no ghosts");
   assert.deepEqual(goneOf(null, less, 1000, S), [], "a first map leaves nothing behind");
-  const { FAINT, FOUND } = await import("../packs/field/filter.ts");
+  const { FAINT, FOUND } = await import("../plugins/field/filter.ts");
   const kept = goneOf(all, less, 1000, { ...S, query_fade: 0.1 }, Uint8Array.from([FOUND, FOUND, FAINT]));
   assert.deepEqual(kept.map((q) => q.alpha), [1, 0.1], "found, a closed item is drawn whole; kept faint by the find line, it fades from faint");
   assert.equal(ghostFade(0, 600), 1);
@@ -362,7 +362,7 @@ test("an item that leaves the map fades out where it stood over gone_ms, closed 
 });
 
 test("a link with an end that left fades out with it, and a ghost keeps the title it was shown with", async () => {
-  const { goneLinksOf, goneOf } = await import("../packs/field/gone.ts");
+  const { goneLinksOf, goneOf } = await import("../plugins/field/gone.ts");
   const item = (id: string) => ({ id, title: "Item " + id, type: "work", status: "", closed: false });
   const whole: FieldIn = { items: [item("a"), item("b"), item("c")], links: [{ id: "l1", type: "part_of", from: "b", to: "a" }, { id: "l2", type: "depends_on", from: "c", to: "a" }], types: ["work"] };
   const S = { ...settings(), gone_ms: 600, link_alpha: 0.5, shapes: 0 };
@@ -381,7 +381,7 @@ test("a link with an end that left fades out with it, and a ghost keeps the titl
 });
 
 test("link names follow their links into a rebuilt map; one whose link left fades where it stood", async () => {
-  const { rekeyWires } = await import("../packs/field/gone.ts");
+  const { rekeyWires } = await import("../plugins/field/gone.ts");
   const item = (id: string) => ({ id, title: id, type: "work", status: "", closed: false });
   const links = [{ id: "l1", type: "part_of", from: "b", to: "a" }, { id: "l2", type: "depends_on", from: "c", to: "a" }];
   const all = build({ items: [item("a"), item("b"), item("c")], links, types: ["work"] }, null);
@@ -395,7 +395,7 @@ test("link names follow their links into a rebuilt map; one whose link left fade
 });
 
 test("an item that stays but takes a new size eases to it over resize_ms; a ghost leaves as hollow as it was drawn", async () => {
-  const { resizeOf, resizeAt, goneOf } = await import("../packs/field/gone.ts");
+  const { resizeOf, resizeAt, goneOf } = await import("../plugins/field/gone.ts");
   const item = (id: string) => ({ id, title: id, type: "work", status: "", closed: false });
   const whole: FieldIn = { items: [item("a"), item("b"), item("c")], links: [{ id: "l1", type: "depends_on", from: "a", to: "b" }, { id: "l2", type: "depends_on", from: "a", to: "c" }], types: ["work"] };
   const S = { ...settings(), shapes: 1 };
@@ -413,11 +413,11 @@ test("an item that stays but takes a new size eases to it over resize_ms; a ghos
   assert.equal(resizeOf(null, less, 0), null);
   assert.equal(resizeOf(less, less, 0), null, "nothing changed size: nothing to ease");
   const gone = goneOf(all, less, 1000, S);
-  assert.deepEqual(gone.map((q) => q.how), [all.side && (await import("../packs/field/shapes.ts")).fill(all.side[all.idIx.get("c")!]!)]);
+  assert.deepEqual(gone.map((q) => q.how), [all.side && (await import("../plugins/field/shapes.ts")).fill(all.side[all.idIx.get("c")!]!)]);
 });
 
 test("the map follows the find line once typing pauses: a value is taken only after it holds still for find_wait_ms", async (t) => {
-  const { Settle } = await import("../packs/field/filter.ts");
+  const { Settle } = await import("../plugins/field/filter.ts");
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const took: string[] = [];
   const s = new Settle("", (v) => took.push(v));
@@ -433,7 +433,7 @@ test("the map follows the find line once typing pauses: a value is taken only af
 });
 
 test("an item that comes onto the map fades in where it lands over come_ms; what was there stays whole", async () => {
-  const { bornOf, comeFade } = await import("../packs/field/gone.ts");
+  const { bornOf, comeFade } = await import("../plugins/field/gone.ts");
   const item = (id: string) => ({ id, title: id, type: "work", status: "", closed: false });
   const one = build({ items: [item("a")], links: [], types: ["work"] }, null);
   one.born = bornOf(null, one, 0);
@@ -447,7 +447,7 @@ test("an item that comes onto the map fades in where it lands over come_ms; what
 });
 
 test("an arranged tree's names are boxes on screen that the items' titles give way to: ghosts' below, boughs' above", async () => {
-  const { treeNameBoxes } = await import("../packs/field/treeover.ts");
+  const { treeNameBoxes } = await import("../plugins/field/treeover.ts");
   const a = { profile: "P", items: {}, wires: [], boughs: [{ at: [10, 0] as [number, number], text: "tool" }], ghosts: [{ at: [0, 0] as [number, number], text: "Check" }] };
   const S = { ...settings(), tree_text: 10, tree_ghost_text: 5 };
   const boxes = treeNameBoxes(a, { k: 2, tx: 100, ty: 50 }, 1, S, (t, px) => t.length * px * 0.5);
@@ -459,7 +459,7 @@ test("an arranged tree's names are boxes on screen that the items' titles give w
 });
 
 test("an arranged tree waits tree_in_ms while the old map fades out, then comes in at least as fast as gone_ms", async () => {
-  const { treeStrength } = await import("../packs/field/treeover.ts");
+  const { treeStrength } = await import("../plugins/field/treeover.ts");
   const S = { ...settings(), tree_in_ms: 450, gone_ms: 600 };
   assert.equal(treeStrength(1, 0, S), 0, "not yet, however far the items have come");
   assert.equal(treeStrength(1, 449, S), 0);
@@ -471,7 +471,7 @@ test("an arranged tree waits tree_in_ms while the old map fades out, then comes 
 });
 
 test("a title that takes another spot than last frame's has moved, and fades across; a new one or one kept in place has not", async () => {
-  const { movedTitles } = await import("../packs/field/paint.ts");
+  const { movedTitles } = await import("../plugins/field/paint.ts");
   const was = new Map([["a", 0], ["b", 2], ["c", 1]]);
   assert.deepEqual(movedTitles(was, [["a", 0], ["b", 3], ["d", 1], ["c", undefined]]), ["b", "c"]);
   assert.deepEqual(movedTitles(new Map(), [["a", 0]]), [], "a first frame moves nothing");
@@ -481,7 +481,7 @@ test("a title that takes another spot than last frame's has moved, and fades acr
 });
 
 test("after a jump the camera eases in from rest over find_follow_ms, then closes a share of the gap as before", async () => {
-  const { followShare } = await import("../packs/field/follow.ts");
+  const { followShare } = await import("../plugins/field/follow.ts");
   assert.equal(followShare(16, 350, 0), 0, "the first frame of a jump does not move");
   assert.ok(followShare(16, 350, 100) < followShare(16, 350, 300), "it gathers speed");
   assert.equal(followShare(16, 350, 400), 1 - Math.exp(-16 / 350), "then as it always did");
@@ -490,7 +490,7 @@ test("after a jump the camera eases in from rest over find_follow_ms, then close
 });
 
 test("a placed name's corners reach along its turned line, so the arranged tree's fit keeps it in view", async () => {
-  const { nameCorners } = await import("../packs/field/treeover.ts");
+  const { nameCorners } = await import("../plugins/field/treeover.ts");
   const flat = nameCorners(10, 20, "abcd", { turn: 0, dx: 5, dy: 0, anchor: "start" }, 10);
   const xs = flat.map((p) => p[0]), ys = flat.map((p) => p[1]);
   assert.deepEqual([Math.min(...xs), Math.max(...xs)], [15, 15 + 4 * 10 * 0.55]);
@@ -502,7 +502,7 @@ test("a placed name's corners reach along its turned line, so the arranged tree'
 });
 
 test("a link with places is named with them, so the map shows where its item is said", async () => {
-  const { wireName } = await import("../packs/field/wires.ts");
+  const { wireName } = await import("../plugins/field/wires.ts");
   assert.equal(wireName("in_context_filter"), "in context filter");
   assert.equal(wireName("in_context_filter", ["tool:Edit", "file:*.html"]), "at tool:Edit, file:*.html", "the places are what it says: the filter it points to says the rest");
   const g = build({ items: [{ id: "a", title: "a", type: "record", status: "", closed: false }, { id: "b", title: "b", type: "context_filter", status: "", closed: false }], links: [{ id: "l", type: "in_context_filter", from: "a", to: "b", places: ["prompt"] }], types: ["record", "context_filter"] }, null);

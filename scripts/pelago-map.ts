@@ -7,7 +7,7 @@
  *   mapped, only the fields its type declares. Lanes and integrations are
  *   the trial flavour `branch`. A field nothing here declares goes into the
  *   note, under "From the old map"; UI state and private fields are left.
- *   Instructions and reflexes become nodes for the words pack. Links are
+ *   Instructions and reflexes become nodes for the words plugin. Links are
  *   mapped onto the five; an island is an item and what is on it part_of it.
  *   Facts are grouped by on whose authority each item's status was last set.
  * - An archive: the same landing, but every item, link and field is kept.
@@ -15,11 +15,11 @@
 import type { Fact, Header } from "../spec/changeset.ts";
 import type { Authority, Json } from "../spec/common.ts";
 import { COMMON, type BaseDef, type FieldDef, type FlavourDef } from "../spec/types.ts";
-import { WORK } from "../packs/work/index.ts";
-import { QUESTION } from "../packs/question/index.ts";
-import { RECORD } from "../packs/record/index.ts";
-import { ACTOR } from "../packs/actor/index.ts";
-import { BRANCH } from "../packs/branch/index.ts";
+import { WORK } from "../plugins/work/index.ts";
+import { QUESTION } from "../plugins/question/index.ts";
+import { RECORD } from "../plugins/record/index.ts";
+import { ACTOR } from "../plugins/actor/index.ts";
+import { BRANCH } from "../plugins/branch/index.ts";
 
 /** An item as the old server's flat read gives it, with fields true and notes whole. */
 export interface OldItem {
@@ -108,7 +108,7 @@ export const LANDS: Record<string, Land> = {
   "site.particle_setup": { type: "record", kind: "particle_setup", status: DRAFT },
 };
 
-/** What the old map says to agents: nodes for the words pack. */
+/** What the old map says to agents: nodes for the words plugin. */
 export const SAID = new Set(["instruction", "reflex"]);
 
 /** Each old link, as one of the five. Absent: it doesn't move (see LEFT_LINKS). */
@@ -147,7 +147,7 @@ export const DROP: Record<string, string> = {
   cell: "UI state",
   focus: "UI state",
   corner: "UI state",
-  packs_off: "UI state",
+  plugins_off: "UI state",
   parts_off: "UI state",
   email: "private",
   islands: "UI state",
@@ -439,7 +439,7 @@ export function landArchive(dump: Dump): { facts: Fact[]; counts: { items: Recor
 export const archiveHeader = (origin: string): Header => ({
   actor: { id: "agent:interchange", kind: "agent" },
   authority: { of: "agent", basis: `Read from ${origin} through its own query reads` },
-  pack: { id: "archive" },
+  plugin: { id: "archive" },
   action: "archive.make",
   reason: "An old map kept read only",
   time: new Date().toISOString(),

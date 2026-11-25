@@ -8,34 +8,34 @@ import { inverse } from "../spec/changeset.ts";
 import { Refused } from "../spec/common.ts";
 import type { GraphCommit, GraphRead, GraphStage, GraphWatch } from "../spec/graph.ts";
 import { LIMIT_MAX } from "../spec/graph.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
-import graph from "../packs/graph/index.ts";
-import { Store } from "../packs/graph/store.ts";
-import { exportSets, fromLines, importSets, setsOf, toLines } from "../packs/graph/interchange.ts";
+import graph from "../plugins/graph/index.ts";
+import { Store } from "../plugins/graph/store.ts";
+import { exportSets, fromLines, importSets, setsOf, toLines } from "../plugins/graph/interchange.ts";
 
 const header: Header = {
   actor: { id: "person:test", kind: "person" },
   authority: { of: "agent" },
-  pack: { id: "test" },
+  plugin: { id: "test" },
   action: "test.write",
   reason: "a test",
   time: "2026-11-20T00:00:00.000Z",
 };
 const set = (...facts: Proposed["facts"]): Proposed => ({ header, facts });
 
-async function start(db?: string, stages: Pack[] = []) {
-  const probe: Pack = { id: "probe", inject: ["graph.read", "graph.watch", "graph.commit", "graph.stage"], apply() {} };
-  const modules: Record<string, Pack> = { "graph.ts": graph, "probe.ts": probe };
+async function start(db?: string, stages: Plugin[] = []) {
+  const probe: Plugin = { id: "probe", inject: ["graph.read", "graph.watch", "graph.commit", "graph.stage"], apply() {} };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "probe.ts": probe };
   for (const s of stages) modules[`${s.id}.ts`] = s;
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   await loader.apply([
-    { id: "graph", pack: "graph.ts", config: db ? { db } : {} },
-    ...stages.map((s) => ({ id: s.id, pack: `${s.id}.ts` })),
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts", config: db ? { db } : {} },
+    ...stages.map((s) => ({ id: s.id, plugin: `${s.id}.ts` })),
+    { id: "probe", plugin: "probe.ts" },
   ]);
   const ctx = loader.fiber("probe")!.ctx;
   return {
@@ -175,18 +175,18 @@ test("the store outlives a restart: items, the cursor, and a watcher resuming af
 test("the write chain: stages in config order, a check refuses before the store, a record sees only what applied", async () => {
   const order: string[] = [];
   const recorded: Committed[] = [];
-  const check: Pack = {
+  const check: Plugin = {
     id: "check",
     inject: ["graph.stage"],
     apply(ctx) {
       ctx.get<GraphStage>("graph.stage").stage(async (c, next) => {
         order.push("check");
-        if (c.facts.some(([, , f]) => f === "forbidden")) throw new Refused({ code: "check.no", message: "no", by: { pack: "check" } });
+        if (c.facts.some(([, , f]) => f === "forbidden")) throw new Refused({ code: "check.no", message: "no", by: { plugin: "check" } });
         return next(c);
       });
     },
   };
-  const record: Pack = {
+  const record: Plugin = {
     id: "record",
     inject: ["graph.stage"],
     apply(ctx) {
@@ -235,5 +235,47 @@ test("the interchange format: a graph exported as change sets imports into anoth
   } finally {
     a.close();
     b.close();
+  }
+});
+
+test("what was written before spec edition 11 reads renamed: a header's and an event's pack, an acting pack, a packs field", async () => {
+  const { actingPlugin, eventNow, fieldNow, headerNow, oldField } = await import("../plugins/graph/renamed.ts");
+  const { plugin, ...rest } = header;
+  const old = { ...rest, pack: plugin } as unknown as Header;
+  assert.deepEqual(headerNow(old), header);
+  assert.equal(headerNow(header), header, "a header written now is as it is");
+  const [set] = [...fromLines(JSON.stringify({ header: old, facts: [] }) + "\n")];
+  assert.deepEqual(set!.header.plugin, { id: "test" }, "an export written before the rename imports");
+  const event = eventNow({ pack: "words", kind: "said" } as never) as unknown as Record<string, unknown>;
+  assert.equal(event.plugin, "words");
+  assert.ok(!("pack" in event));
+  assert.equal(actingPlugin("pack:keep"), "keep");
+  assert.equal(actingPlugin("plugin:keep"), "keep");
+  assert.equal(actingPlugin("person:me"), undefined);
+  assert.deepEqual(fieldNow({ packs: { map: { off: true } } }, "plugins"), { map: { off: true } });
+  assert.deepEqual(fieldNow({ plugins: { a: {} }, packs: { b: {} } }, "plugins"), { a: {} }, "the new name wins");
+  assert.deepEqual(oldField({ packs: { b: {} } }, "plugins"), ["packs", { b: {} }]);
+  assert.equal(oldField({ plugins: {} }, "plugins"), undefined);
+});
+
+test("a change set logged before spec edition 11 reads with its header's plugin", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "graph-renamed-"));
+  const db = join(dir, "g.sqlite");
+  try {
+    const s = new Store(db);
+    s.apply(set(["+", "i1", "type", "node"]));
+    s.close();
+    // Rewrite the logged body as edition 10 wrote it.
+    const { DatabaseSync } = await import("node:sqlite");
+    const raw = new DatabaseSync(db);
+    const row = raw.prepare("SELECT seq, body FROM changes").get() as { seq: number; body: string };
+    raw.prepare("UPDATE changes SET body = ? WHERE seq = ?").run(row.body.replace('"plugin":', '"pack":'), row.seq);
+    raw.close();
+    const again = new Store(db);
+    const [c] = again.since().items;
+    assert.deepEqual(c!.header.plugin, { id: "test" });
+    again.close();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });

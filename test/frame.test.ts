@@ -1,10 +1,10 @@
 /**
- * The frame's folds (packs/frame/fold.ts): which fills are folded, and when
+ * The frame's folds (plugins/frame/fold.ts): which fills are folded, and when
  * a side shows as a rail. Input in, the folded list out.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { foldedOf, foldRegion, isRail } from "../packs/frame/fold.ts";
+import { foldedOf, foldRegion, isRail } from "../plugins/frame/fold.ts";
 
 test("a side is a rail when every fill it shows is folded, and only then", () => {
   assert.equal(isRail(["harness/node"], ["harness/node", "harness/run"]), true);
@@ -25,7 +25,7 @@ test("the folded list comes from the page key, else the config's default", () =>
 });
 
 test("the center shows the fill here.view names; else the first, unless it waits for a first pick", async () => {
-  const { centerShown } = await import("../packs/frame/center.ts");
+  const { centerShown } = await import("../plugins/frame/center.ts");
   const fills = ["harness/view", "field/field"];
   const id = (f: string) => f;
   assert.equal(centerShown(fills, id, "field/field", true), "field/field");

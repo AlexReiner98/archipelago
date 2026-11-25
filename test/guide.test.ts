@@ -3,9 +3,9 @@ import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { guide, INDEX, read } from "../packs/docs/files.ts";
-import { sectionOf, short, target } from "../packs/docs/guide.ts";
-import { chapter, external, inline, links, parse, resolve, slug } from "../packs/docs/markdown.ts";
+import { guide, INDEX, read } from "../plugins/docs/files.ts";
+import { sectionOf, short, target } from "../plugins/docs/guide.ts";
+import { chapter, external, inline, links, parse, resolve, slug } from "../plugins/docs/markdown.ts";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 
@@ -75,9 +75,9 @@ test("markdown: a chapter's title and its sections; anchors as GitHub makes them
 });
 
 test("markdown: links resolve from the file they're in", () => {
-  assert.deepEqual(resolve("packs/docs/README.md", "../../spec/graph.md#reads"), { path: "spec/graph.md", anchor: "reads" });
+  assert.deepEqual(resolve("plugins/docs/README.md", "../../spec/graph.md#reads"), { path: "spec/graph.md", anchor: "reads" });
   assert.deepEqual(resolve("guide/README.md", "../README.md"), { path: "README.md" });
-  assert.deepEqual(resolve("guide/README.md", "../packs/"), { path: "packs/" });
+  assert.deepEqual(resolve("guide/README.md", "../plugins/"), { path: "plugins/" });
   assert.deepEqual(resolve("spec/agent.md", "#gates"), { path: "spec/agent.md", anchor: "gates" });
   assert.equal(resolve("README.md", "../outside.md"), undefined);
   assert.equal(external("https://example.org"), true);
@@ -87,17 +87,17 @@ test("markdown: links resolve from the file they're in", () => {
   assert.equal(target(entries, "README.md", "app/boot.ts"), undefined);
 });
 
-test("guide: the path in the index's order, the spec's contracts in its README's order, then every pack's README", async () => {
+test("guide: the path in the index's order, the spec's contracts in its README's order, then every plugin's README", async () => {
   const all = await guide(ROOT);
   const path = all.filter((e) => e.part === "path").map((e) => e.path);
-  assert.deepEqual(path, ["README.md", "guide/first-run.md", "guide/concepts.md", "guide/writing-a-pack.md", "guide/profiles-and-the-harness.md", "spec/README.md"]);
+  assert.deepEqual(path, ["README.md", "guide/first-run.md", "guide/concepts.md", "guide/writing-a-plugin.md", "guide/profiles-and-the-harness.md", "spec/README.md"]);
   const spec = all.filter((e) => e.part === "spec").map((e) => e.path);
   assert.deepEqual(spec.slice(0, 3), ["spec/graph.md", "spec/action.md", "spec/agent.md"]);
   assert.ok(!spec.includes("spec/README.md"));
-  assert.deepEqual(all.map((e) => e.part), [...all.map((e) => e.part)].sort((a, b) => ["path", "spec", "pack"].indexOf(a) - ["path", "spec", "pack"].indexOf(b)));
-  const packs = all.filter((e) => e.part === "pack");
-  assert.ok(packs.some((e) => e.pack === "docs" && e.path === "packs/docs/README.md" && e.title === "docs"));
-  assert.deepEqual(packs.map((e) => e.pack), [...packs.map((e) => e.pack)].sort());
+  assert.deepEqual(all.map((e) => e.part), [...all.map((e) => e.part)].sort((a, b) => ["path", "spec", "plugin"].indexOf(a) - ["path", "spec", "plugin"].indexOf(b)));
+  const plugins = all.filter((e) => e.part === "plugin");
+  assert.ok(plugins.some((e) => e.plugin === "docs" && e.path === "plugins/docs/README.md" && e.title === "docs"));
+  assert.deepEqual(plugins.map((e) => e.plugin), [...plugins.map((e) => e.plugin)].sort());
   assert.equal(await read(ROOT, "guide/first-run.md"), await readFile(join(ROOT, "guide/first-run.md"), "utf8"));
   assert.ok((await read(ROOT, INDEX)).startsWith("# The guide"));
   await assert.rejects(read(ROOT, "package.json"), /not in the guide/);

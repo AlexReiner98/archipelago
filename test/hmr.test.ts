@@ -8,11 +8,11 @@ import { ModuleGraph } from "../runtime/hmr.ts";
 import { NodeHost, type HotResult } from "../runtime/node.ts";
 
 /**
- * Fixture packs on disk, so Node's real module loader is in play:
+ * Fixture plugins on disk, so Node's real module loader is in play:
  * - word.ts: a plain module the provider imports.
  * - provider.ts: provides `demo.greet`, built from word.ts.
  * - consumer.ts: injects it and puts its greeting in the world.
- * The world is a set on globalThis: what is in it is what the packs did.
+ * The world is a set on globalThis: what is in it is what the plugins did.
  */
 const dir = mkdtempSync(join(tmpdir(), "cordis-hmr-"));
 after(() => rmSync(dir, { recursive: true, force: true }));
@@ -76,8 +76,8 @@ test("load, hot-reload, unload: the old version's effects go and nothing is left
   const host = await new NodeHost({
     base: pathToFileURL(dir + "/").href,
     tree: [
-      { id: "consumer", pack: "consumer.ts" },
-      { id: "provider", pack: "provider.ts" },
+      { id: "consumer", plugin: "consumer.ts" },
+      { id: "provider", plugin: "provider.ts" },
     ],
   }).start();
   const { loader } = host;
@@ -117,7 +117,7 @@ test("load, hot-reload, unload: the old version's effects go and nothing is left
   assert.deepEqual(world(), ["bonjour!!", "provider:bonjour"]);
 
   await host.stop();
-  assert.deepEqual(world(), [], "everything the packs did is gone");
+  assert.deepEqual(world(), [], "everything the plugins did is gone");
   assert.equal(host.runtime.fibers.size, 0);
 });
 
@@ -129,8 +129,8 @@ test("the watcher hot-reloads a file edited on disk", async () => {
   const host = await new NodeHost({
     base: pathToFileURL(dir + "/").href,
     tree: [
-      { id: "provider", pack: "provider.ts" },
-      { id: "consumer", pack: "consumer.ts" },
+      { id: "provider", plugin: "provider.ts" },
+      { id: "consumer", plugin: "consumer.ts" },
     ],
     watch: dir,
     onReload: (r) => {
@@ -156,7 +156,7 @@ test("a change that reaches a declined module is not hot-reloaded: it needs a re
   setWord("hello");
   const host = await new NodeHost({
     base: pathToFileURL(dir + "/").href,
-    tree: [{ id: "provider", pack: "provider.ts" }],
+    tree: [{ id: "provider", plugin: "provider.ts" }],
     declined: (u) => u.endsWith("/word.ts"),
   }).start();
   const before = host.loader.fiber("provider");

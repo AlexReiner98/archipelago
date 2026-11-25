@@ -1,7 +1,7 @@
 # types
 
 What kinds of item and link the map holds. The graph knows no types; the
-types broker holds them, packs fill it, and the schema pack checks writes
+types broker holds them, plugins fill it, and the schema plugin checks writes
 against it in the write chain. Types: [types.ts](types.ts).
 
 ## Capabilities
@@ -18,7 +18,7 @@ against it in the write chain. Types: [types.ts](types.ts).
 Decided (20 Nov 2026, "How do types grow without creeping?"):
 
 - **A base** is a kind of item by behaviour: its statuses, open and
-  closed. Edition 1's packs ship four: work, question, record, actor.
+  closed. Edition 1's plugins ship four: work, question, record, actor.
 - **A flavour** names its base and adds fields, never statuses or
   behaviour. The broker refuses a flavour of a base that isn't there, or
   one that declares a field its base already has.
@@ -28,44 +28,44 @@ Decided (20 Nov 2026, "How do types grow without creeping?"):
   when unused, under the same loop as nodes. `trial` says which.
 - **Code knows bases and field kinds, never type names.** A UI draws a
   status by whether it is open or closed, and a field by its kind. A view
-  for one flavour is a pack of its own.
+  for one flavour is a plugin of its own.
 
 Every base has `title`, `note` and `status` (`COMMON`); a base or flavour
 declares only what it adds. A new item takes its base's first open status.
 
 ## Marks
 
-Edition 10: the pack that defines a base names the shape its items are
+Edition 10: the plugin that defines a base names the shape its items are
 drawn in (`types.mark` `mark(base, shape)`, one of the style's
 `MARK_SHAPES`), so no two bases look alike. A shape another base holds, or
 a second shape for one base, is refused. A base none names takes the first
 shape no base holds, in the order bases are defined; `marks()` gives every
-base defined now with its shape. Edition 1's packs name theirs: work a
+base defined now with its shape. Edition 1's plugins name theirs: work a
 square, question a diamond, record a circle, actor a triangle; the profile
-pack's base is a hexagon. A shape is the naming pack's effect and goes
+plugin's base is a hexagon. A shape is the naming plugin's effect and goes
 when it unloads.
 
 ## Links
 
 A kind of link names the bases its ends may be (`from`, `to`; absent, any),
-a flavour counting as its base. Edition 1's packs ship five: `part_of`,
+a flavour counting as its base. Edition 1's plugins ship five: `part_of`,
 `depends_on`, `waits_on` (to an actor), `bears_on` (to a question) and
 `about`. A grouping is a link, never a field.
 
 ## Acyclic kinds of link
 
-Edition 11: a pack can hold a kind of link acyclic (`types.acyclic`), so
+Edition 11: a plugin can hold a kind of link acyclic (`types.acyclic`), so
 the links of that kind form a DAG: an order of steps, a tree of tests. The
-schema pack then refuses a change set whose links of that kind would close
+schema plugin then refuses a change set whose links of that kind would close
 a loop (`schema.cycle`, naming the loop). Only what a set touches is
 judged: a loop already on the graph is refused once a set changes one of
-its links, not before. A kind stays held while any pack holds it.
+its links, not before. A kind stays held while any plugin holds it.
 
 ## Names
 
 Type names are unprefixed (`work`, `part_of`), so data moved from another
-map lands as it is. A taken name is refused, never replaced: two packs
-can't both define `work`. To replace a base, turn its pack off and load
-another. Definitions are the defining pack's effects and go when it
-unloads; what is on the graph stays, and the schema pack says what no
+map lands as it is. A taken name is refused, never replaced: two plugins
+can't both define `work`. To replace a base, turn its plugin off and load
+another. Definitions are the defining plugin's effects and go when it
+unloads; what is on the graph stays, and the schema plugin says what no
 longer fits.

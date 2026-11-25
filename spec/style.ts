@@ -2,7 +2,7 @@
  * style: the tokens every view draws with. See style.md.
  *
  * A token is a CSS custom property on the page's root (`--fg`). A style
- * pack sets them, in light and dark; a view only ever refers to them. With
+ * plugin sets them, in light and dark; a view only ever refers to them. With
  * no style loaded, each token is its plain value here: the system's own
  * colours and font, so the page still reads.
  */
@@ -18,7 +18,7 @@ export type Shape = "square" | "diamond" | "circle" | "triangle";
 export const SHAPES: readonly Shape[] = ["square", "diamond", "circle", "triangle"];
 
 /**
- * Edition 10: the shapes a base may be drawn in. A pack names its base's
+ * Edition 10: the shapes a base may be drawn in. A plugin names its base's
  * (`types.mark`, spec/types.ts); a base none names takes the first shape no
  * base holds. Edition 1's four, then two more, so six bases each have their own.
  */
@@ -96,7 +96,7 @@ export const TOKENS = {
   schema: "GrayText",
   /** Edition 9: what the harness (Claude Code) gave the agent, not the map. */
   harness: "CanvasText",
-  // Packs, in turn.
+  // Plugins, in turn.
   "hue-1": "CanvasText",
   "hue-2": "CanvasText",
   "hue-3": "CanvasText",
@@ -142,7 +142,7 @@ export function sheet(css: string): string {
   return css.replace(/var\(--([a-z0-9-]+)\)/g, (all, name: string) => (name in TOKENS ? v(name as Token) : all));
 }
 
-/** The event a style pack fires on `document` when its tokens come or go. */
+/** The event a style plugin fires on `document` when its tokens come or go. */
 export const CHANGED = "style:changed";
 
 /** Calls `on` whenever the tokens change; returns its disposer. A view re-reads then. */

@@ -5,7 +5,7 @@ node_modules/
 .DS_Store
 CLAUDE.local.md
 .data/
-# Skills the map writes into this checkout for its runs (packs/placed)
+# Skills the map writes into this checkout for its runs (plugins/placed)
 .claude/skills/
 # Local editor and preview settings
 .claude/launch.json

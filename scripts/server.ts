@@ -12,7 +12,7 @@
  *   --data dir    its data (graph.sqlite, exchange.jsonl), default <root>/app/.data
  *   --port n      the page's port; the adapter is n + 1, the bridge n + 2 (default 5180)
  *   --no-watch    hot reload off
- *   --no-write    the written pack off: no skill or memory file is written
+ *   --no-write    the written plugin off: no skill or memory file is written
  *
  * The data persists across restarts. The server's output goes to server.log
  * there, its pid to server.pid.

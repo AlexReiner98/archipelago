@@ -5,7 +5,7 @@
  * behaviour; a flavour names its base and adds fields only. The UI,
  * verdicts and statuses know bases and field kinds, never a type's name.
  */
-import type { Capability, Dispose, PackId } from "./common.ts";
+import type { Capability, Dispose, PluginId } from "./common.ts";
 import type { MarkShape } from "./style.ts";
 
 /** What a field holds. `id` is another item's id; `choice` is one of `values`. */
@@ -46,7 +46,7 @@ export interface BaseDef {
 
 /**
  * A flavour: a base with fields added, nothing else. It starts as a trial
- * (`trial` absent or true) and is kept by its record; a pack that ships a
+ * (`trial` absent or true) and is kept by its record; a plugin that ships a
  * flavour already kept says `trial: false`.
  */
 export interface FlavourDef {
@@ -80,12 +80,12 @@ export interface TypeInfo {
   fields: Record<string, FieldDef>;
   /** A flavour on trial. Bases are never on trial. */
   trial: boolean;
-  /** The pack that defined it. */
-  pack: PackId;
+  /** The plugin that defined it. */
+  plugin: PluginId;
 }
 
 export interface LinkInfo extends LinkDef {
-  pack: PackId;
+  plugin: PluginId;
 }
 
 /** `types.define`. Each returns the disposer that takes the definition back. */
@@ -113,7 +113,7 @@ export interface TypesRead {
 }
 
 /**
- * `types.mark`, edition 10: the shape each base is drawn in. The pack that
+ * `types.mark`, edition 10: the shape each base is drawn in. The plugin that
  * defines a base names its shape; a base none names takes the first shape
  * no base holds (MARK_SHAPES order, bases in the order they are defined),
  * round again once all are held.
@@ -132,12 +132,12 @@ export interface TypesMark {
 
 /**
  * `types.acyclic`, edition 11: kinds of link that may never close a loop.
- * A pack holds a kind of link acyclic; the schema pack then refuses a
+ * A plugin holds a kind of link acyclic; the schema plugin then refuses a
  * change set whose links of that kind would form a cycle (`schema.cycle`).
  * Links already on the graph are not judged until a set touches them.
  */
 export interface TypesAcyclic {
-  /** Holds links of kind `link` acyclic. The kind need not be defined yet; several packs may hold the same kind. */
+  /** Holds links of kind `link` acyclic. The kind need not be defined yet; several plugins may hold the same kind. */
   hold(link: string): Dispose;
   /** Every kind of link held acyclic now. */
   held(): string[];
@@ -155,6 +155,6 @@ export interface Capabilities {
 export const capabilities: Capability[] = [
   { key: "types.define", since: 1, doc: "Defines a base, a flavour of one, or a kind of link." },
   { key: "types.read", since: 1, doc: "The bases, flavours and links defined now, resolved, and when they change." },
-  { key: "types.mark", since: 10, doc: "The shape each base is drawn in: named by its pack, else the first shape no base holds." },
-  { key: "types.acyclic", since: 11, doc: "Kinds of link held acyclic: the schema pack refuses a change that would close a loop of one." },
+  { key: "types.mark", since: 10, doc: "The shape each base is drawn in: named by its plugin, else the first shape no base holds." },
+  { key: "types.acyclic", since: 11, doc: "Kinds of link held acyclic: the schema plugin refuses a change that would close a loop of one." },
 ];

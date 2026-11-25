@@ -2,19 +2,19 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ActionInvoke, ActionRegister } from "../spec/action.ts";
 import type { AgentRun } from "../spec/agent.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import types from "../packs/types/index.ts";
-import record from "../packs/record/index.ts";
-import links from "../packs/links/index.ts";
-import items from "../packs/items/index.ts";
-import profile from "../packs/profile/index.ts";
-import used from "../packs/used/index.ts";
-import { serverOf, tally } from "../packs/used/tally.ts";
+import action from "../plugins/action/index.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import types from "../plugins/types/index.ts";
+import record from "../plugins/record/index.ts";
+import links from "../plugins/links/index.ts";
+import items from "../plugins/items/index.ts";
+import profile from "../plugins/profile/index.ts";
+import used from "../plugins/used/index.ts";
+import { serverOf, tally } from "../plugins/used/tally.ts";
 
 const T = "2026-11-22T10:00:00.000Z";
 
@@ -38,13 +38,13 @@ test("tally: per tool and server, runs given and runs used; a server used when o
   assert.equal(serverOf("Bash"), undefined);
 });
 
-/** Stands in for the transcript pack: what each run was given. */
+/** Stands in for the transcript plugin: what each run was given. */
 const GIVEN: Record<string, { name: string; size: number }[]> = {
   r1: [{ name: "system", size: 5000 }, { name: "tool:Bash", size: 900 }, { name: "tool:Artifact", size: 37000 }, { name: "tool:mcp__x__a", size: 300 }, { name: "mcp:x", size: 100 }],
   r2: [{ name: "tool:Bash", size: 900 }, { name: "tool:Artifact", size: 36000 }, { name: "tool:mcp__x__a", size: 300 }],
   r3: [{ name: "tool:Bash", size: 900 }],
 };
-const fakeTranscript: Pack = {
+const fakeTranscript: Plugin = {
   id: "transcript",
   inject: ["action.register"],
   apply(ctx) {
@@ -60,16 +60,16 @@ const fakeTranscript: Pack = {
   },
 };
 
-const probe: Pack = { id: "probe", inject: ["agent.run", "action.invoke"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["agent.run", "action.invoke"], apply() {} };
 
 test("used.tools: across the runs with a transcript, given and used from the tool acts; by name, by profile; writes nothing", async () => {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { graph, action, types, record, links, items, exchange, agent, profile, transcript: fakeTranscript, used, probe } as Record<string, Pack>;
-  const BASE = "mem:/packs/";
+  const modules: Record<string, Plugin> = { graph, action, types, record, links, items, exchange, agent, profile, transcript: fakeTranscript, used, probe } as Record<string, Plugin>;
+  const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
-  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, pack: id }));
+  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, plugin: id }));
   await loader.apply(tree);
   await rt.settle();
   const ctx = (run: string) => loader.fiber("probe")!.ctx.intercept({ actor: { id: "e_agent", kind: "agent" }, run });
@@ -118,9 +118,9 @@ test("used.tools: across the runs with a transcript, given and used from the too
 });
 
 test("on a given node: its use and its server's, what a profile would leave out; the key marks a tool never used", async () => {
-  const { givenNodes } = await import("../packs/harness/given.ts");
-  const { letters, outOf, useLine, useNames } = await import("../packs/harness/use.ts");
-  const { marksIn } = await import("../packs/harness/key.ts");
+  const { givenNodes } = await import("../plugins/harness/given.ts");
+  const { letters, outOf, useLine, useNames } = await import("../plugins/harness/use.ts");
+  const { marksIn } = await import("../plugins/harness/key.ts");
   assert.deepEqual(useNames(["system", "tool:Bash", "tool:mcp__x__a", "mcp:y"]), ["tool:Bash", "tool:mcp__x__a", "mcp:x", "mcp:y"]);
   assert.deepEqual([letters(950), letters(36_400), letters(1_250_000)], ["950", "36k", "1.3M"]);
   const use = new Map([
@@ -139,7 +139,7 @@ test("on a given node: its use and its server's, what a profile would leave out;
   assert.equal(a!.server!.name, "x");
   assert.equal(a!.out, undefined);
   assert.equal(outOf({ use, plans: [{ ...plans[0]!, state: "on", set: ["tool:Artifact"] }], writing: true }, "tool:Artifact")!.applied, true, "written: on, set, and the server writes");
-  assert.deepEqual(givenNodes("r1", rows).map((n) => n.use), [undefined, undefined], "without the packs, nothing");
+  assert.deepEqual(givenNodes("r1", rows).map((n) => n.use), [undefined, undefined], "without the plugins, nothing");
   const marks = marksIn({ nodes: [art!, a!], heard: new Map(), held: new Map(), trial: () => false });
   assert.ok(marks.has("unused") && marks.has("shadow"));
   assert.ok(!marksIn({ nodes: [a!], heard: new Map(), held: new Map(), trial: () => false }).has("unused"), "in the key only when present");

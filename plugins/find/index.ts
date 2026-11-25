@@ -1,0 +1,230 @@
+/**
+ * The find plugin, page side: the map as the page holds it, the query, and
+ * the line that sets it.
+ *
+ * - Provides `find.index`: every item and link of a type defined now, read
+ *   in bounded pages through graph.read and kept live by graph.watch; the
+ *   types from types.read; and `run(query)` (query.ts). The canvas and the
+ *   item page read the map through it.
+ * - Declares `find.query` (page scope): the query the canvas draws. The
+ *   line it puts in `top` sets it; so can anything else, an agent
+ *   included. As you type, the line suggests terms and items (suggest.ts).
+ * - Provides `find.line`: the line, for the command line to draw, and
+ *   `jump(id)`: looks at an item and shows it in the view.
+ * - Provides `find.offer`: another plugin puts rows in the command line (the
+ *   views plugin offers its views), each gone when that plugin is.
+ *
+ * It never writes: changes go through actions.
+ */
+import type { Committed } from "../../spec/changeset.ts";
+import type { Dispose, Id, Json } from "../../spec/common.ts";
+import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
+import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
+import type { SlotFill } from "../../spec/slot.ts";
+import type { LinkInfo, TypeInfo, TypesMark, TypesRead } from "../../spec/types.ts";
+import type { MarkShape } from "../../spec/style.ts";
+import type { Context, Plugin } from "../../runtime/core.ts";
+import { KEYS } from "../../spec/here.ts";
+import { closed, run, type Index, type Result, type Row, type Wire } from "./query.ts";
+import { jumpQuery, type Offer } from "./suggest.ts";
+import { makeLine, STYLE, type LineProps } from "./line.ts";
+
+export { parse, run, closed } from "./query.ts";
+export type { Result, Row, Wire } from "./query.ts";
+export { suggest, jumpQuery, complete, offered, type Suggestion, type Offer } from "./suggest.ts";
+export type { LineProps } from "./line.ts";
+
+export const QUERY = "find.query";
+/** The views that draw the query, as `here.view` names them: a jump from elsewhere opens the first (Landscape, home). Map is kept, off by default. */
+export const DRAWS = ["field/field", "map/map"];
+
+/** `find.index`: the map as this page holds it. */
+export interface FindIndex {
+  /** Whether the first read is done. */
+  ready(): boolean;
+  item(id: Id): Row | undefined;
+  /** Links at an item, both ways. */
+  linksOf(id: Id): Wire[];
+  types(): TypeInfo[];
+  links(): LinkInfo[];
+  type(name: string): TypeInfo | undefined;
+  /** Every base's mark shape (types.mark, edition 10): draw a type with `markShape(marks(), t)`. */
+  marks(): Record<string, MarkShape>;
+  /** Whether an item's status is on its base's closed side. */
+  closed(row: Row): boolean;
+  run(query: string, limit?: number): Result;
+  /** Calls `on` after every change to the index (or the types). */
+  watch(on: () => void): Dispose;
+}
+
+/** `find.line`: the line, to draw anywhere, and the jump it makes. */
+export interface FindLine {
+  /** The find line; `command` is the Ctrl+K form (see line.ts). */
+  Line: (props: LineProps) => unknown;
+  /** Looks at an item (`here.item`) and shows it in the view: the query becomes `near:<id>` unless it draws it already. */
+  jump(id: Id): void;
+}
+
+/** `find.offer`: rows a plugin puts in the command line, such as the views to open. */
+export interface FindOffer {
+  offer(o: Offer): Dispose;
+}
+
+const find: Plugin = {
+  id: "find",
+  about: "The search line: finds items by words, kind, status and links.",
+  inject: ["graph.read", "graph.watch", "types.read", "types.mark", "here.declare", "here.read", "here.set", "slot.fill"],
+  async apply(ctx: Context) {
+    const graph = ctx.get<GraphRead>("graph.read");
+    const live = ctx.get<GraphWatch>("graph.watch");
+    const typesRead = ctx.get<TypesRead>("types.read");
+    const typesMark = ctx.get<TypesMark>("types.mark");
+    const here = ctx.get<HereRead>("here.read");
+    const set = ctx.get<HereSet>("here.set");
+    ctx.get<HereDeclare>("here.declare").declare({ key: QUERY, scope: "page", doc: "The query the map draws." });
+
+    const items = new Map<Id, Row>();
+    const links = new Map<Id, Wire>();
+    let byType = new Map<string, TypeInfo>();
+    let linkTypes: LinkInfo[] = [];
+    let ready = false;
+    const watchers = new Set<() => void>();
+    const changed = () => {
+      for (const on of [...watchers]) {
+        try {
+          on();
+        } catch (err) {
+          ctx.runtime.report(ctx.fiber, err);
+        }
+      }
+    };
+    const index: Index = { items, links, type: (n) => byType.get(n) };
+
+    const put = (it: Item) => {
+      const f = it.fields as Record<string, Json>;
+      if (typeof f.from === "string" && typeof f.to === "string") links.set(it.id, { id: it.id, type: it.type, fields: f, from: f.from, to: f.to });
+      else items.set(it.id, { id: it.id, type: it.type, fields: f });
+    };
+    /** Applies a committed set's facts to the copy, item by item. */
+    const apply = (c: Committed) => {
+      const touched = new Map<Id, Record<string, Json> | null>();
+      // An item the index didn't hold (its type wasn't shown) that this set gives a shown type: read it whole, since
+      // the set holds only what changed (a node moved to a record keeps its title).
+      const unseen = new Set<Id>();
+      for (const [op, id, field, value] of c.facts) {
+        if (!touched.has(id)) {
+          const had = items.get(id) ?? links.get(id);
+          if (!had) unseen.add(id);
+          touched.set(id, had ? { type: had.type, ...had.fields } : {});
+        }
+        const f = touched.get(id) ?? {};
+        if (op === "+") f[field] = value;
+        else delete f[field];
+        touched.set(id, f);
+      }
+      const known = (t: unknown) => typeof t === "string" && (byType.has(t) || linkTypes.some((l) => l.name === t));
+      const whole: Id[] = [];
+      for (const [id, f] of touched) {
+        items.delete(id);
+        links.delete(id);
+        if (!f || !known(f.type)) continue;
+        const { type, ...fields } = f;
+        put({ id, type: String(type), fields });
+        if (unseen.has(id)) whole.push(id);
+      }
+      changed();
+      for (let i = 0; i < whole.length; i += 500) {
+        void graph.get(whole.slice(i, i + 500)).then((got) => {
+          for (const it of got) if (it && known(it.type) && (items.has(it.id) || links.has(it.id))) put(it);
+          changed();
+        });
+      }
+    };
+
+    const loadTypes = () => {
+      const all = typesRead.all() ?? { types: [], links: [] };
+      byType = new Map(all.types.map((t) => [t.name, t]));
+      linkTypes = all.links;
+    };
+    const load = async () => {
+      loadTypes();
+      const names = [...byType.keys(), ...linkTypes.map((l) => l.name)];
+      const fresh: Item[] = [];
+      for (const name of names) {
+        let after: string | undefined;
+        do {
+          const page = await graph.of(name, { limit: 500, ...(after ? { after } : {}) });
+          fresh.push(...page.items);
+          after = page.next;
+        } while (after);
+      }
+      items.clear();
+      links.clear();
+      for (const it of fresh) put(it);
+      ready = true;
+      changed();
+      return names;
+    };
+
+    let stopLive: Dispose | undefined;
+    const follow = async () => {
+      const cursor = await graph.now();
+      const names = await load();
+      await stopLive?.();
+      stopLive = live.watch({ types: names, after: cursor }, (c) => apply(c));
+    };
+    ctx.effect(() => () => void stopLive?.());
+    typesRead.watch(() => void follow());
+    await follow();
+
+    ctx.provide<FindIndex>("find.index", (_caller, from) => ({
+      ready: () => ready,
+      item: (id) => items.get(id),
+      linksOf: (id) => [...links.values()].filter((l) => l.from === id || l.to === id),
+      types: () => [...byType.values()],
+      links: () => linkTypes,
+      type: (n) => byType.get(n),
+      marks: () => typesMark.marks(),
+      closed: (r) => closed(byType.get(r.type), r.fields.status),
+      run: (q, limit) => run(index, q, limit),
+      watch: (on) =>
+        from.effect(() => {
+          watchers.add(on);
+          return () => watchers.delete(on);
+        }),
+    }));
+
+    /** Looks at an item, and shows it in the view: the query stays if it draws the item, else it becomes near:<id>. */
+    const jump = (id: Id) => {
+      const q = here.get<string>(QUERY) ?? "";
+      const next = jumpQuery(index, q, id);
+      if (next !== q) set.set(QUERY, next);
+      set.set(KEYS.item, id);
+      if (!DRAWS.includes(here.get<string>(KEYS.view) ?? "")) set.set(KEYS.view, DRAWS[0]);
+    };
+    const offers = new Set<Offer>();
+    const Line = makeLine({ index, types: () => [...byType.values()], marks: () => typesMark.marks(), watchers, here, set, query: QUERY, jump, offers });
+    ctx.provide<FindLine>("find.line", () => ({ Line, jump }));
+    // Rows another plugin offers the command line; each is gone when its plugin is.
+    ctx.provide<FindOffer>("find.offer", (_caller, from) => ({
+      offer: (o) =>
+        from.effect(() => {
+          offers.add(o);
+          return () => offers.delete(o);
+        }),
+    }));
+
+    ctx.effect(() => {
+      const style = document.createElement("style");
+      style.textContent = STYLE;
+      document.head.append(style);
+      return () => style.remove();
+    });
+    // Wherever the query is drawn: Map, and Landscape (which lights what it finds).
+    const fill = ctx.get<SlotFill>("slot.fill");
+    fill.fill({ slot: "top", name: "find", title: "Find", when: { "here.view": "map/map" }, view: Line });
+    fill.fill({ slot: "top", name: "find-field", title: "Find", when: { "here.view": "field/field" }, view: Line });
+  },
+};
+
+export default find;

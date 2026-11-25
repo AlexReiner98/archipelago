@@ -2,16 +2,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AgentNode, NodeDef } from "../spec/agent.ts";
 import type { ExchangeEvent } from "../spec/exchange.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import agent from "../packs/agent/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import verdict, { type VerdictRead } from "../packs/verdict/index.ts";
-import { playAs, type Script } from "../packs/scripted/index.ts";
-import { covers, judgeRun, listeningOf, namesMiss, placeMatches, records } from "../packs/verdict/judge.ts";
+import agent from "../plugins/agent/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import verdict, { type VerdictRead } from "../plugins/verdict/index.ts";
+import { playAs, type Script } from "../plugins/scripted/index.ts";
+import { covers, judgeRun, listeningOf, namesMiss, placeMatches, records } from "../plugins/verdict/judge.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 const T = (s: number) => `2026-11-20T14:00:${String(s).padStart(2, "0")}.000Z`;
 
 // ---------- judge.ts, apart from the runtime ----------
@@ -29,17 +29,17 @@ const okAct = (run: string, seq: number, place: string) =>
   ev(run, seq, { kind: "act", direction: "from_agent", place, act: { kind: "tool", by: "agent", ok: true } });
 
 const listening = listeningOf([
-  { id: "a/trap", at: ["file:packs/*/page/*.js"] },
+  { id: "a/trap", at: ["file:plugins/*/page/*.js"] },
   { id: "a/schema", at: ["tool:change"], misses: "The schema refused a task without a status" },
   { id: "a/rule", at: ["tool:Bash"], misses: "Bash curl to the map instead of the change tool" },
 ]);
 
-test("places match like the agent pack's", () => {
+test("places match like the agent plugin's", () => {
   assert.ok(placeMatches("tool:*", "tool:Bash"));
   assert.ok(!placeMatches("tool:*", "tool_result:Bash"));
-  assert.ok(placeMatches("file:packs/*/page/*.js", "file:packs/surface/page/a.js"));
-  assert.ok(!placeMatches("file:packs/*.js", "file:packs/surface/page/a.js"));
-  assert.ok(placeMatches("file:packs/**", "file:packs/surface/page/a.js"));
+  assert.ok(placeMatches("file:plugins/*/page/*.js", "file:plugins/surface/page/a.js"));
+  assert.ok(!placeMatches("file:plugins/*.js", "file:plugins/surface/page/a.js"));
+  assert.ok(placeMatches("file:plugins/**", "file:plugins/surface/page/a.js"));
 });
 
 test("failed: the miss came back after the node was said", () => {
@@ -83,11 +83,11 @@ test("a node not said in a run isn't judged there", () => {
 test("a failed edit of a file the node is said for is its miss", () => {
   const v = judgeRun(
     "r",
-    [said("r", 1, "a/trap", "file:packs/surface/page/a.js"), failedAct("r", 2, "tool:Edit", { file_path: "packs/surface/page/b.js" })],
+    [said("r", 1, "a/trap", "file:plugins/surface/page/a.js"), failedAct("r", 2, "tool:Edit", { file_path: "plugins/surface/page/b.js" })],
     listening,
   );
   assert.equal(v[0]!.verdict, "failed");
-  const other = judgeRun("r", [said("r", 1, "a/trap", "file:packs/surface/page/a.js"), failedAct("r", 2, "tool:Edit", { file_path: "spec/agent.ts" })], listening);
+  const other = judgeRun("r", [said("r", 1, "a/trap", "file:plugins/surface/page/a.js"), failedAct("r", 2, "tool:Edit", { file_path: "spec/agent.ts" })], listening);
   assert.equal(other[0]!.verdict, "quiet");
 });
 
@@ -120,8 +120,8 @@ test("a node covers a miss only when it would plausibly have prevented it", () =
   // Words without the place don't.
   assert.equal(covers({ at: ["tool:Edit"], misses: "npm test failing" }, bash, testFails), false);
   // A file: pattern matching the miss's file is as narrow as the miss allows; file:** is not.
-  const edit = ["tool:Edit", "file:packs/grow/miss.ts"];
-  assert.equal(covers({ at: ["file:packs/grow/*.ts"] }, edit, "String to replace not found in file."), true);
+  const edit = ["tool:Edit", "file:plugins/grow/miss.ts"];
+  assert.equal(covers({ at: ["file:plugins/grow/*.ts"] }, edit, "String to replace not found in file."), true);
   assert.equal(covers({ at: ["file:**"] }, edit, "String to replace not found in file."), false);
   assert.equal(covers({ at: ["tool:Edit"] }, edit, "String to replace not found in file."), false);
   assert.equal(covers({ at: ["tool:Edit"], misses: "Edit: string to replace not found" }, edit, "String to replace not found in file."), true);
@@ -159,7 +159,7 @@ const CWD = "C:\\Users\\me\\Documents\\Github\\archipelago-next";
 const begin = (run: string, seq: number, cwd = CWD) =>
   ev(run, seq, { kind: "begin", direction: "from_agent", detail: { run, agent: "agent:claude", harness: "claude-code", reaches: [], cwd, started: T(seq) } });
 const refusedHere = (run: string, seq: number, node: string, place: string) =>
-  ev(run, seq, { kind: "refuse", node, pack: "rules", place, text: "Use the change tool, not Bash, for the map.", detail: { code: "use-change" } });
+  ev(run, seq, { kind: "refuse", node, plugin: "rules", place, text: "Use the change tool, not Bash, for the map.", detail: { code: "use-change" } });
 const deniedAct = (run: string, seq: number, node: string, tool: string, input: Record<string, string>) =>
   ev(run, seq, {
     kind: "act",
@@ -217,7 +217,7 @@ test("absolute paths from Claude Code match file: places, relative to the run's 
   assert.equal(sibling[0]!.verdict, "quiet");
 });
 
-// ---------- the pack, live on the runtime with agent and exchange ----------
+// ---------- the plugin, live on the runtime with agent and exchange ----------
 
 interface NodeSpec {
   name: string;
@@ -226,7 +226,7 @@ interface NodeSpec {
   refuse?: string;
 }
 
-const nodes: Pack<{ nodes: NodeSpec[] }> = {
+const nodes: Plugin<{ nodes: NodeSpec[] }> = {
   id: "nodes",
   inject: ["agent.node"],
   apply(ctx, config) {
@@ -245,14 +245,14 @@ const nodes: Pack<{ nodes: NodeSpec[] }> = {
 };
 
 /** The adapter's side (the scripted agent plays runs from it), and apart from it the harness view's read, so runs go on while verdict is out. */
-const probe: Pack = { id: "probe", inject: ["agent.run"], apply() {} };
-const view: Pack = { id: "view", inject: ["verdict.read"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["agent.run"], apply() {} };
+const view: Plugin = { id: "view", inject: ["verdict.read"], apply() {} };
 
 function setup() {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { "graph.ts": graph, "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "verdict.ts": verdict, "probe.ts": probe, "view.ts": view };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "verdict.ts": verdict, "probe.ts": probe, "view.ts": view };
   const loader = new Loader(rt, {
     base: BASE,
     import: async (url) => {
@@ -267,27 +267,27 @@ function setup() {
 }
 
 const entries = (withVerdict = true): Entry[] => [
-  { id: "graph", pack: "graph.ts" },
-  { id: "exchange", pack: "exchange.ts" },
-  { id: "agent", pack: "agent.ts" },
+  { id: "graph", plugin: "graph.ts" },
+  { id: "exchange", plugin: "exchange.ts" },
+  { id: "agent", plugin: "agent.ts" },
   {
     id: "nodes",
-    pack: "nodes.ts",
+    plugin: "nodes.ts",
     config: {
       nodes: [
-        { name: "trap", at: ["file:packs/*/page/*.js"], say: "Restart the server after adding a page module." },
+        { name: "trap", at: ["file:plugins/*/page/*.js"], say: "Restart the server after adding a page module." },
         { name: "brief", at: ["session_start"], say: "Read the brief." },
       ],
     },
   },
-  ...(withVerdict ? [{ id: "verdict", pack: "verdict.ts" }] : []),
-  { id: "probe", pack: "probe.ts" },
-  { id: "view", pack: "view.ts" },
+  ...(withVerdict ? [{ id: "verdict", plugin: "verdict.ts" }] : []),
+  { id: "probe", plugin: "probe.ts" },
+  { id: "view", plugin: "view.ts" },
 ];
 
 /** A run played by the scripted agent: the trap is said at an edit, then the edit fails or not. */
 async function aRun(as: ReturnType<typeof setup>["as"], run: string, editFails: boolean, failBefore = false) {
-  const input = { file_path: "packs/x/page/a.js" };
+  const input = { file_path: "plugins/x/page/a.js" };
   await as(run).play({
     start: { harness: "test", reaches: ["session_start", "tool:*", "file:*"] },
     steps: [

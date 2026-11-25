@@ -2,7 +2,7 @@
  * here: shared ephemeral state. See here.md.
  */
 import type { JsonSchema } from "./action.ts";
-import type { Actor, Capability, Dispose, Json, PackId } from "./common.ts";
+import type { Actor, Capability, Dispose, Json, PluginId } from "./common.ts";
 
 /**
  * - `page`: one open page. Two tabs can look at different things.
@@ -12,14 +12,14 @@ import type { Actor, Capability, Dispose, Json, PackId } from "./common.ts";
 export type Scope = "page" | "person";
 
 export interface KeyDef {
-  /** Dotted, starting with the declaring pack's id; the provider refuses a key outside it. */
+  /** Dotted, starting with the declaring plugin's id; the provider refuses a key outside it. */
   key: string;
   scope: Scope;
   value?: JsonSchema;
   doc?: string;
 }
 
-/** The keys the spec declares, so packs that never met agree on them. */
+/** The keys the spec declares, so plugins that never met agree on them. */
 export const KEYS = {
   /** The item being looked at: an Id. */
   item: "here.item",
@@ -29,20 +29,20 @@ export const KEYS = {
   node: "here.node",
   /** The exchange event being looked at: an event id. */
   event: "here.event",
-  /** The fill shown in the region `center`, as `pack/name`: the frame sets it (edition 7). */
+  /** The fill shown in the region `center`, as `plugin/name`: the frame sets it (edition 7). */
   view: "here.view",
 } as const;
 
 export interface Change {
   key: string;
   value: Json | undefined;
-  /** Who set it: the pack, and the actor if its context carries one. */
-  by: { pack: PackId; actor?: Actor };
+  /** Who set it: the plugin, and the actor if its context carries one. */
+  by: { plugin: PluginId; actor?: Actor };
 }
 
 /** `here.declare`. */
 export interface HereDeclare {
-  /** Declares a key beyond the spec's, as the calling pack's. A taken key is refused. */
+  /** Declares a key beyond the spec's, as the calling plugin's. A taken key is refused. */
   declare(def: KeyDef): Dispose;
 }
 

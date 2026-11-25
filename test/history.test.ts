@@ -7,17 +7,17 @@ import type { ActionContext, ActionInvoke, ActionRegister, Outcome } from "../sp
 import type { Fact } from "../spec/changeset.ts";
 import type { Json, Page } from "../spec/common.ts";
 import type { GraphRead } from "../spec/graph.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry as TreeEntry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import graph from "../packs/graph/index.ts";
-import history, { netFacts } from "../packs/history/index.ts";
-import { Journal, type Entry, type Snapshot } from "../packs/history/journal.ts";
+import action from "../plugins/action/index.ts";
+import graph from "../plugins/graph/index.ts";
+import history, { netFacts } from "../plugins/history/index.ts";
+import { Journal, type Entry, type Snapshot } from "../plugins/history/journal.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 
-/** A pack with one action that writes whatever facts it is given. */
-const probe: Pack = {
+/** A plugin with one action that writes whatever facts it is given. */
+const probe: Plugin = {
   id: "probe",
   inject: ["action.invoke", "action.register", "graph.read"],
   apply(ctx) {
@@ -37,13 +37,13 @@ async function setup(opts: { db?: string; keep?: number; fold?: number } = {}) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "history.ts": history, "probe.ts": probe };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "history.ts": history, "probe.ts": probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const tree: TreeEntry[] = [
-    { id: "graph", pack: "graph.ts" },
-    { id: "action", pack: "action.ts" },
-    { id: "history", pack: "history.ts", config: { db: opts.db, keep: opts.keep, fold: opts.fold } },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts" },
+    { id: "action", plugin: "action.ts" },
+    { id: "history", plugin: "history.ts", config: { db: opts.db, keep: opts.keep, fold: opts.fold } },
+    { id: "probe", plugin: "probe.ts" },
   ];
   await loader.apply(tree);
   const ctx = loader.fiber("probe")!.ctx.intercept({ actor: { id: "agent:test", kind: "agent" }, run: "r1" });
@@ -70,7 +70,7 @@ test("each committed set is journalled in full, with its inverse; a refused one 
     const got = (await h.ok(h.call<Json>("history.get", { change: b.change! }))).output as unknown as Entry;
     assert.equal(got.header.actor.id, "agent:test");
     assert.deepEqual(got.header.authority, { of: "agent", basis: "test" });
-    assert.equal(got.header.pack.id, "probe");
+    assert.equal(got.header.plugin.id, "probe");
     assert.equal(got.header.action, "probe.write");
     assert.equal(got.header.reason, "a test");
     assert.equal(got.header.run, "r1");
@@ -94,7 +94,7 @@ test("undo applies the inverse as a new set marked undoes; undoing the undo redo
     const u = await h.ok(h.call("history.undo", { change: b.change! }, "wrong status"));
     assert.equal(u.committed!.header.undoes, b.change);
     assert.equal(u.committed!.header.action, "history.undo");
-    assert.equal(u.committed!.header.pack.id, "history");
+    assert.equal(u.committed!.header.plugin.id, "history");
     assert.equal(u.committed!.header.reason, "wrong status");
     assert.equal((await h.read.get(["e1"]))[0]!.fields.status, "todo");
 
@@ -168,7 +168,7 @@ test("net facts: a field's value before a run and after it, nothing for what cam
   );
 });
 
-test("the journal is kept on disk; unloading the pack takes its stage and actions", async () => {
+test("the journal is kept on disk; unloading the plugin takes its stage and actions", async () => {
   const dir = await mkdtemp(join(tmpdir(), "history-"));
   try {
     const db = join(dir, "history.sqlite");
@@ -215,7 +215,7 @@ test("a journal kept before items were indexed is indexed when it opens", async 
   try {
     const db = join(dir, "history.sqlite");
     let j = new Journal(db);
-    j.record({ id: "c1", seq: 1, committed: "t", header: { actor: { id: "a", kind: "agent" }, authority: { of: "agent", basis: "t" }, pack: { id: "p" }, action: "x", reason: "r", time: "t" }, facts: [["+", "e1", "type", "task"]] });
+    j.record({ id: "c1", seq: 1, committed: "t", header: { actor: { id: "a", kind: "agent" }, authority: { of: "agent", basis: "t" }, plugin: { id: "p" }, action: "x", reason: "r", time: "t" }, facts: [["+", "e1", "type", "task"]] });
     j.db.exec("DELETE FROM touches; DELETE FROM meta WHERE key = 'touches'");
     j.close();
     j = new Journal(db);

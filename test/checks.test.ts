@@ -1,20 +1,20 @@
 /**
- * The checks pack: its checker and rejections reading apart from the
- * runtime (a graph as plain data in, the writes it makes out), then the pack
- * in a runtime with the map's packs in memory and a stand-in domain whose
+ * The checks plugin: its checker and rejections reading apart from the
+ * runtime (a graph as plain data in, the writes it makes out), then the plugin
+ * in a runtime with the map's plugins in memory and a stand-in domain whose
  * judge compares a subject's `length` (by its `rev`) with a rule's limit.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Json } from "../spec/common.ts";
 import type { Item } from "../spec/graph.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
-import { carried, identities, order, readsOf, ReadsIndex, seeds, solve, stamp, type Judging, type Read, type Write } from "../packs/checks/checker.ts";
+import { carried, identities, order, readsOf, ReadsIndex, seeds, solve, stamp, type Judging, type Read, type Write } from "../plugins/checks/checker.ts";
 import { LIMIT_MAX } from "../spec/graph.ts";
-import { decidedOf, read as reading, type Decided, type RuleLimit } from "../packs/checks/rejections.ts";
-import checks, { type CheckDomain, type ChecksDomain } from "../packs/checks/index.ts";
-import { preview } from "../packs/checks/preview.ts";
+import { decidedOf, read as reading, type Decided, type RuleLimit } from "../plugins/checks/rejections.ts";
+import checks, { type CheckDomain, type ChecksDomain } from "../plugins/checks/index.ts";
+import { preview } from "../plugins/checks/preview.ts";
 
 /** A graph as data: items by id, and links as [type, from, to]. */
 function graph(items: Item[], links: [string, string, string][]): Read & { items: Map<string, Item> } {
@@ -167,15 +167,15 @@ test("decidedOf: a decision counts at its version, with a rule and a measured fi
   assert.equal(decidedOf(t({ decision: "rejected", decided_version: "v", findings: [] }), "r"), undefined);
 });
 
-// ---- The pack in a runtime ----
+// ---- The plugin in a runtime ----
 
 const BASES = ["graph", "action", "types", "work", "question", "record", "actor", "links", "items", "schema"];
 
-/** A stand-in domain pack: subjects of type `doc`, stamped by `rev`. */
-function docDomain(length: Map<string, number>, calls: string[]): Pack {
+/** A stand-in domain plugin: subjects of type `doc`, stamped by `rev`. */
+function docDomain(length: Map<string, number>, calls: string[]): Plugin {
   return {
     id: "docs",
-    about: "A stand-in domain for the checks pack's tests.",
+    about: "A stand-in domain for the checks plugin's tests.",
     inject: ["types.define", "checks.domain"],
     apply(ctx) {
       ctx.get<any>("types.define").flavour({ name: "doc", base: "record", fields: { rev: { kind: "text" } }, trial: false });
@@ -192,16 +192,16 @@ function docDomain(length: Map<string, number>, calls: string[]): Pack {
 
 async function setup(length: Map<string, number>) {
   const calls: string[] = [];
-  const packs: Record<string, Pack> = {};
-  for (const id of BASES) packs[id] = (await import(`../packs/${id}/index.ts`)).default;
-  packs.checks = checks;
-  packs.docs = docDomain(length, calls);
-  packs.probe = { id: "probe", inject: ["action.invoke", "graph.read", "checks.domain"], apply() {} };
+  const plugins: Record<string, Plugin> = {};
+  for (const id of BASES) plugins[id] = (await import(`../plugins/${id}/index.ts`)).default;
+  plugins.checks = checks;
+  plugins.docs = docDomain(length, calls);
+  plugins.probe = { id: "probe", inject: ["action.invoke", "graph.read", "checks.domain"], apply() {} };
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => void errors.push(e);
-  const loader = new Loader(rt, { base: "mem:/", import: async (u) => ({ default: packs[u.slice(5)]! }) });
-  await loader.apply([...BASES, "checks", "docs", "probe"].map((id) => ({ id, pack: id })));
+  const loader = new Loader(rt, { base: "mem:/", import: async (u) => ({ default: plugins[u.slice(5)]! }) });
+  await loader.apply([...BASES, "checks", "docs", "probe"].map((id) => ({ id, plugin: id })));
   await rt.settle();
   const ctx = loader.fiber("probe")!.ctx.intercept({ actor: { id: "person:owner", kind: "person" } });
   const invoke = ctx.get<any>("action.invoke");
@@ -227,7 +227,7 @@ async function setup(length: Map<string, number>) {
   return { act, make, link, get, settled, quiet, register, calls, errors, history: (page: any) => g.since(page), stop: () => loader.apply([]) };
 }
 
-test("the pack solves a test through its domain's judge, on the test's word, and again when its inputs move", async () => {
+test("the plugin solves a test through its domain's judge, on the test's word, and again when its inputs move", async () => {
   const length = new Map([["r1", 1], ["r2", 3]]);
   const s = await setup(length);
   try {
@@ -279,10 +279,10 @@ test("needs is held acyclic, and a domain can't take a subject or stamp field th
     await s.stop();
   }
   const rt = new Runtime();
-  const loaded: Record<string, Pack> = {};
-  for (const id of BASES) loaded[id] = (await import(`../packs/${id}/index.ts`)).default;
+  const loaded: Record<string, Plugin> = {};
+  for (const id of BASES) loaded[id] = (await import(`../plugins/${id}/index.ts`)).default;
   const tries: string[] = [];
-  const probe: Pack = {
+  const probe: Plugin = {
     id: "probe",
     inject: ["checks.domain"],
     apply(ctx) {
@@ -299,7 +299,7 @@ test("needs is held acyclic, and a domain can't take a subject or stamp field th
     },
   };
   const loader = new Loader(rt, { base: "mem:/", import: async (u) => ({ default: { ...loaded, checks, probe }[u.slice(5)]! }) });
-  await loader.apply([...BASES, "checks", "probe"].map((id) => ({ id, pack: id })));
+  await loader.apply([...BASES, "checks", "probe"].map((id) => ({ id, plugin: id })));
   await rt.settle();
   assert.deepEqual(tries, ["checks.stamp", "checks.subject", "ok", "checks.subject_taken"]);
   await loader.apply([]);
@@ -427,7 +427,7 @@ test("recorded reads: the index seeds a test from an item it read, or a link at 
   assert.deepEqual(idx.seeds([["+", "a", "title", "x"]]), []);
 });
 
-test("the pack: a domain that judges by function reads the graph, and a change to what it read solves the test again", async () => {
+test("the plugin: a domain that judges by function reads the graph, and a change to what it read solves the test again", async () => {
   const calls: string[] = [];
   const s = await setup(new Map());
   try {
@@ -514,7 +514,7 @@ test("preview: which tests a rule change would flip, judged only where the stamp
   await assert.rejects(preview("ta", {}, g, dom), /not a rule/);
 });
 
-test("the pack: checks.preview writes nothing to the map", async () => {
+test("the plugin: checks.preview writes nothing to the map", async () => {
   const s = await setup(new Map([["r1", 1]]));
   try {
     const p = await s.make("doc", "Guide", { rev: "r1" });
@@ -598,7 +598,7 @@ test("decisions per finding: without the hook a decision is cleared whenever the
   assert.deepEqual(carried({ decision: "rejected", decided_version: "a", result: "fail" }, "fail", [], "b", sections(false)), {});
 });
 
-test("the pack: checks.decide keeps the findings' identities when the domain names them, and the checker carries it", async () => {
+test("the plugin: checks.decide keeps the findings' identities when the domain names them, and the checker carries it", async () => {
   const s = await setup(new Map());
   try {
     const { stamp: _, ...byNote } = sections();

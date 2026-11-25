@@ -1,12 +1,12 @@
 /**
  * The activity view's model: runs and journal entries in, groups and lines
- * out (packs/activity/model.ts).
+ * out (plugins/activity/model.ts).
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { RunInfo } from "../spec/agent.ts";
 import type { Fact } from "../spec/changeset.ts";
-import { brief, group, liveness, openAtFirst, standing, status, touches, type Change } from "../packs/activity/model.ts";
+import { brief, group, liveness, openAtFirst, standing, status, touches, type Change } from "../plugins/activity/model.ts";
 
 const agent = { id: "agent:claude", kind: "agent" as const };
 const owner = { id: "person:owner", kind: "person" as const };
@@ -31,7 +31,7 @@ const change = (o: { run?: string; actor?: typeof agent | typeof owner; at: stri
     header: {
       actor: o.actor ?? agent,
       authority: { of: "agent" },
-      pack: { id: "items" },
+      plugin: { id: "items" },
       action: "items.set",
       reason: "because",
       time: o.at,

@@ -2,14 +2,14 @@
  * action: the one way anyone changes anything. See action.md.
  */
 import type { ChangeSetId, Committed, Fact } from "./changeset.ts";
-import type { Actor, Authority, Caller, Capability, Dispose, Id, Json, PackId, Refusal } from "./common.ts";
+import type { Actor, Authority, Caller, Capability, Dispose, Id, Json, PluginId, Refusal } from "./common.ts";
 
-/** A JSON Schema (2020-12) object. Kept loose here; the schema pack checks it. */
+/** A JSON Schema (2020-12) object. Kept loose here; the schema plugin checks it. */
 export type JsonSchema = { [key: string]: Json };
 
 /**
  * What an action is given while it runs. Nothing here grants a capability:
- * an action that reads the graph has its pack inject `graph.read`.
+ * an action that reads the graph has its plugin inject `graph.read`.
  */
 export interface ActionContext {
   /** Who called, from the calling context. */
@@ -29,7 +29,7 @@ export interface ActionContext {
 
 export interface ActionDef<I extends Json = Json, O extends Json = Json> {
   /**
-   * Dotted, starting with the registering pack's id (`verdict.judge`); the
+   * Dotted, starting with the registering plugin's id (`verdict.judge`); the
    * provider refuses a name outside the caller's own.
    */
   name: string;
@@ -43,9 +43,9 @@ export interface ActionDef<I extends Json = Json, O extends Json = Json> {
 }
 
 /**
- * A call, from a person through a UI, an agent through a tool, or a pack.
- * Who is calling isn't part of it: the action pack reads the actor, the run
- * and the pack from the calling context (`Caller` in common.ts).
+ * A call, from a person through a UI, an agent through a tool, or a plugin.
+ * Who is calling isn't part of it: the action plugin reads the actor, the run
+ * and the plugin from the calling context (`Caller` in common.ts).
  */
 export interface Invocation {
   action: string;
@@ -88,14 +88,14 @@ export interface ActionInfo {
   doc?: string;
   input: JsonSchema;
   output?: JsonSchema;
-  /** The pack that registered it, from its context. */
-  pack: PackId;
+  /** The plugin that registered it, from its context. */
+  plugin: PluginId;
 }
 
 /** `action.register`. */
 export interface ActionRegister {
   /**
-   * Declares an action, as the calling pack's. A taken name is refused. An
+   * Declares an action, as the calling plugin's. A taken name is refused. An
    * action whose input or output must change incompatibly gets a new name;
    * the old one is retired, not altered.
    */
@@ -117,7 +117,7 @@ export interface ActionInvoke {
 }
 
 /**
- * The one action name the spec reserves. Its provider (the history pack)
+ * The one action name the spec reserves. Its provider (the history plugin)
  * undoes the committed change set it is given.
  */
 export const UNDO = "history.undo";
@@ -162,7 +162,7 @@ export interface Capabilities {
 }
 
 export const capabilities: Capability[] = [
-  { key: "action.register", since: 1, doc: "Declares an action that persons, agents and packs can invoke." },
+  { key: "action.register", since: 1, doc: "Declares an action that persons, agents and plugins can invoke." },
   { key: "action.list", since: 1, doc: "The declared actions, with their input and output schemas." },
   { key: "action.invoke", since: 1, doc: "Runs an action; everything it writes becomes one change set, applied or refused whole." },
   { key: "action.attest", since: 11, doc: "Runs an action on a test's word at a version: the change set's actor is the test, its authority the test's." },

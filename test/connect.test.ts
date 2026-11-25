@@ -1,40 +1,40 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ActionInvoke, ActionRegister } from "../spec/action.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import graph from "../packs/graph/index.ts";
-import connect, { localCommand, MAKE_TOKEN, SETUP } from "../packs/connect/index.ts";
+import action from "../plugins/action/index.ts";
+import graph from "../plugins/graph/index.ts";
+import connect, { localCommand, MAKE_TOKEN, SETUP } from "../plugins/connect/index.ts";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { EVENTS, install, setup, TOKEN, withToken, type Setup } from "../packs/connect/setup.ts";
-import { runName } from "../packs/connect/view.ts";
+import { EVENTS, install, setup, TOKEN, withToken, type Setup } from "../plugins/connect/setup.ts";
+import { runName } from "../plugins/connect/view.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 
-/** A pack standing in for a host's token maker: `tokens.make`. */
-const tokens: Pack = {
+/** A plugin standing in for a host's token maker: `tokens.make`. */
+const tokens: Plugin = {
   id: "tokens",
   inject: ["action.register"],
   apply(ctx) {
     ctx.get<ActionRegister>("action.register").register({ name: "tokens.make", title: "Make a token", input: { type: "object" }, run: async () => ({ token: "t0ken-secret" }) });
   },
 };
-const probe: Pack = { id: "probe", inject: ["action.invoke"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["action.invoke"], apply() {} };
 
 async function setupTree(config: Record<string, unknown>) {
   const rt = new Runtime();
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "tokens.ts": tokens, "connect.ts": connect, "probe.ts": probe };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "tokens.ts": tokens, "connect.ts": connect, "probe.ts": probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const tree: Entry[] = [
-    { id: "graph", pack: "graph.ts" },
-    { id: "action", pack: "action.ts" },
-    { id: "tokens", pack: "tokens.ts" },
-    { id: "connect", pack: "connect.ts", config },
-    { id: "probe", pack: "probe.ts" },
+    { id: "graph", plugin: "graph.ts" },
+    { id: "action", plugin: "action.ts" },
+    { id: "tokens", plugin: "tokens.ts" },
+    { id: "connect", plugin: "connect.ts", config },
+    { id: "probe", plugin: "probe.ts" },
   ];
   await loader.apply(tree);
   await rt.settle();
@@ -76,7 +76,7 @@ test("a guest map's setup says where to save it; any other says nothing", () => 
 
 test("the local command runs this checkout's hook script", () => {
   const c = localCommand("http://127.0.0.1:5181/hook");
-  assert.match(c, /^node ".*\/packs\/claude-code\/hook\.ts" http:\/\/127\.0\.0\.1:5181\/hook$/);
+  assert.match(c, /^node ".*\/plugins\/claude-code\/hook\.ts" http:\/\/127\.0\.0\.1:5181\/hook$/);
   assert.ok(!c.includes("\\"));
 });
 

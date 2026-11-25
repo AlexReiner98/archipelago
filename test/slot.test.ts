@@ -3,19 +3,19 @@ import { test } from "node:test";
 import type { HereSet } from "../spec/here.ts";
 import type { SlotArrange, SlotDeclare, SlotFill, SlotRead } from "../spec/slot.ts";
 import { REGIONS } from "../spec/slot.ts";
-import { Runtime, type Pack } from "../runtime/core.ts";
-import here from "../packs/here/index.ts";
-import renderer from "../packs/renderer/index.ts";
+import { Runtime, type Plugin } from "../runtime/core.ts";
+import here from "../plugins/here/index.ts";
+import renderer from "../plugins/renderer/index.ts";
 
 const View = () => null;
-const filler = (id: string, fills: { slot: string; name: string; when?: Record<string, any> }[]): Pack => ({
+const filler = (id: string, fills: { slot: string; name: string; when?: Record<string, any> }[]): Plugin => ({
   id,
   inject: ["slot.fill"],
   apply(ctx) {
     for (const f of fills) ctx.get<SlotFill>("slot.fill").fill({ ...f, view: View });
   },
 });
-const names = (read: SlotRead, slot: string) => read.fills(slot).map((f) => `${f.pack}/${f.name}`);
+const names = (read: SlotRead, slot: string) => read.fills(slot).map((f) => `${f.plugin}/${f.name}`);
 
 async function page(arrange?: Record<string, string>) {
   const rt = new Runtime();
@@ -27,7 +27,7 @@ async function page(arrange?: Record<string, string>) {
   return { rt, read: rt.root.get<SlotRead>("slot.read"), set: rt.root.get<HereSet>("here.set") };
 }
 
-test("the six regions are there from the start, and no pack may declare one", async () => {
+test("the six regions are there from the start, and no plugin may declare one", async () => {
   const { rt, read } = await page();
   for (const r of REGIONS) assert.ok(read.slots().some((s) => s.name === r && s.merge === "many"), r);
   assert.throws(() => rt.root.get<SlotDeclare>("slot.declare").declare({ name: "left", merge: "many" }));

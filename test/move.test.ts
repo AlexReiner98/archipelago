@@ -7,34 +7,34 @@ import type { ActionInvoke } from "../spec/action.ts";
 import type { AgentRun } from "../spec/agent.ts";
 import type { Dispose, Json } from "../spec/common.ts";
 import type { GraphRead } from "../spec/graph.ts";
-import { Runtime, type Context, type Pack } from "../runtime/core.ts";
+import { Runtime, type Context, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
-import action from "../packs/action/index.ts";
-import actor from "../packs/actor/index.ts";
-import agent from "../packs/agent/index.ts";
-import archive from "../packs/archive/index.ts";
-import branch from "../packs/branch/index.ts";
-import exchange from "../packs/exchange/index.ts";
-import graph from "../packs/graph/index.ts";
-import { Store } from "../packs/graph/store.ts";
-import history from "../packs/history/index.ts";
-import interchange from "../packs/interchange/index.ts";
-import links from "../packs/links/index.ts";
-import mcp from "../packs/mcp/index.ts";
-import type { McpHost, ToolDef } from "../packs/mcp/host.ts";
-import question from "../packs/question/index.ts";
-import record from "../packs/record/index.ts";
-import schema from "../packs/schema/index.ts";
-import types from "../packs/types/index.ts";
-import work from "../packs/work/index.ts";
+import action from "../plugins/action/index.ts";
+import actor from "../plugins/actor/index.ts";
+import agent from "../plugins/agent/index.ts";
+import archive from "../plugins/archive/index.ts";
+import branch from "../plugins/branch/index.ts";
+import exchange from "../plugins/exchange/index.ts";
+import graph from "../plugins/graph/index.ts";
+import { Store } from "../plugins/graph/store.ts";
+import history from "../plugins/history/index.ts";
+import interchange from "../plugins/interchange/index.ts";
+import links from "../plugins/links/index.ts";
+import mcp from "../plugins/mcp/index.ts";
+import type { McpHost, ToolDef } from "../plugins/mcp/host.ts";
+import question from "../plugins/question/index.ts";
+import record from "../plugins/record/index.ts";
+import schema from "../plugins/schema/index.ts";
+import types from "../plugins/types/index.ts";
+import work from "../plugins/work/index.ts";
 import { archiveHeader, landArchive, landFocus, placeOf, type Dump } from "../scripts/pelago-map.ts";
 
-const BASE = "mem:/packs/";
+const BASE = "mem:/plugins/";
 
 /** A small old map: what the old server's flat read gives. */
 const dump: Dump = {
   items: [
-    { id: "e_isl", type: "island", title: "An island", status: "current", fields: { pack: "core" } },
+    { id: "e_isl", type: "island", title: "An island", status: "current", fields: { plugin: "core" } },
     { id: "e_feat", type: "build.feature", title: "A feature", status: "built", island: "e_isl", fields: { island: "e_isl", focus: true } },
     { id: "e_task", type: "task", title: "A task", status: "waiting", island: "e_feat", body: "Waits on a reply.", fields: { island: "e_feat", priority: "high", cell: [1, 2] } },
     { id: "e_lane", type: "build.lane", title: "A lane", status: "merged", island: "e_feat", fields: { island: "e_feat", branch: "claude/x", files: ["a/**"], checks: "pass", head: "abc" } },
@@ -71,7 +71,7 @@ test("old types land on the bases, with kind; links on the five; islands are par
   assert.deepEqual([of("e_q").status, of("e_v").type, of("e_v").kind, of("e_v").status], ["decided", "question", "verdict", "decided"]);
   assert.equal(of("e_me").email, undefined, "email is private");
   assert.ok(!moved.has("e_run"), "runs are the exchange's");
-  // Nodes for the words pack, said where they were.
+  // Nodes for the words plugin, said where they were.
   assert.deepEqual([of("e_ins").type, of("e_ins").at, of("e_ins").words, of("e_ins").order], ["node", ["session_start"], "Do it this way.", 3]);
   assert.deepEqual([of("e_rfx").at, of("e_rfx").status, of("e_rfx").misses], [["tool:mcp__pelago__change"], "trial", ["a miss"]]);
   assert.deepEqual(of("e_cl").at, [], "a line the old map writes into a file is not said");
@@ -96,7 +96,7 @@ test("old types land on the bases, with kind; links on the five; islands are par
 
 async function runtime(dir: string, extra: { served?: Map<string, ToolDef> } = {}) {
   const served = extra.served ?? new Map<string, ToolDef>();
-  const host: Pack = {
+  const host: Plugin = {
     id: "host",
     inject: ["agent.run", "action.invoke", "graph.read"],
     apply(ctx: Context) {
@@ -112,7 +112,7 @@ async function runtime(dir: string, extra: { served?: Map<string, ToolDef> } = {
       }));
     },
   };
-  const modules: Record<string, Pack> = { graph, action, types, work, question, record, actor, links, branch, schema, history, interchange, exchange, agent, host, mcp, archive };
+  const modules: Record<string, Plugin> = { graph, action, types, work, question, record, actor, links, branch, schema, history, interchange, exchange, agent, host, mcp, archive };
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
@@ -123,7 +123,7 @@ async function runtime(dir: string, extra: { served?: Map<string, ToolDef> } = {
     schema: { db: join(dir, "schema.sqlite") },
     archive: { dir: join(dir, "archives") },
   };
-  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, pack: `${id}.ts`, ...(config[id] ? { config: config[id] } : {}) }));
+  const tree: Entry[] = Object.keys(modules).map((id) => ({ id, plugin: `${id}.ts`, ...(config[id] ? { config: config[id] } : {}) }));
   await loader.apply(tree);
   await rt.settle();
   const ctx = () => loader.fiber("host")!.ctx.intercept({ actor: { id: "agent:test", kind: "agent" }, run: "run-1" });

@@ -1,7 +1,7 @@
 # exchange
 
 One event for each thing that passes between the map and an agent. It's
-what the harness view streams live and what the verdict pack judges a run
+what the harness view streams live and what the verdict plugin judges a run
 by. Types: [exchange.ts](exchange.ts).
 
 ## Capabilities
@@ -22,7 +22,7 @@ by. Types: [exchange.ts](exchange.ts).
 | `direction` | `to_agent` (the map spoke) or `from_agent` (the agent did) |
 | `kind` | `begin`, `end`, `say`, `refuse`, `act`, `miss`; `compact` (edition 3); `gated` (edition 5, a gate held the node back) |
 | `node` | the node that spoke |
-| `pack` | the pack the node or action belongs to |
+| `plugin` | the plugin the node or action belongs to |
 | `text` | what was said, the refusal's words, or the error |
 | `act` | for `act`: kind, by, input, output, ok |
 
@@ -36,12 +36,12 @@ is an `act` with `ok: false`.
   caller.
 - `runs(page)`, `events(run, page)`: the record, bounded like every read.
 - `said(node, page)`: a node's events across runs, for the node's page.
-- `watch(filter, on)`: live, by run, node, pack or kind. Returns a
+- `watch(filter, on)`: live, by run, node, plugin or kind. Returns a
   disposer.
 
 ## Where the events live
 
-The exchange pack decides how it stores events. They're a record of what
+The exchange plugin decides how it stores events. They're a record of what
 passed, not items on the map, so they don't go through actions or the
-journal. What the verdict pack concludes from them (a verdict per run and
+journal. What the verdict plugin concludes from them (a verdict per run and
 node) is written to the graph through an action like any other change.
