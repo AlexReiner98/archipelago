@@ -32,6 +32,8 @@ with its note, what is part of it nested beneath, work as a checklist.
 
 A view item (plugins/views) with `center: "document/document"` and, in its
 `here`, `document.sections`. Notes show whole: nothing folds, since a
-document is read through. A title opens its item (`here.item`); the
+document is read through. A note's pictures (images in Markdown,
+plugins/item/README.md) draw at the page's width with their caption, and
+print with it, each kept on one page. A title opens its item (`here.item`); the
 contents line at the top jumps to a section. Printed, it is the document
 alone.

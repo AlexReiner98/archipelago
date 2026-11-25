@@ -51,3 +51,27 @@ test("a change is pushed to pages, and importers then ask for the new version", 
   assert.match(code, /from "\/plugins\/word\.ts\?v=1"/);
   await reader.cancel();
 });
+
+test("files: a raster image in the folder is served at /files/; nothing else is", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "cordis-files-"));
+  mkdirSync(join(dir, "files"));
+  // A 1x1 PNG: neutral bytes, enough for the type.
+  writeFileSync(join(dir, "files", "dot.png"), Buffer.from("89504e470d0a1a0a", "hex"));
+  writeFileSync(join(dir, "files", "draw.svg"), "<svg/>");
+  writeFileSync(join(dir, "secret.png"), "x");
+  const s = await serve({ root, files: join(dir, "files"), watch: false });
+  try {
+    const ok = await fetch(new URL("files/dot.png", s.url));
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get("content-type"), "image/png");
+    assert.equal((await ok.arrayBuffer()).byteLength, 8);
+    assert.equal((await fetch(new URL("files/none.png", s.url))).status, 404);
+    assert.equal((await fetch(new URL("files/draw.svg", s.url))).status, 403);
+    assert.equal((await fetch(new URL("files/..%2Fsecret.png", s.url))).status, 403);
+    // Without the option, /files/ is the repository's like any path.
+    assert.equal((await fetch(new URL("files/dot.png", server.url))).status, 404);
+  } finally {
+    await s.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -27,6 +27,9 @@
  * beside a live one: those files are what real sessions load, and only live
  * writes them. `npm run serve`, a person's own copy, writes them.
  *
+ * The page serves <data>/files at /files/, images only: a note's
+ * `![alt](/files/shot.png)` draws from there (plugins/item/README.md).
+ *
  * Point Claude Code at the adapter (plugins/claude-code/README.md) and open
  * http://127.0.0.1:5180/app/.
  *
@@ -65,7 +68,8 @@ await host.runtime.settle();
 for (const s of host.loader.status()) {
   if (s.state !== "active") console.log(`${s.id}: ${s.state}${s.missing ? ` (waiting for ${s.missing.join(", ")})` : ""}${s.error ? ` ${s.error}` : ""}`);
 }
-const page = await serve({ port: PAGE, root, watch: values.watch, ...pageAccess({ port: PAGE }) });
+// A note's pictures: <data>/files, at /files/ on the page's own origin.
+const page = await serve({ port: PAGE, root, watch: values.watch, files: join(values.data, "files"), ...pageAccess({ port: PAGE }) });
 console.log(`context interface on ${page.url}app/${values.watch ? "" : " (hot reload off)"}`);
 
 const stop = async () => {

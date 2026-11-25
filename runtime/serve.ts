@@ -30,6 +30,11 @@ const TYPES: Record<string, string> = {
   ".css": "text/css",
   ".json": "application/json",
   ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
 };
 
 /** Imports and re-exports with a relative or rooted specifier. */
@@ -44,9 +49,14 @@ export interface DevServer {
   close(): Promise<void>;
 }
 
-/** `hosts` and `origins` add to what the guard answers (guard.ts). */
-export async function serve(options: { port?: number; root?: string; watch?: boolean } & LocalAccess = {}): Promise<DevServer> {
+/**
+ * `hosts` and `origins` add to what the guard answers (guard.ts). `files`
+ * is a folder served as is at `/files/` (the data's pictures a note shows),
+ * read only, nothing outside it.
+ */
+export async function serve(options: { port?: number; root?: string; watch?: boolean; files?: string } & LocalAccess = {}): Promise<DevServer> {
   const root = resolve(options.root ?? join(fileURLToPath(import.meta.url), "../.."));
+  const files = options.files && resolve(options.files);
   const graph = new ModuleGraph();
   const clients = new Set<ServerResponse>();
 
@@ -78,6 +88,23 @@ export async function serve(options: { port?: number; root?: string; watch?: boo
       return;
     }
     let path = decodeURIComponent(url.pathname);
+    if (files && path.startsWith("/files/")) {
+      const file = join(files, path.slice("/files/".length));
+      const ext = extname(file).toLowerCase();
+      // Only a file inside the folder, a raster image: an SVG opened on its own runs script.
+      if (!file.startsWith(files + sep) || !TYPES[ext]?.startsWith("image/") || ext === ".svg") {
+        res.writeHead(403).end();
+        return;
+      }
+      try {
+        const body = await readFile(file);
+        res.writeHead(200, { "content-type": TYPES[ext]!, "cache-control": "no-store", "x-content-type-options": "nosniff" });
+        res.end(body);
+      } catch {
+        res.writeHead(404).end(`not found: ${path}`);
+      }
+      return;
+    }
     let file = join(root, path);
     if (!file.startsWith(root + sep) && file !== root) {
       res.writeHead(403).end();

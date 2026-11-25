@@ -33,11 +33,14 @@ export const SECTIONS = "document.sections";
 const LIMIT = 1000;
 
 const STYLE = sheet(`
-.dc { height:100%; overflow:auto; }
-.dc-page { max-width:46rem; margin:0 auto; padding:var(--gap-l, 24px) var(--gap-l, 24px) 80px; color:var(--fg); font:var(--text-m) var(--font); line-height:1.55; }
-.dc-toc { display:flex; flex-wrap:wrap; gap:4px 14px; padding-bottom:10px; margin-bottom:18px; border-bottom:1px solid var(--line); }
-.dc-toc a { color:var(--dim); cursor:pointer; white-space:nowrap; }
-.dc-toc a:hover { color:var(--fg); }
+.dc { height:100%; overflow:auto; container-type:inline-size; }
+.dc-page { max-width:48rem; margin:0 auto; padding:var(--gap-l, 24px) var(--gap-l, 24px) 80px; color:var(--fg); font-family:var(--font); font-size:17px; line-height:1.65; }
+.dc-toc { margin:0 0 8px; }
+.dc-toc-h { color:var(--dim); font-size:.8em; letter-spacing:.06em; text-transform:uppercase; margin:0 0 6px; }
+.dc-toc ol { list-style:none; margin:0; padding:0; }
+.dc-toc li { margin:0; }
+.dc-toc a { display:block; padding:3px 0; color:var(--fg); cursor:pointer; }
+.dc-toc a:hover { color:var(--pick); }
 .dc-sec { margin:0 0 10px; }
 .dc-h { cursor:pointer; margin:1.1em 0 .3em; line-height:1.3; }
 .dc-h:hover { color:var(--pick); }
@@ -51,6 +54,10 @@ h4.dc-h, h5.dc-h { font-size:1em; }
 .dc-note th, .dc-note td { border:1px solid var(--line); padding:3px 8px; text-align:left; vertical-align:top; }
 .dc-note blockquote { margin:.4em 0; padding-left:10px; border-left:3px solid var(--line); color:var(--dim); }
 .dc-note .sub { font-weight:600; margin:.6em 0 .2em; }
+.dc-pic { display:block; margin:.8em 0 1em; position:relative; left:50%; transform:translateX(-50%); width:min(1600px, 100cqw - 48px); text-align:center; }
+.dc-pic a { display:inline-block; max-width:100%; cursor:zoom-in; }
+.dc-pic img { display:block; box-sizing:border-box; max-width:100%; height:auto; border:1px solid var(--line); border-radius:var(--radius, 4px); }
+.dc-cap { display:block; margin:.35em auto 0; max-width:46rem; color:var(--dim); font-size:.85em; }
 .dc-work { list-style:none; padding-left:0; margin:.2em 0 .5em; }
 .dc-work li { margin:.15em 0; }
 .dc-work .mk { display:inline-block; width:1.3em; }
@@ -66,6 +73,8 @@ h4.dc-h, h5.dc-h { font-size:1em; }
   .dc-page { position:absolute; left:0; top:0; max-width:none; color:#000; }
   .dc-toc { display:none; }
   .dc-h { break-after:avoid; }
+  .dc-pic { break-inside:avoid; left:0; transform:none; width:auto; }
+  .dc-cap { color:#444; }
 }
 `);
 
@@ -99,8 +108,9 @@ const document_: Plugin = {
     };
 
     const Spans = ({ text }: { text: string }) =>
-      inline(text).map((s: Span) =>
+      inline(text, location.origin).map((s: Span) =>
         s.k === "t" ? s.text
+        : s.k === "img" ? html`<span class="dc-pic"><a href=${s.src} target="_blank" rel="noopener" title="Open full size"><img src=${s.src} alt=${s.alt} loading="lazy" /></a>${s.alt ? html`<span class="dc-cap">${s.alt}</span>` : null}</span>`
         : s.k === "code" ? html`<code>${s.text}</code>`
         : s.k === "b" ? html`<b>${s.text}</b>`
         : s.k === "i" ? html`<i>${s.text}</i>`
@@ -163,7 +173,7 @@ const document_: Plugin = {
       const nodes = outline(sections(Array.isArray(named) ? named : undefined, found, src), src);
       const jump = (id: Id) => document.getElementById(`dc-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
       return html`<div class="dc"><div class="dc-page">
-        ${nodes.length > 2 && html`<nav class="dc-toc">${nodes.map((n) => html`<a key=${n.row.id} onClick=${() => jump(n.row.id)}>${String(n.row.fields.title ?? n.row.id)}</a>`)}</nav>`}
+        ${nodes.length > 2 && html`<nav class="dc-toc"><div class="dc-toc-h">Contents</div><ol>${nodes.map((n) => html`<li key=${n.row.id}><a onClick=${() => jump(n.row.id)}>${String(n.row.fields.title ?? n.row.id)}</a></li>`)}</ol></nav>`}
         ${nodes.length ? nodes.map((n) => (isWork(n) ? html`<${Work} nodes=${[n]} />` : html`<${Section} key=${n.row.id} n=${n} />`)) : html`<div class="dc-empty">${idx.ready() ? "Nothing to read here." : "Reading the map…"}</div>`}
       </div></div>`;
     };
