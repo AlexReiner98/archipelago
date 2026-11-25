@@ -70,3 +70,38 @@ claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-
 
 That session reports to dev as well as to live, through the user-level
 hooks.
+
+## Maps by name
+
+Live and dev above are tied to their checkouts and fixed ports. A map can
+also be served by name, so any number of servers run side by side and none
+of them clash: a dev checkout, a fresh clone, a session's worktree testing a
+plugin.
+
+```
+npm run map -- serve                  # this checkout's code, a map named after its branch, any free port
+npm run map -- serve --map try --from live   # a named map, copied from another on its first start
+npm run map -- up --map live          # detached: outlives the terminal or preview that started it
+npm run map -- ls                     # every server: map, port, commit, checkout, the folders that report to it
+npm run map -- down try
+```
+
+| Piece | Is | Kept in |
+|---|---|---|
+| Code | a checkout at a commit, holding no data | wherever it is cloned |
+| Map | a named data folder | `~/.archipelago/maps/<name>/` (`ARCHIPELAGO_HOME`) |
+| Server | one code serving one map, on any free port | `~/.archipelago/servers/<name>.json` while it runs |
+| Connection | "this folder reports to map *name*", never a port | the folder's `.claude/settings.local.json` and `.mcp.json` |
+
+- A second server for a map that runs is refused, naming the one that does.
+- With no `--map`, the map is named after the branch (`claude/x` is
+  `claude-x`) and starts as a copy of `live` when a map of that name exists.
+  `--from` takes another map's name or a data folder, such as an older
+  live's `../archipelago-live/app/.data`.
+- A folder connected from such a map's page (`connect.here`) reports to it by
+  name: its hooks run `plugins/claude-code/hook.ts --map <name>` and its MCP
+  server is `plugins/claude-code/proxy.ts <name>`, which find the map in the
+  registry on each call. A session follows the map to a new port, and does
+  nothing while the map is down; its files stay when the server stops.
+- The page's header says which map, commit and checkout it is
+  ([plugins/serving](../plugins/serving/README.md)).

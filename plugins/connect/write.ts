@@ -16,7 +16,12 @@
  *   worktree shares); a folder outside a repository gets none.
  * - `connect-write.status`: folders and files written now. No paths.
  *
- * Config: `hook`, `mcp` (the adapter, as connect's), `ledger`, `home`.
+ * - On a map served by name (config `map`), the files name the map, not a
+ *   port (here.ts), so they stay when the server shuts down: a session
+ *   started then does nothing until the map runs again, and follows it to
+ *   whatever port it takes. Turned off or undone, they still go.
+ *
+ * Config: `hook`, `mcp` (the adapter, as connect's), `ledger`, `home`, `map`.
  * Injects graph.read, graph.watch, action.register.
  */
 import { execFile } from "node:child_process";
@@ -29,7 +34,7 @@ import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import type { Entry } from "../project-files/entries.ts";
 import { bringTo, loadLedger, safeFolder, saveLedger } from "../project-files/write.ts";
-import { CHECKOUT, localCommand } from "./index.ts";
+import { CHECKOUT, localCommand, proxyScript } from "./index.ts";
 import { MCP, SETTINGS, TYPE, wanted } from "./here.ts";
 
 export const STATUS = "connect-write.status";
@@ -41,6 +46,8 @@ export interface ConnectWriteConfig {
   ledger?: string;
   /** The home folder, never written in. */
   home?: string;
+  /** The map's name, when the server serves one by name. */
+  map?: string;
 }
 
 /** Git's exclude for a folder: in the repository's common folder, or none outside one. */
@@ -60,7 +67,8 @@ const connectWrite: Plugin<ConnectWriteConfig> = {
     const mcp = config.mcp ?? "http://127.0.0.1:5181/mcp";
     const report = (e: unknown) => ctx.runtime.report(ctx.fiber, e);
     const repo = JSON.parse(readFileSync(join(CHECKOUT, "plugins", "claude-code", "settings.json"), "utf8"));
-    const want = wanted(repo, { hook, mcp, command: localCommand(hook) });
+    const map = config.map;
+    const want = wanted(repo, { hook, mcp, command: localCommand(hook, map), ...(map ? { byMap: { map, proxy: proxyScript() } } : {}) });
     const ledger = await loadLedger(config.ledger);
     let folders = 0;
 
@@ -104,7 +112,8 @@ const connectWrite: Plugin<ConnectWriteConfig> = {
       gone = true;
       clearTimeout(timer);
       await queue.catch(() => undefined);
-      await pass(true).catch(report);
+      // By name, the files outlast the server: they do nothing while it is down.
+      if (!map) await pass(true).catch(report);
     });
 
     ctx.get<ActionRegister>("action.register").register({

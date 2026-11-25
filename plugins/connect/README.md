@@ -69,6 +69,8 @@ shows it as dots. With no token action, nothing asks for one.
 | `save` | none | On a guest map: where the guest goes to keep it. The page then shows a quiet "save" in `top` |
 | `folder` | the checkout the server runs from | The checkout people work in: what the empty map offers to connect and `connect.here` connects when no folder is named. The live server runs from a worktree of its own, so `live:start` sets it to the checkout live was set up from (`--checkout`, `ARCHIPELAGO_CHECKOUT`) |
 
+| `map` | none | The map's name, when the server serves one by name (`app/server.ts --map`): a connected folder then reports to the map, not a port. Every hook runs `hook.ts --map <name>` and `.mcp.json` runs `proxy.ts <name>` ([claude-code](../claude-code/README.md)), which find the map's server in the registry on each call; the files stay when the server stops |
+
 [app/tree.ts](../../app/tree.ts) sets `hook` and `mcp` from the page's port.
 A host in front sets its own address, command and token action.
 

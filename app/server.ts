@@ -35,10 +35,20 @@
  * The page serves <data>/files at /files/, images only: a note's
  * `![alt](/files/shot.png)` draws from there (plugins/item/README.md).
  *
+ * --map name (ARCHIPELAGO_MAP) serves a map by name (scripts/maps.ts): its
+ * data is <home>/maps/<name>, outside any checkout; it takes any free port
+ * unless --port names one; it records itself in <home>/servers/<name>.json
+ * while it runs, and a second server for the same map is refused, naming
+ * the one that runs. --from (a map's name or a data folder) copies a map in
+ * when this one has none yet. Folders connected to it report by its name,
+ * so they follow it to whatever port it takes (plugins/connect).
+ *
+ * The page's header says which map, commit and checkout this is (plugins/serving).
+ *
  * Point Claude Code at the adapter (plugins/claude-code/README.md) and open
  * http://127.0.0.1:5180/app/.
  *
- *   node app/server.ts [--data dir] [--port 5180] [--no-watch] [--no-write] [--checkout dir]
+ *   node app/server.ts [--map name [--from map|dir]] [--data dir] [--port 5180] [--no-watch] [--no-write] [--checkout dir]
  */
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -47,24 +57,61 @@ import { NodeHost } from "../runtime/node.ts";
 import { serve } from "../runtime/serve.ts";
 import { otelFromEnv, pageAccess, serverTree } from "./tree.ts";
 import { temporaryPlace } from "../scripts/place.ts";
+import { claim, commitOf, freePort, hasMap, homeOf, letPortGo, MAP_NAME, mapDir, release, snapshot, sourceOf, update } from "../scripts/maps.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { values } = parseArgs({
   allowNegative: true,
   options: {
-    data: { type: "string", default: join(root, "app", ".data") },
-    port: { type: "string", default: process.env.ARCHIPELAGO_PORT ?? "5180" },
+    map: { type: "string", default: process.env.ARCHIPELAGO_MAP || undefined },
+    from: { type: "string" },
+    data: { type: "string" },
+    port: { type: "string", default: process.env.ARCHIPELAGO_PORT || undefined },
     watch: { type: "boolean", default: process.env.ARCHIPELAGO_WATCH !== "0" },
     write: { type: "boolean", default: process.env.ARCHIPELAGO_WRITE !== "0" },
     checkout: { type: "string", default: process.env.ARCHIPELAGO_CHECKOUT || undefined },
   },
 });
-const PAGE = Number(values.port);
+const map = values.map;
+const commit = commitOf(root);
+if (map !== undefined && !MAP_NAME.test(map)) {
+  console.error(`refused: "${map}" is not a map name (letters, digits, ".", "_" and "-")`);
+  process.exit(1);
+}
+const data = values.data ?? (map ? mapDir(map) : join(root, "app", ".data"));
+if (map) {
+  // One server per map: the registry says who serves it, and hooks and the MCP proxy find it there.
+  const home = homeOf();
+  const claimed = claim({ map, pid: process.pid, checkout: root, data, started: new Date().toISOString(), ...(commit ? { commit } : {}) }, home);
+  if (!claimed.ok) {
+    const r = claimed.running;
+    console.error(`refused: map ${map} is already served by pid ${r.pid}${r.port ? ` on http://127.0.0.1:${r.port}/app/` : ""}, from ${r.checkout}${r.commit ? ` at ${r.commit}` : ""}. Stop it first (npm run map -- down ${map}).`);
+    process.exit(1);
+  }
+  process.on("exit", () => release(map, process.pid, home));
+  if (values.from && !hasMap(data)) {
+    const from = sourceOf(values.from, home);
+    snapshot(from, data);
+    console.log(`map ${map}: copied from ${from}`);
+  }
+}
+const PAGE = values.port ? Number(values.port) : map ? await freePort() : 5180;
+if (map) {
+  update(map, process.pid, { port: PAGE });
+  process.on("exit", () => letPortGo(PAGE));
+}
 // A map kept somewhere that goes away goes with it: said once, at start (scripts/place.ts).
-const away = temporaryPlace(values.data);
-if (away) console.log(`note: this map's data (${values.data}) won't last: ${away}. To keep a map, run it from a checkout in a folder you keep (README, "Set it up to keep").`);
+const away = temporaryPlace(data);
+if (away) console.log(`note: this map's data (${data}) won't last: ${away}. To keep a map, run it from a checkout in a folder you keep (README, "Set it up to keep").`);
 
-const tree = serverTree({ data: values.data, port: PAGE, write: values.write, otel: otelFromEnv(process.env), ...(values.checkout ? { checkout: values.checkout } : {}) });
+const tree = serverTree({
+  data,
+  port: PAGE,
+  write: values.write,
+  otel: otelFromEnv(process.env),
+  serving: { root, ...(map ? { map } : {}), ...(commit ? { commit } : {}) },
+  ...(values.checkout ? { checkout: values.checkout } : {}),
+});
 
 const host = new NodeHost({
   tree,
@@ -79,8 +126,8 @@ for (const s of host.loader.status()) {
   if (s.state !== "active") console.log(`${s.id}: ${s.state}${s.missing ? ` (waiting for ${s.missing.join(", ")})` : ""}${s.error ? ` ${s.error}` : ""}`);
 }
 // A note's pictures: <data>/files, at /files/ on the page's own origin.
-const page = await serve({ port: PAGE, root, watch: values.watch, files: join(values.data, "files"), bridge: PAGE + 2, ...pageAccess({ port: PAGE }) });
-console.log(`context interface on ${page.url}app/${values.watch ? "" : " (hot reload off)"}`);
+const page = await serve({ port: PAGE, root, watch: values.watch, files: join(data, "files"), bridge: PAGE + 2, ...pageAccess({ port: PAGE }) });
+console.log(`${map ? `map ${map}: ` : ""}context interface on ${page.url}app/${values.watch ? "" : " (hot reload off)"}`);
 
 const stop = async () => {
   await page.close();

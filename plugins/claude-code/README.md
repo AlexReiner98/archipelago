@@ -142,6 +142,24 @@ call as an act, and hands back what was said with the result. `DELETE /mcp`
 ends the run; a session the server doesn't know (it restarted) is a 404, and
 the client starts a new one.
 
+### A map by name
+
+A server that serves a map by name (`app/server.ts --map`) takes any free
+port, so nothing can name its address in advance. [registry.ts](registry.ts)
+says where each map's server is (`~/.archipelago/servers/<name>.json`, or
+under `ARCHIPELAGO_HOME`), and two scripts read it on every call:
+
+- `hook.ts --map <name>`: the hook, sent to the map's adapter wherever it is;
+  nothing, exit 0, while the map isn't running.
+- `proxy.ts <name>`: a stdio MCP server passing each message on to the map's
+  `/mcp`. When the map moves, it opens a session there with the client's own
+  `initialize`; while it is down it answers with no tools, and tells the
+  client its tools changed (`notifications/tools/list_changed`) once the map
+  starts.
+
+A folder connected from such a map's page holds these
+([connect](../connect/README.md)).
+
 ## Running it
 
 ```
