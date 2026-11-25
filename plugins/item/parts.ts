@@ -53,8 +53,9 @@ export function parts(d: Deps) {
   };
 
   const Spans = ({ text }: { text: string }) =>
-    inline(text).map((s: Span) =>
+    inline(text, location.origin).map((s: Span) =>
       s.k === "t" ? s.text
+      : s.k === "img" ? html`<span class="ip-pic"><img src=${s.src} alt=${s.alt} title=${s.alt} loading="lazy" />${s.alt ? html`<span class="ip-cap">${s.alt}</span>` : null}</span>`
       : s.k === "code" ? html`<code>${s.text}</code>`
       : s.k === "b" ? html`<b>${s.text}</b>`
       : s.k === "i" ? html`<i>${s.text}</i>`

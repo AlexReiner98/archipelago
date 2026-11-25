@@ -3,7 +3,9 @@
  * the map. What comes before the first heading is the lead; each heading
  * starts a section, which the page folds. Blocks are paragraphs, lists,
  * quotes, fenced code and tables; inline are `code`, **bold**, *emphasis*,
- * [links](…) and item ids, which the page draws by name.
+ * [links](…), images ![alt](url) and item ids, which the page draws by
+ * name. An image draws only from the map's own origin (`own`); any other
+ * is a link at most, never fetched.
  *
  * Pure: text in, structure out, so the page and the tests read it alike.
  */
@@ -15,6 +17,8 @@ export type Span =
   | { k: "i"; text: string }
   /** A web link. */
   | { k: "a"; text: string; href: string }
+  /** An image on the map's own origin: the page draws it, `alt` its caption. */
+  | { k: "img"; alt: string; src: string }
   /** An item on the map, by id; `text` when the note names it itself. */
   | { k: "ref"; id: string; text?: string };
 
@@ -122,8 +126,25 @@ export function parse(text: string): Note {
   return note;
 }
 
+/**
+ * Whether a URL is on the map's own origin, and so may load: a path on it
+ * (`/files/shot.png`, `files/shot.png`) or a full URL at `origin` exactly.
+ * Any other scheme or host, `//host/…` included, is not.
+ */
+export function own(url: string, origin?: string): boolean {
+  const base = origin ?? "http://own.invalid";
+  let at: URL;
+  try {
+    at = new URL(url, base + "/");
+  } catch {
+    return false;
+  }
+  return (at.protocol === "http:" || at.protocol === "https:") && at.origin === new URL(base).origin;
+}
+
 const INLINE = new RegExp(
   [
+    /!\[([^\]]*)\]\(([^)\s]+)\)/.source,
     /`([^`]+)`/.source,
     /\*\*([^*]+)\*\*/.source,
     /\[([^\]]+)\]\(([^)\s]+)\)/.source,
@@ -133,8 +154,8 @@ const INLINE = new RegExp(
   "g",
 );
 
-/** A line's text as spans. */
-export function inline(text: string): Span[] {
+/** A line's text as spans. `origin` is the page's (`location.origin`): an image there loads. */
+export function inline(text: string, origin?: string): Span[] {
   const out: Span[] = [];
   let at = 0;
   const plain = (s: string) => {
@@ -146,17 +167,24 @@ export function inline(text: string): Span[] {
   for (const m of text.matchAll(INLINE)) {
     plain(text.slice(at, m.index));
     at = m.index! + m[0].length;
-    if (m[1] !== undefined) out.push({ k: "code", text: m[1] });
-    else if (m[2] !== undefined) out.push({ k: "b", text: m[2] });
-    else if (m[3] !== undefined) {
-      const href = m[4]!;
+    if (m[1] !== undefined) {
+      const alt = m[1];
+      const src = m[2]!;
+      if (own(src, origin)) out.push({ k: "img", alt, src });
+      // Off the map's origin: never fetched, a link to it at most.
+      else if (/^(https?:)?\/\//.test(src)) out.push({ k: "a", text: alt || src, href: src.startsWith("//") ? `https:${src}` : src });
+      else plain(alt);
+    } else if (m[3] !== undefined) out.push({ k: "code", text: m[3] });
+    else if (m[4] !== undefined) out.push({ k: "b", text: m[4] });
+    else if (m[5] !== undefined) {
+      const href = m[6]!;
       const id = new RegExp(`^${ID.source}$`).exec(href);
-      if (id) out.push({ k: "ref", id: id[0], text: m[3] });
-      else if (/^https?:\/\//.test(href)) out.push({ k: "a", text: m[3], href });
+      if (id) out.push({ k: "ref", id: id[0], text: m[5] });
+      else if (/^https?:\/\//.test(href)) out.push({ k: "a", text: m[5], href });
       // A path in another repository: its name, without a link that leads nowhere here.
-      else plain(m[3]);
-    } else if (m[5] !== undefined) out.push({ k: "i", text: m[5] });
-    else out.push({ k: "ref", id: m[6]! });
+      else plain(m[5]);
+    } else if (m[7] !== undefined) out.push({ k: "i", text: m[7] });
+    else out.push({ k: "ref", id: m[8]! });
   }
   plain(text.slice(at));
   return out;

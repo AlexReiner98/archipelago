@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { inline, parse, refs } from "../plugins/item/note.ts";
+import { inline, own, parse, refs } from "../plugins/item/note.ts";
 import { ago, brief, lines, marks, neighbours, others, shown } from "../plugins/item/read.ts";
 
 test("a note: the lead before the first heading, each heading a section to fold", () => {
@@ -132,4 +132,39 @@ test("others: the items a change reaches besides this one, which undo takes back
     ]),
     3,
   );
+});
+
+test("inline: an image on the map's own origin draws; any other is a link, never loaded", () => {
+  const at = "http://127.0.0.1:5280";
+  assert.deepEqual(inline("Step one: ![the board](/files/step-1.png) then on.", at), [
+    { k: "t", text: "Step one: " },
+    { k: "img", alt: "the board", src: "/files/step-1.png" },
+    { k: "t", text: " then on." },
+  ]);
+  assert.deepEqual(inline(`![full](${at}/files/a.png)`, at), [{ k: "img", alt: "full", src: `${at}/files/a.png` }]);
+  assert.deepEqual(inline("![](/files/a.png)", at), [{ k: "img", alt: "", src: "/files/a.png" }]);
+  assert.deepEqual(inline("![off](https://example.org/a.png)", at), [{ k: "a", text: "off", href: "https://example.org/a.png" }]);
+  assert.deepEqual(inline("![](https://example.org/a.png)", at), [{ k: "a", text: "https://example.org/a.png", href: "https://example.org/a.png" }]);
+  assert.deepEqual(inline("![rel](//example.org/a.png)", at), [{ k: "a", text: "rel", href: "https://example.org/a.png" }]);
+  // Another port is another origin.
+  assert.deepEqual(inline("![p](http://127.0.0.1:5282/files/a.png)", at), [{ k: "a", text: "p", href: "http://127.0.0.1:5282/files/a.png" }]);
+  assert.deepEqual(inline("![d](data:image/png;base64,AAAA)", at), [{ k: "t", text: "d" }]);
+  assert.deepEqual(inline("![j](javascript:void0)", at), [{ k: "t", text: "j" }]);
+  // A link still reads as a link, not an image.
+  assert.deepEqual(inline("[site](https://example.com)", at), [{ k: "a", text: "site", href: "https://example.com" }]);
+});
+
+test("own: a path or the origin itself; no other scheme or host", () => {
+  const at = "https://map.example.org";
+  assert.equal(own("/files/a.png", at), true);
+  assert.equal(own("files/a.png", at), true);
+  assert.equal(own("https://map.example.org/files/a.png", at), true);
+  assert.equal(own("http://map.example.org/files/a.png", at), false);
+  assert.equal(own("https://map.example.org.evil.test/a.png", at), false);
+  assert.equal(own("//other.example.org/a.png", at), false);
+  assert.equal(own("data:image/png;base64,AA", at), false);
+  assert.equal(own("javascript:alert(1)", at), false);
+  // With no origin given, only a path counts.
+  assert.equal(own("/files/a.png"), true);
+  assert.equal(own("https://example.org/a.png"), false);
 });
