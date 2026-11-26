@@ -16,6 +16,10 @@
  *   (archive, from <data>/archives), and
  *   the bridge (5182) the page reaches them through.
  *
+ * On fixed ports (the default, or --port), a port already taken is refused
+ * in one line, naming it and `npm run map -- serve`, before anything is
+ * written (scripts/maps.ts `takenOf`).
+ *
  * --port moves all three (page, page + 1, page + 2); --no-watch turns hot
  * reload off, for the page and the plugins. ARCHIPELAGO_PORT and
  * ARCHIPELAGO_WATCH=0 set the same, so scripts/live.ts can start any commit:
@@ -39,8 +43,9 @@
  * data is <home>/maps/<name>, outside any checkout; it takes any free port
  * unless --port names one; it records itself in <home>/servers/<name>.json
  * while it runs, and a second server for the same map is refused, naming
- * the one that runs. --from (a map's name or a data folder) copies a map in
- * when this one has none yet. Folders connected to it report by its name,
+ * the one that runs. --from copies a map in when this one has none yet: a
+ * map's name copies that map; a data folder (an older server's) is moved
+ * in with its ledgers, so the folders it had connected report to this map. Folders connected to it report by its name,
  * so they follow it to whatever port it takes (plugins/connect).
  *
  * The page's header says which map, commit and checkout this is (plugins/serving).
@@ -57,7 +62,7 @@ import { NodeHost } from "../runtime/node.ts";
 import { serve } from "../runtime/serve.ts";
 import { otelFromEnv, pageAccess, serverTree } from "./tree.ts";
 import { temporaryPlace } from "../scripts/place.ts";
-import { claim, commitOf, freePort, hasMap, homeOf, letPortGo, MAP_NAME, mapDir, release, snapshot, sourceOf, update } from "../scripts/maps.ts";
+import { claim, commitOf, freePort, hasMap, homeOf, letPortGo, MAP_NAME, mapDir, release, snapshot, sourceOf, takenLine, takenOf, update } from "../scripts/maps.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { values } = parseArgs({
@@ -91,11 +96,19 @@ if (map) {
   process.on("exit", () => release(map, process.pid, home));
   if (values.from && !hasMap(data)) {
     const from = sourceOf(values.from, home);
-    snapshot(from, data);
-    console.log(`map ${map}: copied from ${from}`);
+    snapshot(from.dir, data, { takeover: from.takeover });
+    console.log(`map ${map}: ${from.takeover ? "moved in" : "copied"} from ${from.dir}${from.takeover ? ", with the folders it had connected" : ""}`);
   }
 }
 const PAGE = values.port ? Number(values.port) : map ? await freePort() : 5180;
+// A port given, or the fixed one: refused in one line while it is taken, before anything is written.
+if (values.port || !map) {
+  const taken = await takenOf(PAGE);
+  if (taken.length) {
+    console.error(takenLine(PAGE, taken));
+    process.exit(1);
+  }
+}
 if (map) {
   update(map, process.pid, { port: PAGE });
   process.on("exit", () => letPortGo(PAGE));

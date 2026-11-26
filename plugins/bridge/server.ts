@@ -16,6 +16,12 @@
  * `config.actor`: whoever is at the page acts as that person. There is no
  * sign-in yet; the server listens on 127.0.0.1 and the runtime's guard
  * refuses another Host, and an Origin not in `config.origins`.
+ *
+ * A script or agent calling `/call` says who it is with `actor`
+ * (`{ id, kind: "agent" }`, `agentActor`): the call is made as that agent,
+ * so its change sets are the agent's, not the person's. Only an agent can
+ * be named: a caller can say it is less than the person at the page, never
+ * someone else.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Actor, Dispose } from "../../spec/common.ts";
@@ -54,6 +60,18 @@ export interface BridgeConfig {
   onListen?: (port: number) => void;
 }
 
+/** An agent's id: what a caller may name itself (`agent:script`, `mcp-1a2b`). */
+const AGENT_ID = /^[A-Za-z0-9][\w.:@/-]{0,127}$/;
+
+/** The actor a `/call` names, or why it can't be used; undefined when it names none. */
+export function agentActor(raw: unknown): Actor | { error: string } | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const a = raw as { id?: unknown; kind?: unknown };
+  if (typeof a !== "object" || a.kind !== "agent") return { error: 'actor: only an agent can be named here, as { "id": "agent:<name>", "kind": "agent" }' };
+  if (typeof a.id !== "string" || !AGENT_ID.test(a.id)) return { error: "actor: an id of letters, digits and . _ : @ / -, at most 128 long" };
+  return { id: a.id, kind: "agent" };
+}
+
 function body(req: IncomingMessage): Promise<any> {
   return new Promise((ok, fail) => {
     const chunks: Buffer[] = [];
@@ -77,9 +95,9 @@ const bridge: Plugin<BridgeConfig> = {
     const as = config.actor ? ctx.intercept({ [META.actor]: config.actor }) : ctx;
     const streams = new Map<string, { res: ServerResponse; watches: Map<number, Dispose> }>();
 
-    const method = (key: string, name: string): ((...a: unknown[]) => unknown) => {
+    const method = (key: string, name: string, from: Context = as): ((...a: unknown[]) => unknown) => {
       if (!(KEYS as readonly string[]).includes(key)) throw new Error(`${key} is not served`);
-      const cap = as.get<Record<string, unknown>>(key);
+      const cap = from.get<Record<string, unknown>>(key);
       const fn = Object.hasOwn(cap, name) ? cap[name] : undefined;
       if (typeof fn !== "function") throw new Error(`${key} has no method ${name}`);
       return fn as (...a: unknown[]) => unknown;
@@ -116,8 +134,10 @@ const bridge: Plugin<BridgeConfig> = {
         if (req.method !== "POST") return send(res, 404, { error: "not found" });
         const msg = await body(req);
         if (path === "/call") {
+          const who = agentActor(msg.actor);
+          if (who && "error" in who) return send(res, 200, { error: who.error });
           try {
-            const value = await method(msg.key, msg.method)(...(msg.args ?? []));
+            const value = await method(msg.key, msg.method, who ? ctx.intercept({ [META.actor]: who }) : as)(...(msg.args ?? []));
             return send(res, 200, { value: value ?? null });
           } catch (err) {
             const refusal = (err as { refusal?: unknown }).refusal;

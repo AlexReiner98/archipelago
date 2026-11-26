@@ -11,6 +11,12 @@ by calling it. Plugins in the page inject them as if they ran there.
   sign-in yet; it listens on 127.0.0.1, and the runtime's guard
   ([runtime/guard.ts](../../runtime/guard.ts)) refuses another Host and an
   Origin not in `config.origins` (`config.hosts` adds Host values).
+- A script or agent calling `POST /call` says who it is with `actor`,
+  `{ "id": "agent:<name>", "kind": "agent" }`: the call is made as that
+  agent, so its change sets are the agent's and the next run hears that an
+  agent changed the map, not a person. Only an agent can be named (an id of
+  letters, digits and `. _ : @ / -`): a caller can say it is less than the
+  person at the page, never someone else. With no `actor`, it is the page's.
 - A watch takes its callback last; its calls come down the stream. The
   synchronous reads (`agent.tree.nodes`, `action.list.list`) are copies
   the client keeps fresh by the key's own watch.

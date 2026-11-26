@@ -13,7 +13,7 @@
  * app/server.ts `--map` and scripts/archipelago.ts use it.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -128,6 +128,19 @@ export function holdPort(port: number, pid = process.pid, home = homeOf()): bool
   return false;
 }
 
+/** Which of a page's three ports (page, adapter, bridge) something else already listens on. */
+export async function takenOf(page: number): Promise<number[]> {
+  const taken: number[] = [];
+  for (const p of [page, page + 1, page + 2]) if (!(await free(p))) taken.push(p);
+  return taken;
+}
+
+/** One line for a server whose fixed ports are taken: which, and the command that takes free ones. */
+export function takenLine(page: number, taken: number[]): string {
+  const which = taken.length === 1 ? `port ${taken[0]} is` : `ports ${taken.join(", ")} are`;
+  return `refused: ${which} already taken (another Archipelago, or another program), so this server can't use ${page}-${page + 2}. Run npm run map -- serve for a map on free ports, or give --port another one.`;
+}
+
 /** Lets a held port go, when it is still this process's. */
 export function letPortGo(port: number, pid = process.pid, home = homeOf()): void {
   const file = join(home, "ports", String(port));
@@ -149,16 +162,33 @@ export async function freePort(home = homeOf(), from = PORTS_FROM, pid = process
 /** Whether a data folder holds a map yet. */
 export const hasMap = (dir: string) => existsSync(join(dir, "graph.sqlite"));
 
-/** Where `--from` copies from: a map by name, else a data folder. */
-export function sourceOf(from: string, home = homeOf()): string {
-  if (MAP_NAME.test(from) && hasMap(mapDir(from, home))) return mapDir(from, home);
+/** Where `--from` copies from: a map by name (a copy), else a data folder (an older server's, moved in: `takeover`). */
+export function sourceOf(from: string, home = homeOf()): { dir: string; takeover: boolean } {
+  if (MAP_NAME.test(from) && hasMap(mapDir(from, home))) return { dir: mapDir(from, home), takeover: false };
   const dir = resolve(from);
-  if (hasMap(dir)) return dir;
+  if (hasMap(dir)) return { dir, takeover: true };
   throw new Error(`nothing to copy from: no map named ${from}, and no graph.sqlite in ${dir}`);
 }
 
-/** Copies a data folder's graph, schema, history and exchange journal, consistent even while a server writes them. */
-export function snapshot(from: string, to: string): void {
+/** What a server keeps of its own beside its map: what its writers wrote into folders (connect, lean), and live's moves. */
+export const LEDGERS = ["connect.json", "lean.json", "promotions.log"];
+
+/**
+ * Copies a data folder's graph, schema, history and exchange journal,
+ * consistent even while a server writes them, and its pictures and archives.
+ * `takeover`: the folder is an older server's being moved in, not a map
+ * being copied, so its ledgers come too (`LEDGERS`): the new server then
+ * replaces what the old one wrote in its connected folders with its own,
+ * and live's moves stay on record.
+ */
+export function snapshot(from: string, to: string, { takeover = false } = {}): void {
+  mkdirSync(to, { recursive: true });
+  for (const dir of ["files", "archives"]) if (existsSync(join(from, dir)) && !existsSync(join(to, dir))) cpSync(join(from, dir), join(to, dir), { recursive: true });
+  if (takeover) for (const f of LEDGERS) if (existsSync(join(from, f))) copyFileSync(join(from, f), join(to, f));
+  copyMap(from, to);
+}
+
+function copyMap(from: string, to: string): void {
   mkdirSync(to, { recursive: true });
   for (const name of ["graph.sqlite", "schema.sqlite", "history.sqlite"]) {
     const db = join(from, name);

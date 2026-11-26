@@ -1,37 +1,51 @@
 /**
- * The live server: the one real sessions report to. It runs a fixed commit
- * from its own git worktree outside this checkout, with hot reload off and
- * its own data, so editing this checkout never touches it.
+ * The live server: the one real sessions report to. It is map `live`
+ * (scripts/maps.ts) served by a fixed commit from its own git worktree
+ * outside this checkout, with hot reload off, so editing this checkout never
+ * touches it. Its port is any free one: `npm run map -- ls` says which, and
+ * connected folders find it by name.
  *
- *   node scripts/live.ts setup [--data-from dir]   make the worktree at main's head, install, (copy data in);
+ *   node scripts/live.ts setup [--data-from dir]   make the worktree at main's head, install, (move data in);
  *                                                  refused in a folder that goes away (place.ts) without --here-anyway
- *   node scripts/live.ts start|stop|status          the live server, on 5180 (adapter 5181, bridge 5182)
+ *   node scripts/live.ts start|stop|status          map live, served from the worktree (`map up|down --map live`)
  *   node scripts/live.ts promote [commit]           test the commit, move live to it, restart (default main)
  *   node scripts/live.ts rollback                   move live back to the commit before the last promote
- *   node scripts/live.ts copy                       copy live's data to the dev server's (app/.data here)
+ *   node scripts/live.ts copy                       copy live's map to the dev server's (app/.data here)
  *
  * The worktree is ../archipelago-live beside this checkout (an older
  * ../archipelago-next-live is used while it is still there), or
- * ARCHIPELAGO_LIVE. Its data is <worktree>/app/.data: ignored, so checking
- * out another commit there leaves it as it is. Each promote is a line in
- * promotions.log there.
+ * ARCHIPELAGO_LIVE. The map is <home>/maps/live (ARCHIPELAGO_HOME, default
+ * ~/.archipelago), outside any checkout, so moving the worktree to another
+ * commit leaves it as it is. Each promote is a line in promotions.log there.
+ *
+ * An older live kept its data in <worktree>/app/.data and ran on 5180. The
+ * first `start` with no map live yet stops that server and moves its data in
+ * (`--from`, which brings the folders it had connected, so they report to
+ * map live from then on). Its folder stays as it was, as a backup.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, rmdirSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, readFileSync, rmSync, rmdirSync, symlinkSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { placeAdvice, temporaryPlace } from "./place.ts";
+import { hasMap, homeOf, mapDir, servedOf, snapshot } from "./maps.ts";
 
 const here = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const older = join(here, "..", "archipelago-next-live");
 const live = resolve(process.env.ARCHIPELAGO_LIVE ?? (existsSync(older) ? older : join(here, "..", "archipelago-live")));
-const liveData = join(live, "app", ".data");
+const MAP = "live";
+const home = homeOf();
+const liveData = mapDir(MAP, home);
+/** Where an older live kept its data, on fixed ports: moved into map live at its first start. */
+const oldData = join(live, "app", ".data");
 const devData = join(here, "app", ".data");
 const promotions = join(liveData, "promotions.log");
 const DEV_PAGE = "http://127.0.0.1:5280/app/";
+const OLD_PAGE = "http://127.0.0.1:5180/app/";
+/** What a commit needs for live to be a map: the map command. */
+const MAPS = "scripts/archipelago.ts";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -40,6 +54,7 @@ const { values, positionals } = parseArgs({
 
 const git = (cwd: string, ...args: string[]) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 const short = (sha: string) => sha.slice(0, 7);
+const answers = (url: string) => fetch(url, { signal: AbortSignal.timeout(1000) }).then(() => true, () => false);
 
 /** Runs a command in the console, its output shown; true when it exits 0. */
 function run(cwd: string, cmd: string, args: string[]): boolean {
@@ -51,38 +66,50 @@ function npm(cwd: string, ...args: string[]): boolean {
   return spawnSync(["npm", ...args].join(" "), { cwd, stdio: "inherit", shell: true }).status === 0;
 }
 
+/** Whether a commit can serve live as a map. */
+const servesMaps = (sha: string) => spawnSync("git", ["cat-file", "-e", `${sha}:${MAPS}`], { cwd: here }).status === 0;
+
+/** The older live, on fixed ports from <worktree>/app/.data (scripts/server.ts), stopped if it runs. */
+function stopOld(): void {
+  if (!existsSync(join(oldData, "server.pid"))) return;
+  run(here, process.execPath, [join(here, "scripts", "server.ts"), "stop", "--root", live, "--data", oldData]);
+}
+
 /**
- * The live server, through scripts/server.ts: no hot reload, default ports.
- * It runs from its own worktree, so it is told the checkout people work in
- * (this one, ARCHIPELAGO_CHECKOUT): what its page offers to connect.
+ * Map live, served from the worktree's own code: started detached (`map up`),
+ * or stopped. It runs from its own worktree, so it is told the checkout
+ * people work in (this one, ARCHIPELAGO_CHECKOUT): what its page offers to
+ * connect. The first start moves an older live's data in.
  */
-function server(verb: "start" | "stop" | "status"): boolean {
+function server(verb: "start" | "stop"): boolean {
+  if (verb === "stop") return run(here, process.execPath, ["--disable-warning=ExperimentalWarning", join(here, MAPS), "down", MAP]);
+  if (!existsSync(join(live, MAPS))) {
+    console.log(`live's worktree is at ${short(git(live, "rev-parse", "HEAD"))}, from before maps by name: move it on with npm run promote`);
+    return false;
+  }
+  const from = !hasMap(liveData) && hasMap(oldData) ? oldData : undefined;
+  if (from) {
+    stopOld();
+    console.log(`moving the older live's data into map ${MAP}: ${from} (left as it was, as a backup)`);
+  }
   process.env.ARCHIPELAGO_CHECKOUT = here;
-  return run(here, process.execPath, [join(here, "scripts", "server.ts"), verb, "--root", live, "--data", liveData, "--no-watch"]);
+  const ok = run(live, process.execPath, ["--disable-warning=ExperimentalWarning", join(live, MAPS), "up", "--map", MAP, "--no-watch", ...(from ? ["--from", from] : [])]);
+  // An older live's moves stay on record (a worktree at a commit before the move copies no ledger).
+  if (ok && from && !existsSync(promotions) && existsSync(join(from, "promotions.log"))) copyFileSync(join(from, "promotions.log"), promotions);
+  return ok;
+}
+
+async function status(): Promise<void> {
+  console.log(`live's worktree at ${short(git(live, "rev-parse", "HEAD"))} in ${live}`);
+  const s = servedOf(MAP, home);
+  console.log(s ? `map ${MAP} runs (pid ${s.pid}) on http://127.0.0.1:${s.port}/app/, from ${s.checkout}${s.commit ? ` at ${s.commit}` : ""}` : `map ${MAP} isn't running${hasMap(liveData) ? "" : " and has no data yet"}: npm run live:start`);
+  if (hasMap(oldData) && (await answers(OLD_PAGE))) console.log(`an older live still answers on ${OLD_PAGE}: npm run live:start stops it and moves its data into map ${MAP}${hasMap(liveData) ? " (already done: stop it with node scripts/server.ts stop --root <worktree> --data <worktree>/app/.data)" : ""}`);
 }
 
 function needLive(): void {
   if (!existsSync(join(live, ".git"))) {
     console.log(`no live worktree at ${live}: run node scripts/live.ts setup`);
     process.exit(1);
-  }
-}
-
-/** Copies a data folder's graph and exchange journal, consistent even while a server writes them. */
-function snapshot(from: string, to: string): void {
-  mkdirSync(to, { recursive: true });
-  const db = join(from, "graph.sqlite");
-  if (existsSync(db)) {
-    for (const f of ["graph.sqlite", "graph.sqlite-wal", "graph.sqlite-shm"]) rmSync(join(to, f), { force: true });
-    const src = new DatabaseSync(db, { readOnly: true });
-    src.exec(`VACUUM INTO '${join(to, "graph.sqlite").replaceAll("'", "''")}'`);
-    src.close();
-  }
-  const journal = join(from, "exchange.jsonl");
-  if (existsSync(journal)) {
-    const text = readFileSync(journal);
-    // Up to the last whole line: a write may be under way.
-    writeFileSync(join(to, "exchange.jsonl"), text.subarray(0, text.lastIndexOf(10) + 1));
   }
 }
 
@@ -126,6 +153,10 @@ function move(sha: string, why: string): boolean {
     console.log(`live is already at ${short(sha)}`);
     return server("start");
   }
+  if (!servesMaps(sha)) {
+    console.log(`refused: ${short(sha)} is from before maps by name (no ${MAPS}), so it can't serve map ${MAP}. Live stays at ${short(was)}.`);
+    return false;
+  }
   server("stop");
   git(live, "checkout", "--quiet", "--detach", sha);
   if (install(live) && server("start")) {
@@ -159,22 +190,28 @@ switch (verb) {
     }
     if (!install(live)) process.exit(1);
     if (values["data-from"]) {
-      if (existsSync(join(liveData, "graph.sqlite"))) {
-        console.log(`live already has data in ${liveData}: not copying over it`);
+      if (hasMap(liveData)) {
+        console.log(`map ${MAP} already has data in ${liveData}: not copying over it`);
         process.exit(1);
       }
-      snapshot(resolve(values["data-from"]), liveData);
-      console.log(`copied data from ${resolve(values["data-from"])} to ${liveData}`);
+      // An older server's folder, moved in: its connected folders come with it.
+      snapshot(resolve(values["data-from"]), liveData, { takeover: true });
+      console.log(`moved data from ${resolve(values["data-from"])} into map ${MAP} (${liveData})`);
     }
-    console.log("start it with: node scripts/live.ts start");
+    console.log("start it with: npm run live:start");
     break;
   }
   case "start":
+    needLive();
+    if (!server("start")) process.exitCode = 1;
+    break;
   case "stop":
+    needLive();
+    if (!server("stop")) process.exitCode = 1;
+    break;
   case "status":
     needLive();
-    if (verb === "status") console.log(`live at ${short(git(live, "rev-parse", "HEAD"))} in ${live}`);
-    if (!server(verb)) process.exitCode = 1;
+    await status();
     break;
   case "promote": {
     needLive();
@@ -184,6 +221,10 @@ switch (verb) {
     }
     const target = positionals[1] ?? "main";
     const sha = git(here, "rev-parse", `${target}^{commit}`);
+    if (!servesMaps(sha)) {
+      console.log(`refused: ${short(sha)} is from before maps by name (no ${MAPS}), so it can't serve map ${MAP}.`);
+      process.exit(1);
+    }
     if (!test(sha)) {
       console.log(`refused: the tests fail at ${short(sha)}. Live stays at ${short(git(live, "rev-parse", "HEAD"))}.`);
       process.exit(1);
@@ -205,17 +246,17 @@ switch (verb) {
   }
   case "copy": {
     needLive();
-    try {
-      await fetch(DEV_PAGE, { signal: AbortSignal.timeout(1000) });
+    if (await answers(DEV_PAGE)) {
       console.log(`the dev server answers on ${DEV_PAGE}: stop it first (npm run dev:stop)`);
       process.exit(1);
-    } catch {}
-    if (readdirSync(liveData).length === 0) {
+    }
+    const from = hasMap(liveData) ? liveData : hasMap(oldData) ? oldData : undefined;
+    if (!from) {
       console.log(`no live data in ${liveData}`);
       process.exit(1);
     }
-    snapshot(liveData, devData);
-    console.log(`copied live's data to ${devData}`);
+    snapshot(from, devData);
+    console.log(`copied live's map to ${devData}`);
     break;
   }
   default:

@@ -21,7 +21,16 @@
  *   started then does nothing until the map runs again, and follows it to
  *   whatever port it takes. Turned off or undone, they still go.
  *
- * Config: `hook`, `mcp` (the adapter, as connect's), `ledger`, `home`, `map`.
+ * - A folder reports to one map. One whose `.mcp.json` names another map by
+ *   name, a map that is there (`reportsElsewhere`), is left as it is, and
+ *   what this writer once wrote there is dropped from its ledger, never taken
+ *   out: so a map copied from live (whose connections come with its graph)
+ *   never writes its hooks beside live's. Files that name a port (an older
+ *   server's) are taken over: with that server's ledger, copied in when a
+ *   map starts from its data folder (scripts/maps.ts `snapshot`), its
+ *   entries are replaced by this map's, as `connect.here` would write them.
+ *
+ * Config: `hook`, `mcp` (the adapter, as connect's), `ledger`, `home`, `map`, `maps`.
  * Injects graph.read, graph.watch, action.register.
  */
 import { execFile } from "node:child_process";
@@ -36,6 +45,8 @@ import type { Entry } from "../project-files/entries.ts";
 import { bringTo, loadLedger, safeFolder, saveLedger } from "../project-files/write.ts";
 import { CHECKOUT, localCommand, proxyScript } from "./index.ts";
 import { MCP, SETTINGS, TYPE, wanted } from "./here.ts";
+import { reportsElsewhere } from "./folders.ts";
+import { homeOf } from "../claude-code/registry.ts";
 
 export const STATUS = "connect-write.status";
 
@@ -48,7 +59,10 @@ export interface ConnectWriteConfig {
   home?: string;
   /** The map's name, when the server serves one by name. */
   map?: string;
+  /** Where maps by name are kept (ARCHIPELAGO_HOME, default ~/.archipelago): to tell whether a folder reports to another one. */
+  maps?: string;
 }
+
 
 /** Git's exclude for a folder: in the repository's common folder, or none outside one. */
 const excludeOf = (folder: string) =>
@@ -70,16 +84,27 @@ const connectWrite: Plugin<ConnectWriteConfig> = {
     const map = config.map;
     const want = wanted(repo, { hook, mcp, command: localCommand(hook, map), ...(map ? { byMap: { map, proxy: proxyScript() } } : {}) });
     const ledger = await loadLedger(config.ledger);
+    const maps = config.maps ?? homeOf();
     let folders = 0;
+    let elsewhere = 0;
 
-    /** Per file, what is wanted of ours now. */
+    /** Per file, what is wanted of ours now; the files of folders another map keeps are forgotten (`elsewhere`). */
     const wantedNow = async (): Promise<Map<string, Entry[]>> => {
       const out = new Map<string, Entry[]>();
+      const forget = new Set<string>();
       folders = 0;
+      elsewhere = 0;
       for (let p = await graph.of(TYPE, { limit: LIMIT_MAX }); ; p = await graph.of(TYPE, { limit: LIMIT_MAX, after: p.next })) {
         for (const it of p.items) {
           const folder = it.fields.folder;
           if (it.fields.status !== "on" || typeof folder !== "string" || !(await safeFolder(folder, home))) continue;
+          if (reportsElsewhere(folder, map, maps)) {
+            elsewhere++;
+            forget.add(join(folder, SETTINGS)).add(join(folder, MCP));
+            const exclude = await excludeOf(folder);
+            if (exclude) forget.add(exclude);
+            continue;
+          }
           folders++;
           out.set(join(folder, SETTINGS), want.settings);
           out.set(join(folder, MCP), want.mcp);
@@ -88,6 +113,8 @@ const connectWrite: Plugin<ConnectWriteConfig> = {
         }
         if (!p.next) break;
       }
+      // Another map's now: what we wrote there is its own, so it is dropped from the ledger, never taken out.
+      for (const f of forget) if (!out.has(f)) delete ledger[f];
       return out;
     };
 
@@ -123,7 +150,7 @@ const connectWrite: Plugin<ConnectWriteConfig> = {
       input: { type: "object", properties: {} },
       async run() {
         await queue.catch(() => undefined);
-        return { folders, files: Object.keys(ledger).length };
+        return { folders, files: Object.keys(ledger).length, elsewhere };
       },
     });
   },
