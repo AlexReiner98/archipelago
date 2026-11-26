@@ -286,6 +286,24 @@ test("a hold let go between a failed create and its read is free, and taken; one
   rmSync(file);
 });
 
+test("two servers taking over the same abandoned hold at once: only one gets it", () => {
+  const file = join(home, "ports", "5600");
+  mkdirSync(join(home, "ports"), { recursive: true });
+  writeFileSync(file, "999999");
+  // This server reads the abandoned hold; before it acts, another server takes it over.
+  let other: boolean | undefined;
+  const otherFirst = (f: string) => {
+    const text = readFileSync(f, "utf8");
+    if (other === undefined) other = holdPort(5600, process.ppid, home);
+    return text;
+  };
+  assert.equal(holdPort(5600, process.pid, home, otherFirst), false);
+  assert.equal(other, true);
+  assert.equal(readFileSync(file, "utf8"), String(process.ppid), "the other server still holds it");
+  assert.equal(existsSync(`${file}.999999`), false, "no takeover left behind");
+  letPortGo(5600, process.ppid, home);
+});
+
 test("a connected session's hook follows its map to a new port, and says nothing while it is down", async () => {
   const map = "moving";
   assert.deepEqual((await hook(map, { hook_event_name: "UserPromptSubmit", session_id: "x", cwd: home })), { out: "", code: 0 });

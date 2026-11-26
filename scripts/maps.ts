@@ -108,7 +108,7 @@ const free = (port: number) =>
 /**
  * Holds a page port for this process: `<home>/ports/<port>` made exclusively,
  * so two servers starting at once never take the same one. A hold whose
- * process is gone is taken over. A hold that goes between the failed create
+ * process is gone is taken over, by one server only (`takeOver`). A hold that goes between the failed create
  * and its read (its process let the port go) is free: the create is tried
  * again. An empty one is still being written by the process that made it,
  * so it is held. `read` is the read of a hold, given only by tests.
@@ -134,9 +134,41 @@ export function holdPort(port: number, pid = process.pid, home = homeOf(), read 
     const was = Number(text);
     if (was === pid) return true;
     if (alive(was)) return false;
-    rmSync(file, { force: true });
+    if (!takeOver(file, text, was, pid)) return false;
   }
   return false;
+}
+
+/**
+ * Removes an abandoned hold, when this server is the one taking it over:
+ * `<port>.<was>` made exclusively is the right to remove a hold of `was`, so
+ * of two servers that read the same abandoned hold, only one removes it, and
+ * the other, its turn come, finds the new hold and leaves it. False when
+ * another server is taking it over now.
+ */
+function takeOver(file: string, text: string, was: number, pid: number): boolean {
+  const right = `${file}.${was}`;
+  try {
+    writeFileSync(right, String(pid), { flag: "wx" });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    let taker = "";
+    try {
+      taker = readFileSync(right, "utf8");
+    } catch {}
+    // Being written, or its taker still working: theirs. Its taker gone: try again.
+    if (!taker.trim() || alive(Number(taker))) return false;
+    rmSync(right, { force: true });
+    return true;
+  }
+  try {
+    if (readFileSync(file, "utf8") === text) rmSync(file, { force: true });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+  } finally {
+    rmSync(right, { force: true });
+  }
+  return true;
 }
 
 /** Which of a page's three ports (page, adapter, bridge) something else already listens on. */
