@@ -27,7 +27,9 @@
  *
  * With `--map`, the adapter is the named map's, found in the registry of
  * servers (registry.ts) at each call: a session follows its map to whatever
- * port it runs on, and while the map isn't running the hook says nothing.
+ * port it runs on, and while the map isn't running the hook says nothing,
+ * but at a session's start: one line that the map is down, and how to start
+ * it (`downLine`).
  *
  * ARCHIPELAGO_HOOK_URL sets the url, ARCHIPELAGO_HOOK_TIMEOUT_MS how long to
  * wait for the answer (default 3000). ARCHIPELAGO_TOKEN, else the file
@@ -206,6 +208,23 @@ export async function withTranscript(body: string, dir = cursorDir()): Promise<{
   }
 }
 
+/**
+ * What a session starting while its map is down hears: one line for the
+ * person (`systemMessage`) and the same for the agent, with the command that
+ * starts it. Every other event, and a session resumed or compacted, hears
+ * nothing, so a map that is down never gets in the way.
+ */
+export function downLine(map: string, body: string): string | undefined {
+  try {
+    const input = JSON.parse(body) as { hook_event_name?: unknown; source?: unknown };
+    if (input.hook_event_name !== "SessionStart" || (input.source !== undefined && input.source !== "startup" && input.source !== "clear")) return undefined;
+  } catch {
+    return undefined;
+  }
+  const say = `Map ${map} isn't running, so this session isn't recorded. Start it with: archipelago (or npm run live:start in your Archipelago checkout).`;
+  return JSON.stringify({ systemMessage: say, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: `${say} Its tools appear once it runs.` } });
+}
+
 /** The token: the environment's, else the token file's when there is one. */
 function tokenOf(): string | undefined {
   if (process.env.ARCHIPELAGO_TOKEN) return process.env.ARCHIPELAGO_TOKEN;
@@ -220,9 +239,16 @@ if (import.meta.main) {
   let done: ((answer: string | null, ok: boolean) => void) | undefined;
   try {
     const url = await hookUrl();
-    // The map isn't running: say nothing.
-    if (!url) process.exit(0);
     const chunks: Buffer[] = [];
+    // The map isn't running: nothing, but at a session's start one line that says so (`downLine`).
+    if (!url) {
+      if (map) {
+        for await (const c of process.stdin) chunks.push(c as Buffer);
+        const line = downLine(map, Buffer.concat(chunks).toString("utf8"));
+        if (line) process.stdout.write(line);
+      }
+      process.exit(0);
+    }
     for await (const c of process.stdin) chunks.push(c as Buffer);
     const sending = await withTranscript(withRemote(Buffer.concat(chunks).toString("utf8")));
     done = sending.answered;

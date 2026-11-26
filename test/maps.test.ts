@@ -16,6 +16,8 @@ import { adapterOf, entryOf, serverFile, type Served } from "../plugins/claude-c
 import { proxy } from "../plugins/claude-code/proxy.ts";
 import { wanted } from "../plugins/connect/here.ts";
 import { lineOf } from "../plugins/serving/view.ts";
+// @ts-expect-error: plain JavaScript, read before any TypeScript runs; no types of its own.
+import { newEnough } from "../bin/node-min.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const home = mkdtempSync(join(tmpdir(), "archipelago-maps-"));
@@ -172,6 +174,40 @@ test("a server on fixed ports that are taken says so in one line, and writes not
   }
 });
 
+test("the archipelago command says which Node it needs", () => {
+  assert.equal(newEnough("22.18.0"), true);
+  assert.equal(newEnough("24.1.0"), true);
+  assert.equal(newEnough("22.17.9"), false);
+  assert.equal(newEnough("20.19.0"), false);
+});
+
+test("go with map live running sets nothing up again: it connects the folder it is run in and says where live is", async () => {
+  const live = await serveMap("live");
+  assert.ok(live.served, live.out);
+  const proj = join(home, "proj");
+  mkdirSync(proj, { recursive: true });
+  const go = (...args: string[]) =>
+    new Promise<{ code: number | null; out: string }>((ok) => {
+      let out = "";
+      const child = spawn(process.execPath, [join(root, "bin", "archipelago.mjs"), "go", "--no-open", ...args], { cwd: proj, env: { ...process.env, ARCHIPELAGO_HOME: home, INIT_CWD: "" }, windowsHide: true });
+      child.stdout.on("data", (c) => (out += c));
+      child.stderr.on("data", (c) => (out += c));
+      child.on("exit", (code) => ok({ code, out }));
+    });
+  const page = `map live: http://127.0.0.1:${live.served.port}/app/`;
+  // A server that writes no files can't connect a folder: said in one line, and go still says where live is.
+  const r = await go();
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /not connected: This server writes no files/);
+  assert.ok(r.out.includes(page), r.out);
+  assert.doesNotMatch(r.out, /live worktree|testing|npm ci/, "nothing set up again");
+  // Run inside the checkout that serves live: never connected.
+  const own = await go("--folder", root);
+  assert.equal(own.code, 0, own.out);
+  assert.doesNotMatch(own.out, /connected|not connected/);
+  assert.ok(own.out.includes(page));
+});
+
 test("the registry refuses a second claim on a running map and takes over one whose process is gone", () => {
   const map = "claimed";
   const mine = { ...entry(map, 0), pid: process.pid };
@@ -199,6 +235,13 @@ test("a free port is held, so servers starting at once never take the same one",
 test("a connected session's hook follows its map to a new port, and says nothing while it is down", async () => {
   const map = "moving";
   assert.deepEqual((await hook(map, { hook_event_name: "UserPromptSubmit", session_id: "x", cwd: home })), { out: "", code: 0 });
+  // But a session starting while it is down hears one line, with the command that starts it.
+  const start = await hook(map, { hook_event_name: "SessionStart", source: "startup", session_id: "x", cwd: home });
+  assert.equal(start.code, 0);
+  const said = JSON.parse(start.out);
+  assert.match(said.systemMessage, /^Map moving isn't running.*archipelago/);
+  assert.equal(said.hookSpecificOutput.hookEventName, "SessionStart");
+  assert.deepEqual(await hook(map, { hook_event_name: "SessionStart", source: "resume", session_id: "x", cwd: home }), { out: "", code: 0 }, "a resumed session: nothing");
   const one = await adapter("one");
   put(entry(map, one.page));
   assert.match((await hook(map, { hook_event_name: "UserPromptSubmit", session_id: "x", cwd: home })).out, /"one"/);

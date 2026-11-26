@@ -7,6 +7,11 @@
  *   up    [--map name] [same options]   the same, detached: it outlives the terminal or preview that started it
  *   down  <map>                         stops the map's server
  *   ls                                  every server: map, port, commit, checkout, the folders that report to it
+ *   go    [--folder dir] [--no-connect] [--no-open]
+ *        jump in: map live set up and running (live:setup, live:start, each
+ *        only when needed), the folder you are in connected to it, its page
+ *        open. Safe to run any time: run again, it only opens the page.
+ *        `archipelago` with nothing after it (bin/archipelago.mjs) is `go`.
  *
  * With no --map, the map is named after the checkout's branch (`claude/x` is
  * `claude-x`), and when it has no data yet and a map `live` exists, it starts
@@ -20,9 +25,9 @@
  * `npm run serve`, `dev` and `dev:*` stay on their fixed ports, and say in
  * one line when those are taken.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { closeSync, mkdirSync, openSync, rmSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { defaultMap, hasMap, homeOf, MAP_NAME, mapDir, reporting, servedOf, serverFile, servers, alive } from "./maps.ts";
@@ -38,6 +43,9 @@ const { values, positionals } = parseArgs({
     port: { type: "string" },
     watch: { type: "boolean", default: true },
     write: { type: "boolean", default: true },
+    open: { type: "boolean", default: true },
+    connect: { type: "boolean", default: true },
+    folder: { type: "string" },
   },
 });
 const verb = positionals[0] ?? "ls";
@@ -77,6 +85,42 @@ function notServed(map: string): void {
     console.log(`map ${map} is already served by pid ${s.pid} on ${page(s.port!)}, from ${s.checkout}${s.commit ? ` at ${s.commit}` : ""}`);
     process.exit(verb === "up" && s.checkout === here ? 0 : 1);
   }
+}
+
+/** Whether a folder is the given checkout or inside it (the live worktree is never connected: it serves the map). */
+function insideOf(folder: string, checkout: string): boolean {
+  const fold = (p: string) => (process.platform === "win32" ? resolve(p).toLowerCase() : resolve(p));
+  const r = relative(fold(checkout), fold(folder));
+  return r === "" || (!r.startsWith("..") && !isAbsolute(r));
+}
+
+/** Connects a folder to map live through its bridge (`connect.here`), as the person at the machine; what to tell them. */
+async function connectHere(bridge: number, folder: string): Promise<string> {
+  const call = async (action: string) => {
+    const r = await fetch(`http://127.0.0.1:${bridge}/call`, {
+      method: "POST",
+      body: JSON.stringify({ key: "action.invoke", method: "invoke", args: [{ action, input: { folder }, authority: { of: "human", basis: "ran archipelago in this folder" }, reason: "archipelago: connect the folder it was run in" }] }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    return ((await r.json()) as { value?: { ok: boolean; output?: { connected?: boolean; reports_to?: string }; refused?: { message: string } }; error?: string });
+  };
+  try {
+    const state = (await call("connect.folder")).value;
+    if (state?.ok && state.output?.connected) return `${folder} reports to map live.`;
+    const r = await call("connect.here");
+    if (r.value?.ok) return `connected ${folder}: start a new Claude Code session there (terminal or desktop app) and it reports to map live.`;
+    return `not connected: ${r.value?.refused?.message ?? r.error ?? "no answer"}`;
+  } catch (e) {
+    return `not connected: map live's bridge didn't answer (${(e as Error).message})`;
+  }
+}
+
+/** Opens a page in the default browser; quietly does nothing where it can't. */
+function openPage(url: string): void {
+  const [cmd, args] = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
+  try {
+    spawn(cmd, args, { detached: true, stdio: "ignore", windowsHide: true }).on("error", () => undefined).unref();
+  } catch {}
 }
 
 switch (verb) {
@@ -151,7 +195,30 @@ switch (verb) {
     }
     break;
   }
+  case "go": {
+    // The folder the person is in: npm run keeps it in INIT_CWD, the bin runs there.
+    const folder = resolve(values.folder ?? process.env.INIT_CWD ?? process.cwd());
+    const node = (script: string, ...args: string[]) =>
+      spawnSync(process.execPath, ["--disable-warning=ExperimentalWarning", join(here, "scripts", script), ...args], { cwd: here, stdio: "inherit" }).status === 0;
+    if (!servedOf("live", home)) {
+      // Each step only when it is needed: setup makes nothing twice, start moves an older live in.
+      if (!node("live.ts", "setup") || !node("live.ts", "start")) process.exit(1);
+    }
+    const s = servedOf("live", home);
+    if (!s?.port) {
+      console.log("map live didn't come up: npm run live:status says why");
+      process.exit(1);
+    }
+    const url = page(s.port);
+    if (values.connect && !insideOf(folder, s.checkout)) {
+      const said = await connectHere(s.port + 2, folder);
+      console.log(said);
+    }
+    if (values.open) openPage(url);
+    console.log(`map live: ${url}`);
+    break;
+  }
   default:
-    console.log("npm run map -- serve|up [--map name] [--from map|dir] [--port n] [--no-write] [--no-watch] | down <map> | ls");
+    console.log("npm run map -- serve|up [--map name] [--from map|dir] [--port n] [--no-write] [--no-watch] | down <map> | ls | go [--folder dir] [--no-connect] [--no-open]");
     process.exitCode = 1;
 }

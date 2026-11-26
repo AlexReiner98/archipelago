@@ -71,8 +71,10 @@ keep, follow the README's "Set it up to keep":
   system's temp folder, a folder an app made for your session (a scratch
   workspace), or a session's own worktree (`.claude/worktrees/`). If your
   session started in one, say so when you ask.
-- `npm install`, `npm run live:setup`, `npm run live:start`; open the
-  address it prints (any free port; `npm run live:status` says it again).
+- `npm install`, `npm link`, then `archipelago` in the clone: it runs
+  `live:setup` and `live:start` when needed, connects the folder it is run
+  in, and opens the page (any free port; `npm run live:status` says it
+  again). Without `npm link`: `npm run go`.
 - Connect the clone, not the live worktree: `connect.here { folder: <the
   clone> }`, or the empty map's line. `connect.here` writes the folder's
   hooks and MCP server; to look first, `connect.folder` reads.
