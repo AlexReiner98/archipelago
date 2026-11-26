@@ -5,13 +5,13 @@
  */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
-import { claim, defaultMap, freePort, letPortGo, nameFrom, release, reporting, servers } from "../scripts/maps.ts";
+import { claim, defaultMap, freePort, holdPort, letPortGo, nameFrom, release, reporting, servers } from "../scripts/maps.ts";
 import { saveLedger } from "../plugins/project-files/write.ts";
 import { adapterOf, entryOf, serverFile, type Served } from "../plugins/claude-code/registry.ts";
 import { proxy } from "../plugins/claude-code/proxy.ts";
@@ -148,11 +148,32 @@ test("two servers for different maps run at once, on free ports nobody gave them
   assert.equal(entryOf("alpha", home)?.pid, a.served.pid);
 });
 
+/** Listens on a port, or says it is in use. */
+const listenOn = (port: number) =>
+  new Promise<Server | undefined>((ok) => {
+    const s = createServer();
+    s.once("error", () => ok(undefined));
+    s.listen(port, "127.0.0.1", () => ok(s));
+  });
+
+/**
+ * Three free ports in a row, the middle one held: below the ephemeral range
+ * other tests' `listen(0)` draws from, and away from the fixed (5180, 5280)
+ * and free (5300-6000) ones, so nothing else takes the two beside it.
+ */
+async function middleHeld(): Promise<{ holder: Server; taken: number }> {
+  for (let p = 7101; p < 7900; p += 3) {
+    const sides = await Promise.all([listenOn(p - 1), listenOn(p + 1)]);
+    const holder = sides.every(Boolean) ? await listenOn(p) : undefined;
+    await Promise.all(sides.map((s) => s && new Promise((ok) => s.close(ok))));
+    if (holder) return { holder, taken: p };
+  }
+  throw new Error("no three free ports in a row between 7100 and 7900");
+}
+
 test("a server on fixed ports that are taken says so in one line, and writes nothing", async () => {
-  // Something else holds the adapter's port.
-  const holder = createServer();
-  await new Promise<void>((ok) => holder.listen(0, "127.0.0.1", ok));
-  const taken = (holder.address() as { port: number }).port;
+  // Something else holds the adapter's port, and only that one.
+  const { holder, taken } = await middleHeld();
   const data = join(home, "fixed-data");
   try {
     const { code, out } = await new Promise<{ code: number | null; out: string }>((ok) => {
@@ -244,6 +265,25 @@ test("a free port is held, so servers starting at once never take the same one",
   writeFileSync(join(home, "ports", "5400"), "999999");
   assert.equal(await freePort(home, 5400), 5400);
   letPortGo(5400, process.pid, home);
+});
+
+test("a hold let go between a failed create and its read is free, and taken; one still being written is held", () => {
+  const file = join(home, "ports", "5500");
+  mkdirSync(join(home, "ports"), { recursive: true });
+  // Another server holds 5500, and lets it go just after this create fails.
+  writeFileSync(file, String(process.ppid));
+  const goneOnRead = (f: string) => {
+    rmSync(f);
+    return readFileSync(f, "utf8");
+  };
+  assert.equal(holdPort(5500, process.pid, home, goneOnRead), true);
+  assert.equal(readFileSync(file, "utf8"), String(process.pid));
+  letPortGo(5500, process.pid, home);
+  // Made, its pid not yet written: held, never taken over.
+  writeFileSync(file, "");
+  assert.equal(holdPort(5500, process.pid, home), false);
+  assert.equal(readFileSync(file, "utf8"), "");
+  rmSync(file);
 });
 
 test("a connected session's hook follows its map to a new port, and says nothing while it is down", async () => {
