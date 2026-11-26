@@ -17,6 +17,7 @@ import types from "../plugins/types/index.ts";
 import work from "../plugins/work/index.ts";
 import game from "../plugins/game/index.ts";
 import { analyze, profiles, readGame, type Game } from "../plugins/game/analysis.ts";
+import { parsePayoff } from "../plugins/game/view.ts";
 
 // ---- the reasoning, pure ----
 
@@ -247,4 +248,59 @@ test("refusals say how to fix the call", async () => {
   assert.deepEqual(((await m.item(g)).fields.players as any[]).map((p) => p.name), ["Row", "Col"]);
   assert.deepEqual(m.errors, []);
   await m.done();
+});
+
+test("game.rename: a strategy or a player gets a new name, its payoffs and plays links kept; undo takes it back", async () => {
+  const m = await map();
+  const firm = (await m.ok("items.create", { type: "actor", title: "North Ltd" })).output.id;
+  const g = (
+    await m.ok("game.create", {
+      title: "Release",
+      players: [
+        { name: "Player 1", strategies: ["A", "B"], actor: firm },
+        { name: "Player 2", strategies: ["A", "B"] },
+      ],
+      payoffs: [
+        { profile: ["A", "A"], payoff: [2, 2] },
+        { profile: ["A", "B"], payoff: [4, 1] },
+      ],
+    })
+  ).output.id;
+
+  // A strategy: in the player's list and in every profile that uses it, for that player only.
+  await m.ok("game.rename", { game: g, player: "Player 2", strategy: "A", to: "now" });
+  let it = await m.item(g);
+  assert.deepEqual(it.fields.players, [{ name: "Player 1", strategies: ["A", "B"] }, { name: "Player 2", strategies: ["now", "B"] }]);
+  assert.deepEqual(it.fields.payoffs, [{ profile: ["A", "now"], payoff: [2, 2] }, { profile: ["A", "B"], payoff: [4, 1] }]);
+
+  // A player: its name, and the plays link that says who it is.
+  const renamed = await m.ok("game.rename", { game: g, player: "Player 1", to: "Us" });
+  it = await m.item(g);
+  assert.deepEqual((it.fields.players as any[]).map((p) => p.name), ["Us", "Player 2"]);
+  assert.deepEqual((await m.read.links(g, { type: "plays", dir: "in" })).items.map((l) => [l.from, l.fields.as]), [[firm, "Us"]]);
+  assert.equal((await m.ok("game.analyze", { game: g, record: false })).output.complete, false, "the payoffs are the same two, under the new names");
+
+  // The same name again changes nothing; a name taken, or one not there, is refused with what there is.
+  assert.equal((await m.ok("game.rename", { game: g, player: "Us", to: "Us" })).change, undefined);
+  const taken = await m.call("game.rename", { game: g, player: "Us", to: "Player 2" });
+  assert.ok(!taken.ok && taken.refused.code === "game.taken", JSON.stringify(taken));
+  const twice = await m.call("game.rename", { game: g, player: "Player 2", strategy: "B", to: "now" });
+  assert.ok(!twice.ok && twice.refused.code === "game.taken");
+  const none = await m.call("game.rename", { game: g, player: "Us", strategy: "C", to: "D" });
+  assert.ok(!none.ok && none.refused.code === "game.strategy_unknown" && /It has: A, B/.test(none.refused.message));
+
+  // Undo, like any change.
+  await m.ok("history.undo", { change: renamed.change });
+  assert.deepEqual(((await m.item(g)).fields.players as any[]).map((p) => p.name), ["Player 1", "Player 2"]);
+  assert.deepEqual((await m.read.links(g, { type: "plays", dir: "in" })).items.map((l) => l.fields.as), ["Player 1"]);
+  assert.deepEqual(m.errors, []);
+  await m.done();
+});
+
+test("a payoff typed into a cell: one number per player, apart by commas or spaces", () => {
+  assert.deepEqual(parsePayoff("3, 3", 2), [3, 3]);
+  assert.deepEqual(parsePayoff(" -1  2.5 ", 2), [-1, 2.5]);
+  assert.deepEqual(parsePayoff("1;2;3", 3), [1, 2, 3]);
+  assert.deepEqual(parsePayoff("3", 2), { error: "2 numbers, one per player, in player order" });
+  assert.deepEqual(parsePayoff("3, three", 2), { error: "numbers only, such as 3, 0" });
 });

@@ -10,7 +10,7 @@ map as a finding about the game, and like every change it can be undone.
 | [analysis.ts](analysis.ts) | both | The reasoning, pure: a game in, an analysis out |
 | [index.ts](index.ts) | server | The `game` flavour, the `plays` link and the actions. Injects `types.define`, `action.register`, `graph.read` |
 | [explain.ts](explain.ts) | server | The game in plain words from a model: the `explanation` flavour, `explain.game`, `explain.decide` (below) |
-| [view.ts](view.ts) | page | The view Games and the matrix on a game's item page. Injects `find.index`, `here.read`, `here.set`, `slot.fill`, `action.invoke` |
+| [view.ts](view.ts) | page | The view Games, where a person makes and edits games (below), and the matrix on a game's item page. Injects `find.index`, `here.read`, `here.set`, `slot.fill`, `action.invoke` |
 
 ## On the map
 
@@ -40,6 +40,7 @@ Each is one change set. Agents call them through `act`.
 | `game.strategy` | `game`, `player`, `strategies` | Adds strategies to a player; outcomes they make have no payoff yet |
 | `game.payoff` | `game`, `cells: [{ profile, payoff }]` | Sets what outcomes are worth, each replacing the one for its profile. A profile or payoff is a list in player order or an object by player name. Answers how many outcomes are `missing` |
 | `game.remove` | `game`, `player`, `strategy?`, `clear?` | Takes a strategy out, with the payoffs that use it; without `strategy`, the player, with its `plays` links (clearing payoffs, so `clear: true`) |
+| `game.rename` | `game`, `player`, `strategy?`, `to` | Renames the player's strategy, in its list and every payoff that uses it; without `strategy`, the player, with its `plays` links. Payoffs stay. The same name again writes nothing; a name taken is refused (`game.taken`) |
 | `game.analyze` | `game`, `record?` | Reasons the game out and answers the analysis. Unless `record: false`, keeps it as a record (`kind: finding`, `value` the analysis, `note` its lines) linked `about` the game, and supersedes the findings it made before. The same analysis again writes nothing. An incomplete game is answered with what is missing, and nothing is kept |
 
 Refusals name what to fix: `game.strategy_unknown` ("Col has no strategy
@@ -69,6 +70,22 @@ dominated strategy is struck through. Under it, the reasoning in lines and
 page, and the findings kept. On a game's item page (`item.actions`), the
 same matrix small, its equilibria, and the way into Games. More than two
 players are drawn one row per outcome.
+
+A person models a game on the page, no agent needed, each step an action
+as the person at the page, undone like any other:
+
+- **+ new game** at the top of the list: a title makes a game
+  (`game.create`) with two players, two strategies each, opened in edit.
+- **Edit** on a game: click a player's or a strategy's name to rename it
+  (`game.rename`, payoffs kept); **+ strategy** and **×** add and take out
+  a strategy (`game.strategy`, `game.remove`); **+ player** and **remove
+  player** add and take out a player (`game.player`, `game.remove`), which
+  clears the payoffs set, as the line under them says.
+- A cell, clicked, takes its payoffs: one number per player in player
+  order, apart by commas or spaces (`3, 0`), Enter to set (`game.payoff`),
+  Escape to leave. What doesn't read as that is said under the cell and
+  nothing is sent. An empty cell reads as missing, not 0, and the analysis
+  says what is missing until every outcome has its payoffs.
 
 ## In plain words: the explain plugin
 
@@ -172,5 +189,5 @@ change; undo takes it back.
   games, and games of incomplete information.
 - An explanation in one voice per map: nodes at `game:explain` set it, not
   a choice per reader.
-- Editing in the page: a person models a game through the actions, as an
-  agent does, and the page shows it.
+- Moving a player or a strategy to another place in the order, or renaming
+  a game itself (`items.set` its `title`).

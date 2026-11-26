@@ -302,6 +302,46 @@ const game: Plugin = {
     });
 
     register.register({
+      name: "game.rename",
+      title: "Rename a player or a strategy, keeping the payoffs",
+      input: {
+        type: "object",
+        properties: {
+          game: { type: "string" },
+          player: { type: "string" },
+          strategy: { type: "string", description: "The player's strategy to rename. Absent: the player is renamed, with its plays links." },
+          to: { type: "string", description: "The new name." },
+        },
+        required: ["game", "player", "to"],
+      },
+      async run(input: { game: Id; player: string; strategy?: string; to: string }, call: ActionContext) {
+        const { item, game: g } = await load(input.game);
+        const p = playerOf(g, input.player);
+        const i = g.players.indexOf(p);
+        const to = input.to.trim();
+        if (!to) refuse("name", "Say the new name in to.");
+        if (input.strategy !== undefined) {
+          if (!p.strategies.includes(input.strategy)) refuse("strategy_unknown", `${p.name} has no strategy ${input.strategy}. It has: ${p.strategies.join(", ")}.`);
+          if (to === input.strategy) return { game: item.id, renamed: to };
+          if (p.strategies.includes(to)) refuse("taken", `${p.name} has ${to} already.`);
+          const next = {
+            players: g.players.map((q) => (q === p ? { ...q, strategies: q.strategies.map((s) => (s === input.strategy ? to : s)) } : q)),
+            payoffs: g.payoffs.map((c) => (c.profile[i] === input.strategy ? { ...c, profile: c.profile.map((s, j) => (j === i ? to : s)) } : c)),
+          };
+          call.write(write(item, next));
+          return { game: item.id, renamed: to };
+        }
+        if (to === p.name) return { game: item.id, renamed: to };
+        if (g.players.some((q) => q.name === to)) refuse("taken", `${to} plays already.`);
+        const facts = write(item, { ...g, players: g.players.map((q) => (q === p ? { ...q, name: to } : q)) });
+        const links = await graph.links(item.id, { type: PLAYS.name, dir: "in" }, { limit: LIMIT_MAX });
+        for (const l of links.items) if (l.fields.as === p.name) facts.push(["-", l.id, "as", p.name], ["+", l.id, "as", to]);
+        call.write(facts);
+        return { game: item.id, renamed: to };
+      },
+    });
+
+    register.register({
       name: "game.analyze",
       title: "Reason a game out",
       input: {

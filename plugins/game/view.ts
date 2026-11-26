@@ -13,12 +13,15 @@
  * response, an outcome every player best-responds in is an equilibrium
  * (ringed), and a strictly dominated strategy is struck through. It reads
  * through find's index, reasons with analysis.ts as `game.analyze` does,
- * and writes only through actions: `game.analyze` ("Keep this analysis"),
+ * and writes only through actions: `game.create` (a new game, from its
+ * title, in the list), `game.payoff`, `game.strategy`, `game.player` and
+ * `game.remove` and `game.rename` (while editing: a cell takes its
+ * payoffs, players and strategies are renamed, added and taken out), `game.analyze` ("Keep this analysis"),
  * and the explain plugin's `explain.game` and `explain.decide` (the game
  * in plain words, from the configured model, with accept and reject).
  */
 import { h } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import htm from "htm";
 import type { ActionInvoke } from "../../spec/action.ts";
 import type { Json } from "../../spec/common.ts";
@@ -51,6 +54,8 @@ interface LiveSession {
 }
 /** The model last picked on this page, kept across games while the page is open. */
 let chosenModel = "";
+/** The game being edited on this page, so a game just made opens in edit. */
+let editing = "";
 
 const STYLE = sheet(`
 .gm { padding:var(--space-3) var(--space-4); overflow:auto; height:100%; box-sizing:border-box; font-size:var(--text-s); display:flex; gap:var(--space-4); }
@@ -58,7 +63,11 @@ const STYLE = sheet(`
 .gm-list div { padding:2px 0; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .gm-list div:hover { color:var(--pick); }
 .gm-list .on { color:var(--pick); font-weight:var(--bold); }
-.gm-main { flex:1; min-width:0; }
+.gm-main { flex:1; min-width:0; overflow-x:auto; }
+@media (max-width:40rem) {
+  .gm { flex-direction:column; gap:var(--space-2); }
+  .gm-list { flex:none; border-right:0; border-bottom:1px solid var(--line); padding:0 0 var(--space-2); }
+}
 .gm-main h2 { font-size:var(--text-l); margin:0 0 var(--space-1); cursor:pointer; }
 .gm-main h2:hover { color:var(--pick); }
 .gm-dim { color:var(--dim); }
@@ -89,6 +98,18 @@ const STYLE = sheet(`
 .gm-stale { opacity:.6; }
 .gm-btn.on { border-color:var(--pick); color:var(--pick); }
 .gm-btn[disabled] { opacity:.6; cursor:default; }
+.gm-in { font:inherit; background:var(--control); color:var(--control-fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:0 var(--space-2); min-width:0; }
+.gm-cell { width:6em; text-align:center; }
+.gm-mx td:has(.gm-edit), .gm-mx td:has(.gm-cell) { min-width:7em; }
+.gm-edit { cursor:text; border-bottom:1px dashed var(--dim); }
+.gm-new { margin-bottom:var(--space-2); }
+.gm-new .gm-in { width:100%; box-sizing:border-box; }
+.gm-players { margin:var(--space-2) 0; display:flex; flex-direction:column; gap:var(--space-1); }
+.gm-pl { display:flex; gap:var(--space-2); align-items:center; flex-wrap:wrap; }
+.gm-pn { font-weight:var(--bold); min-width:6em; }
+.gm-chip { border:1px solid var(--line); border-radius:var(--radius); padding:0 var(--space-1); }
+.gm-chip a, .gm-x { cursor:pointer; margin-left:var(--space-1); color:var(--dim); }
+.gm-chip a:hover, .gm-x:hover { color:var(--failed); }
 .gm-sel { font:inherit; background:var(--control); color:var(--control-fg); border:1px solid var(--control-line); border-radius:var(--radius); }
 `);
 
@@ -107,15 +128,55 @@ function marks(g: Game, a: Analysis) {
   return { best, ne, dom };
 }
 
-/** The payoff matrix: two players as rows and columns; more as one row per outcome. */
-function Matrix({ g, a }: { g: Game; a: Analysis }) {
+/**
+ * A payoff as typed into a cell: one number per player, apart by commas or
+ * spaces (`3, 3`, `-1 2.5`). When it isn't that, what it should be.
+ */
+export function parsePayoff(text: string, players: number): number[] | { error: string } {
+  const parts = text.trim().split(/[\s,;]+/).filter(Boolean);
+  if (parts.length !== players) return { error: `${players} numbers, one per player, in player order` };
+  const out = parts.map(Number);
+  if (out.some((x) => !Number.isFinite(x))) return { error: "numbers only, such as 3, 0" };
+  return out;
+}
+
+/** What an edit answers: nothing when it went through, else the refusal's words. */
+type SetCell = (p: string[], text: string) => Promise<string>;
+
+/** One payoff cell: its numbers, marked; while editing, a click makes it an input (Enter sets it, Escape leaves it). */
+function Cell({ p, v, best, set }: { p: string[]; v: number[] | undefined; best: Set<string>; set?: SetCell }) {
+  const [open, setOpen] = useState(false);
+  const [err, setErr] = useState("");
+  // Focused as it opens (in layout, before paint, so no keystroke is lost), its text selected: typing replaces it.
+  const input = useRef<HTMLInputElement>(null);
+  // Its text is set once, as it opens, never as a prop: a change landing while one types re-renders, and would put it back.
+  useLayoutEffect(() => {
+    if (!open || !input.current) return;
+    input.current.value = v ? v.join(", ") : "";
+    input.current.focus();
+    input.current.select();
+  }, [open]);
+  if (set && open)
+    return html`<span><input class="gm-in gm-cell" ref=${input} onBlur=${() => !err && setOpen(false)} placeholder=${p.map(() => "0").join(", ")}
+      onKeyDown=${async (ev: any) => {
+        if (ev.key === "Escape") return setOpen(false), setErr("");
+        if (ev.key !== "Enter" || ev.target.readOnly) return;
+        ev.target.readOnly = true;
+        const said = await set(p, ev.target.value);
+        ev.target.readOnly = false;
+        setErr(said);
+        if (!said) setOpen(false);
+      }} />${err && html`<div class="gm-err gm-small">${err}</div>`}</span>`;
+  const shown = !v ? html`<span>—</span>` : html`<span>${v.map((x, i) => html`${i ? ", " : ""}<span class=${best.has(`${i}|${key(p)}`) ? "br" : ""}>${x}</span>`)}</span>`;
+  return set ? html`<span class="gm-edit" title="Set what this outcome is worth to each player" onClick=${() => setOpen(true)}>${shown}</span>` : shown;
+}
+
+/** The payoff matrix: two players as rows and columns; more as one row per outcome. With `set`, each cell can be edited. */
+function Matrix({ g, a, set }: { g: Game; a: Analysis; set?: SetCell }) {
   const { best, ne, dom } = marks(g, a);
   const cells = new Map(g.payoffs.map((c) => [key(c.profile), c.payoff]));
-  const Pay = ({ p }: { p: string[] }) => {
-    const v = cells.get(key(p));
-    if (!v) return html`<span>—</span>`;
-    return html`<span>${v.map((x, i) => html`${i ? ", " : ""}<span class=${best.has(`${i}|${key(p)}`) ? "br" : ""}>${x}</span>`)}</span>`;
-  };
+  // Plain calls, not components made here: a component made in a render is new each time, and remounts (an open cell would close).
+  const Pay = ({ p }: { p: string[] }) => html`<${Cell} key=${key(p)} p=${p} v=${cells.get(key(p))} best=${best} set=${set} />`;
   const Strat = ({ i, s }: { i: number; s: string }) => {
     const by = dom.get(`${g.players[i]!.name}|${s}`);
     return html`<span class=${by ? "dom" : ""} title=${by ? `strictly dominated by ${by}` : ""}>${s}</span>`;
@@ -124,9 +185,9 @@ function Matrix({ g, a }: { g: Game; a: Analysis }) {
   if (g.players.length === 2) {
     const [r, c] = g.players as [Game["players"][0], Game["players"][0]];
     return html`<table class="gm-mx">
-      <tr><th>${r.name} ╲ ${c.name}</th>${c.strategies.map((s) => html`<th class="p"><${Strat} i=${1} s=${s} /></th>`)}</tr>
+      <tr><th>${r.name} ╲ ${c.name}</th>${c.strategies.map((s) => html`<th class="p">${Strat({ i: 1, s })}</th>`)}</tr>
       ${r.strategies.map(
-        (rs) => html`<tr><th class="p"><${Strat} i=${0} s=${rs} /></th>${c.strategies.map((cs) => html`<td class=${cls([rs, cs])} title=${ne.has(key([rs, cs])) ? "an equilibrium" : ""}><${Pay} p=${[rs, cs]} /></td>`)}</tr>`,
+        (rs) => html`<tr><th class="p">${Strat({ i: 0, s: rs })}</th>${c.strategies.map((cs) => html`<td class=${cls([rs, cs])} title=${ne.has(key([rs, cs])) ? "an equilibrium" : ""}>${Pay({ p: [rs, cs] })}</td>`)}</tr>`,
       )}
     </table>`;
   }
@@ -134,7 +195,7 @@ function Matrix({ g, a }: { g: Game; a: Analysis }) {
   for (const p of g.players) all = all.flatMap((pre) => p.strategies.map((s) => [...pre, s]));
   return html`<table class="gm-mx">
     <tr>${g.players.map((p) => html`<th class="p">${p.name}</th>`)}<th>payoffs</th></tr>
-    ${all.map((p) => html`<tr>${p.map((s, i) => html`<td><${Strat} i=${i} s=${s} /></td>`)}<td class=${cls(p)}><${Pay} p=${p} /></td></tr>`)}
+    ${all.map((p) => html`<tr>${p.map((s, i) => html`<td>${Strat({ i, s })}</td>`)}<td class=${cls(p)}>${Pay({ p })}</td></tr>`)}
   </table>`;
 }
 
@@ -173,9 +234,98 @@ const view: Plugin = {
       return html`<button class="gm-btn" title="Record this analysis as a finding about the game (game.analyze), superseding the one before" onClick=${go}>Keep this analysis</button>${said && html` <span class=${said.startsWith("refused") ? "gm-err" : "gm-dim"}>${said}</span>`}`;
     };
 
+    /** Runs a game action as the person at the page; answers nothing when it went through, else the refusal's words. */
+    const act = async (action: string, input: Json, what: string, title: string): Promise<{ said: string; output?: Json }> => {
+      const out = await invoke.invoke({ action, input, authority: HUMAN(`${what}, on the game's page`), reason: `${what[0]!.toUpperCase()}${what.slice(1)}${what.includes(title) ? "" : ` in ${title}`}` });
+      return out.ok ? { said: "", output: out.output } : { said: out.refused.message };
+    };
+
+    /** An input that does something on Enter: cleared when it went through, else the refusal shown under it. */
+    const Add = ({ placeholder, on, title }: { placeholder: string; on: (text: string) => Promise<string>; title?: string }) => {
+      const [err, setErr] = useState("");
+      const [busy, setBusy] = useState(false);
+      return html`<span class="gm-add"><input class="gm-in" placeholder=${placeholder} title=${title ?? ""} disabled=${busy}
+        onKeyDown=${async (ev: any) => {
+          if (ev.key !== "Enter" || !ev.target.value.trim() || busy) return;
+          const field = ev.target;
+          setBusy(true);
+          const said = await on(field.value.trim());
+          setBusy(false);
+          setErr(said);
+          if (!said) field.value = "";
+          field.focus();
+        }} />${err && html`<span class="gm-err"> ${err}</span>`}</span>`;
+    };
+
+    /** A name that becomes an input on a click: Enter renames it (on), Escape or leaving it keeps it. */
+    const Rename = ({ name, cls, title, on }: { name: string; cls: string; title: string; on: (to: string) => Promise<string> }) => {
+      const [open, setOpen] = useState(false);
+      const [err, setErr] = useState("");
+      const input = useRef<HTMLInputElement>(null);
+      // Its text is set once, as it opens, never as a prop (see Cell).
+      useLayoutEffect(() => {
+        if (!open || !input.current) return;
+        input.current.value = name;
+        input.current.focus();
+        input.current.select();
+      }, [open]);
+      if (!open) return html`<span class=${cls + " gm-edit"} title=${title} onClick=${() => setOpen(true)}>${name}</span>`;
+      return html`<span><input class="gm-in" ref=${input} size=${Math.max(6, name.length + 2)}
+        onBlur=${() => (setOpen(false), setErr(""))}
+        onKeyDown=${async (ev: any) => {
+          if (ev.key === "Escape") return setOpen(false), setErr("");
+          if (ev.key !== "Enter" || ev.target.readOnly) return;
+          const to = ev.target.value.trim();
+          if (!to || to === name) return setOpen(false);
+          ev.target.readOnly = true;
+          const said = await on(to);
+          ev.target.readOnly = false;
+          setErr(said);
+          if (!said) setOpen(false);
+        }} />${err && html`<span class="gm-err"> ${err}</span>`}</span>`;
+    };
+
+    /** A new game from its title: two players with two strategies each, open in edit, every payoff still to set (game.create). */
+    const NewGame = () =>
+      html`<div class="gm-new"><${Add} placeholder="+ new game: its title" title="Make a game (game.create): two players, two strategies each, to rename and fill in"
+        on=${async (title: string) => {
+          const { said, output } = await act("game.create", { title, players: [{ name: "Player 1", strategies: ["A", "B"] }, { name: "Player 2", strategies: ["A", "B"] }] }, `made the game ${title}`, title);
+          if (said) return said;
+          editing = (output as { id: string }).id;
+          set.set(KEYS.item, editing);
+          return "";
+        }} /></div>`;
+
+    /** While editing: each player's strategies, to add or take out, and players to add or take out (game.strategy, game.player, game.remove). */
+    const Players = ({ row, g }: { row: Row; g: Game }) => {
+      const title = String(row.fields.title ?? row.id);
+      const run = async (action: string, input: Json, what: string) => (await act(action, { game: row.id, ...(input as object) }, what, title)).said;
+      const clears = g.payoffs.length ? `, clearing the ${g.payoffs.length} payoffs set` : "";
+      return html`<div class="gm-players">
+        ${g.players.map(
+          (p) => html`<div class="gm-pl" key=${p.name}>
+            <${Rename} name=${p.name} cls="gm-pn" title=${`Rename ${p.name} (game.rename): payoffs stay`} on=${(to: string) => run("game.rename", { player: p.name, to }, `renamed player ${p.name} to ${to}`)} />
+            ${p.strategies.map((s) => html`<span class="gm-chip" key=${s}><${Rename} name=${s} cls="" title=${`Rename ${s} (game.rename): its payoffs stay`} on=${(to: string) => run("game.rename", { player: p.name, strategy: s, to }, `renamed ${p.name}'s strategy ${s} to ${to}`)} /><a title=${`Take ${s} out, with the payoffs that use it (game.remove)`} onClick=${() => run("game.remove", { player: p.name, strategy: s }, `took strategy ${s} out of ${p.name}`)}>×</a></span>`)}
+            <${Add} placeholder="+ strategy" title=${`Add a strategy to ${p.name} (game.strategy)`} on=${(v: string) => run("game.strategy", { player: p.name, strategies: [v] }, `added strategy ${v} to ${p.name}`)} />
+            <a class="gm-dim gm-x" title=${`Take ${p.name} out${clears} (game.remove)`} onClick=${() => run("game.remove", { player: p.name, clear: true }, `took player ${p.name} out`)}>remove player</a>
+          </div>`,
+        )}
+        <${Add} placeholder="+ player: name" title=${`Add a player${clears} (game.player)`} on=${(v: string) => run("game.player", { name: v, clear: true }, `added player ${v}`)} />
+        <span class="gm-dim">adding or removing a player clears the payoffs set; undo brings them back</span>
+      </div>`;
+    };
+
     const Whole = ({ row }: { row: Row }) => {
+      const [edit, setEdit] = useState(editing === row.id);
+      useEffect(() => setEdit(editing === row.id), [row.id]);
       const g = asGame(row);
       const a = analyze(g);
+      const title = String(row.fields.title ?? row.id);
+      const setCell: SetCell = async (p, text) => {
+        const v = parsePayoff(text, g.players.length);
+        if (!Array.isArray(v)) return v.error;
+        return (await act("game.payoff", { game: row.id, cells: [{ profile: p, payoff: v }] }, `set what (${p.join(", ")}) is worth`, title)).said;
+      };
       const findings = index
         .linksOf(row.id)
         .filter((l) => l.type === "about" && l.to === row.id)
@@ -185,7 +335,9 @@ const view: Plugin = {
         <h2 title="Open on the Landscape" onClick=${() => (set.set(KEYS.view, "field/field"), set.set(KEYS.item, row.id))}>${String(row.fields.title ?? row.id)}</h2>
         <div class="gm-dim">${g.players.map((p) => `${p.name} (${p.strategies.length})`).join(" · ") || "No players yet"} · ${String(row.fields.status ?? "")}</div>
         ${typeof row.fields.note === "string" && html`<p class="gm-note">${row.fields.note}</p>`}
-        ${g.players.length >= 2 && html`<${Matrix} g=${g} a=${a} />`}
+        <div class="gm-bar"><button class=${"gm-btn" + (edit ? " on" : "")} title="Set payoffs, and add or take out players and strategies: each change is an action, undone like any other" onClick=${() => ((editing = edit ? "" : row.id), setEdit(!edit))}>${edit ? "Done" : "Edit"}</button>${edit && html`<span class="gm-dim">click a name to rename it, a cell to set its payoffs (one number per player: 3, 0)</span>`}</div>
+        ${edit && html`<${Players} row=${row} g=${g} />`}
+        ${g.players.length >= 2 && html`<${Matrix} g=${g} a=${a} set=${edit ? setCell : undefined} />`}
         <div class="gm-key">underlined: a best response · ringed: an equilibrium · struck: strictly dominated · the first payoff is ${g.players[0]?.name ?? "the first player"}'s</div>
         <ul class="gm-sum">${a.summary.map((l) => html`<li>${l}</li>`)}</ul>
         <div class="gm-bar"><${Keep} row=${row} a=${a} />${findings.map((f) => html`<a class="gm-dim" title=${String(f.fields.note ?? "")} onClick=${() => (set.set(KEYS.view, "field/field"), set.set(KEYS.item, f.id))}>kept ${String(f.fields.as_of ?? "")}</a>`)}</div>
@@ -262,9 +414,9 @@ const view: Plugin = {
       const found = index.run(`type:${TYPE}`, LIMIT).items.filter((r) => r.type === TYPE);
       const shown = found.find((r) => r.id === at) ?? found[0];
       if (!shown)
-        return html`<div class="gm gm-empty">No games on the map yet. An agent models one with <code>game.create</code>, <code>game.payoff</code> and <code>game.analyze</code> (see the game plugin's README).</div>`;
+        return html`<div class="gm"><div class="gm-list"><${NewGame} /></div><div class="gm-main gm-empty">No games on the map yet. Make one here, or an agent models one with <code>game.create</code>, <code>game.payoff</code> and <code>game.analyze</code> (see the game plugin's README).</div></div>`;
       return html`<div class="gm">
-        <div class="gm-list">${found.map((r) => html`<div class=${r === shown ? "on" : ""} onClick=${() => set.set(KEYS.item, r.id)}>${String(r.fields.title ?? r.id)}</div>`)}</div>
+        <div class="gm-list"><${NewGame} />${found.map((r) => html`<div class=${r === shown ? "on" : ""} onClick=${() => set.set(KEYS.item, r.id)}>${String(r.fields.title ?? r.id)}</div>`)}</div>
         <${Whole} row=${shown} />
       </div>`;
     };
