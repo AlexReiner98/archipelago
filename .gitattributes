@@ -1,0 +1,3 @@
+# The archipelago command keeps LF endings on every machine: npm link rewrites
+# a command's endings to LF, so a CRLF checkout would show it as changed.
+bin/* text eol=lf
