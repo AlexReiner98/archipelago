@@ -157,16 +157,52 @@ const isObj = (v: unknown): v is Record<string, Json> => !!v && typeof v === "ob
  * reply's). With `fields`, a field the model wasn't offered is a problem. A
  * null field is absent. Ids come from `newId`.
  */
+/**
+ * The reply's items, through the slips a model makes in the wrapper while
+ * its items are right: the reply wrapped once more under one key (the
+ * tool's or the type's name, `{ "explanation": { "items": [...] } }`),
+ * `items` given as JSON text, or the bare array. The items themselves are
+ * then checked as always. Anything else: what was wrong, in words to send
+ * back, saying what the reply was.
+ */
+export function itemsOf(reply: unknown): unknown[] | string {
+  const asList = (v: unknown): unknown[] | undefined => {
+    if (Array.isArray(v)) return v;
+    if (typeof v === "string") {
+      try {
+        const p = JSON.parse(v) as unknown;
+        if (Array.isArray(p)) return p;
+      } catch {
+        // Not JSON: said below.
+      }
+    }
+    return undefined;
+  };
+  if (Array.isArray(reply)) return reply;
+  if (!isObj(reply)) return `The reply is an object with \`items\`, an array; this reply was ${reply === null ? "null" : typeof reply}.`;
+  if ("items" in reply) {
+    return asList(reply.items) ?? `\`items\` is an array of objects, not ${typeof reply.items === "string" ? "text: give the array itself, not JSON written as a string" : typeof reply.items}.`;
+  }
+  const keys = Object.keys(reply);
+  const only = keys.length === 1 ? reply[keys[0]!] : undefined;
+  if (isObj(only) && "items" in only) {
+    const inner = asList(only.items);
+    if (inner) return inner;
+  }
+  return `The reply is an object with \`items\`, an array, at its top level: { "items": [ ... ] }. This reply's keys were ${keys.map((k) => `\`${k}\``).join(", ") || "none"}.`;
+}
+
 export function factsOf(reply: unknown, t: TypeInfo, newId: () => Id, opts: ShapeOptions & { attach?: { type: string; to: Id }[]; set?: Record<string, Json> } = {}): Made {
   const set = opts.set ?? {};
   const offered = (k: string) => !opts.fields || opts.fields.includes(k);
   const made: Made = { facts: [], ids: {}, names: {}, problems: [] };
   const problem = (code: string, message: string, at?: string) => made.problems.push({ code, message, ...(at ? { at } : {}) });
-  const items = isObj(reply) ? reply.items : undefined;
-  if (!Array.isArray(items)) {
-    problem("typed.shape", "The reply is an object with `items`, an array.", "items");
+  const found = itemsOf(reply);
+  if (typeof found === "string") {
+    problem("typed.shape", found, "items");
     return made;
   }
+  const items = found;
   if (opts.min !== undefined && items.length < opts.min) problem("typed.count", `Give at least ${opts.min} items, not ${items.length}.`, "items");
   if (opts.max !== undefined && items.length > opts.max) problem("typed.count", `Give at most ${opts.max} items, not ${items.length}.`, "items");
   // Refs first, so a link may name an item that comes later.

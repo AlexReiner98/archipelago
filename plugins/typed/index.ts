@@ -42,7 +42,20 @@ export interface TypedConfig {
   model?: ModelConfig | string;
   /** How many times a misfit is sent back before the call fails. Default 1. */
   retries?: number;
+  /** Models by spec, looked up before a spec is made into one: for tests and demos (`{ "scripted": scripted([...]) }`). */
+  models?: Record<string, Model>;
+  /** The specs a caller is offered to choose from (`typed.models`). Default CHOICES. */
+  choices?: string[];
+  /** Where keys are looked for. Default the server's environment. */
+  env?: Record<string, string | undefined>;
 }
+
+/** The specs offered by default. A call may name any spec, these or not. */
+export const CHOICES = ["anthropic:claude-haiku-5-5", "anthropic:claude-sonnet-5-5", "anthropic:claude-opus-5-5", "claude"];
+
+/** The environment variable a spec's key is in, or none (the Claude Code CLI signs in its own way). */
+export const keyFor = (spec: string): string | undefined =>
+  spec.startsWith("anthropic:") ? "ANTHROPIC_API_KEY" : spec.startsWith("openai:") ? "OPENAI_API_KEY" : undefined;
 
 export interface TypedStart {
   /** The type of the items asked for: a base or a flavour. */
@@ -78,8 +91,12 @@ export interface TypedStart {
   max?: number;
   /** How many times a misfit is sent back. Default the config's, else 1. */
   retries?: number;
-  /** The model. Default the configured one. */
-  model?: Model;
+  /**
+   * The model: a spec (`anthropic:<model>`, `openai:<model>`,
+   * `claude[:<model>]`) chosen call by call, or a Model. Default the
+   * configured one.
+   */
+  model?: Model | string;
   /** More facts on the call's run. */
   facts?: Facts;
   /**
@@ -111,6 +128,22 @@ export interface Problem {
 export type TypedResult =
   | { ok: true; run: RunId; type: string; facts: Fact[]; ids: Record<string, Id>; attempts: number; usage: Usage }
   | { ok: false; run: RunId; type: string; problems: Problem[]; attempts: number; usage: Usage };
+
+/**
+ * A call whose model failed (threw: a model not there, a network error, a
+ * CLI that exits badly), rather than answered: the error as it was, with the
+ * call's run, which recorded it, and the model by the name it was asked by.
+ */
+export class CallFailed extends Error {
+  readonly run: RunId;
+  readonly model: string;
+  constructor(run: RunId, model: string, cause: unknown) {
+    super(String((cause as Error)?.message ?? cause), { cause });
+    this.run = run;
+    this.model = model;
+    this.name = "CallFailed";
+  }
+}
 
 /** `typed.ask`, this plugin's own key. */
 export interface TypedAsk {
@@ -161,10 +194,21 @@ const typed: Plugin<TypedConfig> = {
     const invoke = ctx.get<ActionInvoke>("action.invoke");
     const agentRun = ctx.get<AgentRun>("agent.run");
     const exchange = ctx.get<ExchangeRead>("exchange.read");
+    const env = config.env ?? process.env;
+    /** A spec made into a model (a named one first), or refused saying why: no such provider, no key. */
+    const pick = (spec: string): Model => {
+      const named = config.models?.[spec];
+      if (named) return named;
+      try {
+        return modelOf(spec, env)!;
+      } catch (e) {
+        return refuse("model", String((e as Error).message ?? e));
+      }
+    };
     let configured: Model | undefined;
     let unconfigured: string | undefined;
     try {
-      configured = modelOf(config.model);
+      configured = typeof config.model === "string" && config.models?.[config.model] ? config.models[config.model] : modelOf(config.model, env);
     } catch (e) {
       unconfigured = String((e as Error).message ?? e);
     }
@@ -172,7 +216,7 @@ const typed: Plugin<TypedConfig> = {
     const ask = async (start: TypedStart, plugin: string): Promise<TypedResult> => {
       const t = types.get(start.type);
       if (!isType(t)) return refuse("type_unknown", `There is no type ${start.type} now: a base or a flavour of one.`);
-      const model = start.model ?? configured;
+      const model = typeof start.model === "string" && start.model.trim() ? pick(start.model.trim()) : typeof start.model === "object" ? start.model : configured;
       if (!model) return refuse("no_model", unconfigured ?? "No model is configured for typed calls: set the typed plugin's `model`.");
       const made1 = !!start.follow && "made" in start.follow && start.follow.made === true;
       if (start.follow && !made1 && !("item" in start.follow && typeof start.follow.item === "string")) return refuse("follow", "follow is { item, version } or { made: true, version }.");
@@ -184,6 +228,7 @@ const typed: Plugin<TypedConfig> = {
       };
       const schema: JsonSchema = schemaOf(t, types.all().links, shape);
       const retries = Math.max(0, start.retries ?? config.retries ?? 1);
+      const asked = typeof start.model === "string" && start.model.trim() ? start.model.trim() : start.model ? undefined : typeof config.model === "string" ? config.model : undefined;
       let run = "";
       let attempts = 0;
       let usage: Usage = { input: 0, output: 0 };
@@ -197,7 +242,8 @@ const typed: Plugin<TypedConfig> = {
             places: start.places ?? [`typed:${t.name}`],
             ...(start.parent ? { parent: start.parent } : {}),
             ...(followItem ? { follow: followItem } : {}),
-            facts: { ...(start.facts ?? {}), [TYPED]: t.name, model: model.id, caller: plugin },
+            // The model by the name it was asked by (a spec: `claude:<model>`), else the adapter's own id; the adapter's beside it when they differ.
+            facts: { ...(start.facts ?? {}), [TYPED]: t.name, model: asked ?? model.id, ...(asked && asked !== model.id ? { adapter: model.id } : {}), caller: plugin },
           },
           async ({ run: r, said }) => {
             run = r;
@@ -276,6 +322,8 @@ const typed: Plugin<TypedConfig> = {
         );
       } catch (e) {
         if (e instanceof Misfit) return { ok: false, run, type: t.name, problems: e.problems, attempts, usage };
+        // The model failed (an error, not an answer): thrown on with the call's run, so the caller can say where to look.
+        if (run && !(e instanceof Refused)) throw new CallFailed(run, asked ?? model.id, e);
         throw e;
       }
       return { ok: true, run, type: t.name, facts: result!.facts, ids: result!.ids, attempts, usage };
@@ -311,11 +359,29 @@ const typed: Plugin<TypedConfig> = {
           min: { type: "number" },
           max: { type: "number" },
           retries: { type: "number" },
+          model: { type: "string", description: "The model to ask, as a spec: anthropic:<model> (its key in ANTHROPIC_API_KEY on the server), openai:<model>, or claude[:<model>] (the Claude Code CLI). Absent: the server's configured one. typed.models lists those offered." },
         },
         required: ["type", "prompt"],
       },
-      async run(input: Omit<TypedStart, "model" | "facts">, call: ActionContext) {
+      async run(input: Omit<TypedStart, "model" | "facts"> & { model?: string }, call: ActionContext) {
         return (await ask(input, call.caller.plugin)) as unknown as Json;
+      },
+    });
+
+    register.register({
+      name: "typed.models",
+      title: "The models a call can ask",
+      doc: "The specs offered (`model` in typed.ask), whether the server holds each one's key (never the key), and the configured default. Writes nothing.",
+      input: { type: "object", properties: {} },
+      async run() {
+        return {
+          default: configured?.id ?? null,
+          ...(unconfigured ? { unconfigured } : {}),
+          choices: (config.choices ?? CHOICES).map((spec) => {
+            const key = keyFor(spec);
+            return { spec, ready: !!config.models?.[spec] || !key || !!env[key], ...(key ? { key } : {}) };
+          }),
+        };
       },
     });
 
