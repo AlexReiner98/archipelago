@@ -60,6 +60,8 @@ const host = await startBrowser({
     { id: "checks", plugin: "plugins/checks/view.ts", disabled: true },
     { id: "document", plugin: "plugins/document/index.ts" },
     { id: "item", plugin: "plugins/item/index.ts" },
+    // A game's payoff matrix, in Games and on its item page (plugins/game).
+    { id: "game", plugin: "plugins/game/view.ts" },
     { id: "style-view", plugin: "plugins/style/view.ts" },
     { id: "docs", plugin: "plugins/docs/view.ts" },
     { id: "guide", plugin: "plugins/docs/guide.ts" },

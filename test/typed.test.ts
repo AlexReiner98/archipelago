@@ -15,8 +15,8 @@ import exchange from "../plugins/exchange/index.ts";
 import graph from "../plugins/graph/index.ts";
 import schema from "../plugins/schema/index.ts";
 import types from "../plugins/types/index.ts";
-import typed, { retryOf, systemOf, type TypedAsk, type TypedRecord } from "../plugins/typed/index.ts";
-import { factsOf, inReplyWords, schemaOf, strictSubset } from "../plugins/typed/shape.ts";
+import typed, { CallFailed, retryOf, systemOf, type TypedAsk, type TypedRecord } from "../plugins/typed/index.ts";
+import { factsOf, inReplyWords, itemsOf, schemaOf, strictSubset } from "../plugins/typed/shape.ts";
 import { jsonIn, modelOf, scripted, textPrompt } from "../plugins/typed/model.ts";
 
 // ---------- apart from the runtime ----------
@@ -394,4 +394,64 @@ test("the caller's subject by its size, never the prompt's words; follow made: t
 test("system and retry words", () => {
   assert.equal(systemOf(work, undefined, []), "You make items for a map. Each is a work. Reply with one JSON object that matches the schema you are given, and nothing else.");
   assert.equal(retryOf([{ code: "x", message: "One." }, { code: "y", message: "Two." }]), "That reply doesn't fit the map's types:\n- One.\n- Two.\nGive the whole reply again, fixed.");
+});
+
+test("a call names its model by spec: a named one, or refused saying why; typed.models offers them, keys never shown", async () => {
+  const a = scripted([{ items: [{ ref: "a", title: "Sweep", room: "hall" }] }], "a");
+  const { errors, ask, act } = await setup({ models: { "anthropic:fast": a }, env: { OPENAI_API_KEY: "sk-test" }, choices: ["anthropic:fast", "anthropic:slow", "openai:mini", "claude"] });
+  const out = await ask.ask({ type: "chore", prompt: "Plan the hall.", model: "anthropic:fast" });
+  assert.ok(out.ok, JSON.stringify(out));
+  assert.equal(a.asked.length, 1);
+  const viaAction = (await act("typed.ask", { type: "chore", prompt: "x", model: "nope:x" })) as any;
+  assert.equal(viaAction.refused.code, "typed.model");
+  assert.match(viaAction.refused.message, /No model nope:x/);
+  const noKey = (await act("typed.ask", { type: "chore", prompt: "x", model: "anthropic:slow" })) as any;
+  assert.match(noKey.refused.message, /set ANTHROPIC_API_KEY/);
+  const models = ((await act("typed.models", {})) as any).output;
+  assert.equal(models.default, null);
+  assert.deepEqual(models.choices, [
+    { spec: "anthropic:fast", ready: true, key: "ANTHROPIC_API_KEY" },
+    { spec: "anthropic:slow", ready: false, key: "ANTHROPIC_API_KEY" },
+    { spec: "openai:mini", ready: true, key: "OPENAI_API_KEY" },
+    { spec: "claude", ready: true },
+  ]);
+  assert.ok(!JSON.stringify(models).includes("sk-test"));
+  assert.deepEqual(errors, []);
+});
+
+test("a reply's wrapper slips are taken as meant, its items still checked; anything else says what the reply was", async () => {
+  const one = [{ ref: "a", title: "Sweep" }];
+  // Seen from a small model: wrapped under the type's name, then items as JSON text.
+  assert.deepEqual(itemsOf({ chore: { items: one } }), one);
+  assert.deepEqual(itemsOf({ items: JSON.stringify(one) }), one);
+  assert.deepEqual(itemsOf({ chore: { items: JSON.stringify(one) } }), one);
+  assert.deepEqual(itemsOf(one), one);
+  assert.match(itemsOf({ items: "Sweep the hall" }) as string, /not text: give the array itself/);
+  assert.match(itemsOf({ chore: one, other: 1 }) as string, /at its top level.*keys were `chore`, `other`/);
+  assert.match(itemsOf("just words") as string, /this reply was string/);
+
+  // On a call: the wrapped reply fits first time, and a wrong item inside is still a misfit.
+  const { ask } = await setup();
+  const ok = await ask.ask({ type: "chore", prompt: "Plan the hall.", model: scripted([{ chore: { items: JSON.stringify([{ ref: "a", title: "Sweep", room: "hall" }]) } }]) });
+  assert.ok(ok.ok, JSON.stringify(ok));
+  assert.equal(ok.attempts, 1);
+  const bad = await ask.ask({ type: "chore", prompt: "Plan the hall.", retries: 0, model: scripted([{ chore: { items: [{ ref: "a", title: "Sweep", room: "garden" }] } }]) });
+  assert.equal(bad.ok, false);
+});
+
+test("a call's run names the model as it was asked for, and a model that fails is thrown on with the call's run", async () => {
+  const fast = scripted([{ items: [{ ref: "a", title: "Sweep", room: "hall" }] }], "command:claude");
+  const down = scripted([() => { throw new Error("service down"); }], "command:claude");
+  const { ask, read } = await setup({ models: { claude: fast, "claude:gone": down }, env: {} });
+  const ok = await ask.ask({ type: "chore", prompt: "Plan the hall.", model: "claude" });
+  assert.ok(ok.ok);
+  const run = (await read.runs()).items.find((r) => r.run === ok.run)!;
+  assert.deepEqual([run.facts?.model, run.facts?.adapter], ["claude", "command:claude"]);
+
+  const failed = await ask.ask({ type: "chore", prompt: "Plan the hall.", model: "claude:gone" }).catch((e: unknown) => e);
+  assert.ok(failed instanceof CallFailed, String(failed));
+  assert.equal(failed.message, "service down");
+  assert.equal(failed.model, "claude:gone");
+  const last = (await read.events(failed.run)).items.at(-2)!;
+  assert.deepEqual([last.place, last.act?.kind, last.act?.ok], ["reply_end", "reply", false], "the call recorded the failure on its run");
 });
