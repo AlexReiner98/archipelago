@@ -62,6 +62,8 @@ const host = await startBrowser({
     { id: "item", plugin: "plugins/item/index.ts" },
     // A game's payoff matrix, in Games and on its item page (plugins/game).
     { id: "game", plugin: "plugins/game/view.ts" },
+    // The look of a tool people work in, after Impeccable's Operate mode: on the Games page first (plugins/operate).
+    { id: "operate", plugin: "plugins/operate/view.ts", config: { scope: ".gm" } },
     { id: "style-view", plugin: "plugins/style/view.ts" },
     { id: "docs", plugin: "plugins/docs/view.ts" },
     { id: "guide", plugin: "plugins/docs/guide.ts" },
