@@ -108,22 +108,33 @@ const free = (port: number) =>
 /**
  * Holds a page port for this process: `<home>/ports/<port>` made exclusively,
  * so two servers starting at once never take the same one. A hold whose
- * process is gone is taken over.
+ * process is gone is taken over. A hold that goes between the failed create
+ * and its read (its process let the port go) is free: the create is tried
+ * again. An empty one is still being written by the process that made it,
+ * so it is held. `read` is the read of a hold, given only by tests.
  */
-export function holdPort(port: number, pid = process.pid, home = homeOf()): boolean {
+export function holdPort(port: number, pid = process.pid, home = homeOf(), read = (f: string) => readFileSync(f, "utf8")): boolean {
   const file = join(home, "ports", String(port));
   mkdirSync(join(home, "ports"), { recursive: true });
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < 5; i++) {
     try {
       writeFileSync(file, String(pid), { flag: "wx" });
       return true;
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-      const was = Number(readFileSync(file, "utf8"));
-      if (was === pid) return true;
-      if (alive(was)) return false;
-      rmSync(file, { force: true });
     }
+    let text: string;
+    try {
+      text = read(file);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw e;
+    }
+    if (!text.trim()) return false;
+    const was = Number(text);
+    if (was === pid) return true;
+    if (alive(was)) return false;
+    rmSync(file, { force: true });
   }
   return false;
 }
