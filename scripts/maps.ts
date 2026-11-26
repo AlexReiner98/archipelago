@@ -209,7 +209,8 @@ function copyMap(from: string, to: string): void {
 /** The folders that report to a map: those its connect writer wrote an `.mcp.json` into (its ledger, `connect.json`). */
 export function reporting(data: string): string[] {
   try {
-    const ledger = JSON.parse(readFileSync(join(data, "connect.json"), "utf8")) as Record<string, unknown>;
+    // The ledger as the writer keeps it (plugins/project-files saveLedger): `{ files: { <path>: ... } }`.
+    const ledger = (JSON.parse(readFileSync(join(data, "connect.json"), "utf8")) as { files?: Record<string, unknown> }).files ?? {};
     return Object.keys(ledger)
       .filter((f) => /[\\/]\.mcp\.json$/.test(f))
       .map((f) => f.slice(0, -"/.mcp.json".length));
