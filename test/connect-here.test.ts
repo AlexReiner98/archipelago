@@ -16,6 +16,7 @@ import connect from "../plugins/connect/index.ts";
 import { AWAY, FOLDER_STATE, HERE } from "../plugins/connect/folders.ts";
 import connectWrite, { STATUS } from "../plugins/connect/write.ts";
 import { MARK, NAME, wanted } from "../plugins/connect/here.ts";
+import { snapshot } from "../scripts/maps.ts";
 
 const HOOK = "http://127.0.0.1:5381/hook";
 const MCP_URL = "http://127.0.0.1:5381/mcp";
@@ -23,7 +24,7 @@ const REPO = JSON.parse(await readFile(new URL("../plugins/claude-code/settings.
 const probe: Plugin = { id: "probe", inject: ["action.invoke"], apply() {} };
 const wait = (ms = 200) => new Promise((r) => setTimeout(r, ms));
 
-async function tree(dir: string, opts: { writes: boolean }) {
+async function tree(dir: string, opts: { writes: boolean; folder?: string; data?: string; map?: string; maps?: string }) {
   const home = join(dir, "home");
   await mkdir(home, { recursive: true });
   const rt = new Runtime();
@@ -32,9 +33,12 @@ async function tree(dir: string, opts: { writes: boolean }) {
   const modules: Record<string, Plugin> = { graph, action, types, history, connect: connect as Plugin, "connect-write": connectWrite as Plugin, probe };
   const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
+  const data = opts.data ?? join(dir, "data");
+  const named = { ...(opts.map ? { map: opts.map } : {}), maps: opts.maps ?? join(dir, "maps") };
   const config: Record<string, object> = {
-    connect: { hook: HOOK, mcp: MCP_URL, writes: opts.writes, home },
-    "connect-write": { hook: HOOK, mcp: MCP_URL, home, ledger: join(dir, "data", "connect.json") },
+    ...(opts.data ? { graph: { db: join(data, "graph.sqlite") } } : {}),
+    connect: { hook: HOOK, mcp: MCP_URL, writes: opts.writes, home, ...named, ...(opts.folder ? { folder: opts.folder } : {}) },
+    "connect-write": { hook: HOOK, mcp: MCP_URL, home, ledger: join(data, "connect.json"), ...named },
   };
   const entries: Entry[] = Object.keys(modules)
     .filter((id) => opts.writes || id !== "connect-write")
@@ -82,7 +86,7 @@ test("connect.here writes a folder's settings beside the person's and the contex
     assert.ok((await readFile(exclude, "utf8")).includes(MARK));
     const porcelain = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], { cwd: proj, encoding: "utf8" });
     assert.ok(!porcelain.includes(".mcp.json") && !porcelain.includes("settings.local"), "git status stays clean");
-    assert.deepEqual(await status(), { folders: 1, files: 3 });
+    assert.deepEqual(await status(), { folders: 1, files: 3, elsewhere: 0 });
     assert.equal(((await invoke(FOLDER_STATE, { folder: proj })) as unknown as { output: { connected: boolean } }).output.connected, true);
 
     // Away: what it added goes, the rest stays as it was.
@@ -134,6 +138,85 @@ test("connect.here is refused where the server writes no files, and for a folder
     assert.ok(!above.ok && above.refused.code === "connect.folder", "a folder above it");
   } finally {
     await w.loader.apply([]);
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("a map moved in from an older server's data takes its folders over; a map copied from it leaves them to it", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "connect-takeover-"));
+  const proj = join(dir, "proj");
+  await mkdir(proj, { recursive: true });
+  execFileSync("git", ["init", "-q"], { cwd: proj });
+  const settings = join(proj, ".claude", "settings.local.json");
+  const mcp = join(proj, ".mcp.json");
+  const maps = join(dir, "maps");
+  const oldData = join(dir, "old-live", "app", ".data");
+  const liveData = join(maps, "maps", "live");
+  const forkData = join(maps, "maps", "claude-x");
+  const text = async () => [await readFile(settings, "utf8"), await readFile(mcp, "utf8")].join("\n");
+  const commands = (s: { hooks: Record<string, { hooks: { command?: string; url?: string }[] }[]> }) =>
+    Object.values(s.hooks).flatMap((g) => g.flatMap((x) => x.hooks.map((h) => h.command ?? h.url ?? "")));
+
+  // An older live, by port, connects the folder; then it is stopped hard: no unload, its entries stay.
+  const old = await tree(dir, { writes: true, data: oldData, maps });
+  assert.ok((await old.invoke(HERE, { folder: proj })).ok);
+  await wait();
+  assert.ok(commands(JSON.parse(await readFile(settings, "utf8"))).every((c) => c.includes(HOOK)));
+  snapshot(oldData, liveData, { takeover: true });
+
+  // Map live, moved in from that data folder: its writer replaces the old entries with its own.
+  const live = await tree(dir, { writes: true, data: liveData, map: "live", maps });
+  const fork = { loader: undefined as undefined | Awaited<ReturnType<typeof tree>>["loader"] };
+  try {
+    await wait();
+    const s = JSON.parse(await readFile(settings, "utf8"));
+    const cmds = commands(s);
+    assert.ok(cmds.length > 0);
+    assert.ok(cmds.every((c) => c.includes("--map live") && !c.includes(HOOK)), `only live's hooks: ${cmds.join(" | ")}`);
+    const server = JSON.parse(await readFile(mcp, "utf8")).mcpServers[NAME];
+    assert.equal(server.type, "stdio");
+    assert.equal(server.args[1], "live");
+    assert.equal(server.url, undefined, "no port left");
+
+    // A map copied from live brings its connection, on: it leaves the folder to live.
+    const before = await text();
+    snapshot(liveData, forkData);
+    assert.ok(!existsSync(join(forkData, "connect.json")), "a copy brings no ledger");
+    const f = await tree(dir, { writes: true, data: forkData, map: "claude-x", maps });
+    fork.loader = f.loader;
+    await wait();
+    assert.equal(await text(), before, "the folder still reports to live alone");
+    assert.deepEqual(((await f.invoke(STATUS, {})) as unknown as { output: object }).output, { folders: 0, files: 0, elsewhere: 1 });
+    const state = (await f.invoke(FOLDER_STATE, { folder: proj })) as unknown as { output: { connected: boolean; reports_to?: string } };
+    assert.deepEqual([state.output.connected, state.output.reports_to], [false, "live"]);
+    const here = await f.invoke(HERE, { folder: proj });
+    assert.ok(!here.ok && here.refused.code === "connect.elsewhere" && /reports to map live/.test(here.refused.message), JSON.stringify(here));
+    await f.loader.apply([]);
+    assert.equal(await text(), before, "and unloading takes nothing of live's");
+    assert.deepEqual([...old.errors, ...live.errors, ...f.errors], []);
+  } finally {
+    await fork.loader?.apply([]);
+    await live.loader.apply([]);
+    await old.loader.apply([]);
+    await rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  }
+});
+
+test("a server that runs from another worktree (live) is told the checkout people work in: what it offers and connects by default", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "connect-checkout-"));
+  const work = join(dir, "archipelago");
+  await mkdir(work, { recursive: true });
+  const t = await tree(dir, { writes: false, folder: work });
+  try {
+    const state = await t.invoke(FOLDER_STATE, {});
+    assert.ok(state.ok, JSON.stringify(state));
+    assert.equal((state.output as { folder: string }).folder, work, "the default folder is the one named, not the server's own");
+    const setup = await t.invoke("connect.setup", {});
+    assert.ok(setup.ok);
+    assert.equal((setup.output as { folder?: string }).folder, work, "the empty map offers the checkout people work in");
+    assert.deepEqual(t.errors, []);
+  } finally {
+    await t.loader.apply([]);
     await rm(dir, { recursive: true, force: true });
   }
 });

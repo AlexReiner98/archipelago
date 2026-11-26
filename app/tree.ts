@@ -44,6 +44,10 @@ export interface TreeOptions {
   hosts?: string[];
   /** Where the otel plugin sends the exchange as spans (plugins/otel). Absent: it sends nothing. */
   otel?: OtelConfig;
+  /** The checkout people work in, when it isn't the one the server runs from (the live server's): what the page offers to connect. */
+  checkout?: string;
+  /** Which code and map this server is, for the page's header (plugins/serving): its checkout, its map when it serves one by name, its commit. */
+  serving?: { root?: string; map?: string; commit?: string };
 }
 
 /**
@@ -77,9 +81,12 @@ export function pageAccess({ port: PAGE, origins = [], hosts = [] }: Pick<TreeOp
  * The server's config tree. A host that runs the server its own way (more
  * plugins, another front) starts from this tree and adds to it.
  */
-export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], otel = {} }: TreeOptions): Entry[] {
+export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], otel = {}, checkout, serving = {} }: TreeOptions): Entry[] {
   // The app's own origin is the page's: the adapter and the bridge answer it, and a host's in front.
   const access = pageAccess({ port: PAGE, origins, hosts });
+  // A map served by name: the folders connected to it report by that name, so they follow it to any port (plugins/connect).
+  const map = serving.map;
+  const hosted = !!origins.length || !!hosts.length;
   return [
     { id: "graph", plugin: "plugins/graph/index.ts", config: { db: join(data, "graph.sqlite") } },
     { id: "action", plugin: "plugins/action/index.ts" },
@@ -136,13 +143,15 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
     // What a person copies to connect Claude Code: the adapter as this machine reaches it. A host in front sets its own.
     // A folder's sessions are connected from the page, as an item; its files written only by a server that writes and
     // has no host in front (a host never writes hooks into folders on its own machine).
-    { id: "connect", plugin: "plugins/connect/index.ts", config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp`, writes: write && !origins.length && !hosts.length } },
+    { id: "connect", plugin: "plugins/connect/index.ts", config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp`, writes: write && !hosted, ...(checkout ? { folder: checkout } : {}), ...(map ? { map } : {}) } },
     {
       id: "connect-write",
       plugin: "plugins/connect/write.ts",
-      config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp`, ledger: join(data, "connect.json") },
-      disabled: !write || !!origins.length || !!hosts.length,
+      config: { hook: `http://127.0.0.1:${PAGE + 1}/hook`, mcp: `http://127.0.0.1:${PAGE + 1}/mcp`, ledger: join(data, "connect.json"), ...(map ? { map } : {}) },
+      disabled: !write || hosted,
     },
+    // Which map, commit and checkout this is, for the page's header. A host in front shows no folder of its machine.
+    { id: "serving", plugin: "plugins/serving/index.ts", config: { port: PAGE, ...(map ? { map } : {}), ...(serving.commit ? { commit: serving.commit } : {}), ...(serving.root && !hosted ? { checkout: serving.root } : {}) } },
     // A host's way in to its maps (plugins/gate): off until a host in front names where it answers (`at`).
     { id: "gate", plugin: "plugins/gate/index.ts" },
     { id: "docs", plugin: "plugins/docs/index.ts" },

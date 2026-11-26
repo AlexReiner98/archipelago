@@ -16,6 +16,17 @@ and the bridge between them run on 5280, 5281 and 5282. The map is kept in
 adopt onto the map, so a change made there is what the next session loads;
 `npm run dev` is the same server without writing them.
 
+If 5280, 5281 or 5282 is already taken (another Archipelago, or any other
+program), it says which in one line and starts nothing.
+`npm run map -- serve` runs a map on free ports instead, and prints where
+([Live and dev](live-and-dev.md), "Maps by name").
+
+The map lasts as long as that folder. To try it, anywhere will do; for a
+map you mean to keep, clone into a folder you choose and keep, and run the
+live copy from there (the README, "Set it up to keep"). The server says so
+when it starts in a folder that goes away: the system's temp folder, one an
+app made for one session, or a session's own worktree.
+
 ## Look around
 
 - The view picker at the top switches views: **Landscape** (the map, home),

@@ -23,7 +23,7 @@ first run begins ─▶ ◐ First run · <its name>  open ─▶ Harness, on tha
 | [here.ts](here.ts) | server | The `connection` type, and what a connected folder's files hold: the repository's hooks for this adapter, the MCP server, git's exclude lines. Plain data |
 | [folders.ts](folders.ts) | server | `connect.here`, `connect.away`, `connect.folder`: a folder's connection on or off, as a change set (history shows it, undo takes it back). Refused where the server writes no files |
 | [write.ts](write.ts) | server | `connect-write`: each connection that is on written into its folder's files through [project-files](../project-files/README.md), beside what is there; taken out when it goes off, is undone, or the server shuts down (Ctrl+C; after a crash or a hard kill, at its next start, if the connection is off by then). Loaded only when the server writes and has no host in front |
-| [index.ts](index.ts) | server | `connect.setup`, `connect.token` when a token action is named, and the folder actions (folders.ts). Config `writes`, `home`. Injects `action.register`, `types.define`, `graph.read` |
+| [index.ts](index.ts) | server | `connect.setup`, `connect.token` when a token action is named, and the folder actions (folders.ts). Config `writes`, `home`, `folder`. Injects `action.register`, `types.define`, `graph.read` |
 | [view.ts](view.ts) | page | Fills Field's `field.empty`, `over`, and `top` on a guest map. Injects `action.invoke`, `exchange.read`, `exchange.watch`, `here.set`, `slot.fill` |
 
 ## What is copied
@@ -67,6 +67,26 @@ shows it as dots. With no token action, nothing asks for one.
 | `script` | none | Where a hook script is served (`<origin>/hook.ts`): the hooks row is then one command |
 | `name` | `archipelago` | The MCP server's name |
 | `save` | none | On a guest map: where the guest goes to keep it. The page then shows a quiet "save" in `top` |
+| `folder` | the checkout the server runs from | The checkout people work in: what the empty map offers to connect and `connect.here` connects when no folder is named. The live server runs from a worktree of its own, so `live:start` sets it to the checkout live was set up from (`--checkout`, `ARCHIPELAGO_CHECKOUT`) |
+| `map` | none | The map's name, when the server serves one by name (`app/server.ts --map`): a connected folder then reports to the map, not a port. Every hook runs `hook.ts --map <name>` and `.mcp.json` runs `proxy.ts <name>` ([claude-code](../claude-code/README.md)), which find the map's server in the registry on each call; the files stay when the server stops |
+| `maps` | `ARCHIPELAGO_HOME`, or `~/.archipelago` | Where maps by name are kept: to tell whether a folder already reports to another one |
+
+## One map per folder
+
+A folder reports to one map, the one its files name. When a connected
+folder's `.mcp.json` names another map by name, and that map is there, this
+server leaves the folder as it is: the writer skips it (and forgets, never
+takes out, what it once wrote there), `connect.folder` says `reports_to`
+that map, and `connect.here` is refused, naming it. So a map copied from
+live (`npm run map -- serve --from live`), whose connections come with its
+graph, never writes its hooks beside live's.
+
+Files that name a port, an older server's, are taken over. A map started
+from an older server's data folder (`--from ../archipelago-live/app/.data`)
+brings that server's ledger (the writer's config `ledger`, kept beside its data) with it, so its writer replaces
+the old entries with its own, leaving the folder exactly as `connect.here`
+would write it. Stop the old server first: one still running writes its
+own back.
 
 [app/tree.ts](../../app/tree.ts) sets `hook` and `mcp` from the page's port.
 A host in front sets its own address, command and token action.

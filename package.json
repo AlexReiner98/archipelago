@@ -6,8 +6,13 @@
   "engines": {
     "node": ">=22.18.0"
   },
+  "bin": {
+    "archipelago": "bin/archipelago.mjs"
+  },
   "scripts": {
     "check": "tsc -p .",
+    "go": "node bin/archipelago.mjs go",
+    "map": "node --disable-warning=ExperimentalWarning scripts/archipelago.ts",
     "test": "node --test --test-timeout=20000 test/*.test.ts",
     "serve": "node app/server.ts --port 5280",
     "dev": "node app/server.ts --port 5280 --no-write",

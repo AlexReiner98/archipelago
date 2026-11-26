@@ -52,3 +52,33 @@ human or agent) when working in this repository. The
 - To see a change in the browser, `npm run dev` (it writes no skill or
   memory file, so it never competes with a live server) and open
   http://127.0.0.1:5280/app/. Node runs the TypeScript directly: there is no build.
+- When 5280 is taken (another checkout, a worktree), `npm run dev` says so
+  in one line, and `npm run map -- serve`
+  serves a map named after the branch, copied from `live` when there is one,
+  on any free port, and prints where; `npm run map -- ls` lists every server
+  ([guide](guide/live-and-dev.md), "Maps by name").
+
+## Setting it up for someone
+
+When a person asks you to set Archipelago up, or to run a map they will
+keep, follow the README's "Set it up to keep":
+
+- Ask them where their map should live, before anything is cloned: it is
+  their choice, and the map is kept in that folder for as long as they keep
+  it (the clone, and the live worktree beside it that serves map `live`,
+  whose data is in `~/.archipelago/maps/live`). Offer a folder they already keep code in as an example; don't
+  choose for them. Never set a map up in a folder that goes away: the
+  system's temp folder, a folder an app made for your session (a scratch
+  workspace), or a session's own worktree (`.claude/worktrees/`). If your
+  session started in one, say so when you ask.
+- `npm install`, `npm link`, then `archipelago` in the clone: it runs
+  `live:setup` and `live:start` when needed, connects the folder it is run
+  in, and opens the page (any free port; `npm run live:status` says it
+  again). Without `npm link`: `npm run go`.
+- Connect the clone, not the live worktree: `connect.here { folder: <the
+  clone> }`, or the empty map's line. `connect.here` writes the folder's
+  hooks and MCP server; to look first, `connect.folder` reads.
+- Tell them to start their next session in the clone: that folder reports
+  to the map, and your own session may not.
+- Their own folders stay theirs: don't touch a server, branch or folder
+  another session is using.
