@@ -150,7 +150,9 @@ says where each map's server is (`~/.archipelago/servers/<name>.json`, or
 under `ARCHIPELAGO_HOME`), and two scripts read it on every call:
 
 - `hook.ts --map <name>`: the hook, sent to the map's adapter wherever it is;
-  nothing, exit 0, while the map isn't running.
+  nothing, exit 0, while the map isn't running, except when a session starts
+  (or is cleared): then one line, to the person and the agent, that the map
+  is down and `archipelago` starts it.
 - `proxy.ts <name>`: a stdio MCP server passing each message on to the map's
   `/mcp`. When the map moves, it opens a session there with the client's own
   `initialize`; while it is down it answers with no tools, and tells the

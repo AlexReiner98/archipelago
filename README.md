@@ -73,6 +73,16 @@ Then run the live copy, the one your sessions report to:
 ```
 cd <the folder you chose>/archipelago
 npm install
+npm link                  # once: the archipelago command, from any folder
+archipelago               # map live set up and running, this folder connected, its page open
+```
+
+`archipelago` is safe to run any time, from any folder you work in: it
+sets live up and starts it only when needed, connects that folder, and
+opens the page. After a restart, run it again. A connected session that
+starts while live is down says so in one line. Its steps, one at a time:
+
+```
 npm run live:setup        # once: a worktree at main beside this one (../archipelago-live)
 npm run live:start        # map live, detached: it outlives the terminal; also live:stop, live:status
 ```

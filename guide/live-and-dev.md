@@ -93,7 +93,12 @@ npm run map -- serve --map try --from live   # a named map, copied from another 
 npm run map -- up --map live          # detached: outlives the terminal or preview that started it
 npm run map -- ls                     # every server: map, port, commit, checkout, the folders that report to it
 npm run map -- down try
+npm run map -- go                     # jump in: live running, the folder you are in connected, its page open
 ```
+
+`npm link` in a clone puts all of this on the PATH as `archipelago`
+([bin/archipelago.mjs](../bin/archipelago.mjs)): `archipelago ls`,
+`archipelago down try`, and `archipelago` alone for `go`.
 
 | Piece | Is | Kept in |
 |---|---|---|
