@@ -11,7 +11,8 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
-import { claim, defaultMap, freePort, letPortGo, nameFrom, release, servers } from "../scripts/maps.ts";
+import { claim, defaultMap, freePort, letPortGo, nameFrom, release, reporting, servers } from "../scripts/maps.ts";
+import { saveLedger } from "../plugins/project-files/write.ts";
 import { adapterOf, entryOf, serverFile, type Served } from "../plugins/claude-code/registry.ts";
 import { proxy } from "../plugins/claude-code/proxy.ts";
 import { wanted } from "../plugins/connect/here.ts";
@@ -172,6 +173,19 @@ test("a server on fixed ports that are taken says so in one line, and writes not
   } finally {
     holder.close();
   }
+});
+
+test("ls names the folders that report to a map, read from the ledger its writer keeps", async () => {
+  const data = join(home, "maps", "reported");
+  const proj = join(home, "reporting-proj");
+  mkdirSync(join(proj, ".claude"), { recursive: true });
+  // The ledger as the connect writer saves it.
+  await saveLedger(join(data, "connect.json"), {
+    [join(proj, ".claude", "settings.local.json")]: { entries: [] },
+    [join(proj, ".mcp.json")]: { entries: [] },
+  });
+  assert.deepEqual(reporting(data), [proj]);
+  assert.deepEqual(reporting(join(home, "maps", "none")), [], "no ledger: none");
 });
 
 test("the archipelago command says which Node it needs", () => {
