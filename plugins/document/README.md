@@ -7,6 +7,7 @@ with its note, what is part of it nested beneath, work as a checklist.
 | File | Runs | What it is |
 |---|---|---|
 | [outline.ts](outline.ts) | both | What goes where, in what order: pure, rows and links in, an outline out |
+| [marks.ts](marks.ts) | page | Each item's mark, by the spec's rule (spec/style.md): shape from the base, side from the status |
 | [index.ts](index.ts) | page | The view `Document` in `center`. Injects `find.index`, `here.*`, `slot.fill` |
 
 ## What it reads

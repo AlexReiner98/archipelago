@@ -11,7 +11,7 @@ import here from "../plugins/here/index.ts";
 import find, { DRAWS, QUERY, type FindLine } from "../plugins/find/index.ts";
 import { complete, jumpQuery, offered, suggest, type Offer, type Suggestion } from "../plugins/find/suggest.ts";
 import { commandList } from "../plugins/find/line.ts";
-import type { Row, Wire } from "../plugins/find/query.ts";
+import { parse, run, type Row, type Wire } from "../plugins/find/query.ts";
 
 const base = (name: string, open: string[], closed: string[]): TypeInfo => ({ name, base: name, statuses: { open, closed }, fields: COMMON, trial: false, plugin: name });
 const TYPES = new Map([
@@ -180,4 +180,54 @@ test("near: and in: take an item's title as well as its id (underscores for spac
   assert.equal(itemRef(index, "Semantic_HTML"), "i_r");
   assert.equal(itemRef(index, "nothing"), "nothing", "unknown stays as given: it finds nothing");
   assert.deepEqual(run(index, "near:Frontend").items.map((r) => r.id).sort(), ["i_f", "i_r"]);
+});
+
+/** A plan with a hub, its parts, what they depend on, and one item apart. */
+function queryIndex(items: [string, string, string, string][], links: [string, string, string][]) {
+  return {
+    items: new Map<string, Row>(items.map(([id, type, title, status]) => [id, { id, type, fields: { title, status } }])),
+    links: new Map<string, Wire>(links.map(([type, from, to], i) => [`l${i}`, { id: `l${i}`, type, from, to, fields: {} }])),
+    type: (n: string) => TYPES.get(n),
+  };
+}
+
+const QIX = queryIndex(
+  [
+    ["hub", "work", "Track 3", "doing"],
+    ["a", "work", "Base types", "done"],
+    ["b", "work", "Map UI", "doing"],
+    ["c", "bug", "Canvas fit is off", "todo"],
+    ["q", "question", "Where is the edge?", "decided"],
+    ["x", "work", "Something else", "todo"],
+  ],
+  [
+    ["part_of", "a", "hub"],
+    ["part_of", "b", "hub"],
+    ["part_of", "c", "b"],
+    ["depends_on", "b", "a"],
+    ["depends_on", "b", "q"],
+  ],
+);
+
+test("find parses a line into words and terms; empty is is:open", () => {
+  assert.deepEqual(parse(""), { words: [], is: "open" });
+  assert.deepEqual(parse("Map  ui type:work in:hub"), { words: ["map", "ui"], type: "work", in: "hub" });
+  assert.deepEqual(parse("is:closed status:done"), { words: [], is: "closed", status: "done" });
+});
+
+test("find runs a query: words, sides, a type or its base, in: at any depth, near:", () => {
+  const ids = (q: string) => run(QIX, q).items.map((r) => r.id);
+  assert.deepEqual(ids(""), ["hub", "b", "c", "x"]);
+  assert.deepEqual(ids("is:closed"), ["a", "q"]);
+  assert.deepEqual(ids("map"), ["b"]);
+  assert.deepEqual(ids("type:work is:open"), ["hub", "b", "c", "x"], "a flavour matches its base");
+  assert.deepEqual(ids("type:bug"), ["c"]);
+  assert.deepEqual(ids("in:hub").sort(), ["a", "b", "c", "hub"]);
+  assert.deepEqual(ids("near:b").sort(), ["a", "b", "c", "hub", "q"]);
+  assert.deepEqual(ids("id:q"), ["q"]);
+  const r = run(QIX, "in:hub");
+  assert.equal(r.links.length, 4, "only the links among the items drawn");
+  const capped = run(QIX, "is:open", 2);
+  assert.equal(capped.items.length, 2);
+  assert.equal(capped.more, 2);
 });

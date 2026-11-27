@@ -1,8 +1,8 @@
 /**
  * Marks for states, by the spec's rule (spec/style.md): shape from the
  * base, side from where the status sits, never the type's name. The glyph
- * and its colour are the style's tokens. The item page draws by the same
- * rule.
+ * and its colour are the style's tokens. The document marks each item
+ * with it; the item page draws by the same rule.
  */
 import type { Json } from "../../spec/common.ts";
 import type { TypeInfo } from "../../spec/types.ts";

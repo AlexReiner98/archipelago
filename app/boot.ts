@@ -74,9 +74,6 @@ const host = await startBrowser({
     { id: "serving", plugin: "plugins/serving/view.ts" },
     { id: "sync", plugin: "plugins/sync/view.ts" },
     { id: "gate", plugin: "plugins/gate/view.ts" },
-    // Map (plugins/map) and its legend (plugins/legend) are kept but not loaded, so no one sees them
-    // (21 Nov 2026: Field, now Landscape, is home). To use them, add:
-    //   { id: "map", plugin: "plugins/map/index.ts" }, { id: "legend", plugin: "plugins/legend/index.ts" },
     // Examples to copy, off until turned on (plugins/examples): a panel, and a frame of your own.
     { id: "today", plugin: "plugins/examples/today.ts", disabled: true },
     { id: "column", plugin: "plugins/examples/column.ts", disabled: true },
