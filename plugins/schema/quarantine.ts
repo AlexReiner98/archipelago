@@ -38,7 +38,25 @@ CREATE TABLE IF NOT EXISTS record (
   last_made TEXT,
   last_miss TEXT
 );
+CREATE TABLE IF NOT EXISTS known (
+  type TEXT PRIMARY KEY,
+  plugin TEXT NOT NULL,
+  base TEXT,
+  at TEXT NOT NULL
+);
 `;
+
+/**
+ * A type as it was last seen defined: by which plugin, and its base (`link`
+ * for a kind of link). Kept after the type goes, so what is left on the
+ * graph can say whose it was.
+ */
+export interface Known {
+  type: string;
+  plugin: string;
+  base: string;
+  at: string;
+}
 
 /** A type's record: how many items were made of it, how many held sets it caused, and when last. */
 export interface TypeRecord {
@@ -72,7 +90,19 @@ export class Quarantine {
       made: p("INSERT INTO record (type, made, last_made) VALUES (?, ?, ?) ON CONFLICT (type) DO UPDATE SET made = made + excluded.made, last_made = excluded.last_made"),
       missed: p("INSERT INTO record (type, misses, last_miss) VALUES (?, 1, ?) ON CONFLICT (type) DO UPDATE SET misses = misses + 1, last_miss = excluded.last_miss"),
       record: p("SELECT type, made, misses, last_made, last_miss FROM record ORDER BY type"),
+      knew: p("INSERT INTO known (type, plugin, base, at) VALUES (?, ?, ?, ?) ON CONFLICT (type) DO UPDATE SET plugin = excluded.plugin, base = excluded.base, at = excluded.at"),
+      known: p("SELECT type, plugin, base, at FROM known ORDER BY type"),
     };
+  }
+
+  /** Remembers each type defined now, by whom; one that was known already takes its newest definer. */
+  knew(types: Omit<Known, "at">[], at: string): void {
+    for (const t of types) this.q.knew!.run(t.type, t.plugin, t.base, at);
+  }
+
+  /** Every type ever seen defined, with whom it was last defined by. */
+  known(): Known[] {
+    return this.q.known!.all() as unknown as Known[];
   }
 
   /** Counts items made, by type, as of `at`. */

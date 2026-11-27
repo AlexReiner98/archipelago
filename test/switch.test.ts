@@ -14,7 +14,7 @@ import { TYPE as PAGE_TYPE } from "../plugins/page/overlay.ts";
 import { byFolder } from "../plugins/docs/cards.ts";
 import { reference, type PluginDoc } from "../plugins/docs/read.ts";
 import sw, { refused, SET, TYPE, unlocked } from "../plugins/switch/server.ts";
-import { needed, plan, standsOn, stops } from "../plugins/switch/ties.ts";
+import { holds, leftBy, needed, plan, standsOn, stops } from "../plugins/switch/ties.ts";
 
 const doc = (id: string, more: Partial<PluginDoc> = {}): PluginDoc => ({
   id,
@@ -59,6 +59,22 @@ test("ties: what the Plugins view and its switch stand on is needed, the rest ca
   assert.ok(n.has("docs") && n.has("here") && n.has("frame") && n.has("renderer"));
   assert.ok(!n.has("a") && !n.has("v") && !n.has("lone"));
   assert.deepEqual([...needed(ALL, ["c"])].sort(), ["a", "b", "c"]);
+});
+
+test("ties: an off card says what it left without a type; an on card, what its kinds hold", () => {
+  const untyped = [
+    { type: "work", plugin: "work", base: "work", items: 30 },
+    { type: "bug", plugin: "work-bugs", base: "work", items: 12, more: true },
+    { type: "event", items: 4 },
+    { type: "note", plugin: "notes", base: "record", items: 2 },
+  ];
+  const off = doc("work", { parts: ["work", "work-bugs"], entries: [{ id: "work", side: "server", off: true }] });
+  assert.deepEqual(leftBy(off, untyped).map((u) => u.type), ["work", "bug"], "by the card, its parts and its entries");
+  assert.deepEqual(leftBy(doc("lone"), untyped), [], "a type never defined is no card's");
+
+  const on = doc("work", { types: [{ name: "work", count: 30 }, { name: "bug", base: "work", count: 100, more: true }, { name: "chore", base: "work", count: 0 }] });
+  assert.deepEqual(holds(on), { items: 130, more: true, kinds: ["work", "bug"] });
+  assert.deepEqual(holds(doc("lone")), { items: 0, more: false, kinds: [] });
 });
 
 test("plan: a card's entries split by the runtime each is in", () => {

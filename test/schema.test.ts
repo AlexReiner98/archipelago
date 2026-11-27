@@ -32,13 +32,16 @@ const dependsOn: LinkInfo = { name: "depends_on", from: ["work"], to: ["work"], 
 const defined = new Map<string, TypeInfo | LinkInfo>();
 /** Kinds of link held acyclic (types.acyclic), as the broker would answer. */
 const acyclic = new Set<string>();
+/** Who hears the stand-in broker change: `retyped()` tells them, as the broker would when a plugin defines or takes back. */
+const typeWatchers = new Set<() => void>();
+const retyped = () => typeWatchers.forEach((on) => on());
 const types: Plugin = {
   id: "types",
   apply(ctx) {
     ctx.provide<TypesRead>("types.read", () => ({
       all: () => ({ types: [...defined.values()].filter((t): t is TypeInfo => "statuses" in t), links: [...defined.values()].filter((t): t is LinkInfo => !("statuses" in t)) }),
       get: (name) => defined.get(name),
-      watch: () => () => {},
+      watch: (on) => (typeWatchers.add(on), () => void typeWatchers.delete(on)),
     }));
     ctx.provide<TypesAcyclic>("types.acyclic", () => ({
       hold: (link) => (acyclic.add(link), () => void acyclic.delete(link)),
@@ -245,6 +248,47 @@ test("each type's record: what is made of it and the misses it causes, trial fla
     assert.deepEqual([of("event").made, of("event").defined], [1, false]);
     const one = (await s.ok(s.call<Json>("schema.record", { type: "bug" }))).output as unknown as unknown[];
     assert.equal(one.length, 1);
+  } finally {
+    await s.stop();
+  }
+});
+
+test("untyped: items whose type went with its plugin stay, and say whose it was", async () => {
+  const s = await setup();
+  try {
+    await s.ok(s.write(...task("a"), ...task("b"), ["+", "c", "type", "bug"], ["+", "c", "title", "C"], ["+", "l1", "type", "depends_on"], ["+", "l1", "from", "a"], ["+", "l1", "to", "b"]));
+    await s.ok(s.write(["+", "e1", "type", "event"]));
+    type Out = { types: { type: string; plugin?: string; base?: string; items: number; more?: boolean }[] };
+    const untyped = async () => ((await s.ok(s.call<Json>("schema.untyped", {}))).output as unknown as Out).types;
+    assert.deepEqual(await untyped(), [{ type: "event", items: 1 }], "never defined: no plugin to name");
+
+    // The plugin that defined work, bug and depends_on is turned off: their definitions go, the items stay.
+    for (const t of ["work", "bug", "depends_on"]) defined.delete(t);
+    retyped();
+    const gone = await untyped();
+    assert.deepEqual(
+      gone.map((t) => [t.type, t.plugin, t.base, t.items]),
+      [
+        ["work", "types", "work", 2],
+        ["bug", "types", "work", 1],
+        ["depends_on", "types", "link", 1],
+        ["event", undefined, undefined, 1],
+      ],
+      "whose it was first, most items first",
+    );
+    assert.equal((await s.read.get(["a"]))[0]?.fields.title, "A", "the item is unchanged");
+
+    const page = (await s.ok(s.call<Json>("schema.untyped", { type: "work", limit: 1 }))).output as unknown as { items: { id: string; title?: string; status?: string }[]; next?: string };
+    assert.deepEqual(page.items, [{ id: "a", title: "A", status: "todo" }]);
+    const rest = (await s.ok(s.call<Json>("schema.untyped", { type: "work", after: page.next! } as unknown as Json))).output as unknown as { items: { id: string }[]; next?: string };
+    assert.deepEqual(rest.items.map((i) => i.id), ["b"]);
+    assert.equal(rest.next, undefined);
+
+    // Turned back on: nothing is left without its type, and nothing about the items changed.
+    for (const t of [work, bug, dependsOn]) defined.set(t.name, t);
+    retyped();
+    assert.deepEqual((await untyped()).map((t) => t.type), ["event"]);
+    assert.equal((await s.refused(s.call("schema.untyped", { type: "work" }))).code, "schema.defined");
   } finally {
     await s.stop();
   }
