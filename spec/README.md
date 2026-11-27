@@ -34,7 +34,7 @@ surface, and the spec owns the six places of edition 1 and edition 2's
 Edition 3 adds the place `compact` and the person's acts, `decision` and
 `notice` ([agent](agent.md)). Edition 4 says a node's same words once per
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
-([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 12 (draft, not yet accepted) adds `graph.all`, every item a page
+([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 12 adds `graph.all`, every item a page
 at a time, for a checkpoint of the log now that the log is the truth
 ([graph](graph.md)). Edition 11 adds
 `types.acyclic`, kinds of link a plugin holds acyclic, which the schema plugin
@@ -133,9 +133,9 @@ The spec has editions: 1, 2, 3… Plugins don't declare versions of anything.
   word, what it reads now and the edition. Every accepted entry is read
   with the rename applied, so the rename is recorded, never silent, and
   the frozen entries stay as they were accepted.
-- Editions 1 to 11 are accepted (edition 1 on 20 Nov 2026, up to 9 on
-  23 Nov 2026, the first public release, 10 the same day, and 11 on
-  25 Nov 2026): their capabilities' meanings are
+- Editions 1 to 12 are accepted (edition 1 on 20 Nov 2026, up to 9 on
+  23 Nov 2026, the first public release, 10 the same day, 11 on
+  25 Nov 2026, and 12 on 27 Nov 2026): their capabilities' meanings are
   fixed. `ACCEPTED` in common.ts says up to which edition.
 - A test holds it: `test/spec-frozen.test.ts` compares every accepted
   type, capability and term with `test/spec-frozen.json` and fails on any
