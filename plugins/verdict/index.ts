@@ -7,8 +7,11 @@
  * judge.ts, apart from the runtime.
  *
  * It reads the whole record back when it loads, follows each new event and
- * each change to the tree, and judges a run again only when that run (or
- * the tree) changed.
+ * each change to the tree, and keeps per run only a digest of it (judge.ts,
+ * RunDigest), never its events. A run is judged again from its digest when
+ * it changed or a node said in it did; a changed node's near misses are
+ * looked for again by reading back, from the exchange, only the runs it
+ * was said in where an act worked at its places (README, "What it holds").
  */
 import type { AgentTree, NodeInfo, RunId } from "../../spec/agent.ts";
 import type { Dispose, Page, PageRequest } from "../../spec/common.ts";
@@ -16,7 +19,7 @@ import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exch
 import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
-import { judgeRun, listeningOf, records, replayOf, slimEvent, type Listening, type NodeRecord, type RunVerdict } from "./judge.ts";
+import { judgeDigest, listeningOf, mayBeNear, missPhrases, newDigest, take, tally, type Listener, type Listening, type NodeRecord, type RunDigest, type RunVerdict } from "./judge.ts";
 
 export type { NodeRecord, RunVerdict, Verdict } from "./judge.ts";
 
@@ -77,12 +80,20 @@ const verdict: Plugin = {
     const tree = ctx.get<AgentTree>("agent.tree");
     const graph = ctx.get<GraphRead>("graph.read");
 
-    /** Events per run by seq, so an event seen twice (read back and watched) counts once. */
-    const events = new Map<RunId, Map<number, ExchangeEvent>>();
+    /** Per run, what judging reads of it (judge.ts, RunDigest): never its events. */
+    const digests = new Map<RunId, RunDigest>();
     /** Runs in the order this plugin first saw them. */
     const order: RunId[] = [];
     const judged = new Map<RunId, RunVerdict[]>();
     const watchers = new Set<(c: VerdictChange) => void>();
+    /** Places, nodes and paths, each kept once. */
+    const strings = new Map<string, string>();
+    const intern = (s: string) => {
+      const had = strings.get(s);
+      if (had !== undefined) return had;
+      strings.set(s, s);
+      return s;
+    };
     let listening: Listening = listeningOf(await withMisses(graph, tree.nodes()));
 
     const notify = (change: VerdictChange) => {
@@ -94,45 +105,121 @@ const verdict: Plugin = {
         }
       }
     };
-    const add = (e: ExchangeEvent) => {
-      let run = events.get(e.run);
-      if (!run) {
-        events.set(e.run, (run = new Map()));
-        order.push(e.run);
+    /** Work that changes verdicts (listening again, reading runs again); a read waits for it. */
+    let work = Promise.resolve();
+    const queue = (job: () => Promise<void>) => {
+      work = work.then(job).catch((err) => ctx.runtime.report(ctx.fiber, err));
+    };
+    const digestFor = (run: RunId) => {
+      let d = digests.get(run);
+      if (!d) {
+        digests.set(run, (d = newDigest(run)));
+        order.push(run);
       }
-      if (run.has(e.seq)) return false;
-      // Only what judging reads: a whole act's body for every run filled the heap (judge.ts, slimEvent).
-      run.set(e.seq, slimEvent(e));
+      return d;
+    };
+    /** Reads a run back from the exchange, a page at a time, into a digest of its own. */
+    const readRun = async (run: RunId, begin?: { cwd?: string; replay_of?: RunId }) => {
+      const d = newDigest(run, begin);
+      for (let ev = await read.events(run, { limit: LIMIT_MAX }); ; ) {
+        for (const e of ev.items) take(d, e, listening, intern);
+        if (!ev.next) break;
+        ev = await read.events(run, { limit: LIMIT_MAX, after: ev.next });
+      }
+      return d;
+    };
+    /**
+     * Looks for a run's near misses again, reading it back from the
+     * exchange with today's places and phrases: the only part of judging
+     * that needs more of an act than its digest keeps. Near misses taken
+     * live while it read stay.
+     */
+    const nearAgain = async (run: RunId) => {
+      const d = digests.get(run);
+      if (!d) return;
+      const again = await readRun(run, d.begun ? { cwd: d.cwd, replay_of: d.replay_of } : undefined);
+      for (const node of new Set([...d.near.keys(), ...again.near.keys()])) {
+        const seqs = [...(again.near.get(node) ?? []), ...(d.near.get(node) ?? []).filter((s) => s > again.last)];
+        if (seqs.length) d.near.set(node, seqs);
+        else d.near.delete(node);
+      }
+      judged.delete(run);
+    };
+    /** Takes an event into its run's digest: false when it was seen already. */
+    const add = (e: ExchangeEvent) => {
+      const d = digestFor(e.run);
+      if (!take(d, e, listening, intern)) return false;
       judged.delete(e.run);
+      if (d.lateBegin) {
+        d.lateBegin = false;
+        queue(async () => {
+          await nearAgain(e.run);
+          notify({ run: e.run });
+        });
+      }
       return true;
     };
-    const eventsOf = (run: RunId) => [...(events.get(run)?.values() ?? [])];
     const verdictsOf = (run: RunId): RunVerdict[] => {
+      const d = digests.get(run);
+      if (!d) return [];
       let v = judged.get(run);
-      if (!v) judged.set(run, (v = judgeRun(run, eventsOf(run), listening)));
+      if (!v) judged.set(run, (v = judgeDigest(d, listening)));
       return v;
     };
     /** Live runs' records, or replays' (a run with `replay_of`): kept apart, so a replay never stands for a live run. */
     const allRecords = (replays = false) =>
-      records(order.filter((run) => !!replayOf(eventsOf(run)) === replays).map((run) => ({ verdicts: verdictsOf(run), events: eventsOf(run) }))).sort((a, b) =>
-        (b.last ?? "").localeCompare(a.last ?? ""),
-      );
+      tally(
+        order
+          .map((run) => digests.get(run)!)
+          .filter((d) => !!d.replay_of === replays)
+          .map((d) => ({ verdicts: verdictsOf(d.run), said: d.said })),
+      ).sort((a, b) => (b.last ?? "").localeCompare(a.last ?? ""));
 
     // Watch first, then read back, so nothing appended in between is lost.
+    // What comes live while reading back waits, so each run is taken in seq order.
+    let held: ExchangeEvent[] | undefined = [];
     live.watch({}, (e) => {
-      if (add(e)) notify({ run: e.run });
+      if (held) held.push(e);
+      else if (add(e)) notify({ run: e.run });
     });
-    /** Reads where the nodes listen and what they prevent again, then judges every run again. */
-    let relisten = Promise.resolve();
-    const listen = () => {
-      relisten = relisten
-        .then(async () => {
-          listening = listeningOf(await withMisses(graph, tree.nodes()));
-          judged.clear();
-          notify({});
-        })
-        .catch((err) => ctx.runtime.report(ctx.fiber, err));
-    };
+    /**
+     * Reads where the nodes listen and what they prevent again. Only the
+     * runs a changed node was said in are judged again; its near misses are
+     * looked for again only where an act worked at its places, by reading
+     * those runs back. Nothing else is read.
+     */
+    const listen = () =>
+      queue(async () => {
+        const was = listening;
+        listening = listeningOf(await withMisses(graph, tree.nodes()));
+        const changed = new Set<string>();
+        const nearChanged = new Set<string>();
+        for (const node of new Set([...was.keys(), ...listening.keys()])) {
+          const a = was.get(node);
+          const b = listening.get(node);
+          if (JSON.stringify(a) === JSON.stringify(b)) continue;
+          changed.add(node);
+          const sig = (l?: Listener) => JSON.stringify(l ? [l.at, missPhrases(l.misses)] : null);
+          if (sig(a) !== sig(b)) nearChanged.add(node);
+        }
+        const again: RunId[] = [];
+        for (const d of digests.values()) {
+          let touched = false;
+          let reread = false;
+          for (const node of changed) {
+            if (!d.said.has(node)) continue;
+            touched = true;
+            if (!nearChanged.has(node)) continue;
+            const l = listening.get(node);
+            if (l && mayBeNear(d, l)) reread = true;
+            else d.near.delete(node);
+          }
+          if (touched) judged.delete(d.run);
+          if (reread) again.push(d.run);
+        }
+        for (const run of again) await nearAgain(run);
+        notify({});
+      });
     tree.watch(listen);
     // A node's misses can change without the tree changing.
     ctx.get<GraphWatch>("graph.watch").watch({ fields: ["misses"] }, listen);
@@ -143,35 +230,44 @@ const verdict: Plugin = {
       page = await read.runs({ limit: LIMIT_MAX, after: page.next });
     }
     // Oldest first, ahead of any run first seen live while reading back.
-    const seenLive = order.splice(0);
     for (const run of past.reverse()) {
-      if (!events.has(run)) events.set(run, new Map());
+      if (digests.has(run)) continue;
+      const d = await readRun(run);
+      digests.set(run, d);
       order.push(run);
-      for (let ev = await read.events(run, { limit: LIMIT_MAX }); ; ) {
-        for (const e of ev.items) add(e);
-        if (!ev.next) break;
-        ev = await read.events(run, { limit: LIMIT_MAX, after: ev.next });
-      }
     }
-    for (const run of seenLive) if (!order.includes(run)) order.push(run);
+    const waiting = held;
+    held = undefined;
+    for (const e of waiting) add(e);
+    for (const d of digests.values()) {
+      if (!d.lateBegin) continue;
+      d.lateBegin = false;
+      queue(() => nearAgain(d.run));
+    }
+    await work;
 
     ctx.provide<VerdictRead>("verdict.read", (_caller, from) => ({
       async run(run) {
+        await work;
         return verdictsOf(run);
       },
       async records(page) {
+        await work;
         return pageOf(allRecords(), page);
       },
       async record(node) {
+        await work;
         return allRecords().find((r) => r.node === node);
       },
       async replayed(node) {
+        await work;
         return allRecords(true).find((r) => r.node === node);
       },
       async verdicts(node, page) {
+        await work;
         const list = [...order]
           .reverse()
-          .flatMap((run) => verdictsOf(run).filter((v) => v.node === node));
+          .flatMap((run) => (digests.get(run)?.said.has(node) ? verdictsOf(run).filter((v) => v.node === node) : []));
         return pageOf(list, page);
       },
       watch(on): Dispose {
