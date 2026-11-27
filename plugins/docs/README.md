@@ -51,7 +51,9 @@ are any.
 - **Composable.** A card's title line is the slot `docs.card.head`, its
   body `docs.card`, a plugin's page `docs.page`, all `many`; each fill gets
   `{ plugin, all }`. This plugin fills the body and the page. The on/off switch
-  is the [switch plugin](../switch/README.md)'s fill in the head.
+  is the [switch plugin](../switch/README.md)'s fill in the head. After the
+  cards, `docs.list` (`many`, each fill gets `{ all }`) holds what belongs
+  to no card: the switch's list of kinds whose plugin is gone.
 - **Entries.** Each card holds its entries in each runtime's config tree
   (`entries`: id, side, off), read from `loader.tree`'s status by position,
   so a switch knows what to turn.

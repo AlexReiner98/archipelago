@@ -14,7 +14,7 @@ import { TYPE as PAGE_TYPE } from "../plugins/page/overlay.ts";
 import { byFolder } from "../plugins/docs/cards.ts";
 import { reference, type PluginDoc } from "../plugins/docs/read.ts";
 import sw, { refused, SET, TYPE, unlocked } from "../plugins/switch/server.ts";
-import { holds, leftBy, needed, plan, standsOn, stops } from "../plugins/switch/ties.ts";
+import { holds, leftBy, needed, orphans, plan, standsOn, stops } from "../plugins/switch/ties.ts";
 
 const doc = (id: string, more: Partial<PluginDoc> = {}): PluginDoc => ({
   id,
@@ -75,6 +75,18 @@ test("ties: an off card says what it left without a type; an on card, what its k
   const on = doc("work", { types: [{ name: "work", count: 30 }, { name: "bug", base: "work", count: 100, more: true }, { name: "chore", base: "work", count: 0 }] });
   assert.deepEqual(holds(on), { items: 130, more: true, kinds: ["work", "bug"] });
   assert.deepEqual(holds(doc("lone")), { items: 0, more: false, kinds: [] });
+});
+
+test("ties: kinds whose plugin is not loaded at all are no card's, and listed on their own", () => {
+  const untyped = [
+    { type: "work", plugin: "work", base: "work", items: 30 },
+    { type: "branch", plugin: "branch", base: "record", items: 78 },
+    { type: "event", items: 4 },
+  ];
+  const all = [doc("work", { entries: [{ id: "work", side: "server", off: true }] }), doc("lone")];
+  assert.deepEqual(orphans(untyped, all).map((u) => u.type), ["branch", "event"], "work's card answers for work; branch's plugin was deleted; event was never defined");
+  assert.deepEqual(orphans(untyped, [...all, doc("branch")]).map((u) => u.type), ["event"], "loaded again, its card answers for it");
+  assert.deepEqual(orphans([], all), []);
 });
 
 test("plan: a card's entries split by the runtime each is in", () => {
