@@ -89,6 +89,17 @@ npm run live:setup        # once: a worktree at main beside this one (../archipe
 npm run live:start        # map live, detached: it outlives the terminal; also live:stop, live:status
 ```
 
+Plugins kept in a folder of their own, such as the learning loop
+(`archipelago-loop`), are added to live once and come back on every start:
+
+```
+npm run map -- plugins add <the loop's folder> --map live
+npm run live:stop; npm run live:start
+```
+
+`live:status` and the page's Plugins view say which folders are loaded
+([Live and dev](guide/live-and-dev.md), "Plugin folders").
+
 Open the address `live:start` prints (any free port; `live:status` says it
 again). Live runs a fixed commit with hot reload off, keeps its map in
 `~/.archipelago/maps/live/`, outside any checkout, and offers to
@@ -100,7 +111,8 @@ started in that folder report to it from then on. Edit and test here
 
 **If an agent sets it up for you,** these are its steps: it asks you where
 your map should live before it clones anything (your choice, not its),
-never works in a folder that goes away, starts live, and connects that
+never works in a folder that goes away, starts live, adds the plugin
+folders you keep (`npm run map -- plugins add <dir> --map live`), and connects that
 folder with `connect.here { folder }` (the page's line does the same). A
 session that began in a temporary folder then tells you to start your
 next session in the clone, since it is the folder that reports to the map.

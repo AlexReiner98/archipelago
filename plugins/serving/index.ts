@@ -5,13 +5,17 @@
  * - `serving.about`: `{ map, commit, checkout, port }`. `map` is the map's
  *   name when the server serves one by name (app/server.ts `--map`), else
  *   absent; `commit` short, with `+` when the checkout has changes;
- *   `checkout` the folder the code runs from, absent behind a host. Read only.
+ *   `checkout` the folder the code runs from, absent behind a host;
+ *   `folders` the plugin folders it loaded, where the list came from
+ *   (`flag`, `env` or `map`) and each named one that didn't load, absent
+ *   behind a host. Read only.
  *
- * Config: `map`, `commit`, `checkout`, `port` (app/tree.ts sets them).
+ * Config: `map`, `commit`, `checkout`, `port`, `folders` (app/tree.ts sets them).
  * Injects action.register.
  */
 import type { ActionRegister } from "../../spec/action.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
+import type { PluginFolders } from "../claude-code/registry.ts";
 
 export const ABOUT = "serving.about";
 
@@ -20,6 +24,7 @@ export interface ServingConfig {
   commit?: string;
   checkout?: string;
   port?: number;
+  folders?: PluginFolders;
 }
 
 export type About = ServingConfig;
@@ -34,14 +39,15 @@ const serving: Plugin<ServingConfig> = {
       ...(config.commit ? { commit: config.commit } : {}),
       ...(config.checkout ? { checkout: config.checkout } : {}),
       ...(config.port ? { port: config.port } : {}),
+      ...(config.folders ? { folders: config.folders } : {}),
     };
     ctx.get<ActionRegister>("action.register").register({
       name: ABOUT,
       title: "Which map, commit and checkout this server is",
-      doc: "The map's name (when served by name), the commit, the checkout and the page's port. Read only.",
+      doc: "The map's name (when served by name), the commit, the checkout, the page's port, and the plugin folders it loaded (and from where). Read only.",
       input: { type: "object", properties: {} },
       async run() {
-        return about as Record<string, string | number>;
+        return about as unknown as Record<string, string | number>;
       },
     });
   },

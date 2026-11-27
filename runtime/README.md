@@ -72,9 +72,22 @@ A new url rebuilds an entry, a new config reloads it, `disabled` unloads it,
 
 Plugins can be kept outside this repository, in a folder of their own
 (another repository), and loaded beside the ones here:
-`node app/server.ts --plugins <dir>`, once for each folder, or
-`ARCHIPELAGO_PLUGINS` with the folders split by the path delimiter, which
-`npm run map -- serve` and live pass on. The folder's `<folder>/archipelago.json`
+`npm run map -- plugins add <dir>` once, and the map loads it on every
+start from then on. The list is kept with the map's data, in
+`<map>/plugins.json` (`{ "folders": [<dir>, …] }`), so `npm run map --
+serve`, `live:start`, `archipelago` and `promote` bring the folders back
+with no variable set; a copy of a map (`--from`, a branch map copied from
+live) loads the same ones. `plugins ls` lists them, `plugins rm <dir|name>`
+takes one out; each takes effect at the next start. `--map live` for live.
+
+For one start only, `node app/server.ts --plugins <dir>` (once for each
+folder), or `ARCHIPELAGO_PLUGINS` with the folders split by the path
+delimiter, which `npm run map -- serve` and live pass on: either wins over
+the map's list. A folder named but not loadable (gone, no manifest, a
+second of one name) is left out in one line, naming it and where the list
+came from; the rest start. Which folders loaded, and from where, are in
+`live:status`, `npm run map -- ls` and the page's Plugins view ("Plugin
+folders", [plugins/serving](../plugins/serving/README.md)). The folder's `<folder>/archipelago.json`
 names it and lists its entries, paths relative to it:
 
 ```json

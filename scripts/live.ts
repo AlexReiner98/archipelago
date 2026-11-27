@@ -12,6 +12,11 @@
  *   node scripts/live.ts rollback                   move live back to the commit before the last promote
  *   node scripts/live.ts copy                       copy live's map to the dev server's (app/.data here)
  *
+ * The plugin folders live loads (the learning loop's, say) are the ones map
+ * live remembers: `npm run map -- plugins add <dir> --map live`, kept in
+ * <home>/maps/live/plugins.json, so every start and promote brings them
+ * back. `status` says which loaded and from where.
+ *
  * The worktree is ../archipelago-live beside this checkout (an older
  * ../archipelago-next-live is used while it is still there), or
  * ARCHIPELAGO_LIVE. The map is <home>/maps/live (ARCHIPELAGO_HOME, default
@@ -103,6 +108,13 @@ async function status(): Promise<void> {
   console.log(`live's worktree at ${short(git(live, "rev-parse", "HEAD"))} in ${live}`);
   const s = servedOf(MAP, home);
   console.log(s ? `map ${MAP} runs (pid ${s.pid}) on http://127.0.0.1:${s.port}/app/, from ${s.checkout}${s.commit ? ` at ${s.commit}` : ""}` : `map ${MAP} isn't running${hasMap(liveData) ? "" : " and has no data yet"}: npm run live:start`);
+  if (s?.plugins) {
+    const p = s.plugins;
+    const from = p.from === "map" ? "remembered by map live" : p.from === "flag" ? "from --plugins" : p.from === "env" ? "from ARCHIPELAGO_PLUGINS" : "";
+    for (const f of p.loaded) console.log(`plugin folder ${f.name} from ${f.dir}${from ? ` (${from})` : ""}`);
+    for (const m of p.missing) console.log(`plugin folder ${m.dir} is not loaded: ${m.why}`);
+    if (!p.loaded.length && !p.missing.length) console.log(`no plugin folder loaded (no learning loop): npm run map -- plugins add <dir> --map live, then npm run live:stop and live:start`);
+  } else if (s) console.log("its commit doesn't say which plugin folders it loaded");
   if (hasMap(oldData) && (await answers(OLD_PAGE))) console.log(`an older live still answers on ${OLD_PAGE}: npm run live:start stops it and moves its data into map ${MAP}${hasMap(liveData) ? " (already done: stop it with node scripts/server.ts stop --root <worktree> --data <worktree>/app/.data)" : ""}`);
 }
 

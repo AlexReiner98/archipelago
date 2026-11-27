@@ -3,6 +3,7 @@
  * Kept apart from the server so a host can start from it (`serverTree`) and
  * add its own plugins, through the same loader.
  */
+import type { PluginFolders } from "../plugins/claude-code/registry.ts";
 import { join } from "node:path";
 import type { Entry } from "../runtime/loader.ts";
 import { localOrigins } from "../runtime/guard.ts";
@@ -58,7 +59,7 @@ export interface TreeOptions {
   /** The checkout people work in, when it isn't the one the server runs from (the live server's): what the page offers to connect. */
   checkout?: string;
   /** Which code and map this server is, for the page's header (plugins/serving): its checkout, its map when it serves one by name, its commit. */
-  serving?: { root?: string; map?: string; commit?: string };
+  serving?: { root?: string; map?: string; commit?: string; folders?: PluginFolders };
 }
 
 /** What the page server is given, so that it answers the same as the adapter and the bridge. */
@@ -120,7 +121,7 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
       disabled: !write || hosted,
     },
     // Which map, commit and checkout this is, for the page's header. A host in front shows no folder of its machine.
-    { id: "serving", plugin: "plugins/serving/index.ts", config: { port: PAGE, ...(map ? { map } : {}), ...(serving.commit ? { commit: serving.commit } : {}), ...(serving.root && !hosted ? { checkout: serving.root } : {}) } },
+    { id: "serving", plugin: "plugins/serving/index.ts", config: { port: PAGE, ...(map ? { map } : {}), ...(serving.commit ? { commit: serving.commit } : {}), ...(serving.root && !hosted ? { checkout: serving.root } : {}), ...(serving.folders && !hosted ? { folders: serving.folders } : {}) } },
     { id: "docs", plugin: "plugins/docs/index.ts" },
     { id: "docs-tool", plugin: "plugins/docs/tool.ts" },
     { id: "words-tool", plugin: "plugins/words/tool.ts" },
