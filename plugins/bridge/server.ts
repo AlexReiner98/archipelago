@@ -44,6 +44,7 @@ export const KEYS = [
   "profile.read",
   "profile.hears",
   "docs.read",
+  "claim.read",
 ] as const;
 
 /** Reads a client keeps a copy of, refreshed when the key's `watch` fires. */
