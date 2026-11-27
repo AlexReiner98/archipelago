@@ -405,8 +405,7 @@ none is picked: that, or a click on the tree's background.
 
 The Run pane's line under its head (the run's context filters) ends with the
 `harness.run` slot: other plugins' marks on the run shown, each fill given
-its `RunInfo` as `run`. The otel plugin's view puts where the run was
-exported there ([otel](../otel/README.md)).
+its `RunInfo` as `run`.
 
 Injects `slot.fill`, `slot.declare`, `slot.read`, `here.*`, `agent.tree`,
 `exchange.read`, `exchange.watch`, `verdict.read`, `action.list`,

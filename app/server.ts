@@ -66,7 +66,7 @@ import { parseArgs } from "node:util";
 import { NodeHost } from "../runtime/node.ts";
 import { serve } from "../runtime/serve.ts";
 import { foldersOf, mounts, pageEntries, readFolders, serverEntries } from "../runtime/folders.ts";
-import { otelFromEnv, pageAccess, serverTree } from "./tree.ts";
+import { pageAccess, serverTree } from "./tree.ts";
 import { temporaryPlace } from "../scripts/place.ts";
 import { claim, commitOf, freePort, hasMap, homeOf, letPortGo, MAP_NAME, mapDir, release, snapshot, sourceOf, takenLine, takenOf, update } from "../scripts/maps.ts";
 
@@ -135,7 +135,6 @@ const tree = [...serverTree({
   data,
   port: PAGE,
   write: values.write,
-  otel: otelFromEnv(process.env),
   serving: { root, ...(map ? { map } : {}), ...(commit ? { commit } : {}) },
   ...(values.checkout ? { checkout: values.checkout } : {}),
 }), ...serverEntries(folders)];
