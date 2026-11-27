@@ -92,3 +92,16 @@ export function holds(doc: PluginDoc): { items: number; more: boolean; kinds: st
 export function orphans(untyped: readonly Untyped[], all: readonly PluginDoc[]): Untyped[] {
   return untyped.filter((u) => !all.some((d) => leftBy(d, [u]).length));
 }
+
+/**
+ * The orphans in two lists, since they mean different things. `gone`: the
+ * plugin that last defined the kind is not loaded. `never`: no plugin was
+ * seen defining it here. A loaded plugin may keep such items as its own
+ * records without defining a type for them (the words plugin's `node`, the
+ * loaded plugin's `loaded`), or they may be older than the schema's memory
+ * of who defined what. Nothing on the map tells those two apart.
+ */
+export function splitOrphans(untyped: readonly Untyped[], all: readonly PluginDoc[]): { gone: Untyped[]; never: Untyped[] } {
+  const o = orphans(untyped, all);
+  return { gone: o.filter((u) => u.plugin !== undefined), never: o.filter((u) => u.plugin === undefined) };
+}
