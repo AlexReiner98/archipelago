@@ -12,8 +12,8 @@ switch ─▶ switch.set ─▶ page item (as page.set writes it) ─▶ page fo
 | File | Runs | What it is |
 |---|---|---|
 | [server.ts](server.ts) | server | `switch.set`, the flavour `server`, and following it. Injects `types.define`, `graph.read`, `graph.watch`, `action.register`, `loader.tree` |
-| [view.ts](view.ts) | page | The switch: a fill of `docs.card.head`. Injects `action.invoke`, `slot.fill` |
-| [ties.ts](ties.ts) | both | What stands on what between cards, what stops, what is needed, what a card leaves without a type |
+| [view.ts](view.ts) | page | The switch: a fill of `docs.card.head`; the kinds without a plugin: a fill of `docs.list`. Injects `action.invoke`, `slot.fill` |
+| [ties.ts](ties.ts) | both | What stands on what between cards, what stops, what is needed, what a card leaves without a type, and which untyped kinds are no card's (`orphans`) |
 
 - **`switch.set`** takes `{ page?, server?, on }`: entry ids of each
   runtime's config tree, and `on` (`null`: as the template has it). The
@@ -33,6 +33,13 @@ switch ─▶ switch.set ─▶ page item (as page.set writes it) ─▶ page fo
   `schema.untyped` ([plugins/schema](../schema/README.md)): one read for
   every card, again whenever a card is turned on or off. Without the schema
   plugin nothing is shown.
+- **Without a plugin** is a list after the cards, for the untyped kinds no
+  card answers for: the plugin that last defined them is not loaded at all
+  (deleted outright, as `branch` was), or none was ever seen defining them.
+  No switch brings those back, so each kind is a row of its own, with its
+  count and the plugin that last defined it; opened, it lists its items,
+  20 at a time (`schema.untyped` with `type`, bounded by `LIMIT_MAX`). The
+  same read of `schema.untyped` serves the cards and this list.
 - **Needed** shows instead of a switch on what the Plugins view, the switch,
   the page following its item, undo and the frame stand on: turning one
   off here would stop the way back. An agent can still call `switch.set`.

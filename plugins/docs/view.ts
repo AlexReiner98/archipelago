@@ -14,7 +14,9 @@
  * Composable: a card's title line is the slot `docs.card.head`, its body
  * `docs.card`, a plugin's page `docs.page`, all `many`, each fill given
  * `{ plugin, all }`. This plugin fills the body and the page; an on/off switch
- * goes in the head.
+ * goes in the head. After the cards, `docs.list` (`many`, each fill given
+ * `{ all }`) holds what belongs to no card, such as the switch's kinds whose
+ * plugin is gone.
  *
  * It invokes no action. What it opens it opens through `here` keys
  * (`find.query` for the Map, `here.run` for the context interface, `docs.plugin` for a
@@ -38,6 +40,8 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 export const HEAD = "docs.card.head";
 export const BODY = "docs.card";
 export const PAGE = "docs.page";
+/** The list of cards, after its sections: what belongs to no card. */
+export const LIST = "docs.list";
 /** The plugin whose page is open. */
 export const OPEN = "docs.plugin";
 /** The page's query, which the Map draws (the find plugin's `here` key). */
@@ -144,6 +148,7 @@ const view: Plugin = {
     declare.declare({ name: HEAD, merge: "many", doc: "A plugin's card, its title line: each fill gets { plugin, all }." });
     declare.declare({ name: BODY, merge: "many", doc: "A plugin's card, its body: each fill gets { plugin, all }." });
     declare.declare({ name: PAGE, merge: "many", doc: "A plugin's own page, section by section: each fill gets { plugin, all }." });
+    declare.declare({ name: LIST, merge: "many", doc: "The list of cards, after its sections: what belongs to no card. Each fill gets { all }." });
     fill.fill({ slot: BODY, name: "about", view: About as any });
     fill.fill({ slot: BODY, name: "counts", view: Counts as any });
     for (const [name, v] of sections(Link)) fill.fill({ slot: PAGE, name, view: v as any });
@@ -152,6 +157,12 @@ const view: Plugin = {
       const [, tick] = useState(0);
       useEffect(() => slots.watch(name, () => tick((x) => x + 1)) as () => void, [name]);
       return html`${slots.fills(name).map((f) => html`<${f.view} key=${`${f.plugin}/${f.name}`} plugin=${plugin} all=${all} />`)}`;
+    };
+    /** What fills the list's end: each gets every card. */
+    const ListFills = ({ all }: { all: PluginDoc[] }) => {
+      const [, tick] = useState(0);
+      useEffect(() => slots.watch(LIST, () => tick((x) => x + 1)) as () => void, []);
+      return html`${slots.fills(LIST).map((f) => html`<${f.view} key=${`${f.plugin}/${f.name}`} all=${all} />`)}`;
     };
 
     /** One plugin: its name (opening its page) and what fills the head, then what fills the body. */
@@ -225,6 +236,7 @@ const view: Plugin = {
               <div class="dk-grid">${l.docs.map((d) => html`<${Card} key=${d.id} plugin=${d} all=${docs} />`)}</div>
             </section>`,
           )}
+          ${docs.length > 0 && html`<${ListFills} all=${docs} />`}
         </div>
       `;
     };

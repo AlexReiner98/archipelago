@@ -10,6 +10,11 @@
  * off card says how many it left (`schema.untyped`, read once for every
  * card, again whenever one is turned on or off). What the Plugins view and the switch themselves stand on has
  * no switch: turning it off here would stop the way back.
+ *
+ * Kinds whose plugin is not loaded at all (deleted, or never seen defined)
+ * are no card's, so no switch shows them: they get a list of their own after
+ * the cards (a fill of `docs.list`), each with its count and, opened, a page
+ * of its items (`schema.untyped` with `type`, PAGE at a time).
  */
 import { h } from "preact";
 import { useEffect, useState } from "preact/hooks";
@@ -20,11 +25,13 @@ import type { SlotFill } from "../../spec/slot.ts";
 import { sheet } from "../../spec/style.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import type { PluginDoc } from "../docs/read.ts";
-import { holds, leftBy, needed, plan, stops, type Untyped } from "./ties.ts";
+import { holds, leftBy, needed, orphans, plan, stops, type Untyped } from "./ties.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
 const SET = "switch.set";
+/** Items of a kind without a plugin read at a time, when its row is opened. */
+export const PAGE = 20;
 
 const SHEET = sheet(`
 .sw { position:relative; display:inline-flex; align-items:center; gap:var(--space-2); font-size:var(--text-s); }
@@ -39,6 +46,16 @@ const SHEET = sheet(`
 .sw-tip b { font-weight:var(--bold); }
 .sw-err { color:var(--failed); }
 .sw-left { color:var(--moving); white-space:nowrap; }
+.sw-gone > h3 { color:var(--moving); }
+.sw-rows { border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); padding:var(--space-1) var(--space-3); }
+.sw-row { padding:var(--space-1) 0; }
+.sw-row + .sw-row { border-top:1px solid var(--line); }
+.sw-row > button { background:none; border:0; padding:0; font:inherit; color:var(--pick); cursor:pointer; }
+.sw-row > button:hover { text-decoration:underline; }
+.sw-row .sw-was { color:var(--dim); margin-left:var(--space-2); }
+.sw-items { margin:var(--space-1) 0 0; padding-left:var(--space-4); font-size:var(--text-s); }
+.sw-items code { font-family:var(--mono); color:var(--dim); margin-right:var(--space-2); }
+.sw-items button { background:none; border:0; padding:0; font:inherit; color:var(--pick); cursor:pointer; }
 `);
 
 const sw: Plugin = {
@@ -125,6 +142,48 @@ const sw: Plugin = {
       </span>`;
     };
 
+    // ---------- kinds whose plugin is gone: a list after the cards ----------
+
+    type Row = { id: string; title?: string; status?: Json };
+    /** One kind without a plugin: its count, and opened, its items a page at a time. */
+    const Gone = ({ u }: { u: Untyped }) => {
+      const [rows, setRows] = useState<Row[] | undefined>(undefined);
+      const [next, setNext] = useState<string | undefined>(undefined);
+      const [err, setErr] = useState("");
+      const read = async (after?: string) => {
+        const out = await invoke.invoke<Json>({
+          action: "schema.untyped",
+          input: { type: u.type, limit: PAGE, ...(after ? { after } : {}) },
+          authority: { of: "human", basis: "looked at in the Plugins view" },
+          reason: `The items of ${u.type}, whose plugin is gone`,
+        });
+        if (!out.ok) return setErr(out.refused.message);
+        const page = out.output as unknown as { items: Row[]; next?: string };
+        setRows((had) => [...(after ? (had ?? []) : []), ...page.items]);
+        setNext(page.next);
+      };
+      const was = u.plugin ? `last defined by ${u.plugin}, which is not loaded${u.seen ? ` (seen ${u.seen.slice(0, 10)})` : ""}` : "never seen defined here";
+      return html`<div class="sw-row" data-type=${u.type}>
+        <button onClick=${() => (rows ? setRows(undefined) : void read())} aria-expanded=${rows ? "true" : "false"}>${u.type}</button>
+        <span> ${items(u.items, !!u.more)}</span><span class="sw-was">${was}</span>
+        ${err && html`<div class="sw-err">${err}</div>`}
+        ${rows &&
+        html`<ul class="sw-items">
+          ${rows.map((r) => html`<li key=${r.id}><code>${r.id}</code>${r.title ?? ""}${r.status !== undefined ? html` <span class="sw-was">${String(r.status)}</span>` : ""}</li>`)}
+          ${next && html`<li><button onClick=${() => void read(next)}>${PAGE} more</button></li>`}
+        </ul>`}
+      </div>`;
+    };
+    const Gones = ({ all }: { all: PluginDoc[] }) => {
+      const gone = orphans(useUntyped(all), all);
+      if (!gone.length) return null;
+      const n = gone.reduce((s, u) => s + u.items, 0);
+      return html`<section class="dk-list sw-gone">
+        <h3>Without a plugin<span>${items(n, gone.some((u) => u.more))} of ${gone.length} kind${gone.length === 1 ? "" : "s"} no loaded plugin defines. They stay on the map unchanged, but no view drawn from the types shows them, and no switch here brings them back. A plugin that defines the kind again shows them; schema.untyped lists them.</span></h3>
+        <div class="sw-rows">${gone.map((u) => html`<${Gone} key=${u.type} u=${u} />`)}</div>
+      </section>`;
+    };
+
     ctx.effect(() => {
       const style = document.createElement("style");
       style.textContent = SHEET;
@@ -132,6 +191,7 @@ const sw: Plugin = {
       return () => style.remove();
     });
     ctx.get<SlotFill>("slot.fill").fill({ slot: "docs.card.head", name: "switch", view: Switch as any });
+    ctx.get<SlotFill>("slot.fill").fill({ slot: "docs.list", name: "without-a-plugin", view: Gones as any });
   },
 };
 

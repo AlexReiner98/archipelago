@@ -65,6 +65,8 @@ export interface Untyped {
   type: string;
   plugin?: string;
   base?: string;
+  /** When it was last seen defined. */
+  seen?: string;
   items: number;
   more?: boolean;
 }
@@ -79,4 +81,14 @@ export function leftBy(doc: PluginDoc, untyped: readonly Untyped[]): Untyped[] {
 export function holds(doc: PluginDoc): { items: number; more: boolean; kinds: string[] } {
   const kinds = (doc.types ?? []).filter((t) => t.count);
   return { items: kinds.reduce((s, t) => s + (t.count ?? 0), 0), more: kinds.some((t) => t.more), kinds: kinds.map((t) => t.name) };
+}
+
+/**
+ * The untyped kinds no card answers for: the plugin that last defined them is
+ * not loaded at all (deleted, or never added here), or none was ever seen
+ * defining them. No card's switch can bring them back, so the Plugins view
+ * shows them in a list of their own.
+ */
+export function orphans(untyped: readonly Untyped[], all: readonly PluginDoc[]): Untyped[] {
+  return untyped.filter((u) => !all.some((d) => leftBy(d, [u]).length));
 }
