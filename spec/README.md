@@ -5,11 +5,11 @@ be changed silently. Each contract is a TypeScript module (the types) and a
 short doc.
 
 <!-- contracts: written by scripts/contracts.ts from the spec -->
-This is **edition 11**. A capability that came after edition 1 shows the edition it came in.
+This is **edition 12**. A capability that came after edition 1 shows the edition it came in.
 
 | Contract | Capabilities | What it is |
 |---|---|---|
-| [graph](graph.md) | `graph.read` `graph.watch` `graph.stage` `graph.commit` | The graph plugin stores items and links and is the truth. |
+| [graph](graph.md) | `graph.read` `graph.watch` `graph.stage` `graph.commit` `graph.all` (12) | The graph plugin stores items and links. |
 | [action](action.md) | `action.register` `action.list` `action.invoke` `action.attest` (11) | Every change goes through a declared action, whether a person or an agent makes it. |
 | [agent](agent.md) | `agent.node` `agent.tree` `agent.run` `agent.facts` (5) `agent.gate` (5) | Everything the map says to an agent and everything the agent does passes through one service. |
 | [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event for each thing that passes between the map and an agent. |
@@ -34,7 +34,9 @@ surface, and the spec owns the six places of edition 1 and edition 2's
 Edition 3 adds the place `compact` and the person's acts, `decision` and
 `notice` ([agent](agent.md)). Edition 4 says a node's same words once per
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
-([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 11 adds
+([agent](agent.md)), and the read side of profiles ([profile](profile.md)). Edition 12 (draft, not yet accepted) adds `graph.all`, every item a page
+at a time, for a checkpoint of the log now that the log is the truth
+([graph](graph.md)). Edition 11 adds
 `types.acyclic`, kinds of link a plugin holds acyclic, which the schema plugin
 keeps from closing a loop ([types](types.md)), and `action.attest`, a
 change made on a test's word at the version of its inputs

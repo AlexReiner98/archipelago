@@ -4,10 +4,15 @@
  *
  * - `entries` holds the newest sets whole: header, facts, inverse, and
  *   which later set undid it, if one has.
- * - `snapshots` holds what older entries were folded into: the range they
- *   covered, who made them, and their net facts (each field touched, from
- *   the value it had before the range to the value it had after). The
- *   graph is the truth, so this is a record, not something to rebuild from.
+ * - `checkpoints` hold the whole map at one seq, each item's fields, for a
+ *   map whose entries don't reach back to its first change (a journal
+ *   begun late): the log is then the latest checkpoint and every entry
+ *   after it.
+ * - `snapshots` holds what older entries were folded into, when a map
+ *   folds at all (off unless `keep` is set): the range they covered, who
+ *   made them, and their net facts (each field touched, from the value it
+ *   had before the range to the value it had after). The log is the truth:
+ *   snapshots then entries, in order, rebuild every item (`replay`).
  */
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 import type { ChangeSetId, Committed, Fact, Header } from "../../spec/changeset.ts";
@@ -25,6 +30,14 @@ export interface Entry {
   inverse: Fact[];
   /** The set that undid this one, while that undo stands. */
   undoneBy?: ChangeSetId;
+}
+
+/** The whole map at one seq. */
+export interface Checkpoint {
+  n: number;
+  seq: number;
+  at: string;
+  items: number;
 }
 
 export interface Snapshot {
@@ -93,6 +106,8 @@ CREATE TABLE IF NOT EXISTS entries (
 CREATE INDEX IF NOT EXISTS entries_run ON entries (run, seq);
 CREATE TABLE IF NOT EXISTS touches (id TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY (id, seq)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS touches_seq ON touches (seq);
+CREATE TABLE IF NOT EXISTS checkpoints (n INTEGER PRIMARY KEY AUTOINCREMENT, seq INTEGER NOT NULL, at TEXT NOT NULL, items INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS checkpoint_items (n INTEGER NOT NULL, id TEXT NOT NULL, fields TEXT NOT NULL, PRIMARY KEY (n, id)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS snapshots (
   n INTEGER PRIMARY KEY AUTOINCREMENT,
   first INTEGER NOT NULL,
@@ -159,6 +174,10 @@ export class Journal {
       snap: p("INSERT INTO snapshots (first, last, body) VALUES (?, ?, ?)"),
       snaps: p("SELECT n, body FROM snapshots WHERE n < ? ORDER BY n DESC LIMIT ?"),
       covering: p("SELECT n FROM snapshots WHERE first <= ? AND last >= ? LIMIT 1"),
+      forward: p("SELECT * FROM entries WHERE seq > ? ORDER BY seq LIMIT ?"),
+      first: p("SELECT min(seq) AS seq FROM entries"),
+      snapFirst: p("SELECT min(first) AS first FROM snapshots"),
+      snapsUp: p("SELECT body FROM snapshots ORDER BY first"),
     };
     // A journal written before `touches` was kept is indexed once, on open.
     if (!this.db.prepare("SELECT value FROM meta WHERE key = 'touches'").get()) {
@@ -233,6 +252,112 @@ export class Journal {
     const rows = this.q.snaps!.all(before, limit + 1) as { n: number; body: string }[];
     const items = rows.slice(0, limit).map((r) => ({ n: r.n, ...(JSON.parse(r.body) as Omit<Snapshot, "n">) }));
     return rows.length > limit ? { items, next: String(items.at(-1)!.n) } : { items };
+  }
+
+  /** Entries oldest first, after `page.after` (a seq), a page at a time. */
+  since(page?: PageRequest): Page<Entry> {
+    const limit = Math.max(1, Math.min(page?.limit ?? 50, LIMIT_MAX));
+    const rows = this.q.forward!.all(page?.after ? Number(page.after) : 0, limit + 1) as Row[];
+    const items = rows.slice(0, limit).map(entryOf);
+    return rows.length > limit ? { items, next: String(items.at(-1)!.seq) } : { items };
+  }
+
+  /** The last seq the log holds, in an entry or a snapshot; 0 while it is empty. */
+  last(): number {
+    const e = (this.db.prepare("SELECT max(seq) AS seq FROM entries").get() as { seq: number | null }).seq ?? 0;
+    const s = (this.db.prepare("SELECT max(last) AS last FROM snapshots").get() as { last: number | null }).last ?? 0;
+    return Math.max(e, s);
+  }
+
+  /** The latest checkpoint, if one was made. */
+  checkpoint(): Checkpoint | undefined {
+    return this.db.prepare("SELECT n, seq, at, items FROM checkpoints ORDER BY n DESC LIMIT 1").get() as Checkpoint | undefined;
+  }
+
+  /** Keeps the whole map at `seq`: each item's fields, `type` among them. */
+  keepCheckpoint(seq: number, items: Iterable<[string, Record<string, Json>]>): Checkpoint {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const at = new Date().toISOString();
+      const { lastInsertRowid } = this.db.prepare("INSERT INTO checkpoints (seq, at, items) VALUES (?, ?, 0)").run(seq, at);
+      const n = Number(lastInsertRowid);
+      const add = this.db.prepare("INSERT INTO checkpoint_items (n, id, fields) VALUES (?, ?, ?)");
+      let count = 0;
+      for (const [id, fields] of items) {
+        add.run(n, id, JSON.stringify(fields));
+        count++;
+      }
+      this.db.prepare("UPDATE checkpoints SET items = ? WHERE n = ?").run(count, n);
+      this.db.exec("COMMIT");
+      return { n, seq, at, items: count };
+    } catch (err) {
+      this.db.exec("ROLLBACK");
+      throw err;
+    }
+  }
+
+  /** A checkpoint's items, a page at a time, by id. */
+  checkpointItems(n: number, page?: PageRequest): Page<{ id: string; fields: Record<string, Json> }> {
+    const limit = Math.max(1, Math.min(page?.limit ?? 50, LIMIT_MAX));
+    const rows = this.db.prepare("SELECT id, fields FROM checkpoint_items WHERE n = ? AND id > ? ORDER BY id LIMIT ?").all(n, page?.after ?? "", limit + 1) as { id: string; fields: string }[];
+    const items = rows.slice(0, limit).map((r) => ({ id: r.id, fields: JSON.parse(r.fields) as Record<string, Json> }));
+    return rows.length > limit ? { items, next: items.at(-1)!.id } : { items };
+  }
+
+  /**
+   * Whether the log reaches back: its entries begin at the first change, or
+   * a checkpoint holds everything before the entries after it.
+   */
+  reachesBack(): boolean {
+    const begins = this.begins();
+    if (begins === undefined || begins === 1) return true;
+    const cp = this.checkpoint();
+    return !!cp && cp.seq + 1 >= begins;
+  }
+
+  /** Where the log begins: the first seq it holds, in a snapshot or an entry; undefined while it is empty. */
+  begins(): number | undefined {
+    const s = (this.q.snapFirst!.get() as { first: number | null }).first;
+    const e = (this.q.first!.get() as { seq: number | null }).seq;
+    return s ?? e ?? undefined;
+  }
+
+  /**
+   * Every item as the log makes it: each snapshot's net facts, then each
+   * entry's facts, in order, applied to nothing. A field holds the last
+   * value asserted; a retraction empties it; an item with no fields left is
+   * gone. Reads the journal's own store, a row at a time.
+   */
+  replay(): { items: Map<string, Record<string, Json>>; sets: number; from?: number } {
+    const items = new Map<string, Record<string, Json>>();
+    const apply = (facts: Fact[]) => {
+      for (const [op, id, field, value] of facts) {
+        const it = items.get(id) ?? {};
+        if (op === "+") it[field] = value;
+        else if (same(it[field], value)) delete it[field];
+        if (Object.keys(it).length) items.set(id, it);
+        else items.delete(id);
+      }
+    };
+    let sets = 0;
+    // From the start where the entries (and snapshots) reach it; else from the latest checkpoint.
+    const cp = this.begins() === 1 ? undefined : this.checkpoint();
+    if (cp) {
+      for (const r of this.db.prepare("SELECT id, fields FROM checkpoint_items WHERE n = ?").iterate(cp.n) as Iterable<{ id: string; fields: string }>) {
+        items.set(r.id, JSON.parse(r.fields) as Record<string, Json>);
+      }
+    } else {
+      for (const r of this.q.snapsUp!.iterate() as Iterable<{ body: string }>) {
+        const snap = JSON.parse(r.body) as Omit<Snapshot, "n">;
+        apply(snap.facts);
+        sets += snap.count;
+      }
+    }
+    for (const r of this.db.prepare("SELECT facts FROM entries WHERE seq > ? ORDER BY seq").iterate(cp?.seq ?? 0) as Iterable<{ facts: string }>) {
+      apply(JSON.parse(r.facts) as Fact[]);
+      sets++;
+    }
+    return { items, sets, ...(cp ? { from: cp.seq } : {}) };
   }
 
   size(): number {

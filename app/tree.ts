@@ -122,6 +122,8 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
     { id: "schema", plugin: "plugins/schema/index.ts", config: { db: join(data, "schema.sqlite") } },
     { id: "history", plugin: "plugins/history/index.ts", config: { db: join(data, "history.sqlite") } },
     { id: "interchange", plugin: "plugins/interchange/index.ts" },
+    // Syncs this map with another, both ways, on `npm run map -- sync` (plugins/sync).
+    { id: "sync", plugin: "plugins/sync/index.ts", config: { db: join(data, "sync.sqlite"), ...(map ? { name: map } : {}) } },
     { id: "exchange", plugin: "plugins/exchange/index.ts", config: { journal: join(data, "exchange.jsonl") } },
     { id: "agent", plugin: "plugins/agent/index.ts" },
     { id: "git", plugin: "plugins/git/index.ts" },

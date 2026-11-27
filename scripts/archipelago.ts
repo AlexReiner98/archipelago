@@ -7,6 +7,14 @@
  *   up    [--map name] [same options]   the same, detached: it outlives the terminal or preview that started it
  *   down  <map>                         stops the map's server
  *   ls                                  every server: map, port, commit, checkout, the folders that report to it
+ *   sync  <map|url> [--map name] [--dry] [--keep theirs] [--token t]
+ *        syncs the map (default live) with another, both ways: what each
+ *        changed since they last synced, the later change winning field by
+ *        field (plugins/sync). The other is a map served here by name, or a
+ *        server's bridge by url (its token in --token or ARCHIPELAGO_SYNC_TOKEN).
+ *        The first run joins the two (the map's own fields kept where a pair
+ *        differs; --keep theirs keeps the other's). --dry says what would
+ *        go, and writes nothing.
  *   go    [--folder dir] [--no-connect] [--no-open]
  *        jump in: map live set up and running (live:setup, live:start, each
  *        only when needed), the folder you are in connected to it, its page
@@ -30,6 +38,7 @@ import { closeSync, mkdirSync, openSync, rmSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { httpEnd, syncMaps, type Report } from "../plugins/sync/run.ts";
 import { defaultMap, hasMap, homeOf, MAP_NAME, mapDir, reporting, servedOf, serverFile, servers, alive } from "./maps.ts";
 
 const here = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -46,6 +55,9 @@ const { values, positionals } = parseArgs({
     open: { type: "boolean", default: true },
     connect: { type: "boolean", default: true },
     folder: { type: "string" },
+    dry: { type: "boolean", default: false },
+    token: { type: "string" },
+    keep: { type: "string" },
   },
 });
 const verb = positionals[0] ?? "ls";
@@ -218,7 +230,52 @@ switch (verb) {
     console.log(`map live: ${url}`);
     break;
   }
+  case "sync": {
+    const mine = values.map ?? "live";
+    const other = positionals[1];
+    if (!other) {
+      console.log("npm run map -- sync <map|url> [--map name] [--dry] [--keep theirs] [--token t]");
+      process.exit(1);
+    }
+    /** A map served here, by its bridge (two above its page). */
+    const bridgeOf = (map: string): string => {
+      const s = servedOf(map, home);
+      if (!s?.port) {
+        console.log(`map ${map} isn't running: npm run map -- up --map ${map}`);
+        process.exit(1);
+      }
+      return `http://127.0.0.1:${s.port + 2}`;
+    };
+    const far = /^https?:\/\//.test(other) ? httpEnd(other, values.token ?? process.env.ARCHIPELAGO_SYNC_TOKEN) : httpEnd(bridgeOf(other));
+    let r: Report;
+    try {
+      r = await syncMaps(httpEnd(bridgeOf(mine)), far, { dry: values.dry, keep: values.keep === "theirs" ? "b" : "a" });
+    } catch (e) {
+      console.log(`not synced: ${(e as Error).message}`);
+      process.exitCode = 1;
+      break;
+    }
+    const said = (v: { value?: unknown; gone?: true }) => (v.gone ? "taken away" : v.value === undefined ? "unset" : JSON.stringify(v.value).slice(0, 60));
+    console.log(`${r.dry ? "would sync" : "synced"} ${r.a.name} and ${r.b.name}`);
+    console.log(`  ${r.a.name}: ${r.a.read} change sets since the last sync, ${r.dry ? "" : `${r.a.sent} sent (${r.a.facts} facts)`}`);
+    console.log(`  ${r.b.name}: ${r.b.read} change sets since the last sync, ${r.dry ? "" : `${r.b.sent} sent (${r.b.facts} facts)`}`);
+    if (r.joined) {
+      const j = r.joined;
+      console.log(`  first sync, joined: ${j.same} items on both (${j.differed} differed, ${j.kept === "a" ? r.a.name : r.b.name}'s kept), ${j.copied.toB} copied to ${r.b.name}, ${j.copied.toA} to ${r.a.name}${j.ambiguous ? `, ${j.ambiguous} names on more than one item left unpaired` : ""}`);
+    }
+    if (r.plugins) console.log(`  made by a map's own plugins: ${r.plugins.paired} paired with the other's, ${r.plugins.copied} copied`);
+    if (r.conflicts.length) {
+      console.log(`  ${r.conflicts.length} changed on both, the later kept:`);
+      for (const c of r.conflicts) {
+        const won = c.won === "a" ? r.a.name : r.b.name;
+        console.log(`    ${c.title ?? c.id}${c.field ? ` · ${c.field}` : ""}: ${won}'s (${r.a.name}: ${said(c.a)}, ${r.b.name}: ${said(c.b)})`);
+      }
+    }
+    for (const f of r.refused) console.log(`  refused on ${f.to === "a" ? r.a.name : r.b.name}: ${f.item ? `item ${f.item} of ` : ""}set ${f.set}, ${f.code}: ${f.message}`);
+    if (!r.dry) console.log("  each copy is a change set by agent:sync/<the other map>: history.undo takes it back");
+    break;
+  }
   default:
-    console.log("npm run map -- serve|up [--map name] [--from map|dir] [--port n] [--no-write] [--no-watch] | down <map> | ls | go [--folder dir] [--no-connect] [--no-open]");
+    console.log("npm run map -- serve|up [--map name] [--from map|dir] [--port n] [--no-write] [--no-watch] | down <map> | ls | sync <map|url> [--map name] [--dry] [--keep theirs] [--token t] | go [--folder dir] [--no-connect] [--no-open]");
     process.exitCode = 1;
 }

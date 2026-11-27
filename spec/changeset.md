@@ -43,6 +43,8 @@ change first, or a fresh change, resolves it. Nothing is merged silently.
 
 ## What it is not
 
-The graph is the truth. Change sets are a record of how it got there, kept
-by the history plugin, and the journal can be trimmed. Nothing rebuilds the
-graph from them.
+The log of change sets is the truth (decided 27 Nov 2026; it was the
+graph until then). The history plugin keeps every one, and the graph's
+tables are their projection: replayed in order, from nothing, they make
+every item (`history.verify` checks). Maps sync by sending each other their
+change sets.

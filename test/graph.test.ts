@@ -6,7 +6,7 @@ import { test } from "node:test";
 import type { Committed, Header, Proposed } from "../spec/changeset.ts";
 import { inverse } from "../spec/changeset.ts";
 import { Refused } from "../spec/common.ts";
-import type { GraphCommit, GraphRead, GraphStage, GraphWatch } from "../spec/graph.ts";
+import type { GraphAll, GraphCommit, GraphRead, GraphStage, GraphWatch } from "../spec/graph.ts";
 import { LIMIT_MAX } from "../spec/graph.ts";
 import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
@@ -25,7 +25,7 @@ const header: Header = {
 const set = (...facts: Proposed["facts"]): Proposed => ({ header, facts });
 
 async function start(db?: string, stages: Plugin[] = []) {
-  const probe: Plugin = { id: "probe", inject: ["graph.read", "graph.watch", "graph.commit", "graph.stage"], apply() {} };
+  const probe: Plugin = { id: "probe", inject: ["graph.read", "graph.all", "graph.watch", "graph.commit", "graph.stage"], apply() {} };
   const modules: Record<string, Plugin> = { "graph.ts": graph, "probe.ts": probe };
   for (const s of stages) modules[`${s.id}.ts`] = s;
   const rt = new Runtime();
@@ -42,6 +42,7 @@ async function start(db?: string, stages: Plugin[] = []) {
     loader,
     errors,
     read: ctx.get<GraphRead>("graph.read"),
+    all: ctx.get<GraphAll>("graph.all"),
     watch: ctx.get<GraphWatch>("graph.watch"),
     commit: (c: Proposed) => ctx.get<GraphCommit>("graph.commit").commit(c),
     stop: () => loader.apply([]),
@@ -278,4 +279,15 @@ test("a change set logged before spec edition 11 reads with its header's plugin"
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("graph.all (edition 12): every item, a bounded page at a time, in the order each was first made", async () => {
+  const g = await start();
+  const header = { actor: { id: "agent:t", kind: "agent" as const }, authority: { of: "agent" as const, basis: "t" }, plugin: { id: "t" }, action: "t", reason: "t", time: "2026-11-27T00:00:00.000Z" };
+  for (const id of ["c", "a", "b"]) await g.commit({ header, facts: [["+", id, "type", id === "b" ? "link" : "task"], ...(id === "b" ? ([["+", id, "from", "c"], ["+", id, "to", "a"]] as const) : [])] as never });
+  const first = await g.all.all({ limit: 2 });
+  assert.deepEqual([first.items.map((i) => i.id), first.next !== undefined], [["c", "a"], true]);
+  const rest = await g.all.all({ limit: 2, after: first.next! });
+  assert.deepEqual([rest.items.map((i) => i.id), rest.next], [["b"], undefined]);
+  await g.stop();
 });

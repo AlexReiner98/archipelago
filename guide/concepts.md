@@ -27,7 +27,8 @@ turned off, and the loader reads it as a capability
 
 ## The map
 
-The graph holds items and links, and it is the truth. Kinds of item are
+The graph holds items and links, as the log of change sets makes them:
+the log is the truth, and the graph's tables are its projection. Kinds of item are
 declared by plugins ([types](../spec/types.md)). No plugin owns a part of the
 data: a grouping is a link or a query.
 

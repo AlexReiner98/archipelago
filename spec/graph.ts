@@ -36,6 +36,17 @@ export interface GraphRead {
   now(): Promise<Cursor>;
 }
 
+/**
+ * `graph.all`, edition 12: every item, a page at a time, in the order each
+ * was first made. What a checkpoint of the log reads (the history plugin):
+ * the whole map at one seq, for a map whose log doesn't reach back to its
+ * first change.
+ */
+export interface GraphAll {
+  /** At most LIMIT_MAX items a page, in a stable order. */
+  all(page?: PageRequest): Promise<Page<Item>>;
+}
+
 /** What a watcher wants to hear about. Every key narrows; none means all. */
 export interface WatchFilter {
   ids?: Id[];
@@ -90,6 +101,7 @@ export interface Capabilities {
   "graph.watch": GraphWatch;
   "graph.stage": GraphStage;
   "graph.commit": GraphCommit;
+  "graph.all": GraphAll;
 }
 
 export const capabilities: Capability[] = [
@@ -97,4 +109,5 @@ export const capabilities: Capability[] = [
   { key: "graph.watch", since: 1, doc: "Each committed change set touching a filter, in order, resumable from a cursor." },
   { key: "graph.stage", since: 1, doc: "Adds a check or record stage to the write chain." },
   { key: "graph.commit", since: 1, doc: "Sends a change set (changeset format, edition 1) down the write chain; all or nothing." },
+  { key: "graph.all", since: 12, doc: "Every item, a bounded page at a time, in the order each was first made: what a checkpoint of the log reads." },
 ];
