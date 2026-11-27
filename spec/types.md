@@ -93,5 +93,7 @@ Type names are unprefixed (`work`, `part_of`), so data moved from another
 map lands as it is. A taken name is refused, never replaced: two plugins
 can't both define `work`. To replace a base, turn its plugin off and load
 another. Definitions are the defining plugin's effects and go when it
-unloads; what is on the graph stays, and the schema plugin says what no
-longer fits.
+unloads; what is on the graph stays, unchanged, and fits again when the
+type is defined again. Views drawn from the types leave those items out
+meanwhile; the schema plugin lists them (`schema.untyped`, with the plugin
+that last defined each type) and checks what is written to them.

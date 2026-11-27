@@ -13,7 +13,7 @@ switch ─▶ switch.set ─▶ page item (as page.set writes it) ─▶ page fo
 |---|---|---|
 | [server.ts](server.ts) | server | `switch.set`, the flavour `server`, and following it. Injects `types.define`, `graph.read`, `graph.watch`, `action.register`, `loader.tree` |
 | [view.ts](view.ts) | page | The switch: a fill of `docs.card.head`. Injects `action.invoke`, `slot.fill` |
-| [ties.ts](ties.ts) | both | What stands on what between cards, what stops, what is needed |
+| [ties.ts](ties.ts) | both | What stands on what between cards, what stops, what is needed, what a card leaves without a type |
 
 - **`switch.set`** takes `{ page?, server?, on }`: entry ids of each
   runtime's config tree, and `on` (`null`: as the template has it). The
@@ -26,6 +26,13 @@ switch ─▶ switch.set ─▶ page item (as page.set writes it) ─▶ page fo
 - **What else stops** shows on the switch before you flip it: every running
   card that stands on it, however far down. A card stands on the plugins it
   uses and on the plugin whose slot it fills.
+- **What it leaves** shows too. An on card's tip says how many items its
+  kinds hold (the counts on its card): turned off, they stay on the graph
+  unchanged, but no view shows them until it is back on. An off card says
+  how many it left without a type, beside its switch, from
+  `schema.untyped` ([plugins/schema](../schema/README.md)): one read for
+  every card, again whenever a card is turned on or off. Without the schema
+  plugin nothing is shown.
 - **Needed** shows instead of a switch on what the Plugins view, the switch,
   the page following its item, undo and the frame stand on: turning one
   off here would stop the way back. An agent can still call `switch.set`.

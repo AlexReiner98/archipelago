@@ -14,6 +14,7 @@ on its own.
 | `schema.drop` `{ quarantine }` | Stops holding it, with the call's reason; the record stays |
 | `schema.check` `{ facts }` | Would these facts fit? Writes and holds nothing |
 | `schema.record` `{ type? }` | Each type's record: items made of it, held sets it caused, when last, and whether it is a trial flavour; writes nothing |
+| `schema.untyped` `{ type?, limit?, after? }` | Types items on the graph have that no plugin defines now, with the plugin that last defined each and how many items hold it; with `type`, a page of its items; writes nothing |
 
 The record is what the learning loop keeps a trial flavour by, or makes it
 dormant by (decision "How do types grow without creeping?"). A type counts
@@ -51,3 +52,18 @@ Without a `types.read` provider the plugin is inactive and nothing is checked.
 
 Injects `graph.stage`, `graph.read`, `types.read`, `types.acyclic` and `action.register`.
 Node only.
+
+## Left without a type
+
+Turning a plugin off takes back its types, never the items made of them:
+they stay on the graph as they were, and come back into every view when a
+plugin defines the type again. While it is gone, views drawn from the
+types (`find.index` and what reads it) leave them out, so the plugin says
+what is left. It remembers each type it sees defined and by whom (the
+`known` table, beside the record), and `schema.untyped` lists the names it
+knows or has seen items made of that no plugin defines now, each counted
+by `graph.of` up to 5000 (past that, `more`). One a plugin took back names
+that plugin and its base (`link` for a kind of link); one never defined,
+such as a harness's own, names none. The Plugins view's switch shows it
+([plugins/switch](../switch/README.md)). A type defined while the plugin
+was not running (a fresh in-memory store) is only known once it is seen.

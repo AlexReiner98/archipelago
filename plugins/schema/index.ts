@@ -29,6 +29,20 @@ export interface SchemaConfig {
 
 const by = { plugin: "schema" };
 const RELEASE = "schema.release";
+/** How many items of one type `schema.untyped` counts; past it, the count says `more`. */
+export const UNTYPED_COUNT = 5000;
+
+/** A type no plugin defines now that items on the graph still have: whose it was, and how many hold it. */
+export interface Untyped {
+  type: string;
+  /** The plugin that last defined it, and its base (`link` for a kind of link); absent when it was never seen defined. */
+  plugin?: string;
+  base?: string;
+  /** When it was last seen defined. */
+  seen?: string;
+  items: number;
+  more?: true;
+}
 
 const schema: Plugin<SchemaConfig> = {
   id: "schema",
@@ -56,6 +70,31 @@ const schema: Plugin<SchemaConfig> = {
     };
     const quarantine = new Quarantine(config.db);
     ctx.effect(() => () => quarantine.close());
+    // Every type defined, by whom, kept after it goes: what is left on the graph can then say whose it was.
+    const remember = () => {
+      const all = types.all();
+      try {
+        quarantine.knew(
+          [...all.types.map((t) => ({ type: t.name, plugin: t.plugin, base: t.base })), ...all.links.map((l) => ({ type: l.name, plugin: l.plugin, base: "link" }))],
+          new Date().toISOString(),
+        );
+      } catch (err) {
+        ctx.runtime.report(ctx.fiber, err);
+      }
+    };
+    remember();
+    types.watch(remember);
+    /** How many items of a type the graph holds, up to UNTYPED_COUNT; past it, `more`. */
+    const count = async (type: string): Promise<{ items: number; more?: true }> => {
+      let items = 0;
+      let after: string | undefined;
+      do {
+        const page = await graph.of(type, { limit: LIMIT_MAX, ...(after ? { after } : {}) });
+        items += page.items.length;
+        after = page.next;
+      } while (after && items < UNTYPED_COUNT);
+      return after ? { items, more: true } : { items };
+    };
     /** Releases in flight, by their facts, so the stage can mark each applied once it is. */
     const releasing = new Map<string, string>();
 
@@ -194,6 +233,45 @@ const schema: Plugin<SchemaConfig> = {
             return { ...r, ...info };
           });
         return out as unknown as Json;
+      },
+    });
+
+    register.register({
+      name: "schema.untyped",
+      title: "Items whose type no plugin defines now",
+      doc: "Without `type`: each type that items on the graph have but no plugin defines now, with the plugin that last defined it (none: never seen defined, such as a harness's own) and how many items hold it (counted up to 5000; past that, `more`). Those items stay on the graph unchanged, but views drawn from the types leave them out until a plugin defines the type again. With `type`: a page of its items (`limit`, `after`). Writes nothing.",
+      input: {
+        type: "object",
+        properties: {
+          type: { type: "string" },
+          limit: { type: "number" },
+          after: { type: "string" },
+        },
+      },
+      async run(input: { type?: string; limit?: number; after?: string }) {
+        if (input.type !== undefined) {
+          if (types.get(input.type)) throw new Refused({ code: "schema.defined", message: `${input.type} is defined now (by ${types.get(input.type)!.plugin}).`, by });
+          const limit = Math.max(1, Math.min(input.limit ?? 50, LIMIT_MAX));
+          const page = await graph.of(input.type, { limit, ...(input.after ? { after: input.after } : {}) });
+          return {
+            items: page.items.map((it) => ({ id: it.id, ...(typeof it.fields.title === "string" ? { title: it.fields.title } : {}), ...(it.fields.status !== undefined ? { status: it.fields.status } : {}) })),
+            ...(page.next ? { next: page.next } : {}),
+          } as unknown as Json;
+        }
+        // The names items may have: every type ever seen defined, and every one items were made of.
+        const known = new Map(quarantine.known().map((k) => [k.type, k]));
+        const names = new Set([...known.keys(), ...quarantine.record().map((r) => r.type)]);
+        const gone = [...names].filter((n) => !types.get(n)).slice(0, LIMIT_MAX);
+        const out: Untyped[] = [];
+        for (const type of gone) {
+          const n = await count(type);
+          if (!n.items) continue;
+          const k = known.get(type);
+          out.push({ type, ...(k ? { plugin: k.plugin, base: k.base, seen: k.at } : {}), ...n });
+        }
+        // Those a plugin took away first, then the ones never defined; most items first.
+        out.sort((a, b) => Number(!a.plugin) - Number(!b.plugin) || b.items - a.items || a.type.localeCompare(b.type));
+        return { types: out } as unknown as Json;
       },
     });
 

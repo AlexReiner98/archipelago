@@ -59,3 +59,24 @@ export function plan(entries: EntryDoc[], on: boolean): { page: string[]; server
   const ids = (side: string) => entries.filter((e) => e.side === side).map((e) => e.id);
   return { page: ids("page"), server: ids("server"), on };
 }
+
+/** A type no plugin defines now, as `schema.untyped` gives it: the plugin that last defined it, and how many items hold it. */
+export interface Untyped {
+  type: string;
+  plugin?: string;
+  base?: string;
+  items: number;
+  more?: boolean;
+}
+
+/** What a card leaves on the graph without its type, now that it is off: the untyped kinds its plugins defined last. */
+export function leftBy(doc: PluginDoc, untyped: readonly Untyped[]): Untyped[] {
+  const ids = new Set([doc.id, ...(doc.parts ?? []), ...(doc.entries ?? []).map((e) => e.id)]);
+  return untyped.filter((u) => u.plugin !== undefined && ids.has(u.plugin));
+}
+
+/** How many items a card's kinds hold, from the counts on its card; `more` when one was past its page. */
+export function holds(doc: PluginDoc): { items: number; more: boolean; kinds: string[] } {
+  const kinds = (doc.types ?? []).filter((t) => t.count);
+  return { items: kinds.reduce((s, t) => s + (t.count ?? 0), 0), more: kinds.some((t) => t.more), kinds: kinds.map((t) => t.name) };
+}
