@@ -11,7 +11,8 @@
  *   server (`bridge.link`), and the newest change with its undo.
  *
  * It meets the harness through `here.run`: a run picked here is the run the
- * harness shows, and `⇢` opens it there. The harness keeps what was said and
+ * harness shows, and `⇢` opens it there, when the learning loop's harness is
+ * loaded. The harness keeps what was said and
  * done in a run; this keeps what it changed. People only look and undo:
  * every write is `history.undo`, through `action.invoke`.
  */
@@ -27,7 +28,7 @@ import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { HereRead, HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
-import type { SlotFill } from "../../spec/slot.ts";
+import { fillKey, type SlotFill, type SlotRead } from "../../spec/slot.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import type { BridgeLink } from "../bridge/client.ts";
 import { sheet } from "../../spec/style.ts";
@@ -97,7 +98,7 @@ const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 const activity: Plugin = {
   id: "activity",
   about: "What agents are doing and what they changed, with an undo on each change.",
-  inject: ["slot.fill", "here.read", "here.set", "exchange.read", "exchange.watch", "graph.read", "graph.watch", "action.invoke", "bridge.link"],
+  inject: ["slot.fill", "slot.read", "here.read", "here.set", "exchange.read", "exchange.watch", "graph.read", "graph.watch", "action.invoke", "bridge.link"],
   apply(ctx: Context) {
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
@@ -224,9 +225,12 @@ const activity: Plugin = {
       set.set(THEN_FROM, `c${c.seq - 1}`);
       set.set(KEYS.view, THEN);
     };
+    // The Context interface is the learning loop's (a plugin folder of its own): without it, a run has no ⇢ and is only picked.
+    const views = ctx.get<SlotRead>("slot.read");
+    const harnessOn = () => views.fills("center").some((f) => fillKey(f) === HARNESS);
     const openRun = (run: string) => {
       set.set(KEYS.run, run);
-      set.set(KEYS.view, HARNESS);
+      if (harnessOn()) set.set(KEYS.view, HARNESS);
     };
 
     // ---------- the view ----------
@@ -271,7 +275,7 @@ const activity: Plugin = {
           <span class="x">${title ?? g.key.slice(4, 12)}</span>
           <span class="av-n">${day(g.run?.started ?? g.last)}${g.run?.ended ? `–${clock(g.run.ended)}` : g.run ? ` · ${state}` : ""}</span>
           <span class="av-n">${plural(g.changes.length, "change")}</span>
-          ${g.key.startsWith("run:") && html`<button class="av-btn" title="Show what was said and done in the harness" onClick=${(e: Event) => (e.stopPropagation(), openRun(g.key.slice(4)))}>⇢ harness</button>`}
+          ${g.key.startsWith("run:") && harnessOn() && html`<button class="av-btn" title="Show what was said and done in the harness" onClick=${(e: Event) => (e.stopPropagation(), openRun(g.key.slice(4)))}>⇢ harness</button>`}
         </div>
         ${open && g.changes.map((c) => html`<${ChangeRows} key=${c.id} c=${c} />`)}
       `;

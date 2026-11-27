@@ -120,7 +120,7 @@ minutes apart (a tab per round, the latest first).
 
 The page key `claim.plan` holds the same data for any other look or query.
 
-A replay ([replay](../replay/README.md)) plays a past run again to judge a
+A replay ([replay](https://github.com/AlexReiner98/archipelago-loop/blob/main/replay/README.md)) plays a past run again to judge a
 trial node: it is not an agent working now, so the nodes leave it alone.
 
 ## How long a hold lasts

@@ -45,8 +45,9 @@ changed between two points (`history.diff`, the view Then).
 
 What the map says to an agent passes through one service at named places,
 and the exchange records every say, refusal and act
-([agent](../spec/agent.md), [exchange](../spec/exchange.md)). A verdict
-per run says whether each node worked.
+([agent](../spec/agent.md), [exchange](../spec/exchange.md)). The
+learning loop (`archipelago-loop`), a plugin folder of its own, judges from it
+whether each node worked in each run.
 
 ## The page
 

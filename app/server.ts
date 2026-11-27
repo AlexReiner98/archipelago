@@ -6,14 +6,12 @@
  *   types and the bases (work, question, record, actor, links, items) with
  *   the trial flavour branch, interchange (a moved map's change sets),
  *   exchange, agent, git and hub (a run's repository and hub as facts),
- *   verdict, words, loaded, profile (which runs a node is for), written,
- *   placed (a profile's skills written where its runs are), used (which given
- *   tools runs use), lean (what a profile leaves out of Claude Code's
- *   context; its writer only with writing on), grow, since ("since
- *   you last heard", at each prompt), the Claude Code adapter (5181), the
+ *   claim (the shared plan), words, call, scripted, the Claude Code adapter (5181), the
  *   map's agent tools on its MCP server (mcp), the reference read from the
  *   running plugins (docs, and its `plugins` tool, docs-tool), and
  *   the bridge (5182) the page reaches them through.
+ *   The learning loop (verdict, profile, the Context interface and the rest)
+ *   is a plugin folder of its own, archipelago-loop, loaded with --plugins.
  *
  * On fixed ports (the default, or --port), a port already taken is refused
  * in one line, naming it and `npm run map -- serve`, before anything is
@@ -24,9 +22,9 @@
  * ARCHIPELAGO_WATCH=0 set the same, so scripts/live.ts can start any commit:
  * an older one ignores them and runs on the default ports.
  *
- * --no-write (ARCHIPELAGO_WRITE=0) leaves the written plugin off, so the
- * server writes no skill or memory file, and the lean writer, so it writes
- * no project settings. The dev server (`npm run dev`, `dev:start`) runs so
+ * --no-write (ARCHIPELAGO_WRITE=0) leaves every writer off: a connected
+ * folder's hooks, and a plugin folder's entries that say `"writes": true`
+ * (the learning loop's skill, memory and settings writers). The dev server (`npm run dev`, `dev:start`) runs so
  * beside a live one: those files are what real sessions load, and only live
  * writes them. `npm run serve`, a person's own copy, writes them.
  *
@@ -136,7 +134,7 @@ const tree = [...serverTree({
   write: values.write,
   serving: { root, ...(map ? { map } : {}), ...(commit ? { commit } : {}) },
   ...(values.checkout ? { checkout: values.checkout } : {}),
-}), ...serverEntries(folders)];
+}), ...serverEntries(folders, { write: values.write, data })];
 
 const host = new NodeHost({
   tree,
@@ -153,7 +151,7 @@ for (const s of host.loader.status()) {
 // A note's pictures: <data>/files, at /files/ on the page's own origin.
 // Plugin folders' page files at /ext/<name>/, and their page entries at /app/plugins.json (runtime/folders.ts).
 const page = await serve({ port: PAGE, root, watch: values.watch, files: join(data, "files"), bridge: PAGE + 2, mounts: mounts(folders), plugins: pageEntries(folders), ...pageAccess({ port: PAGE }) });
-console.log(`${map ? `map ${map}: ` : ""}context interface on ${page.url}app/${values.watch ? "" : " (hot reload off)"}`);
+console.log(`${map ? `map ${map}: ` : ""}map on ${page.url}app/${values.watch ? "" : " (hot reload off)"}`);
 for (const f of folders) console.log(`plugin folder ${f.name}: ${f.server.length} server, ${f.page.length} page entries, from ${f.dir}`);
 
 const stop = async () => {

@@ -107,7 +107,7 @@ find line has words, only what it finds and what lies near it.
   an item as the Landscape does (the Context interface draws a tree's root
   as its context filter).
   The agent sessions live now (the page key `sessions.live`, set by
-  [plugins/sessions](../sessions/README.md)) are each a pentagon of the type
+  the learning loop's [sessions](https://github.com/AlexReiner98/archipelago-loop/blob/main/sessions/README.md)) are each a pentagon of the type
   `session`, linked `runs_in` to each of their context filters on the map.
   They are not items and nothing is written: they come and go with the
   sessions. A find that finds a filter finds its sessions too; one coming

@@ -90,7 +90,7 @@ test("markdown: links resolve from the file they're in", () => {
 test("guide: the path in the index's order, the spec's contracts in its README's order, then every plugin's README", async () => {
   const all = await guide(ROOT);
   const path = all.filter((e) => e.part === "path").map((e) => e.path);
-  assert.deepEqual(path, ["README.md", "guide/first-run.md", "guide/concepts.md", "guide/writing-a-plugin.md", "guide/profiles-and-the-harness.md", "spec/README.md"]);
+  assert.deepEqual(path, ["README.md", "guide/first-run.md", "guide/concepts.md", "guide/writing-a-plugin.md", "spec/README.md"]);
   const spec = all.filter((e) => e.part === "spec").map((e) => e.path);
   assert.deepEqual(spec.slice(0, 3), ["spec/graph.md", "spec/action.md", "spec/agent.md"]);
   assert.ok(!spec.includes("spec/README.md"));

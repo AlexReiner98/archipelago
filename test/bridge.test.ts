@@ -4,7 +4,7 @@ import type { Dispose } from "../spec/common.ts";
 import { Runtime, type Context, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
 import client from "../plugins/bridge/client.ts";
-import server, { agentActor, KEYS } from "../plugins/bridge/server.ts";
+import server, { agentActor, KEYS, SERVE, type BridgeServe } from "../plugins/bridge/server.ts";
 
 /** A stand-in for the browser's EventSource: the test opens, feeds and fails each one. */
 class FakeSource {
@@ -130,6 +130,48 @@ test("a caller through the bridge may say it is an agent, and acts as that agent
     // The page's own calls are untouched by the one before.
     assert.deepEqual((await call({})).value, { actor: { id: "person:owner", kind: "person" } });
     assert.equal(agentActor(undefined), undefined);
+  } finally {
+    await loader.apply([]);
+  }
+});
+
+test("a plugin from elsewhere has the bridge serve a key of its own, until it unloads", async () => {
+  const stub: Plugin = {
+    id: "stub",
+    apply(ctx: Context) {
+      for (const k of KEYS) ctx.provide(k, () => ({}));
+    },
+  };
+  // What a plugin folder's plugin does with a key it injects: hands it to the bridge.
+  const loop: Plugin = {
+    id: "loop",
+    inject: [SERVE],
+    apply(ctx: Context) {
+      ctx.get<BridgeServe>(SERVE).serve("verdict.read", { of: async (run: string) => `verdicts of ${run}` });
+    },
+  };
+  const modules: Record<string, Plugin> = { stub, loop, bridge: server as Plugin };
+  let port = 0;
+  const rt = new Runtime();
+  const loader = new Loader(rt, { base: "mem:/", import: async (u) => ({ default: modules[u.slice("mem:/".length, -3)] }) });
+  const tree = (withLoop: boolean) => [
+    { id: "stub", plugin: "stub.ts" },
+    { id: "bridge", plugin: "bridge.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "loop", plugin: "loop.ts", disabled: !withLoop },
+  ];
+  const caps = async () => ((await (await fetch(`http://127.0.0.1:${port}/caps`)).json()) as { keys: string[] }).keys;
+  const call = async () =>
+    (await (await fetch(`http://127.0.0.1:${port}/call`, { method: "POST", body: JSON.stringify({ key: "verdict.read", method: "of", args: ["r1"] }) })).json()) as { value?: string; error?: string };
+  try {
+    await loader.apply(tree(true));
+    await rt.settle();
+    assert.ok((await caps()).includes("verdict.read"));
+    assert.equal((await call()).value, "verdicts of r1");
+    // The plugin unloads: its key goes, and the bridge serves the core's alone.
+    await loader.apply(tree(false));
+    await rt.settle();
+    assert.deepEqual(await caps(), [...KEYS]);
+    assert.match((await call()).error ?? "", /not served/);
   } finally {
     await loader.apply([]);
   }

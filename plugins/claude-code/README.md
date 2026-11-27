@@ -107,11 +107,11 @@ one stopped, for what Claude Code loaded: memory files from an
 the meta entry after it loads (`skill:<name>`, named by its Skill call, else
 its folder), and skills an `invoked_skills` attachment loads again after a
 compaction. Each is noted with the action `loaded.note`, when a plugin
-declares it ([loaded](../loaded/README.md)), and reached with what was
+declares it ([loaded](https://github.com/AlexReiner98/archipelago-loop/blob/main/loaded/README.md)), and reached with what was
 loaded as the input, ahead of the hook's own places: a memory file is said
 before the turn's first tool call. What is said there isn't handed back:
 the map speaks there through the file itself, which it writes once the
-file is adopted ([written](../written/README.md)). Both places are edition 2
+file is adopted ([written](https://github.com/AlexReiner98/archipelago-loop/blob/main/written/README.md)). Both places are edition 2
 terms, listed in the adapter's `reaches`.
 After a restart the transcript is read from its start, and the loads the
 exchange already holds are skipped.
@@ -202,7 +202,7 @@ The run's transcript is its `transcript` fact: the hook's
 `transcript_path`, and for a subagent its own file (`agent_transcript_path`,
 else `<session>/subagents/agent-<agent_id>.jsonl` beside the session's).
 The transcript plugin reads what the agent was given from it
-([transcript](../transcript/README.md)). It is a path on this machine, so
+([transcript](https://github.com/AlexReiner98/archipelago-loop/blob/main/transcript/README.md)). It is a path on this machine, so
 the context interface never shows it.
 
 A server elsewhere can't open that path, so hook.ts reads the transcript

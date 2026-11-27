@@ -33,7 +33,9 @@ their new values (∅ cleared).
   opens it, so the page opens on what is happening now.
 - It meets the harness through `here.run`: a run picked here is the run the
   harness shows, and `⇢ harness` opens it there. The harness shows what was
-  said and done in a run; this shows what it changed. An item opens on the
+  said and done in a run; this shows what it changed. The harness is the
+  learning loop's, a plugin folder of its own: without it, a run has no
+  `⇢ harness`, and picking one only sets `here.run`. An item opens on the
   Map (`here.item`).
 - The connection is the bridge client's own key `bridge.link`
   ([bridge](../bridge/README.md)).

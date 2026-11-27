@@ -25,7 +25,7 @@ each step, and ends (`open: true` leaves it open). Each step may give its
 
 `play` answers with the run, each step's answers, everything said (with
 the places reached) and every refusal. What was judged is the
-[verdict](../verdict/README.md) plugin's, read for the run as for any other.
+[verdict](https://github.com/AlexReiner98/archipelago-loop/blob/main/verdict/README.md) plugin's, read for the run as for any other.
 
 ```ts
 const played = await playAs(ctx, {
@@ -58,7 +58,7 @@ harness `scripted`, titled "Replay of …", with the fact `replay_of`.
   added since is heard at the places the run reached, where it went quiet
   too, and judged there.
 
-The [replay](../replay/README.md) plugin uses this to judge a trial node on
+The [replay](https://github.com/AlexReiner98/archipelago-loop/blob/main/replay/README.md) plugin uses this to judge a trial node on
 past runs where its place came up.
 
 A call Claude Code rejected before any hook ran (read back from the

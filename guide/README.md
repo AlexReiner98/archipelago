@@ -10,8 +10,10 @@ is a file in this repository, so the guide is always the code's own.
 2. [First run](first-run.md)
 3. [Concepts](concepts.md)
 4. [Writing a plugin](writing-a-plugin.md)
-5. [Profiles and the harness](profiles-and-the-harness.md)
-6. [The spec](../spec/README.md)
+5. [The spec](../spec/README.md)
+
+The learning loop (profiles, verdicts and the Context interface) is a plugin
+folder of its own, `archipelago-loop`, with its own chapter.
 
 ## Then the spec and every plugin
 

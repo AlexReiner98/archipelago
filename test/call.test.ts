@@ -9,11 +9,8 @@ import { Loader, type Entry } from "../runtime/loader.ts";
 import action from "../plugins/action/index.ts";
 import agent from "../plugins/agent/index.ts";
 import call, { callFacts, decisionOf, type CallAsk } from "../plugins/call/index.ts";
-import context from "../plugins/context/index.ts";
 import exchange from "../plugins/exchange/index.ts";
 import graph from "../plugins/graph/index.ts";
-import verdict, { type VerdictRead } from "../plugins/verdict/index.ts";
-import { judgeRun, listeningOf } from "../plugins/verdict/judge.ts";
 
 // ---------- apart from the runtime ----------
 
@@ -31,18 +28,6 @@ const T = (s: number) => `2026-11-24T10:00:${String(s).padStart(2, "0")}.000Z`;
 const ev = (seq: number, e: Partial<ExchangeEvent>): ExchangeEvent => ({ id: `c:${seq}`, run: "c", seq, time: T(seq), direction: "to_agent", kind: "say", ...e }) as ExchangeEvent;
 const decision = (seq: number, ok: boolean) => ev(seq, { kind: "act", direction: "from_agent", place: "reply_end", act: { kind: "decision", by: "person", ok } });
 
-test("verdict: a rejected answer fails every node said to it, an accepted one holds them, the last decision wins", () => {
-  const listening = listeningOf([{ id: "w/hint", at: ["check:*"] }, { id: "w/finding", at: ["finding"] }]);
-  const said = [ev(1, { node: "w/hint", place: "check:style" }), ev(2, { node: "w/finding", place: "finding" }), ev(3, { kind: "act", direction: "from_agent", place: "reply_end", act: { kind: "reply", by: "agent", ok: true } })];
-  assert.deepEqual(judgeRun("c", said, listening).map((v) => v.verdict), ["quiet", "quiet"]);
-  assert.deepEqual(judgeRun("c", [...said, decision(4, false)], listening).map((v) => [v.verdict, v.failed_by]), [["failed", [4]], ["failed", [4]]]);
-  assert.deepEqual(judgeRun("c", [...said, decision(4, true)], listening).map((v) => v.verdict), ["held", "held"]);
-  assert.deepEqual(judgeRun("c", [...said, decision(4, false), decision(5, true)], listening).map((v) => v.verdict), ["held", "held"]);
-  // A tool decision (Claude Code's allow or deny) stays as it was: a miss only where it is covered.
-  const deny = ev(4, { kind: "act", direction: "from_agent", place: "tool:Bash", act: { kind: "decision", by: "person", ok: false } });
-  assert.deepEqual(judgeRun("c", [...said, deny], listening).map((v) => v.verdict), ["quiet", "quiet"]);
-});
-
 // ---------- through the runtime ----------
 
 const nodes: Plugin = {
@@ -59,7 +44,7 @@ const nodes: Plugin = {
 
 /** A domain: its judge asks through call.ask. */
 const domain: Plugin = { id: "domain", inject: ["call.ask"], apply() {} };
-const probe: Plugin = { id: "probe", inject: ["exchange.read", "verdict.read", "action.invoke"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["exchange.read", "action.invoke"], apply() {} };
 const seed: Plugin = {
   id: "seed",
   inject: ["action.register"],
@@ -72,19 +57,18 @@ async function setup() {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Plugin> = { graph, action, exchange, agent, nodes, call, verdict, context, domain, probe, seed };
+  const modules: Record<string, Plugin> = { graph, action, exchange, agent, nodes, call, domain, probe, seed };
   const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)]! }) });
-  const tree: Entry[] = ["graph", "action", "exchange", "agent", "nodes", "call", "verdict", "context", "domain", "probe", "seed"].map((id) => ({ id, plugin: id }));
+  const tree: Entry[] = ["graph", "action", "exchange", "agent", "nodes", "call", "domain", "probe", "seed"].map((id) => ({ id, plugin: id }));
   await loader.apply(tree);
   await rt.settle();
   const ask = loader.fiber("domain")!.ctx.get<CallAsk>("call.ask");
   const p = loader.fiber("probe")!.ctx;
   const read = p.get<ExchangeRead>("exchange.read");
-  const verdicts = p.get<VerdictRead>("verdict.read");
   const invoke = p.get<ActionInvoke>("action.invoke");
   const act = (name: string, input: unknown) => invoke.invoke({ action: name, input: input as never, authority: { of: "human", basis: "test" }, reason: "test" });
-  return { rt, errors, ask, read, verdicts, act };
+  return { rt, errors, ask, read, act };
 }
 
 test("a call is a run under its parent: begun, said to at its places, answered, ended", async () => {
@@ -106,19 +90,6 @@ test("a call is a run under its parent: begun, said to at its places, answered, 
   assert.deepEqual(reply.input, { subject: { type: "source file", tokens: 900 } }, "the subject by its type and size only");
   assert.equal((reply.output as { text: string }).text, "Line 14 is 120 characters; wrap it at 80.");
   await rt.settle();
-  assert.deepEqual(errors, []);
-});
-
-test("the window of a call: the map's words, the subject by its size, the answer; the model's own count as the total", async () => {
-  const { errors, ask, act } = await setup();
-  const out = await ask.ask({ title: "line_length", places: ["check:line_length", "finding"], parent: "checker" }, async () => ({ text: "ok", subject: { type: "source file", tokens: 900 }, usage: { input: 1200, output: 40 } }));
-  const w = await act("context.window", { run: out.run });
-  assert.ok(w.ok, JSON.stringify(w));
-  const win = w.output as { total: { tokens: number; from: string }; sources: Record<string, number>; parts: { id: string; source: string; tokens: number }[] };
-  assert.deepEqual(win.total, { tokens: 1240, from: "usage" });
-  assert.equal(win.sources.subject, 900);
-  assert.ok((win.sources.map ?? 0) > 0);
-  assert.deepEqual(win.parts.find((p) => p.source === "subject"), { id: "subject:source file", title: "source file", source: "subject", channel: "context", state: "said", tokens: 900, count: 1, fitted: 0 });
   assert.deepEqual(errors, []);
 });
 
@@ -147,23 +118,19 @@ async function until(ok: () => Promise<boolean>, ms = 2000) {
   while (!(await ok()) && Date.now() < end) await new Promise((r) => setTimeout(r, 10));
 }
 
-test("an answer may name the item it made: the run says so, and the item's decision judges the call", async () => {
-  const { rt, errors, ask, read, verdicts, act } = await setup();
+// How a decision judges the nodes said to a call is the learning loop's verdict (archipelago-loop, test/verdict-call.test.ts).
+test("an answer may name the item it made: the run says so", async () => {
+  const { errors, ask, read } = await setup();
   const out = await ask.ask({ title: "made", places: ["check:line_length", "finding"], parent: "checker" }, async () => ({ text: "made t9", follow: { item: "t9", version: "v1" } }));
   const run = (await read.runs()).items.find((r) => r.run === out.run)!;
   assert.deepEqual([run.facts?.harness, run.facts?.item, run.facts?.version], ["call", "t9", "v1"]);
-  await act("seed.raw", { facts: [["+", "t9", "type", "test"], ["+", "t9", "decision", "accepted"], ["+", "t9", "decided_version", "v1"]] });
-  await rt.settle();
-  await until(async () => (await verdicts.run(out.run)).every((v) => v.verdict === "held"));
-  assert.deepEqual((await verdicts.run(out.run)).map((v) => v.verdict), ["held", "held"]);
   assert.deepEqual(errors, []);
 });
 
-test("a person's decision on the item a call follows becomes the verdict of the nodes said to it", async () => {
-  const { rt, errors, ask, read, verdicts, act } = await setup();
+test("a person's decision on the item a call follows is recorded on its run, once per decision at its version", async () => {
+  const { rt, errors, ask, read, act } = await setup();
   await act("seed.raw", { facts: [["+", "t1", "type", "test"], ["+", "t1", "version", "v1"]] });
   const out = await ask.ask({ title: "line_length", places: ["check:line_length", "finding"], parent: "checker", follow: { item: "t1", version: "v1" } }, async () => ({ text: "long line" }));
-  assert.deepEqual((await verdicts.run(out.run)).map((v) => [v.node, v.verdict]), [["nodes/style", "quiet"], ["nodes/finding", "quiet"]]);
 
   const startedAt = (await read.runs()).items.find((r) => r.run === out.run)!.started;
   await act("seed.raw", { facts: [["+", "t1", "decision", "rejected"], ["+", "t1", "decided_version", "v1"]] });
@@ -176,7 +143,6 @@ test("a person's decision on the item a call follows becomes the verdict of the 
   const evs = (await read.events(out.run)).items;
   const d = evs.find((e) => e.kind === "act" && e.act?.kind === "decision")!;
   assert.deepEqual([d.place, d.act!.by, d.act!.ok], ["reply_end", "person", false]);
-  assert.deepEqual((await verdicts.run(out.run)).map((v) => v.verdict), ["failed", "failed"]);
   const run = (await read.runs()).items.find((r) => r.run === out.run)!;
   // Times are to the millisecond: on a fast runner the ask and the decision may share one, so the start is compared, not ordered.
   assert.ok(run.ended && run.started === startedAt && run.started <= run.ended, "begun again for the decision, then ended; its start kept");
@@ -184,8 +150,8 @@ test("a person's decision on the item a call follows becomes the verdict of the 
   // A change of mind: accepted at the same version.
   await act("seed.raw", { facts: [["-", "t1", "decision", "rejected"], ["+", "t1", "decision", "accepted"]] });
   await rt.settle();
-  await until(async () => (await verdicts.run(out.run)).every((v) => v.verdict === "held"));
-  assert.deepEqual((await verdicts.run(out.run)).map((v) => v.verdict), ["held", "held"]);
+  await until(async () => (await read.events(out.run)).items.filter((e) => e.act?.kind === "decision").length === 2);
+  assert.deepEqual((await read.events(out.run)).items.filter((e) => e.act?.kind === "decision").map((e) => e.act!.ok), [false, true]);
 
   // A decision at another version isn't this call's.
   const before = (await read.events(out.run)).items.length;

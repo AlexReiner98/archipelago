@@ -18,7 +18,7 @@ export const SEED = [
     title: "Says the run is recorded",
     kind: "instruction",
     at: ["session_start"],
-    words: "This run is recorded on the exchange: every say, refusal and act shows live in the context interface.",
+    words: "This run is recorded on the exchange: every say, refusal and act shows live on the map's page.",
   },
   {
     title: "No secrets",
@@ -49,7 +49,7 @@ export interface TreeOptions {
   data: string;
   /** The page's port: the adapter listens one above it, the bridge two. */
   port: number;
-  /** Whether the written plugin writes skill and memory files. */
+  /** Whether the server writes files outside its data: a connected folder's hooks and MCP server. */
   write: boolean;
   /** More origins the page, the adapter and the bridge answer, besides the page's own (a host in front of them). */
   origins?: string[];
@@ -98,26 +98,11 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
     { id: "agent", plugin: "plugins/agent/index.ts" },
     { id: "git", plugin: "plugins/git/index.ts" },
     { id: "hub", plugin: "plugins/hub/index.ts" },
-    { id: "verdict", plugin: "plugins/verdict/index.ts" },
     // Agents on one repository agree on a shared plan, kept on the map: a write to a file another live run holds is refused (plugins/claim).
     { id: "claim", plugin: "plugins/claim/index.ts" },
     { id: "words", plugin: "plugins/words/index.ts", config: { seed: SEED } },
-    { id: "loaded", plugin: "plugins/loaded/index.ts" },
-    { id: "transcript", plugin: "plugins/transcript/index.ts" },
-    { id: "context", plugin: "plugins/context/index.ts" },
     { id: "call", plugin: "plugins/call/index.ts" },
-    { id: "profile", plugin: "plugins/profile/index.ts" },
-    { id: "used", plugin: "plugins/used/index.ts" },
-    { id: "lean", plugin: "plugins/lean/index.ts" },
-    { id: "lean-write", plugin: "plugins/lean/write.ts", config: { ledger: join(data, "lean.json") }, disabled: !write },
-    { id: "written", plugin: "plugins/written/index.ts", disabled: !write },
-    { id: "placed", plugin: "plugins/placed/index.ts", disabled: !write },
-    { id: "grow", plugin: "plugins/grow/index.ts" },
-    { id: "budget", plugin: "plugins/budget/index.ts" },
-    { id: "keep", plugin: "plugins/keep/index.ts" },
     { id: "scripted", plugin: "plugins/scripted/index.ts" },
-    { id: "replay", plugin: "plugins/replay/index.ts" },
-    { id: "since", plugin: "plugins/since/index.ts" },
     {
       id: "claude-code",
       plugin: "plugins/claude-code/index.ts",

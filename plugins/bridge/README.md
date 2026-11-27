@@ -1,10 +1,18 @@
 # bridge
 
 Server capabilities in the browser. [server.ts](server.ts) (Node) serves
-`agent.tree`, `exchange.read`, `exchange.watch`, `verdict.read`,
-`action.list`, `action.invoke`, `graph.read`, `graph.watch`, `types.read`, `types.mark` (edition 10), `profile.read` and `docs.read` over HTTP and
+`agent.tree`, `exchange.read`, `exchange.watch`,
+`action.list`, `action.invoke`, `graph.read`, `graph.all`, `graph.watch`, `types.read`, `types.mark` (edition 10), `docs.read` and `claim.read` over HTTP and
 one event stream; [client.ts](client.ts) (the page) provides the same keys
 by calling it. Plugins in the page inject them as if they ran there.
+
+- The bridge waits for each of those keys. A plugin from elsewhere (a
+  plugin folder's) has it serve one more with `bridge.serve`:
+  `serve(key, cap, sync?)`, given the capability it injected, served until
+  that plugin unloads. The learning loop's served plugin (archipelago-loop) serves
+  `verdict.read`, `profile.read` and `profile.hears` this way. `bridge.serve`
+  is this plugin's key, not a spec contract. A page reads the keys as it
+  loads (`GET /caps`), so a key served later is there on its next load.
 
 - Calls are made from the server plugin's context intercepted with
   `config.actor`: whoever is at the page acts as that person. There is no

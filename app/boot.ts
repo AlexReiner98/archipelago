@@ -55,7 +55,6 @@ const host = await startBrowser({
     { id: "renderer", plugin: "plugins/renderer/index.ts", config: { mount: "#app" } },
     { id: "frame", plugin: "plugins/frame/index.ts", config: { folded: ["harness/run"], wait: true } },
     { id: "views", plugin: "plugins/views/view.ts", config: { home: "field" } },
-    { id: "harness", plugin: "plugins/harness/index.ts" },
     { id: "activity", plugin: "plugins/activity/index.ts" },
     // The view Then: what changed between two points in the log, and an item as it was at each (plugins/history).
     { id: "history", plugin: "plugins/history/view.ts" },
@@ -63,8 +62,6 @@ const host = await startBrowser({
     { id: "command", plugin: "plugins/command/index.ts" },
     { id: "page", plugin: "plugins/page/view.ts" },
     { id: "field", plugin: "plugins/field/index.ts" },
-    { id: "arrange", plugin: "plugins/arrange/index.ts" },
-    { id: "sessions", plugin: "plugins/sessions/index.ts" },
     // The view Shared plan: each agent's intents on a time line, what each built on, and what is held now (plugins/claim).
     { id: "claim", plugin: "plugins/claim/view.ts" },
     { id: "connect", plugin: "plugins/connect/view.ts" },

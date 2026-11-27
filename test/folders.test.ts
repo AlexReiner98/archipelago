@@ -42,6 +42,26 @@ test("a folder's entries: the server's as file URLs, the page's at /ext/<name>/"
   assert.deepEqual(mounts([f]), { design: f.dir });
 });
 
+test("a folder's writer is off on a server that doesn't write, and each entry is told the map's data folder", () => {
+  const dir = folder("loop", {
+    name: "loop",
+    server: [
+      { id: "judge", plugin: "judge.ts" },
+      { id: "writer", plugin: "writer.ts", config: { ledger: "x.json" }, writes: true },
+      { id: "listed", plugin: "listed.ts", config: [1, 2] },
+    ],
+  });
+  const f = readFolder(dir);
+  const url = (p: string) => pathToFileURL(join(dir, p)).href;
+  assert.deepEqual(serverEntries([f], { write: false, data: "/home/me/map" }), [
+    { id: "judge", plugin: url("judge.ts"), config: { data: "/home/me/map" } },
+    { id: "writer", plugin: url("writer.ts"), config: { data: "/home/me/map", ledger: "x.json" }, disabled: true },
+    { id: "listed", plugin: url("listed.ts"), config: [1, 2] },
+  ]);
+  // A server that writes leaves the writer on; `writes` itself is never an entry's field.
+  assert.deepEqual(serverEntries([f], { write: true })[1], { id: "writer", plugin: url("writer.ts"), config: { ledger: "x.json" } });
+});
+
 test("a manifest that won't do is refused, saying what to fix", () => {
   assert.throws(() => readFolder(join(tmp, "nothing-here")), /no readable archipelago\.json/);
   assert.throws(() => readFolder(folder("bad-name", { name: "Not OK" })), /"name" is lowercase/);
