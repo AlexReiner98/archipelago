@@ -1,5 +1,5 @@
 {
-  "accepted": 11,
+  "accepted": 12,
   "entries": {
     "action.ts:ActionAttest": "export interface ActionAttest {\n    invoke<O extends Json = Json>(call: {\n        action: string;\n        input: Json;\n        attest: Attestation;\n        reason: string;\n    }): Promise<Outcome<O>>;\n}",
     "action.ts:ActionContext": "export interface ActionContext {\n    caller: Caller;\n    authority: Authority;\n    reason: string;\n    write(facts: Fact[]): void;\n    written(): readonly Fact[];\n    call<O extends Json = Json>(name: string, input: Json): Promise<O>;\n}",
@@ -149,6 +149,8 @@
     "exchange.ts:ExchangeRead": "export interface ExchangeRead {\n    runs(page?: PageRequest): Promise<Page<RunInfo>>;\n    events(run: RunId, page?: PageRequest): Promise<Page<ExchangeEvent>>;\n    said(node: string, page?: PageRequest): Promise<Page<ExchangeEvent>>;\n}",
     "exchange.ts:ExchangeWatch": "export interface ExchangeWatch {\n    watch(filter: ExchangeFilter, on: (event: ExchangeEvent) => void): Dispose;\n}",
     "graph.ts:capabilities:type": "Capability[]",
+    "graph.ts:capabilities[graph.all]": "{ key: \"graph.all\", since: 12, doc: \"Every item, a bounded page at a time, in the order each was first made: what a checkpoint of the log reads.\" }",
+    "graph.ts:Capabilities[graph.all]": "\"graph.all\": GraphAll;",
     "graph.ts:capabilities[graph.commit]": "{ key: \"graph.commit\", since: 1, doc: \"Sends a change set (changeset format, edition 1) down the write chain; all or nothing.\" }",
     "graph.ts:Capabilities[graph.commit]": "\"graph.commit\": GraphCommit;",
     "graph.ts:capabilities[graph.read]": "{ key: \"graph.read\", since: 1, doc: \"Bounded reads of items, links and committed change sets.\" }",
@@ -158,6 +160,7 @@
     "graph.ts:capabilities[graph.watch]": "{ key: \"graph.watch\", since: 1, doc: \"Each committed change set touching a filter, in order, resumable from a cursor.\" }",
     "graph.ts:Capabilities[graph.watch]": "\"graph.watch\": GraphWatch;",
     "graph.ts:Direction": "export type Direction = \"out\" | \"in\" | \"both\";",
+    "graph.ts:GraphAll": "export interface GraphAll {\n    all(page?: PageRequest): Promise<Page<Item>>;\n}",
     "graph.ts:GraphCommit": "export interface GraphCommit {\n    commit(change: Proposed): Promise<Committed>;\n}",
     "graph.ts:GraphRead": "export interface GraphRead {\n    get(ids: Id[]): Promise<(Item | null)[]>;\n    of(type: string, page?: PageRequest): Promise<Page<Item>>;\n    links(id: Id, opts: {\n        type?: string;\n        dir: Direction;\n    }, page?: PageRequest): Promise<Page<Link>>;\n    since(page?: PageRequest): Promise<Page<Committed>>;\n    now(): Promise<Cursor>;\n}",
     "graph.ts:GraphStage": "export interface GraphStage {\n    stage(run: Stage): Dispose;\n}",
