@@ -31,6 +31,11 @@ page, [app/tree.ts](../app/tree.ts) for the server. On dev the runtime
 reloads it as you edit. [plugins/examples/](../plugins/examples/README.md) has
 two to copy, off until turned on.
 
+A plugin that isn't the core's, such as an app built on the map, can live
+in a repository of its own: a plugin folder, loaded with `--plugins <dir>`
+([runtime](../runtime/README.md), "Plugin folders"). It reaches this
+repository only through the spec, imported by package name.
+
 ## What it may do
 
 - Ask for what it uses in `inject`, and nothing else. A key nothing

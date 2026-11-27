@@ -50,16 +50,22 @@
  *
  * The page's header says which map, commit and checkout this is (plugins/serving).
  *
+ * --plugins dir (ARCHIPELAGO_PLUGINS, folders split by the path delimiter)
+ * loads a plugin folder kept outside this repository beside the plugins
+ * here: its archipelago.json names its server and page entries
+ * (runtime/folders.ts). Give it once for each folder.
+ *
  * Point Claude Code at the adapter (plugins/claude-code/README.md) and open
  * http://127.0.0.1:5180/app/.
  *
- *   node app/server.ts [--map name [--from map|dir]] [--data dir] [--port 5180] [--no-watch] [--no-write] [--checkout dir]
+ *   node app/server.ts [--map name [--from map|dir]] [--data dir] [--port 5180] [--no-watch] [--no-write] [--checkout dir] [--plugins dir]…
  */
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { NodeHost } from "../runtime/node.ts";
 import { serve } from "../runtime/serve.ts";
+import { foldersOf, mounts, pageEntries, readFolders, serverEntries } from "../runtime/folders.ts";
 import { otelFromEnv, pageAccess, serverTree } from "./tree.ts";
 import { temporaryPlace } from "../scripts/place.ts";
 import { claim, commitOf, freePort, hasMap, homeOf, letPortGo, MAP_NAME, mapDir, release, snapshot, sourceOf, takenLine, takenOf, update } from "../scripts/maps.ts";
@@ -75,8 +81,16 @@ const { values } = parseArgs({
     watch: { type: "boolean", default: process.env.ARCHIPELAGO_WATCH !== "0" },
     write: { type: "boolean", default: process.env.ARCHIPELAGO_WRITE !== "0" },
     checkout: { type: "string", default: process.env.ARCHIPELAGO_CHECKOUT || undefined },
+    plugins: { type: "string", multiple: true, default: foldersOf(process.env.ARCHIPELAGO_PLUGINS) },
   },
 });
+let folders;
+try {
+  folders = readFolders(values.plugins);
+} catch (e) {
+  console.error(`refused: ${(e as Error).message}`);
+  process.exit(1);
+}
 const map = values.map;
 const commit = commitOf(root);
 if (map !== undefined && !MAP_NAME.test(map)) {
@@ -117,14 +131,14 @@ if (map) {
 const away = temporaryPlace(data);
 if (away) console.log(`note: this map's data (${data}) won't last: ${away}. To keep a map, run it from a checkout in a folder you keep (README, "Set it up to keep").`);
 
-const tree = serverTree({
+const tree = [...serverTree({
   data,
   port: PAGE,
   write: values.write,
   otel: otelFromEnv(process.env),
   serving: { root, ...(map ? { map } : {}), ...(commit ? { commit } : {}) },
   ...(values.checkout ? { checkout: values.checkout } : {}),
-});
+}), ...serverEntries(folders)];
 
 const host = new NodeHost({
   tree,
@@ -139,8 +153,10 @@ for (const s of host.loader.status()) {
   if (s.state !== "active") console.log(`${s.id}: ${s.state}${s.missing ? ` (waiting for ${s.missing.join(", ")})` : ""}${s.error ? ` ${s.error}` : ""}`);
 }
 // A note's pictures: <data>/files, at /files/ on the page's own origin.
-const page = await serve({ port: PAGE, root, watch: values.watch, files: join(data, "files"), bridge: PAGE + 2, ...pageAccess({ port: PAGE }) });
+// Plugin folders' page files at /ext/<name>/, and their page entries at /app/plugins.json (runtime/folders.ts).
+const page = await serve({ port: PAGE, root, watch: values.watch, files: join(data, "files"), bridge: PAGE + 2, mounts: mounts(folders), plugins: pageEntries(folders), ...pageAccess({ port: PAGE }) });
 console.log(`${map ? `map ${map}: ` : ""}context interface on ${page.url}app/${values.watch ? "" : " (hot reload off)"}`);
+for (const f of folders) console.log(`plugin folder ${f.name}: ${f.server.length} server, ${f.page.length} page entries, from ${f.dir}`);
 
 const stop = async () => {
   await page.close();

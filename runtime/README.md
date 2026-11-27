@@ -10,7 +10,8 @@ stripping) and in the browser (the dev server strips types).
 | [loader.ts](loader.ts) | The config tree: load, unload, disable, order | §5.2.1 |
 | [hmr.ts](hmr.ts) | The module graph HMR walks | §5.2.2 |
 | [node.ts](node.ts) | Node host: resolve hook, watcher, HMR | |
-| [serve.ts](serve.ts) | Dev server for the browser: types stripped, HMR pushed; with `files`, that folder's raster images at `/files/` | |
+| [serve.ts](serve.ts) | Dev server for the browser: types stripped, HMR pushed; with `files`, that folder's raster images at `/files/`; with `mounts`, plugin folders at `/ext/<name>/` | |
+| [folders.ts](folders.ts) | Plugin folders kept outside this repository: their `<folder>/archipelago.json`, read into server and page entries | |
 | [guard.ts](guard.ts) | What every local server checks first: its own Host, and no foreign Origin | |
 | [browser.ts](browser.ts) | Browser host | |
 
@@ -66,6 +67,34 @@ A new url rebuilds an entry, a new config reloads it, `disabled` unloads it,
 `intercept` changes in place, and a move only changes order.
 `loader.status()` gives each entry's state: `off` (disabled), `waiting`
 (with the capabilities it is `missing`), `active`, `failed` and so on.
+
+## Plugin folders
+
+Plugins can be kept outside this repository, in a folder of their own
+(another repository), and loaded beside the ones here:
+`node app/server.ts --plugins <dir>`, once for each folder, or
+`ARCHIPELAGO_PLUGINS` with the folders split by the path delimiter, which
+`npm run map -- serve` and live pass on. The folder's `<folder>/archipelago.json`
+names it and lists its entries, paths relative to it:
+
+```json
+{ "name": "design",
+  "server": [{ "id": "solver", "plugin": "solver/map.ts" }],
+  "page": [{ "id": "solver", "plugin": "solver/index.ts" }] }
+```
+
+- The server's entries come after this repository's; the page's are
+  served at `/ext/<name>/`, listed at `/app/plugins.json`, and added after
+  the page's own ([app/boot.ts](../app/boot.ts)).
+- Its code imports this repository by package name:
+  `from "archipelago/spec/graph.ts"`. The Node host resolves it to the
+  checkout that serves ([node.ts](node.ts)), and the page server rewrites
+  it to `/spec/graph.ts`: either way the same module this repository's
+  plugins import, never a second copy. The folder's own `node_modules`
+  (`npm install <this checkout>`, which links it) is only for its type
+  check and its tests.
+- A folder's page files are not watched: a change to one needs a reload.
+- No sandbox: a folder's plugins are trusted as this repository's are.
 
 ## Running it
 

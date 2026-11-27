@@ -21,6 +21,7 @@ import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { refuse, type LocalAccess } from "./guard.ts";
 import { ModuleGraph } from "./hmr.ts";
+import type { Entry } from "./loader.ts";
 
 const TYPES: Record<string, string> = {
   ".ts": "text/javascript",
@@ -37,8 +38,11 @@ const TYPES: Record<string, string> = {
   ".webp": "image/webp",
 };
 
-/** Imports and re-exports with a relative or rooted specifier. */
-const IMPORT = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(["'])(\.{1,2}\/[^"']+|\/[^"']+)\2/g;
+/** Imports and re-exports with a relative or rooted specifier, or this repository's package name (a plugin folder's, runtime/folders.ts). */
+const IMPORT = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(["'])(\.{1,2}\/[^"']+|\/[^"']+|archipelago\/[^"']+)\2/g;
+
+/** This repository's package name, as a plugin folder imports it: served from the root. */
+const PACKAGE = "archipelago/";
 
 /** The runtime's own modules: a change to one needs a reload of the page. */
 const declined = (path: string) => path.startsWith("/runtime/");
@@ -54,10 +58,14 @@ export interface DevServer {
  * is a folder served as is at `/files/` (the data's pictures a note shows),
  * read only, nothing outside it. `bridge` is the bridge's port: the page
  * asks `/bridge/caps` first (app/boot.ts), and is told `{ at }`, the
- * bridge's address on the host it asked, instead of a 404.
+ * bridge's address on the host it asked, instead of a 404. `mounts` serves
+ * plugin folders, each name's folder at `/ext/<name>/`, nothing outside it,
+ * and `plugins` is what `/app/plugins.json` lists: the page's entries from
+ * those folders, which the page adds to its tree (runtime/folders.ts).
  */
-export async function serve(options: { port?: number; root?: string; watch?: boolean; files?: string; bridge?: number } & LocalAccess = {}): Promise<DevServer> {
+export async function serve(options: { port?: number; root?: string; watch?: boolean; files?: string; bridge?: number; mounts?: Record<string, string>; plugins?: Entry[] } & LocalAccess = {}): Promise<DevServer> {
   const root = resolve(options.root ?? join(fileURLToPath(import.meta.url), "../.."));
+  const mounted = Object.entries(options.mounts ?? {}).map(([name, dir]) => ({ at: `/ext/${name}/`, dir: resolve(dir) }));
   const files = options.files && resolve(options.files);
   const graph = new ModuleGraph();
   const clients = new Set<ServerResponse>();
@@ -66,7 +74,7 @@ export async function serve(options: { port?: number; root?: string; watch?: boo
   const rewrite = (path: string, code: string) => {
     const deps = new Set<string>();
     const out = code.replace(IMPORT, (_m, lead: string, q: string, spec: string) => {
-      const target = new URL(spec, `http://x${path}`).pathname;
+      const target = spec.startsWith(PACKAGE) ? `/${spec.slice(PACKAGE.length)}` : new URL(spec, `http://x${path}`).pathname;
       deps.add(target);
       return `${lead}${q}${graph.versioned(target)}${q}`;
     });
@@ -95,6 +103,10 @@ export async function serve(options: { port?: number; root?: string; watch?: boo
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(JSON.stringify({ at }));
       return;
     }
+    if (url.pathname === "/app/plugins.json") {
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }).end(JSON.stringify(options.plugins ?? []));
+      return;
+    }
     let path = decodeURIComponent(url.pathname);
     if (files && path.startsWith("/files/")) {
       const file = join(files, path.slice("/files/".length));
@@ -113,8 +125,11 @@ export async function serve(options: { port?: number; root?: string; watch?: boo
       }
       return;
     }
-    let file = join(root, path);
-    if (!file.startsWith(root + sep) && file !== root) {
+    // A plugin folder's file, or this repository's: nothing outside either.
+    const mount = mounted.find((m) => path.startsWith(m.at));
+    const base = mount ? mount.dir : root;
+    let file = mount ? join(mount.dir, path.slice(mount.at.length)) : join(root, path);
+    if (!file.startsWith(base + sep) && file !== root) {
       res.writeHead(403).end();
       return;
     }
