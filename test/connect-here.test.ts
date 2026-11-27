@@ -92,7 +92,8 @@ test("connect.here writes a folder's settings beside the person's and the contex
   try {
     const on = await invoke(HERE, { folder: proj });
     assert.ok(on.ok, JSON.stringify(on));
-    await until(async () => existsSync(join(proj, ".mcp.json")) && (await disk()).hooks.Stop.length === 2);
+    // The writer brings the files to what is wanted one after another, git's exclude last: wait for all of them.
+    await until(async () => existsSync(join(proj, ".mcp.json")) && (await disk()).hooks.Stop.length === 2 && (await readFile(exclude, "utf8")).includes(MARK));
     const s = await disk();
     assert.equal(s.hooks.Stop.length, 2, "the person's Stop hook stays beside ours");
     assert.deepEqual(s.enabledMcpjsonServers, [NAME]);
@@ -106,7 +107,7 @@ test("connect.here writes a folder's settings beside the person's and the contex
 
     // Away: what it added goes, the rest stays as it was.
     assert.ok((await invoke(AWAY, { folder: proj })).ok);
-    await until(() => !existsSync(join(proj, ".mcp.json")));
+    await until(async () => !existsSync(join(proj, ".mcp.json")) && (await readFile(exclude, "utf8")) === excludeBefore);
     assert.deepEqual(await disk(), theirs);
     assert.ok(!existsSync(join(proj, ".mcp.json")), "the file it made goes");
     assert.equal(await readFile(exclude, "utf8"), excludeBefore);
