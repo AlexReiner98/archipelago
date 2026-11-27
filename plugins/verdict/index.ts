@@ -16,7 +16,7 @@ import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exch
 import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
-import { judgeRun, listeningOf, records, replayOf, type Listening, type NodeRecord, type RunVerdict } from "./judge.ts";
+import { judgeRun, listeningOf, records, replayOf, slimEvent, type Listening, type NodeRecord, type RunVerdict } from "./judge.ts";
 
 export type { NodeRecord, RunVerdict, Verdict } from "./judge.ts";
 
@@ -101,7 +101,8 @@ const verdict: Plugin = {
         order.push(e.run);
       }
       if (run.has(e.seq)) return false;
-      run.set(e.seq, e);
+      // Only what judging reads: a whole act's body for every run filled the heap (judge.ts, slimEvent).
+      run.set(e.seq, slimEvent(e));
       judged.delete(e.run);
       return true;
     };
