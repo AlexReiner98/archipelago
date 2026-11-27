@@ -22,7 +22,7 @@ import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import { Journal } from "./journal.ts";
 
-export { Journal, netFacts } from "./journal.ts";
+export { Journal, difference, netFacts, type Difference } from "./journal.ts";
 
 export interface HistoryConfig {
   /** The SQLite database the journal is kept in. None: in memory. */
@@ -219,6 +219,83 @@ const history: Plugin<HistoryConfig> = {
           });
         }
         return { complete: journal.reachesBack() && last === now, ...(begins !== undefined ? { begins } : {}), ...(from !== undefined ? { from } : {}), now, sets, items: items.size, differ: count, examples: differ } as unknown as Json;
+      },
+    });
+
+    /**
+     * A point in the log: a seq, `c<seq>` (the map as that set left it), an
+     * ISO time or date (the map then: the last set committed at or before
+     * it; a bare date is its first instant, UTC), or absent / `now`.
+     */
+    const point = (p: Json | undefined, name: string): { seq: number; time?: string } => {
+      let seq: number | undefined;
+      if (p === undefined || p === null || p === "now") seq = journal.last();
+      else if (typeof p === "number" && Number.isInteger(p) && p >= 0) seq = p;
+      else if (typeof p === "string") {
+        const m = /^c?(\d+)$/.exec(p.trim());
+        if (m) seq = Number(m[1]);
+        else if (!Number.isNaN(Date.parse(p))) seq = journal.seqAt(new Date(Date.parse(p)).toISOString());
+      }
+      if (seq === undefined) {
+        throw new Refused({ code: "history.point", message: `${name}: a seq, c<seq>, an ISO time or date, or now; not ${JSON.stringify(p)}.`, by });
+      }
+      seq = Math.min(seq, journal.last());
+      const time = journal.timeOf(seq);
+      return { seq, ...(time ? { time } : {}) };
+    };
+    const pointDoc = "A seq, `c<seq>` (the map as that set left it), an ISO time or date (the last set committed at or before it; a bare date is its first instant, UTC), or `now` (the default).";
+    const limitOf = (n?: number) => Math.max(1, Math.min(typeof n === "number" ? Math.floor(n) : 50, LIMIT_MAX));
+
+    register.register({
+      name: "history.at",
+      title: "The map as it was at a point in the log",
+      doc: "Replays the log up to a point and answers items as they were then, `{ id, fields }` (type among the fields): those given by `ids` (at most LIMIT_MAX, in order, with `missing` for ids that had no fields then), else every item, by id, a page at a time. Refused before the log begins (`history.before`) or inside a fold (`history.compacted`). Writes nothing.",
+      input: {
+        type: "object",
+        properties: {
+          at: { type: ["string", "number"], description: pointDoc },
+          ids: { type: "array", items: { type: "string" }, description: `At most ${LIMIT_MAX}.` },
+          ...pageInput,
+        },
+      },
+      async run(input: { at?: Json; ids?: string[]; limit?: number; after?: string }) {
+        const at = point(input.at, "at");
+        const { items } = journal.walk(at.seq);
+        if (Array.isArray(input.ids)) {
+          if (input.ids.length > LIMIT_MAX) throw new Refused({ code: "history.ids", message: `At most ${LIMIT_MAX} ids.`, by });
+          const out = input.ids.filter((id) => items.has(id)).map((id) => ({ id, fields: items.get(id)! }));
+          const missing = input.ids.filter((id) => !items.has(id));
+          return { at, items: out, ...(missing.length ? { missing } : {}) } as unknown as Json;
+        }
+        const limit = limitOf(input.limit);
+        const ids = [...items.keys()].filter((id) => !input.after || id > input.after).sort();
+        const page = ids.slice(0, limit);
+        return { at, items: page.map((id) => ({ id, fields: items.get(id)! })), ...(ids.length > limit ? { next: page.at(-1)! } : {}) } as unknown as Json;
+      },
+    });
+
+    register.register({
+      name: "history.diff",
+      title: "What changed between two points in the log",
+      doc: "The map at `from` against the map at `to` (default now), item by item, by id, a page at a time: each item made, gone or changed in between, with each field's value before and after, and the sets that touched it (at most 10). `sets`: how many sets lie between; `total`: how many items differ. Points as in history.at; `from` after `to` is refused. Writes nothing.",
+      input: {
+        type: "object",
+        properties: {
+          from: { type: ["string", "number"], description: pointDoc },
+          to: { type: ["string", "number"], description: pointDoc },
+          ...pageInput,
+        },
+        required: ["from"],
+      },
+      async run(input: { from: Json; to?: Json; limit?: number; after?: string }) {
+        const from = point(input.from, "from");
+        const to = point(input.to, "to");
+        if (from.seq > to.seq) throw new Refused({ code: "history.order", message: `from (c${from.seq}) is after to (c${to.seq}).`, by });
+        const d = journal.diff(from.seq, to.seq);
+        const limit = limitOf(input.limit);
+        const rest = d.items.filter((x) => !input.after || x.id > input.after);
+        const page = rest.slice(0, limit);
+        return { from, to, sets: d.sets, total: d.items.length, items: page, ...(rest.length > limit ? { next: page.at(-1)!.id } : {}) } as unknown as Json;
       },
     });
 

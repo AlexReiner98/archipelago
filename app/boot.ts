@@ -1,7 +1,7 @@
 /**
  * The app, page side: the browser runtime and its config tree. The bridge
  * provides the server's capabilities here; the style, renderer, here, frame, views (the picker),
- * harness, activity, find, command, field (home), connect (a new map's first step), gate (a host's sign-in, drawn over the map), serving (which map, commit and checkout, in the header), sync (what the map syncs with, in the header), item, docs (the Plugins view), guide (the Guide) and switch (its on/off switches) plugins make the page. The bridge is two ports above the page
+ * harness, activity, history (the Then view: what changed between two points in the log), find, command, field (home), connect (a new map's first step), gate (a host's sign-in, drawn over the map), serving (which map, commit and checkout, in the header), sync (what the map syncs with, in the header), item, docs (the Plugins view), guide (the Guide) and switch (its on/off switches) plugins make the page. The bridge is two ports above the page
  * (5180 serves the page and 5182 the bridge, 5280 and 5282 for dev), or at
  * `/bridge/` on the page's own origin when a host in front serves both. `host` is on window, so a plugin can be turned
  * off from the console: `host.loader.edit(t => (t.find(e => e.id === "harness").disabled = true, t))`.
@@ -38,6 +38,8 @@ const host = await startBrowser({
     { id: "views", plugin: "plugins/views/view.ts", config: { home: "field" } },
     { id: "harness", plugin: "plugins/harness/index.ts" },
     { id: "activity", plugin: "plugins/activity/index.ts" },
+    // The view Then: what changed between two points in the log, and an item as it was at each (plugins/history).
+    { id: "history", plugin: "plugins/history/view.ts" },
     // On the run pane: whether the run was exported as OpenTelemetry spans, and where (nothing while the server's otel is off).
     { id: "otel", plugin: "plugins/otel/view.ts" },
     { id: "find", plugin: "plugins/find/index.ts" },

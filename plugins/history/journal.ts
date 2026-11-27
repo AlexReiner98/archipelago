@@ -18,8 +18,46 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 import type { ChangeSetId, Committed, Fact, Header } from "../../spec/changeset.ts";
 import { inverse } from "../../spec/changeset.ts";
 import type { Json, Page, PageRequest } from "../../spec/common.ts";
+import { Refused } from "../../spec/common.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import { headerNow } from "../graph/renamed.ts";
+
+const BY = { plugin: "history" };
+
+/** One item from one point in the log to another. */
+export interface Difference {
+  id: string;
+  /** Made: it had no fields before. Gone: none after. Else changed. */
+  change: "made" | "gone" | "changed";
+  type?: string;
+  title?: string;
+  /** Each field whose value differs, with what it held at each point (absent: empty). */
+  fields: { field: string; before?: Json; after?: Json }[];
+  /** The sets that touched it in between, oldest first, at most 10. */
+  changes: string[];
+}
+
+/** An item's fields at two points, compared; null when they are the same. Pure. */
+export function difference(id: string, before: Record<string, Json> | undefined, after: Record<string, Json> | undefined): Omit<Difference, "changes"> | null {
+  const b = before ?? {};
+  const a = after ?? {};
+  const fields: Difference["fields"] = [];
+  for (const field of new Set([...Object.keys(b), ...Object.keys(a)])) {
+    if (same(b[field], a[field])) continue;
+    fields.push({ field, ...(b[field] !== undefined ? { before: b[field] } : {}), ...(a[field] !== undefined ? { after: a[field] } : {}) });
+  }
+  if (!fields.length) return null;
+  const empty = (x: Record<string, Json>) => Object.keys(x).length === 0;
+  const type = (a.type ?? b.type) as string | undefined;
+  const title = (a.title ?? b.title) as string | undefined;
+  return {
+    id,
+    change: empty(b) ? "made" : empty(a) ? "gone" : "changed",
+    ...(typeof type === "string" ? { type } : {}),
+    ...(typeof title === "string" ? { title } : {}),
+    fields,
+  };
+}
 
 export interface Entry {
   id: ChangeSetId;
@@ -329,8 +367,22 @@ export class Journal {
    * gone. Reads the journal's own store, a row at a time.
    */
   replay(): { items: Map<string, Record<string, Json>>; sets: number; from?: number } {
+    return this.walk(Number.MAX_SAFE_INTEGER);
+  }
+
+  /**
+   * Every item as the log makes it up to `upTo` (a seq): the map as that
+   * set left it. `each` is called with each set (a snapshot as one, at its
+   * first seq) before it is applied. Refused where the log can't say:
+   * before it begins or its checkpoint (`history.before`), or inside a
+   * fold (`history.compacted`, only the fold's net change is kept).
+   */
+  walk(
+    upTo: number,
+    each?: (set: { seq: number; id?: ChangeSetId; facts: readonly Fact[] }, items: ReadonlyMap<string, Record<string, Json>>) => void,
+  ): { items: Map<string, Record<string, Json>>; sets: number; from?: number } {
     const items = new Map<string, Record<string, Json>>();
-    const apply = (facts: Fact[]) => {
+    const apply = (facts: readonly Fact[]) => {
       for (const [op, id, field, value] of facts) {
         const it = items.get(id) ?? {};
         if (op === "+") it[field] = value;
@@ -340,24 +392,98 @@ export class Journal {
       }
     };
     let sets = 0;
+    const full = upTo === Number.MAX_SAFE_INTEGER;
     // From the start where the entries (and snapshots) reach it; else from the latest checkpoint.
     const cp = this.begins() === 1 ? undefined : this.checkpoint();
+    if (!full && !this.reachesBack()) {
+      throw new Refused({ code: "history.before", message: "The log doesn't reach back to the map's first change, and no checkpoint covers the start: history.checkpoint keeps one.", by: BY });
+    }
     if (cp) {
+      if (upTo < cp.seq) {
+        throw new Refused({ code: "history.before", message: `The log begins at its checkpoint, c${cp.seq} (${cp.at}): it can't say what the map was before.`, by: BY, detail: { checkpoint: cp.seq } });
+      }
       for (const r of this.db.prepare("SELECT id, fields FROM checkpoint_items WHERE n = ?").iterate(cp.n) as Iterable<{ id: string; fields: string }>) {
         items.set(r.id, JSON.parse(r.fields) as Record<string, Json>);
       }
     } else {
       for (const r of this.q.snapsUp!.iterate() as Iterable<{ body: string }>) {
         const snap = JSON.parse(r.body) as Omit<Snapshot, "n">;
+        if (snap.first > upTo) break;
+        if (snap.last > upTo) {
+          throw new Refused({ code: "history.compacted", message: `c${upTo} is inside a fold (c${snap.first}–c${snap.last}): only its net change is kept.`, by: BY, detail: { first: snap.first, last: snap.last } });
+        }
+        each?.({ seq: snap.first, facts: snap.facts }, items);
         apply(snap.facts);
         sets += snap.count;
       }
     }
-    for (const r of this.db.prepare("SELECT facts FROM entries WHERE seq > ? ORDER BY seq").iterate(cp?.seq ?? 0) as Iterable<{ facts: string }>) {
-      apply(JSON.parse(r.facts) as Fact[]);
+    for (const r of this.db.prepare("SELECT seq, id, facts FROM entries WHERE seq > ? AND seq <= ? ORDER BY seq").iterate(cp?.seq ?? 0, upTo) as Iterable<{ seq: number; id: string; facts: string }>) {
+      const facts = JSON.parse(r.facts) as Fact[];
+      each?.({ seq: r.seq, id: r.id, facts }, items);
+      apply(facts);
       sets++;
     }
     return { items, sets, ...(cp ? { from: cp.seq } : {}) };
+  }
+
+  /**
+   * The last seq committed at or before `time` (an ISO instant): the map as
+   * it was then. 0 when nothing was yet. Refused (`history.compacted`) when
+   * the time falls inside a fold, whose sets are no longer told apart.
+   */
+  seqAt(time: string): number {
+    const e = (this.db.prepare("SELECT max(seq) AS seq FROM entries WHERE committed <= ?").get(time) as { seq: number | null }).seq ?? 0;
+    let s = 0;
+    for (const r of this.q.snapsUp!.iterate() as Iterable<{ body: string }>) {
+      const snap = JSON.parse(r.body) as Omit<Snapshot, "n">;
+      if (snap.from <= time && time < snap.to) {
+        throw new Refused({ code: "history.compacted", message: `${time} is inside a fold (${snap.from} to ${snap.to}): only its net change is kept.`, by: BY, detail: { first: snap.first, last: snap.last } });
+      }
+      if (snap.to <= time) s = Math.max(s, snap.last);
+    }
+    return Math.max(e, s);
+  }
+
+  /** When the set at or last before `seq` was committed; undefined before the first. */
+  timeOf(seq: number): string | undefined {
+    const e = this.db.prepare("SELECT committed FROM entries WHERE seq <= ? ORDER BY seq DESC LIMIT 1").get(seq) as { committed: string } | undefined;
+    if (e) return e.committed;
+    let t: string | undefined;
+    for (const r of this.q.snapsUp!.iterate() as Iterable<{ body: string }>) {
+      const snap = JSON.parse(r.body) as Omit<Snapshot, "n">;
+      if (snap.last <= seq) t = snap.to;
+    }
+    return t;
+  }
+
+  /**
+   * What changed from the map at `from` to the map at `to` (seqs, from ≤
+   * to), item by item: each item a set in between touched whose fields
+   * differ at the two points, by id. `changes` are the sets that touched
+   * it in between (at most 10; a fold counts by its first seq).
+   */
+  diff(from: number, to: number): { sets: number; items: Difference[] } {
+    const before = new Map<string, Record<string, Json> | undefined>();
+    const by = new Map<string, string[]>();
+    let sets = 0;
+    // Reaching `from` first refuses where the log can't say what it was.
+    if (from < to) this.walk(from);
+    const { items } = this.walk(to, (set, now) => {
+      if (set.seq <= from) return;
+      sets++;
+      for (const id of touched(set.facts)) {
+        if (!before.has(id)) before.set(id, now.has(id) ? { ...now.get(id)! } : undefined);
+        const list = by.get(id) ?? [];
+        if (list.length < 10) list.push(set.id ?? `c${set.seq}`);
+        by.set(id, list);
+      }
+    });
+    const out: Difference[] = [];
+    for (const id of [...before.keys()].sort()) {
+      const d = difference(id, before.get(id), items.get(id));
+      if (d) out.push({ ...d, changes: by.get(id) ?? [] });
+    }
+    return { sets, items: out };
   }
 
   size(): number {

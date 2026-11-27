@@ -14,6 +14,8 @@ change that failed. Kept in SQLite (`config.db`), or in memory without one.
 | `history.checkpoint` `{}` | Keeps the whole map at the seq it reads it at (`graph.all`, a page at a time; read again if a change lands meanwhile): from then on the log is the checkpoint and every entry after it. Writes nothing to the map |
 | `history.state` `{ after?, limit? }` | The latest checkpoint's items, `{ id, fields }` by id, a page at a time, with its `seq`. Writes nothing |
 | `history.verify` `{}` | Replays the log (snapshots, then entries) into items and compares each with the graph's tables, read by id: `complete` (the log begins at the first change and holds the last), `differ` and up to 20 `examples`. Writes nothing |
+| `history.at` `{ at?, ids?, limit?, after? }` | The map as it was at a point: the log replayed to it, items `{ id, fields }` (by `ids`, with `missing`, else every item by id, a page at a time). Writes nothing |
+| `history.diff` `{ from, to?, limit?, after? }` | The map at `from` against the map at `to` (default now), by item id, a page at a time: each item made, changed or gone, each field before and after, and the sets between that touched it (at most 10), with `sets` and `total`. Writes nothing |
 | `history.get` `{ change }` | One entry; writes nothing |
 | `history.snapshots` `{ limit?, after? }` | What older entries folded into; writes nothing |
 
@@ -40,6 +42,16 @@ change that failed. Kept in SQLite (`config.db`), or in memory without one.
   then that checkpoint and every entry after it: `history.verify` replays
   from it, and a first sync reads it ([sync](../sync/README.md)). The
   entries before it stay, for the record and undo.
+- **A point in the log** (`history.at`, `history.diff`): a seq; `c<seq>`,
+  the map as that set left it; an ISO time or date, the last set committed
+  at or before it (a bare date is its first instant, UTC); or `now`. The
+  log can't say what came before it begins or its checkpoint
+  (`history.before`), nor tell apart the sets inside a fold
+  (`history.compacted`): a point there is refused. A diff runs over the
+  map at both points, so a field set and set back in between is no change,
+  and an undo and what it undid cancel out. These are transaction time,
+  what the map held then; when something was true in the world is a field
+  on the item (a record's `as_of`).
 - Nothing folds unless `keep` is set. Then, once more than `keep + fold`
   entries are kept, the oldest `fold` fold into one snapshot: the seqs it
   covers, its actors, plugins and actions, and its net facts. The log still
@@ -48,3 +60,16 @@ change that failed. Kept in SQLite (`config.db`), or in memory without one.
   be sent what it folded.
 
 Injects `graph.stage`, `graph.read`, `graph.all` (edition 12) and `action.register`. Node only.
+
+## The Then view
+
+Page side, [view.ts](view.ts): the view "Then" asks `history.diff` from a
+point (a change set, a time, or a quick pick: an hour ago, today, a week
+ago) to now or another point, and draws each item that differs: + made,
+~ changed, − gone, each field from its value then to its value after, and
+the sets between that touched it. ▸ shows the item whole at both points
+(`history.at`). The point it compares from is the page key `history.from`,
+so another view opens it at a change: Activity's "since" on a change set
+opens it from just before that set. Its words are pure in
+[then.ts](then.ts). Injects `slot.fill`, `here.*` and `action.invoke`;
+it only reads.
