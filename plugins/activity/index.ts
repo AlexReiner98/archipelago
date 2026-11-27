@@ -37,6 +37,9 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 
 export const VIEW = "activity/view";
 const HARNESS = "harness/view";
+/** The Then view and the point it compares from (plugins/history/view.ts). */
+const THEN = "history/then";
+const THEN_FROM = "history.from";
 /** The view an item opens in from Activity: Landscape, home. */
 const OPENS_IN = "field/field";
 /** Change sets read per page, and runs. */
@@ -216,6 +219,11 @@ const activity: Plugin = {
       set.set(KEYS.item, id);
       set.set(KEYS.view, OPENS_IN);
     };
+    /** The Then view (plugins/history), compared from just before a set: its key `history.from`. */
+    const since = (c: Change) => {
+      set.set(THEN_FROM, `c${c.seq - 1}`);
+      set.set(KEYS.view, THEN);
+    };
     const openRun = (run: string) => {
       set.set(KEYS.run, run);
       set.set(KEYS.view, HARNESS);
@@ -235,6 +243,7 @@ const activity: Plugin = {
           <span class="a">${c.header.action}</span>
           <span class="r">${c.header.undoes ? `undoes ${c.header.undoes} · ` : ""}${c.header.reason}</span>
           <span class="av-n">${c.id} · ${clock(c.committed)}</span>
+          <button class="av-btn" title="What changed on the map since just before this set, in the Then view" onClick=${(e: Event) => (e.stopPropagation(), since(c))}>since</button>
           <${UndoButton} c=${c} />
         </div>
         ${t.slice(0, 6).map(
