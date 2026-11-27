@@ -113,6 +113,8 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
     { id: "git", plugin: "plugins/git/index.ts" },
     { id: "hub", plugin: "plugins/hub/index.ts" },
     { id: "verdict", plugin: "plugins/verdict/index.ts" },
+    // Agents on one repository agree on a shared plan, kept on the map: a write to a file another live run holds is refused (plugins/claim).
+    { id: "claim", plugin: "plugins/claim/index.ts" },
     { id: "words", plugin: "plugins/words/index.ts", config: { seed: SEED } },
     { id: "loaded", plugin: "plugins/loaded/index.ts" },
     { id: "transcript", plugin: "plugins/transcript/index.ts" },
