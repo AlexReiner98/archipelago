@@ -25,7 +25,7 @@ import type { SlotFill } from "../../spec/slot.ts";
 import { sheet } from "../../spec/style.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import type { PluginDoc } from "../docs/read.ts";
-import { holds, leftBy, needed, orphans, plan, stops, type Untyped } from "./ties.ts";
+import { holds, leftBy, needed, plan, splitOrphans, stops, type Untyped } from "./ties.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -47,6 +47,7 @@ const SHEET = sheet(`
 .sw-err { color:var(--failed); }
 .sw-left { color:var(--moving); white-space:nowrap; }
 .sw-gone > h3 { color:var(--moving); }
+.sw-gone > h3.sw-never { color:var(--dim); margin-top:var(--space-3); }
 .sw-rows { border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); padding:var(--space-1) var(--space-3); }
 .sw-row { padding:var(--space-1) 0; }
 .sw-row + .sw-row { border-top:1px solid var(--line); }
@@ -155,14 +156,14 @@ const sw: Plugin = {
           action: "schema.untyped",
           input: { type: u.type, limit: PAGE, ...(after ? { after } : {}) },
           authority: { of: "human", basis: "looked at in the Plugins view" },
-          reason: `The items of ${u.type}, whose plugin is gone`,
+          reason: `The items of ${u.type}, which no loaded plugin defines`,
         });
         if (!out.ok) return setErr(out.refused.message);
         const page = out.output as unknown as { items: Row[]; next?: string };
         setRows((had) => [...(after ? (had ?? []) : []), ...page.items]);
         setNext(page.next);
       };
-      const was = u.plugin ? `last defined by ${u.plugin}, which is not loaded${u.seen ? ` (seen ${u.seen.slice(0, 10)})` : ""}` : "never seen defined here";
+      const was = u.plugin ? `last defined by ${u.plugin}, which is not loaded${u.seen ? ` (seen ${u.seen.slice(0, 10)})` : ""}` : "";
       return html`<div class="sw-row" data-type=${u.type}>
         <button onClick=${() => (rows ? setRows(undefined) : void read())} aria-expanded=${rows ? "true" : "false"}>${u.type}</button>
         <span> ${items(u.items, !!u.more)}</span><span class="sw-was">${was}</span>
@@ -175,12 +176,17 @@ const sw: Plugin = {
       </div>`;
     };
     const Gones = ({ all }: { all: PluginDoc[] }) => {
-      const gone = orphans(useUntyped(all), all);
-      if (!gone.length) return null;
-      const n = gone.reduce((s, u) => s + u.items, 0);
+      const { gone, never } = splitOrphans(useUntyped(all), all);
+      if (!gone.length && !never.length) return null;
+      const sum = (us: Untyped[]) => items(us.reduce((s, u) => s + u.items, 0), us.some((u) => u.more));
+      const kinds = (us: Untyped[]) => `${us.length} kind${us.length === 1 ? "" : "s"}`;
       return html`<section class="dk-list sw-gone">
-        <h3>Without a plugin<span>${items(n, gone.some((u) => u.more))} of ${gone.length} kind${gone.length === 1 ? "" : "s"} no loaded plugin defines. They stay on the map unchanged, but no view drawn from the types shows them, and no switch here brings them back. A plugin that defines the kind again shows them; schema.untyped lists them.</span></h3>
-        <div class="sw-rows">${gone.map((u) => html`<${Gone} key=${u.type} u=${u} />`)}</div>
+        ${gone.length > 0 &&
+        html`<h3>Without a plugin<span>${sum(gone)} of ${kinds(gone)} whose plugin is not loaded. They stay on the map unchanged, but no view drawn from the types shows them, and no switch here brings them back. A plugin that defines the kind again shows them; schema.untyped lists them.</span></h3>
+          <div class="sw-rows">${gone.map((u) => html`<${Gone} key=${u.type} u=${u} />`)}</div>`}
+        ${never.length > 0 &&
+        html`<h3 class="sw-never">Never defined here<span>${sum(never)} of ${kinds(never)} no plugin was seen defining as a type. A loaded plugin may keep them as its own records without a type (the words plugin's node, the loaded plugin's loaded), or they are older than the schema's memory of who defined what; their items say which.</span></h3>
+          <div class="sw-rows">${never.map((u) => html`<${Gone} key=${u.type} u=${u} />`)}</div>`}
       </section>`;
     };
 

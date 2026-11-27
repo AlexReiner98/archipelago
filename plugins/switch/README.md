@@ -34,12 +34,19 @@ switch ─▶ switch.set ─▶ page item (as page.set writes it) ─▶ page fo
   every card, again whenever a card is turned on or off. Without the schema
   plugin nothing is shown.
 - **Without a plugin** is a list after the cards, for the untyped kinds no
-  card answers for: the plugin that last defined them is not loaded at all
-  (deleted outright, as `branch` was), or none was ever seen defining them.
-  No switch brings those back, so each kind is a row of its own, with its
-  count and the plugin that last defined it; opened, it lists its items,
-  20 at a time (`schema.untyped` with `type`, bounded by `LIMIT_MAX`). The
-  same read of `schema.untyped` serves the cards and this list.
+  card answers for whose plugin, the one that last defined them, is not
+  loaded at all (deleted outright, as `branch` was). No switch brings those
+  back, so each kind is a row of its own, with its count and the plugin that
+  last defined it; opened, it lists its items, 20 at a time
+  (`schema.untyped` with `type`, bounded by `LIMIT_MAX`). The same read of
+  `schema.untyped` serves the cards and this list.
+- **Never defined here** follows it, the same kind of rows, for untyped kinds
+  no plugin was ever seen defining. They are not plugin-less: a loaded plugin
+  may keep its own records as items without a type (the words plugin's
+  `node`, the loaded plugin's `loaded`), or the items are older than the
+  schema's memory of who defined what (on a map whose plugin was deleted
+  before that memory began, `branch` lands here). Nothing on the map tells
+  those apart, so the list says both and lets the items show which.
 - **Needed** shows instead of a switch on what the Plugins view, the switch,
   the page following its item, undo and the frame stand on: turning one
   off here would stop the way back. An agent can still call `switch.set`.
