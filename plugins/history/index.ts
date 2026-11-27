@@ -7,16 +7,18 @@
  * change set id, it writes that set's inverse as one new change set, which
  * the action plugin marks `undoes`. The graph refuses it with
  * `graph.conflict` if a field has moved since; nothing is merged silently.
- * Reads are actions too (`history.list`, `history.get`,
+ * Reads are actions too (`history.list`, `history.since`, `history.get`,
  * `history.snapshots`), so the context interface and agents reach them the same
- * way. The graph is the truth: nothing is rebuilt from the journal.
- * Node only.
+ * way. The log is the truth (decided 27 Nov 2026): the graph's tables are
+ * its projection, and `history.verify` rebuilds them from it and compares.
+ * Nothing folds unless `keep` is set. Node only.
  */
 import type { ActionContext, ActionRegister, UndoInput } from "../../spec/action.ts";
 import { UNDO } from "../../spec/action.ts";
 import type { Json } from "../../spec/common.ts";
 import { Refused } from "../../spec/common.ts";
-import type { GraphStage } from "../../spec/graph.ts";
+import type { GraphRead, GraphStage } from "../../spec/graph.ts";
+import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import { Journal } from "./journal.ts";
 
@@ -25,9 +27,9 @@ export { Journal, netFacts } from "./journal.ts";
 export interface HistoryConfig {
   /** The SQLite database the journal is kept in. None: in memory. */
   db?: string;
-  /** How many entries are kept in full. Default 5000. */
+  /** How many entries are kept in full before the oldest fold. Unset (the default): every entry is kept, nothing folds. */
   keep?: number;
-  /** How many of the oldest fold into one snapshot, once there are `keep + fold`. Default 1000. */
+  /** How many of the oldest fold into one snapshot, once there are `keep + fold`. Default 1000; only with `keep`. */
   fold?: number;
 }
 
@@ -36,7 +38,7 @@ const by = { plugin: "history" };
 const history: Plugin<HistoryConfig> = {
   id: "history",
   about: "Keeps every change to the map, and undoes any of them.",
-  inject: ["graph.stage", "action.register"],
+  inject: ["graph.stage", "graph.read", "action.register"],
   async apply(ctx: Context, config: HistoryConfig = {}) {
     if (config.db) {
       const { mkdir } = await import("node:fs/promises");
@@ -44,8 +46,9 @@ const history: Plugin<HistoryConfig> = {
       await mkdir(dirname(config.db), { recursive: true });
     }
     const journal = new Journal(config.db);
-    const keep = Math.max(1, config.keep ?? 5000);
+    const keep = config.keep === undefined ? undefined : Math.max(1, config.keep);
     const fold = Math.max(1, config.fold ?? 1000);
+    const graph = ctx.get<GraphRead>("graph.read");
     ctx.effect(() => () => journal.close());
 
     ctx.get<GraphStage>("graph.stage").stage(async (change, next) => {
@@ -53,12 +56,24 @@ const history: Plugin<HistoryConfig> = {
       // Applied already: a journal that fails to write is reported, never undoes the commit.
       try {
         journal.record(committed);
-        journal.compact(keep, fold);
+        if (keep !== undefined) journal.compact(keep, fold);
       } catch (err) {
         ctx.runtime.report(ctx.fiber, err);
       }
       return committed;
     });
+
+    // Sets committed before the stage was on the chain (other plugins' first writes, as the map starts, or
+    // while the plugin was off) are taken from the graph's recent sets, so the log misses none it still has.
+    {
+      let after = String(journal.last());
+      for (;;) {
+        const page = await graph.since({ after, limit: LIMIT_MAX });
+        for (const c of page.items) journal.record(c);
+        if (!page.next || !page.items.length) break;
+        after = page.next;
+      }
+    }
 
     const register = ctx.get<ActionRegister>("action.register");
 
@@ -103,6 +118,52 @@ const history: Plugin<HistoryConfig> = {
       async run(input: { run?: string; item?: string; limit?: number; after?: string }) {
         const only = input.item ? { item: input.item } : input.run ? { run: input.run } : {};
         return journal.entries(only, { limit: input.limit, after: input.after }) as unknown as Json;
+      },
+    });
+
+    register.register({
+      name: "history.since",
+      title: "The journal, oldest first, after a seq",
+      doc: "Committed change sets in full, in the order they were committed, after `after` (a seq; absent, from the start). `begins` is the first seq the journal holds: above 1, the start is in a snapshot or was never kept. Writes nothing.",
+      input: { type: "object", properties: pageInput },
+      async run(input: { limit?: number; after?: string }) {
+        const page = journal.since({ limit: input.limit, after: input.after });
+        const begins = journal.begins();
+        return { ...page, ...(begins !== undefined ? { begins } : {}) } as unknown as Json;
+      },
+    });
+
+    register.register({
+      name: "history.verify",
+      title: "Rebuild the map from the log and compare",
+      doc: "Replays the journal (snapshots, then entries) into items and compares each with the graph's tables, read by id, LIMIT_MAX at a time. `complete`: the log begins at the first change and holds every one the graph committed. `differ`: how many items the tables hold otherwise than the log makes them, with up to 20. Writes nothing.",
+      input: { type: "object", properties: {} },
+      async run() {
+        const { items, sets } = journal.replay();
+        const begins = journal.begins();
+        const last = journal.since({ after: String(Number(await graph.now()) - 1), limit: 1 }).items[0]?.seq;
+        const now = Number(await graph.now());
+        const ids = [...items.keys()];
+        const differ: { id: string; field: string; log?: Json; table?: Json }[] = [];
+        let count = 0;
+        for (let i = 0; i < ids.length; i += LIMIT_MAX) {
+          const batch = ids.slice(i, i + LIMIT_MAX);
+          const got = await graph.get(batch);
+          batch.forEach((id, k) => {
+            const log = items.get(id)!;
+            const it = got[k];
+            const table: Record<string, Json> = it ? { type: it.type, ...it.fields } : {};
+            const fields = new Set([...Object.keys(log), ...Object.keys(table)]);
+            let off = false;
+            for (const f of fields) {
+              if (JSON.stringify(log[f]) === JSON.stringify(table[f])) continue;
+              off = true;
+              if (differ.length < 20) differ.push({ id, field: f, ...(log[f] !== undefined ? { log: log[f] } : {}), ...(table[f] !== undefined ? { table: table[f] } : {}) });
+            }
+            if (off) count++;
+          });
+        }
+        return { complete: begins === 1 && last === now, ...(begins !== undefined ? { begins } : {}), now, sets, items: items.size, differ: count, examples: differ } as unknown as Json;
       },
     });
 

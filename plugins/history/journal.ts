@@ -4,10 +4,11 @@
  *
  * - `entries` holds the newest sets whole: header, facts, inverse, and
  *   which later set undid it, if one has.
- * - `snapshots` holds what older entries were folded into: the range they
- *   covered, who made them, and their net facts (each field touched, from
- *   the value it had before the range to the value it had after). The
- *   graph is the truth, so this is a record, not something to rebuild from.
+ * - `snapshots` holds what older entries were folded into, when a map
+ *   folds at all (off unless `keep` is set): the range they covered, who
+ *   made them, and their net facts (each field touched, from the value it
+ *   had before the range to the value it had after). The log is the truth:
+ *   snapshots then entries, in order, rebuild every item (`replay`).
  */
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 import type { ChangeSetId, Committed, Fact, Header } from "../../spec/changeset.ts";
@@ -159,6 +160,10 @@ export class Journal {
       snap: p("INSERT INTO snapshots (first, last, body) VALUES (?, ?, ?)"),
       snaps: p("SELECT n, body FROM snapshots WHERE n < ? ORDER BY n DESC LIMIT ?"),
       covering: p("SELECT n FROM snapshots WHERE first <= ? AND last >= ? LIMIT 1"),
+      forward: p("SELECT * FROM entries WHERE seq > ? ORDER BY seq LIMIT ?"),
+      first: p("SELECT min(seq) AS seq FROM entries"),
+      snapFirst: p("SELECT min(first) AS first FROM snapshots"),
+      snapsUp: p("SELECT body FROM snapshots ORDER BY first"),
     };
     // A journal written before `touches` was kept is indexed once, on open.
     if (!this.db.prepare("SELECT value FROM meta WHERE key = 'touches'").get()) {
@@ -233,6 +238,58 @@ export class Journal {
     const rows = this.q.snaps!.all(before, limit + 1) as { n: number; body: string }[];
     const items = rows.slice(0, limit).map((r) => ({ n: r.n, ...(JSON.parse(r.body) as Omit<Snapshot, "n">) }));
     return rows.length > limit ? { items, next: String(items.at(-1)!.n) } : { items };
+  }
+
+  /** Entries oldest first, after `page.after` (a seq), a page at a time. */
+  since(page?: PageRequest): Page<Entry> {
+    const limit = Math.max(1, Math.min(page?.limit ?? 50, LIMIT_MAX));
+    const rows = this.q.forward!.all(page?.after ? Number(page.after) : 0, limit + 1) as Row[];
+    const items = rows.slice(0, limit).map(entryOf);
+    return rows.length > limit ? { items, next: String(items.at(-1)!.seq) } : { items };
+  }
+
+  /** The last seq the log holds, in an entry or a snapshot; 0 while it is empty. */
+  last(): number {
+    const e = (this.db.prepare("SELECT max(seq) AS seq FROM entries").get() as { seq: number | null }).seq ?? 0;
+    const s = (this.db.prepare("SELECT max(last) AS last FROM snapshots").get() as { last: number | null }).last ?? 0;
+    return Math.max(e, s);
+  }
+
+  /** Where the log begins: the first seq it holds, in a snapshot or an entry; undefined while it is empty. */
+  begins(): number | undefined {
+    const s = (this.q.snapFirst!.get() as { first: number | null }).first;
+    const e = (this.q.first!.get() as { seq: number | null }).seq;
+    return s ?? e ?? undefined;
+  }
+
+  /**
+   * Every item as the log makes it: each snapshot's net facts, then each
+   * entry's facts, in order, applied to nothing. A field holds the last
+   * value asserted; a retraction empties it; an item with no fields left is
+   * gone. Reads the journal's own store, a row at a time.
+   */
+  replay(): { items: Map<string, Record<string, Json>>; sets: number } {
+    const items = new Map<string, Record<string, Json>>();
+    const apply = (facts: Fact[]) => {
+      for (const [op, id, field, value] of facts) {
+        const it = items.get(id) ?? {};
+        if (op === "+") it[field] = value;
+        else if (same(it[field], value)) delete it[field];
+        if (Object.keys(it).length) items.set(id, it);
+        else items.delete(id);
+      }
+    };
+    let sets = 0;
+    for (const r of this.q.snapsUp!.iterate() as Iterable<{ body: string }>) {
+      const snap = JSON.parse(r.body) as Omit<Snapshot, "n">;
+      apply(snap.facts);
+      sets += snap.count;
+    }
+    for (const r of this.db.prepare("SELECT facts FROM entries ORDER BY seq").iterate() as Iterable<{ facts: string }>) {
+      apply(JSON.parse(r.facts) as Fact[]);
+      sets++;
+    }
+    return { items, sets };
   }
 
   size(): number {

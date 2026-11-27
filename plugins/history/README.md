@@ -10,6 +10,8 @@ change that failed. Kept in SQLite (`config.db`), or in memory without one.
 |---|---|
 | `history.undo` `{ change }` | Writes the inverse of a committed set as a new one, marked `undoes` |
 | `history.list` `{ item?, run?, limit?, after? }` | Entries newest first; `item` narrows to the sets touching one item (its fields, or a link to or from it), else `run` to one run's. Writes nothing |
+| `history.since` `{ after?, limit? }` | Entries oldest first, after a seq: the log as it was written, a page at a time, with `begins`, the first seq the journal holds. Writes nothing |
+| `history.verify` `{}` | Replays the log (snapshots, then entries) into items and compares each with the graph's tables, read by id: `complete` (the log begins at the first change and holds the last), `differ` and up to 20 `examples`. Writes nothing |
 | `history.get` `{ change }` | One entry; writes nothing |
 | `history.snapshots` `{ limit?, after? }` | What older entries folded into; writes nothing |
 
@@ -19,11 +21,21 @@ change that failed. Kept in SQLite (`config.db`), or in memory without one.
   `graph.conflict` (undo the later change first). Undoing an undo redoes,
   and the original stands again. A set already undone is refused with
   `history.undone`.
-- Once more than `keep + fold` entries are kept (5000 + 1000), the oldest
-  `fold` fold into one snapshot: the seqs it covers, its actors, plugins and
-  actions, and its net facts. A folded set can't be undone alone
-  (`history.compacted`).
-- The graph is the truth. Nothing is rebuilt from the journal, and losing
-  it loses only the record and undo.
+- **The log is the truth** (decided 27 Nov 2026). The journal keeps every
+  change set, and the graph's tables are its projection: replayed in order
+  from nothing, the log makes every item. `history.verify` checks that it
+  does. A map whose journal began after its first change (`begins` above 1)
+  has a log that doesn't reach back; `verify` says so, and a first sync
+  refuses it ([sync](../sync/README.md)).
+- Sets committed before the stage was on the chain (other plugins' first
+  writes as the map starts, or while history was off) are recorded when it
+  loads, from the graph's recent sets (`graph.since`, the last thousand):
+  the log misses none the graph still has.
+- Nothing folds unless `keep` is set. Then, once more than `keep + fold`
+  entries are kept, the oldest `fold` fold into one snapshot: the seqs it
+  covers, its actors, plugins and actions, and its net facts. The log still
+  rebuilds the items, but a folded set can't be undone alone
+  (`history.compacted`), and a map synced from a cursor inside a fold can't
+  be sent what it folded.
 
-Injects `graph.stage` and `action.register`. Node only.
+Injects `graph.stage`, `graph.read` and `action.register`. Node only.

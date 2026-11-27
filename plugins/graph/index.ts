@@ -3,10 +3,11 @@
  * write chain. Provides graph.read, graph.watch, graph.stage and
  * graph.commit (spec/graph.md).
  *
- * The graph is the truth: `config.db` names the database, kept across
- * restarts; without one it is in memory. The last `config.keep` committed
- * sets are kept with it, for `since` and for watchers resuming from a
- * cursor; journalling them is history's. Node only.
+ * The tables are the log's projection (the log is the truth, history's
+ * journal): `config.db` names the database, kept across restarts; without
+ * one it is in memory. The last `config.keep` committed sets are kept with
+ * it, for `since` and for watchers resuming from a cursor; the whole log is
+ * history's. Node only.
  */
 import type { Committed, Proposed } from "../../spec/changeset.ts";
 import type { Caller, Cursor, Dispose } from "../../spec/common.ts";

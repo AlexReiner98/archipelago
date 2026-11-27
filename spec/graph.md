@@ -1,7 +1,9 @@
 # graph
 
-The graph plugin stores items and links and is the truth. This is what every
-other plugin sees of it. Types: [graph.ts](graph.ts).
+The graph plugin stores items and links. The log of committed change sets
+is the truth and the graph's tables are its projection (decided 27 Nov
+2026): the history plugin keeps the whole log, and `graph.since` only the
+last sets, for watchers. This is what every other plugin sees of it. Types: [graph.ts](graph.ts).
 
 ## Capabilities
 

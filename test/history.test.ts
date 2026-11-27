@@ -225,3 +225,30 @@ test("a journal kept before items were indexed is indexed when it opens", async 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("the log is the truth: kept whole unless keep is set, read oldest first by history.since, and it rebuilds the tables (history.verify)", async () => {
+  const h = await setup();
+  try {
+    for (let i = 0; i < 7; i++) await h.ok(h.write(["+", `e${i}`, "type", "task"], ["+", `e${i}`, "title", `T${i}`]));
+    await h.ok(h.write(["-", "e3", "title", "T3"], ["+", "e3", "title", "T3, renamed"]));
+    const first = (await h.ok(h.call<Json>("history.since", { limit: 3 }))).output as unknown as Page<Entry> & { begins: number };
+    assert.deepEqual([first.items.map((e) => e.seq), first.next, first.begins], [[1, 2, 3], "3", 1]);
+    const rest = (await h.ok(h.call<Json>("history.since", { after: first.next!, limit: 500 }))).output as unknown as Page<Entry>;
+    assert.deepEqual([rest.items.map((e) => e.seq), rest.next], [[4, 5, 6, 7, 8], undefined]);
+    const v = (await h.ok(h.call<Json>("history.verify", {}))).output as unknown as { complete: boolean; sets: number; items: number; differ: number };
+    assert.deepEqual([v.complete, v.sets, v.items, v.differ], [true, 8, 7, 0]);
+  } finally {
+    await h.stop();
+  }
+  // With keep set, the oldest fold; the folded log still rebuilds the tables.
+  const f = await setup({ keep: 2, fold: 2 });
+  try {
+    for (let i = 0; i < 6; i++) await f.ok(f.write(["+", `e${i}`, "type", "task"]));
+    const since = (await f.ok(f.call<Json>("history.since", {}))).output as unknown as Page<Entry> & { begins: number };
+    assert.ok(since.items[0]!.seq > 1 && since.begins === 1, "entries begin later; the log, in a snapshot, from the start");
+    const v = (await f.ok(f.call<Json>("history.verify", {}))).output as unknown as { complete: boolean; differ: number; items: number };
+    assert.deepEqual([v.complete, v.differ, v.items], [true, 0, 6]);
+  } finally {
+    await f.stop();
+  }
+});

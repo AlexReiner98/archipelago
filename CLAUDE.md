@@ -16,8 +16,10 @@ human or agent) when working in this repository. The
 - No sandbox. Installing a plugin means trusting it.
 - History is a journal plugin. Each change set is written in full (actor,
   authority, plugin, reason, and its facts as `[op, id, field, value]`), and
-  undo applies its inverse. The graph is the truth: nothing is rebuilt from
-  the journal.
+  undo applies its inverse. The log is the truth (decided 27 Nov 2026):
+  the journal keeps every change set, and the graph's tables are its
+  projection, which `history.verify` rebuilds and compares. Maps sync by
+  their logs.
 - No plugin owns a part of the data. A grouping is a link or a query.
 - This repository holds everything one person needs on their own machine, a
   basic map UI included.
