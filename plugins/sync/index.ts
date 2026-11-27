@@ -20,7 +20,7 @@ import { factsFor, idsOf, type Fields, type Write } from "./merge.ts";
 export interface SyncConfig {
   /** Where this map's id and its peers' cursors are kept; absent, in memory. */
   db?: string;
-  /** This map's name, said to its peers. */
+  /** This map's name, said to its peers. Absent, a peer names it by where it reached it. */
   name?: string;
 }
 
@@ -114,7 +114,7 @@ const sync: Plugin<SyncConfig> = {
     ctx.effect(() => () => store.close());
     const graph = ctx.get<GraphRead>("graph.read");
     const register = ctx.get<ActionRegister>("action.register");
-    const name = config.name ?? "this map";
+    const name = config.name;
 
     register.register({
       name: "sync.status",
@@ -122,7 +122,7 @@ const sync: Plugin<SyncConfig> = {
       doc: "This map's id and name, and each peer: how far it has had this map's change sets, when they last synced, and what that run did. Writes nothing.",
       input: { type: "object", properties: {} },
       async run() {
-        return { id: store.id, name, peers: store.peers() } as unknown as Json;
+        return { id: store.id, ...(name ? { name } : {}), peers: store.peers() } as unknown as Json;
       },
     });
 

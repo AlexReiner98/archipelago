@@ -43,12 +43,20 @@ import {
 export interface End {
   /** Calls a key's method; `as` names the agent it acts as. */
   call<T>(key: string, method: string, args: unknown[], as?: Actor): Promise<T>;
+  /** What to call the map when it names itself nothing: where it was reached. */
+  label?: string;
 }
 
 interface Status {
   id: string;
   name: string;
   peers: Peer[];
+}
+
+/** A map's status, named by its own name, else by where it was reached. */
+async function statusOf(end: End): Promise<Status> {
+  const s = await output<Omit<Status, "name"> & { name?: string }>(end, "sync.status");
+  return { ...s, name: s.name ?? end.label ?? "the other map" };
 }
 
 export interface Report {
@@ -185,7 +193,7 @@ function chunks(writes: Write[]): Write[][] {
  * cursors.
  */
 export async function syncMaps(a: End, b: End, opts: { dry?: boolean; keep?: Side } = {}): Promise<Report> {
-  const [sa, sb] = await Promise.all([output<Status>(a, "sync.status"), output<Status>(b, "sync.status")]);
+  const [sa, sb] = await Promise.all([statusOf(a), statusOf(b)]);
   if (sa.id === sb.id) throw new Error(`both ends are map ${sa.name} (${sa.id})`);
   const ca = sa.peers.find((p) => p.id === sb.id)?.cursor;
   const cb = sb.peers.find((p) => p.id === sa.id)?.cursor;
@@ -220,10 +228,27 @@ export async function syncMaps(a: End, b: End, opts: { dry?: boolean; keep?: Sid
         sent(r);
         continue;
       }
-      // One item that doesn't fit holds the whole set: stop holding it, and send each item alone, so only what doesn't fit is held.
-      const held = (r.refused.detail as { quarantine?: string } | undefined)?.quarantine;
-      if (held) await invoke(to, "schema.drop", { quarantine: held }, "sync: sent again an item at a time, so only what doesn't fit is held", RUN);
-      for (const id of ids) sent(await send(chunk.filter((w) => w.id === id)), id);
+      // An item that doesn't fit holds the whole set: stop holding it, send the rest again as one set without the
+      // items the schema named, and each of those alone, so only what doesn't fit is held.
+      const misfits = new Set<Id>();
+      let last: Outcome<{ facts: number }> = r;
+      for (let tries = 0; !last.ok && last.refused.code === "schema.quarantined" && tries < 5; tries++) {
+        const detail = last.refused.detail as { quarantine?: string; problems?: { id?: Id }[] } | undefined;
+        if (detail?.quarantine) await invoke(to, "schema.drop", { quarantine: detail.quarantine }, "sync: sent again without the items that don't fit, each of those alone", RUN);
+        const named = (detail?.problems ?? []).flatMap((p) => (p.id && ids.includes(p.id) && !misfits.has(p.id) ? [p.id] : []));
+        if (!named.length) {
+          // The refusal named no item of the set: each goes alone.
+          for (const id of ids) if (!misfits.has(id)) misfits.add(id);
+          last = { ok: true, output: { facts: 0 } };
+          break;
+        }
+        for (const id of named) misfits.add(id);
+        const rest = chunk.filter((w) => !misfits.has(w.id));
+        last = rest.length ? await send(rest) : { ok: true, output: { facts: 0 } };
+      }
+      if (last.ok && chunk.some((w) => !misfits.has(w.id))) sent(last);
+      else if (!last.ok) sent(last);
+      for (const id of misfits) sent(await send(chunk.filter((w) => w.id === id)), id);
     }
   };
 
@@ -317,9 +342,10 @@ export async function syncMaps(a: End, b: End, opts: { dry?: boolean; keep?: Sid
 }
 
 /** A map's server, through its bridge's `POST /call`; `token` goes as `Authorization: Bearer` for a server that takes one. */
-export function httpEnd(url: string, token?: string): End {
+export function httpEnd(url: string, token?: string, label?: string): End {
   const base = url.replace(/\/+$/, "");
   return {
+    label: label ?? base.replace(/^https?:\/\//, ""),
     async call<T>(key: string, method: string, args: unknown[], as?: Actor): Promise<T> {
       const r = await fetch(`${base}/call`, {
         method: "POST",

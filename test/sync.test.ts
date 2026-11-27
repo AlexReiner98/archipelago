@@ -347,6 +347,21 @@ test("an item the other map's schema doesn't take is held there alone; the rest 
   const held = await b.invoke("schema.quarantined", { state: "held" });
   assert.ok(held.ok);
   if (held.ok) assert.equal((held.output as { items: unknown[] }).items.length, 1, "the whole set was dropped, only the misfit is held");
+  assert.equal(r.a.sent, 1, "the rest went again as one set; the misfit alone, held");
+  await a.stop();
+  await b.stop();
+});
+
+test("a map that names itself nothing is called by where it was reached", async () => {
+  const a = await map("local");
+  const b = await map("hosted");
+  const unnamed = { ...b.end, label: "app.example/sync", async call<T>(key: string, method: string, args: unknown[], who?: Actor): Promise<T> {
+    const out = await b.end.call<T>(key, method, args, who);
+    if (key === "action.invoke" && (args[0] as { action: string }).action === "sync.status") delete (out as { output: { name?: string } }).output.name;
+    return out;
+  } };
+  const r = await syncMaps(a.end, unnamed, { dry: true });
+  assert.equal(r.b.name, "app.example/sync");
   await a.stop();
   await b.stop();
 });

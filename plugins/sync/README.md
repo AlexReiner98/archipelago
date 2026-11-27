@@ -9,7 +9,8 @@ npm run map -- sync <map|url> [--map name] [--dry] [--keep theirs] [--token t]
 ```
 
 Syncs map `live` (or `--map`) with another map served here by name, or a
-server's bridge by url, its token in `--token` or `ARCHIPELAGO_SYNC_TOKEN`
+server's bridge by url (a map that names itself nothing is called by that
+url), its token in `--token` or `ARCHIPELAGO_SYNC_TOKEN`
 (`Authorization: Bearer`). `--dry` says what would go and writes nothing.
 
 ## The log is what syncs
@@ -36,9 +37,9 @@ first set's, its reason `From <map>: <the first reason>`. So the journal
 keeps it, the Activity view shows it, and `history.undo` takes it back. An
 undo is a change like any other, so it syncs too. Those copies are left out
 when the map sends its log back. Where the other map's schema refuses a set
-(`schema.quarantined`), the held set is dropped and its items are sent one
-at a time, so only the item that doesn't fit is held there; the report
-names each.
+(`schema.quarantined`), the held set is dropped, the rest is sent again as
+one set without the items the refusal named, and each of those alone, so
+only what doesn't fit is held there; the report names each.
 
 ## The first run: a join
 

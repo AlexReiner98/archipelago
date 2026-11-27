@@ -246,10 +246,10 @@ switch (verb) {
       }
       return `http://127.0.0.1:${s.port + 2}`;
     };
-    const far = /^https?:\/\//.test(other) ? httpEnd(other, values.token ?? process.env.ARCHIPELAGO_SYNC_TOKEN) : httpEnd(bridgeOf(other));
+    const far = /^https?:\/\//.test(other) ? httpEnd(other, values.token ?? process.env.ARCHIPELAGO_SYNC_TOKEN) : httpEnd(bridgeOf(other), undefined, other);
     let r: Report;
     try {
-      r = await syncMaps(httpEnd(bridgeOf(mine)), far, { dry: values.dry, keep: values.keep === "theirs" ? "b" : "a" });
+      r = await syncMaps(httpEnd(bridgeOf(mine), undefined, mine), far, { dry: values.dry, keep: values.keep === "theirs" ? "b" : "a" });
     } catch (e) {
       console.log(`not synced: ${(e as Error).message}`);
       process.exitCode = 1;
