@@ -7,6 +7,7 @@
  * off from the console: `host.loader.edit(t => (t.find(e => e.id === "harness").disabled = true, t))`.
  */
 import { startBrowser } from "../runtime/browser.ts";
+import type { Entry } from "../runtime/loader.ts";
 
 /**
  * Where the bridge is: at `/bridge/` on the page's origin when a host serves
@@ -25,6 +26,24 @@ async function bridgeUrl(): Promise<string> {
     // Not there: the dev server's own ports.
   }
   return `http://${location.hostname}:${Number(location.port) + 2}/`;
+}
+
+/**
+ * The page's entries from plugin folders kept outside this repository, as
+ * the server lists them at `/app/plugins.json` (runtime/folders.ts): after
+ * the ones here, in the folders' order. None when it isn't there.
+ */
+async function folderEntries(): Promise<Entry[]> {
+  try {
+    const r = await fetch(new URL("plugins.json", location.href));
+    if (r.ok && (r.headers.get("content-type") ?? "").includes("json")) {
+      const list = (await r.json()) as unknown;
+      if (Array.isArray(list)) return list as Entry[];
+    }
+  } catch {
+    // A host that serves none.
+  }
+  return [];
 }
 
 const host = await startBrowser({
@@ -73,6 +92,7 @@ const host = await startBrowser({
     { id: "docs", plugin: "plugins/docs/view.ts" },
     { id: "guide", plugin: "plugins/docs/guide.ts" },
     { id: "switch", plugin: "plugins/switch/view.ts" },
+    ...(await folderEntries()),
   ],
 });
 host.runtime.onError = (fiber, error) => console.error(`[${fiber.plugin.id}]`, error);

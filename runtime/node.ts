@@ -15,6 +15,15 @@ import { Loader, type Entry } from "./loader.ts";
 
 const strip = (url: string) => url.split("?")[0]!;
 
+/**
+ * This repository's package name, as a plugin folder imports it
+ * (runtime/folders.ts): always this checkout, whatever the folder's own
+ * node_modules holds, so the folder and the plugins here share one copy of
+ * every module.
+ */
+const PACKAGE = "archipelago/";
+const ROOT = new URL("../", import.meta.url).href;
+
 /** The one graph of this process: hooks are process-wide. */
 export const graph = new ModuleGraph();
 let hooked = false;
@@ -24,7 +33,7 @@ function hook(): void {
   hooked = true;
   registerHooks({
     resolve(specifier, context, next) {
-      const r = next(specifier, context);
+      const r = next(specifier.startsWith(PACKAGE) ? new URL(specifier.slice(PACKAGE.length), ROOT).href : specifier, context);
       if (!r.url.startsWith("file:")) return r;
       const url = strip(r.url);
       if (context.parentURL?.startsWith("file:")) graph.record(strip(context.parentURL), url);
