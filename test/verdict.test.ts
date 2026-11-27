@@ -9,7 +9,7 @@ import exchange from "../plugins/exchange/index.ts";
 import graph from "../plugins/graph/index.ts";
 import verdict, { type VerdictRead } from "../plugins/verdict/index.ts";
 import { playAs, type Script } from "../plugins/scripted/index.ts";
-import { covers, judgeRun, listeningOf, namesMiss, OUTPUT_KEPT, placeMatches, records, slimEvent } from "../plugins/verdict/judge.ts";
+import { covers, judgeRun, listeningOf, namesMiss, OUTPUT_KEPT, OUTPUT_KEPT_WORKED, placeMatches, records, slimEvent } from "../plugins/verdict/judge.ts";
 
 const BASE = "mem:/plugins/";
 const T = (s: number) => `2026-11-20T14:00:${String(s).padStart(2, "0")}.000Z`;
@@ -354,7 +354,9 @@ test("the verdict keeps a slim copy of each act: path fields, refusal fields and
   const shot = slimEvent({ ...base, act: { kind: "tool", ok: true, input: { file_path: "a/b.png", limit: 5 }, output: { file: { base64: "/9j/".padEnd(2_000_000, "A") } } } } as never);
   assert.deepEqual((shot.act as { input: object }).input, { file_path: "a/b.png" }, "only the path fields of the input");
   assert.equal(typeof shot.act!.output, "string");
-  assert.equal((shot.act!.output as string).length, OUTPUT_KEPT, "the output as text, cut");
+  assert.equal((shot.act!.output as string).length, OUTPUT_KEPT_WORKED, "a working act's output as text, cut short");
+  const failed = slimEvent({ ...base, act: { kind: "tool", ok: false, input: {}, output: "e".repeat(20_000) } } as never);
+  assert.equal((failed.act!.output as string).length, OUTPUT_KEPT, "a failed act keeps more: its words are the miss");
   const refused = slimEvent({ ...base, act: { kind: "tool", ok: false, input: { command: "x".repeat(50_000) }, output: { refused: "words/a", code: "rule", text: "No.", extra: "y".repeat(50_000) } } } as never);
   assert.deepEqual(refused.act!.output, { refused: "words/a", code: "rule", text: "No." });
   assert.equal((refused.act as { input?: object }).input, undefined, "no path field: no input");

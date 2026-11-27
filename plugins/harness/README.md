@@ -318,7 +318,7 @@ the adapter's own formatting ([got.ts](got.ts), plugins/claude-code/context.ts);
 for the agent to the map,
 the act's input and output field by field, each label over its value;
 a list of facts a fact a line. An act whose input says what it is
-(`description`, a [typed call](../typed/README.md)'s attempt) is named by
+(`description`, a [typed call](https://github.com/AlexReiner98/archipelago-apps/blob/main/typed/README.md)'s attempt) is named by
 it on its line. A refusal that says how to fix its input (edition 11) shows,
 under its words, a `fix <path>` part for each place (what it wants, and an
 example) and "send instead": the input with every fix applied.

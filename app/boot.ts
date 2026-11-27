@@ -74,14 +74,8 @@ const host = await startBrowser({
     // Examples to copy, off until turned on (plugins/examples): a panel, and a frame of your own.
     { id: "today", plugin: "plugins/examples/today.ts", disabled: true },
     { id: "column", plugin: "plugins/examples/column.ts", disabled: true },
-    // The Checks view (plugins/checks/view.ts), off until a server runs the checks plugin: page.set { plugin: "checks", on: true }.
-    { id: "checks", plugin: "plugins/checks/view.ts", disabled: true },
     { id: "document", plugin: "plugins/document/index.ts" },
     { id: "item", plugin: "plugins/item/index.ts" },
-    // A game's payoff matrix, in Games and on its item page (plugins/game).
-    { id: "game", plugin: "plugins/game/view.ts" },
-    // The look of a tool people work in, after Impeccable's Operate mode: on the Games page first (plugins/operate).
-    { id: "operate", plugin: "plugins/operate/view.ts", config: { scope: ".gm" } },
     { id: "style-view", plugin: "plugins/style/view.ts" },
     { id: "docs", plugin: "plugins/docs/view.ts" },
     { id: "guide", plugin: "plugins/docs/guide.ts" },

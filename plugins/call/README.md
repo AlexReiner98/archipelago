@@ -19,7 +19,7 @@ parent run ── call run (harness: "call", parent)
 | `places` | Where the map speaks to it: `check:<fn>`, `finding`, or any place of the open vocabulary |
 | `parent` | The run that made it. Absent: the calling plugin's own run of calls (`calls:<plugin>:…`, titled "`<plugin>` calls"), begun at its first call and ended when this plugin unloads |
 | `facts` | More facts: `fn`, a test's id |
-| `follow` | `{item, version}`: an item whose decision at this version judges the call (a checks test) |
+| `follow` | `{item, version}`: an item whose decision at this version judges the call (a test of a rule) |
 
 It begins the run (`harness: "call"`, `parent`), reaches the places through
 `agent.run`, so what is said there is chosen as it is for an agent: nodes
@@ -60,7 +60,7 @@ the last one: rejected fails them, accepted holds them. On load, the newest
 The [context](../context/README.md) plugin counts a call's subject as a
 source of its own (`subject`, one part per type, its tokens as given), and,
 with no transcript, the answer's `usage` as the model's own total.
-A [typed call](../typed/README.md) is a call whose answer is held to the
+A [typed call](https://github.com/AlexReiner98/archipelago-apps/blob/main/typed/README.md) (in archipelago-apps) is a call whose answer is held to the
 map's types: its attempts and checks are acts in the same run.
 
 Tested in `test/call.test.ts`.
