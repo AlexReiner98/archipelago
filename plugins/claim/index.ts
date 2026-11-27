@@ -8,10 +8,11 @@
  *
  * The plan is on the map: a `plan` item per repository (or folder), and an
  * `intent` part_of it for each claim, with its files and branch, held
- * (`doing`) until its run ends (`done`) or lets go (`dropped`). An intent
+ * (`doing`) for the turn: until the run's reply ends, or the run ends
+ * (`done`), or it lets go (`dropped` when it wrote none of them). An intent
  * that waited for another depends_on it. Like any change it is undone with
  * history; the holds follow the map (graph.watch). A hold on first write is
- * not a claim: it stays off the map, and goes with its run.
+ * not a claim: it stays off the map, and goes with the turn too.
  *
  * Injects agent.node, action.register, action.invoke, exchange.watch,
  * graph.read, graph.watch and types.define; provides its own `claim.read`
@@ -210,7 +211,7 @@ const claim: Plugin<ClaimConfig> = {
       return [...runs.values()].filter((x) => x.info.run !== r.run && !replay(x.info) && now - x.last <= quietMs && scopeOf(x.info) === scope);
     };
 
-    /** A run is over: its intents are done (on the map), its holds on first write go. */
+    /** A run's turn is over: its intents are done (on the map), its holds on first write go. */
     const releasing = new Set<string>();
     const release = (run: string) => {
       const before = loose.length;
@@ -368,6 +369,21 @@ const claim: Plugin<ClaimConfig> = {
       },
     });
 
+    // A hold lasts a turn: as the run's reply ends, it lets go, so another agent waits minutes, not the life of a session.
+    node.node({
+      name: "turn",
+      kind: "rule",
+      title: "Lets go of a run's holds as its turn ends",
+      at: ["reply_end"],
+      repeat: "every",
+      speak(_m, run) {
+        if (replay(run)) return null;
+        seen(run);
+        release(run.run);
+        return null;
+      },
+    });
+
     const reg = ctx.get<ActionRegister>("action.register");
     const runOf = (call: ActionContext): RunInfo => {
       const id = call.caller.run;
@@ -521,8 +537,8 @@ const claim: Plugin<ClaimConfig> = {
 
     reg.register({
       name: "claim.release",
-      title: "A run is over: its intents on the shared plan are done",
-      doc: "The claim plugin calls it when a run ends or goes quiet. A run may call it for itself, never for another.",
+      title: "A run's turn is over: its intents on the shared plan are done",
+      doc: "The claim plugin calls it when a run's reply ends, or the run ends or goes quiet. A run may call it for itself, never for another.",
       input: { type: "object", required: ["run"], properties: { run: { type: "string" } } },
       async run(input: { run: string }, call) {
         if (call.caller.run && call.caller.run !== input.run)

@@ -62,6 +62,10 @@ function agentOf(env: Awaited<ReturnType<typeof boot>>, id: string, title: strin
       await run.begin({ run: id, agent: { id: `e_${id}`, kind: "agent" }, harness: "test", reaches: [], title, cwd: CWD, ...(at.remote ? { facts: { remote: at.remote } } : {}) });
       hear(await run.reach({ run: id, places: ["session_start"], time: time() }));
     },
+    /** The turn's reply ends: the agent stops and waits for its person. */
+    async reply() {
+      hear(await run.reach({ run: id, places: ["reply_end"], time: time() }));
+    },
     async prompt(text: string) {
       hear(await run.reach({ run: id, places: ["prompt"], time: time(), input: text }));
     },
@@ -364,4 +368,33 @@ test("a plan's intents fall into rounds: work that overlaps or follows within th
   const got = rounds([i("c", 30, undefined, "doing"), i("a", 0, 2), i("b", 3, 5)], now);
   assert.deepEqual(got.map((r) => r.intents.map((x) => x.id)), [["a", "b"], ["c"]]);
   assert.equal(got[1]!.end, now);
+});
+
+test("a hold lasts a turn: when the holder's reply ends, the one waiting gets the files, though its session goes on", async () => {
+  const env = await boot(true);
+  const a = agentOf(env, "run-a", "Rename greet");
+  const b = agentOf(env, "run-b", "Add farewell");
+  await a.begin();
+  await b.begin();
+  const took = (await a.take(["src/greet.ts"], "rename")) as unknown as { output: { intent: string } };
+  await a.tool("Edit", "src/greet.ts");
+  await a.tool("Edit", "src/app.ts");
+  assert.equal(await b.tool("Edit", "src/app.ts"), false);
+  const waited = b.invoke.invoke({ action: "claim.take", input: { files: ["src/greet.ts", "src/app.ts"], intent: "add farewell", wait_s: 20 }, authority: { of: "agent", basis: "test" }, reason: "test" });
+  await new Promise((ok) => setTimeout(ok, 30));
+  // A's turn ends; its session does not.
+  await a.reply();
+  const out = await waited;
+  assert.ok(out.ok);
+  await settle();
+  const [done] = await env.graph().get([took.output.intent]);
+  assert.equal(done!.fields.status, "done");
+  assert.deepEqual(env.plan().holds.map((h) => [h.run, h.file]).sort(), [["run-b", "src/app.ts"], ["run-b", "src/greet.ts"]]);
+  // A, in its next turn, finds them held by B.
+  await a.prompt("Now tidy greet");
+  assert.equal(await a.tool("Edit", "src/greet.ts"), false);
+  await a.end();
+  await b.end();
+  assert.deepEqual(env.errors, []);
+  await env.loader.apply([]);
 });

@@ -3,7 +3,7 @@
 Agents working on one repository at once, in one folder or in worktrees of
 it, agree on a shared plan, and the map keeps it and holds them to it: who
 works on what, which files each holds for it, who waited for whom and what
-each built on. Without it, two agents that both change `src/app.ts` find out
+each built on. Without it, two agents that both change one file find out
 at merge time, or never; with it, the second is turned away at its first
 write, told who holds the file and why, and waits for it, then builds on the
 first agent's work.
@@ -28,9 +28,9 @@ agent B ─ claim.take {…, wait_s} ─ waits ─ A ends ─▶ intent "add far
 | `plan` | a flavour of `work`, one per repository (or folder) | `scope`: `repo:host/owner/name`, or the folder |
 | `intent` | a flavour of `work`, one per claim, `part_of` its plan | `run`, `agent`, `files`, `scope`, `branch`, `folder`, `since`, `ended`, `asked` (when it waited first) |
 
-An intent is `doing` while its run holds its files, `done` when the run
-ended or let go after writing there, and `dropped` when it let go without
-writing. An intent that waited for another `depends_on` it: it was built on
+An intent is `doing` while its run holds its files, `done` when the run's
+turn ended (or the run, or it let go after writing there), and `dropped`
+when it let go without writing. An intent that waited for another `depends_on` it: it was built on
 that one. Both flavours ship kept (`trial: false`).
 
 The map is the truth. The holds the nodes check are the open intents,
@@ -44,6 +44,7 @@ run.
 | Node | At | Does |
 |---|---|---|
 | `claim/plan` | `session_start`, `prompt` | When another agent is live on the same repository: how to claim (once), and what the others hold, with their branches. Alone, it says nothing |
+| `claim/turn` | `reply_end` | Says nothing: as a run's reply ends, it lets go of what it holds, its intents done |
 | `claim/held` | `file:**` | A write (`Edit`, `Write`, `MultiEdit`, `NotebookEdit`) to a file another live run holds is refused (`claim.held`), naming the holder and its intent, and its branch to merge when it works in another checkout. A read of one is told. A write to a file nobody holds holds it for the writer. A run that started first hears how to claim here, once, when a second agent starts beside it |
 
 A refusal is a miss like any other on the exchange: the sensory interface
@@ -55,7 +56,7 @@ shows it on the run that was turned away.
 |---|---|---|
 | `claim.take` | `files` (≤ 50; a folder ends in `/`), `intent`, `wait_s?` (≤ 25) | Puts an intent on the plan (the run's open intent with the same words grows instead). When another run holds any of the files: with `wait_s`, waits that long for them, queued, then claims and `depends_on` what it waited for, answering `merge: [branch]` when that was in another checkout; else, or still held, refused, writing nothing |
 | `claim.drop` | `files?` | Lets go of those, or of all; an intent left with no files is done or dropped |
-| `claim.release` | `run` | Marks a run's open intents done. The plugin calls it when a run ends or goes quiet; a run may call it for itself only |
+| `claim.release` | `run` | Marks a run's open intents done. The plugin calls it when a run's reply ends, or the run ends or goes quiet; a run may call it for itself only |
 
 An agent calls them through the MCP `act` tool. Only a call from a run can
 claim.
@@ -121,10 +122,18 @@ trial node: it is not an agent working now, so the nodes leave it alone.
 
 ## How long a hold lasts
 
-While its run is live: it goes when the run ends, when it has been quiet
-for `quiet_min` minutes (15, as a session counts as live), or when the run
-drops it. The intent stays on the map, done or dropped, as the plan's
-record.
+A turn: it goes when the run's reply ends (`reply_end`), when the run ends
+or has been quiet for `quiet_min` minutes (15, as a session counts as live),
+or when the run drops it. The intent stays on the map, done or dropped, as
+the plan's record, and a next turn claims again.
+
+A turn, not a session: a session in the desktop app stays open for hours,
+and a hold for its life would turn every other agent on the repository away
+from each file it ever wrote, and leave a waiting agent waiting for a
+session to close. A turn is when an agent is changing files. Across
+worktrees one gap stays: a holder that has not committed by the end of its
+turn leaves nothing for the waiting agent to merge, no worse than without
+claims.
 
 ## Config
 
