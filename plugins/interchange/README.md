@@ -11,6 +11,6 @@ schema checks it, the journal keeps it, undo takes it back.
 The set's own header is not carried: the journal names whoever invoked the
 import, on the authority they gave, with their reason. A mover that knows
 on whose say-so the facts were first made groups them by it and imports
-each group with that authority (`scripts/from-pelago.ts` does).
+each group with that authority.
 
 Injects `action.register`.

@@ -12,8 +12,7 @@
  *   context; its writer only with writing on), grow, since ("since
  *   you last heard", at each prompt), the Claude Code adapter (5181), the
  *   map's agent tools on its MCP server (mcp), the reference read from the
- *   running plugins (docs, and its `plugins` tool, docs-tool), the old maps kept read only
- *   (archive, from <data>/archives), and
+ *   running plugins (docs, and its `plugins` tool, docs-tool), and
  *   the bridge (5182) the page reaches them through.
  *
  * On fixed ports (the default, or --port), a port already taken is refused

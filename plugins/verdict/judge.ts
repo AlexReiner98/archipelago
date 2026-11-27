@@ -201,17 +201,17 @@ function filePlaces(input: Json | undefined, cwd?: string): Place[] {
   return out;
 }
 
-/** How much of an act's output a slim event keeps, as text: enough for a miss's words and its phrases. */
+/** How much of a failed act's output a slim event keeps, as text: a miss's words. */
 export const OUTPUT_KEPT = 4000;
 
 /**
- * What judging reads of an event, and no more: an act keeps its kind, who
- * decided, whether it worked, the path fields of its input, and of its
- * output the refusal fields (`refused`, `code`, `text`) or its first
- * OUTPUT_KEPT characters as text. Whole bodies (a screenshot, a file read)
- * stay in the exchange's journal; held whole for every run, they filled a
- * map's heap.
+ * How much of a working act's output a slim event keeps: where a node's miss
+ * phrase is looked for (a near miss, `isNearOf`). An error's words come
+ * first in what a tool answers; 4,000 characters of every act that worked
+ * filled a hosted map's 512 MB heap as its journal grew (27 Nov 2026).
  */
+export const OUTPUT_KEPT_WORKED = 400;
+
 /**
  * The first `n` characters as a string of their own. A slice in V8 can keep
  * the whole string it was cut from alive; a copy through a Buffer doesn't.
@@ -220,17 +220,26 @@ function cut(s: string, n = OUTPUT_KEPT): string {
   return s.length <= n ? s : Buffer.from(s.slice(0, n), "utf8").toString("utf8");
 }
 
+/**
+ * What judging reads of an event, and no more: an act keeps its kind, who
+ * decided, whether it worked, the path fields of its input, and of its
+ * output the refusal fields (`refused`, `code`, `text`) or its start as
+ * text: OUTPUT_KEPT characters when it failed, OUTPUT_KEPT_WORKED when it
+ * worked. Whole bodies (a screenshot, a file read) stay in the exchange's
+ * journal; held whole for every run, they filled a map's heap.
+ */
 export function slimEvent(e: ExchangeEvent): ExchangeEvent {
   if (!e.act) return e;
   const { input, output, ...rest } = e.act;
+  const keep = e.act.ok === false ? OUTPUT_KEPT : OUTPUT_KEPT_WORKED;
   const paths = input && typeof input === "object" && !Array.isArray(input) ? Object.fromEntries(PATH_KEYS.flatMap((k) => (typeof input[k] === "string" ? [[k, input[k]]] : []))) : undefined;
   let out: Json | undefined;
   if (output && typeof output === "object" && !Array.isArray(output) && (typeof output.refused === "string" || typeof output.code === "string" || typeof output.text === "string")) {
     out = Object.fromEntries(
-      (["refused", "code", "text"] as const).flatMap((k) => (output[k] === undefined ? [] : [[k, typeof output[k] === "string" ? cut(output[k] as string) : output[k]!]])),
+      (["refused", "code", "text"] as const).flatMap((k) => (output[k] === undefined ? [] : [[k, typeof output[k] === "string" ? cut(output[k] as string, keep) : output[k]!]])),
     );
   } else if (output !== undefined && output !== null) {
-    out = cut(text(output));
+    out = cut(text(output), keep);
   }
   return { ...e, act: { ...rest, ...(paths && Object.keys(paths).length ? { input: paths } : {}), ...(out !== undefined ? { output: out } : {}) } as ExchangeEvent["act"] };
 }
