@@ -33,12 +33,13 @@ import type { FieldIn, Settings } from "./graph.ts";
 import { around, facets as facetsOf, FIND, FOUND, Settle, shown, type Hide } from "./filter.ts";
 import { Legend, LEGEND_STYLE } from "./legend.ts";
 import { DRAW } from "./draw.ts";
-import { palette } from "./paint.ts";
+import { ink, palette } from "./paint.ts";
 import { Panel, PANEL_STYLE, type Section } from "./panel.ts";
 import { BEHAVIOURS, RUN, defaults, step } from "./step.ts";
 import { build, inputColours, seed } from "./graph.ts";
 import { descends, type Verdict } from "./descends.ts";
 import { withFoundSessions, withSessions, type Live } from "./sessions.ts";
+import { withTrail, type TrailIn } from "./trail.ts";
 import type { Arranged } from "./treeover.ts";
 
 export { BEHAVIOURS, step } from "./step.ts";
@@ -77,6 +78,8 @@ export function marksOf(input: FieldIn, pal: string[]): Record<string, { colour:
 }
 /** The live agent sessions and the context filters each is in, set by plugins/sessions: read by name, a key not an import. */
 const SESSIONS = "sessions.live";
+/** The run in focus opened into a graph, set by plugins/trail: read by name, a key not an import. */
+const TRAIL = "trail.graph";
 /** A context filter's tree to arrange the map into, set by plugins/arrange (`context:<title>` on the find line). */
 const ARRANGE = "arrange.tree";
 const REMEMBER = "archipelago.field.dials";
@@ -244,7 +247,13 @@ const fieldPlugin: Plugin = {
       const queried = useMemo(() => (q.trim() ? new Set(index.run(q, S.field_limit).items.map((r) => r.id)) : null), [version, q, S.field_limit]);
       const found = useMemo(() => withFoundSessions(queried, live, !!S.sessions), [queried, liveKey, S.sessions]);
       const shape = useMemo(() => JSON.stringify([result.items.map((r) => [r.id, r.fields.title, r.fields.status]), result.links.map((l) => l.id)]), [result]);
-      const input = useMemo<FieldIn>(() => withSessions(inputOf(result), live, !!S.sessions), [shape, liveKey, S.sessions]);
+      // The run in focus opened into a graph (plugins/trail, a page key by name): drawn as ghosts from its session, linked to what it touched.
+      const trail = (useHere<Json>(TRAIL) ?? null) as unknown as TrailIn | null;
+      const trailKey = trail ? JSON.stringify(trail) : "";
+      const input = useMemo<FieldIn>(
+        () => withTrail(withSessions(inputOf(result), live, !!S.sessions), trail, !!S.trails, ink(document.documentElement).muted),
+        [shape, liveKey, S.sessions, trailKey, S.trails],
+      );
 
       // What the legend hides is left out of the layout: a change to it settles the graph again with what is left.
       const hide = (useHere<Json>(HIDE) ?? HIDE_START) as Hide;
@@ -262,7 +271,7 @@ const fieldPlugin: Plugin = {
         const by = found ? kept : hide;
         if (!Object.keys(by).length) return input;
         const vis = shown(input, by);
-        return { items: input.items.filter((it) => vis.items.has(it.id)), links: input.links.filter((l) => vis.links.has(l.id)), types: input.types };
+        return { items: input.items.filter((it) => vis.items.has(it.id)), links: input.links.filter((l) => vis.links.has(l.id)), types: input.types, colours: input.colours, icons: input.icons };
       }, [input, hideKey, !!found]);
       // Arranged into a profile's tree (plugins/arrange): only its items stay, whatever the legend hides, each found.
       const arranged = (useHere<Json>(ARRANGE) ?? null) as Arranged | null;
@@ -271,10 +280,10 @@ const fieldPlugin: Plugin = {
       // While the find line has words, only what it finds and what lies near it stay: each by how it is drawn.
       const levels = useMemo(() => treeLevels ?? (found ? around(visible, found, S.find_steps!, S.find_faint!) : null), [treeLevels, visible, found, S.find_steps, S.find_faint]);
       // Arranged, what is laid out is the tree's items alone: the find line's words settling mid-flight lay nothing out again.
-      const laidTree = useMemo<FieldIn | null>(() => (treeLevels ? { items: input.items.filter((it) => treeLevels.has(it.id)), links: input.links.filter((l) => treeLevels.has(l.from) && treeLevels.has(l.to)), types: input.types } : null), [input, treeLevels]);
+      const laidTree = useMemo<FieldIn | null>(() => (treeLevels ? { items: input.items.filter((it) => treeLevels.has(it.id)), links: input.links.filter((l) => treeLevels.has(l.from) && treeLevels.has(l.to)), types: input.types, colours: input.colours, icons: input.icons } : null), [input, treeLevels]);
       const laidFound = useMemo<FieldIn>(() => {
         if (!levels || treeLevels) return visible;
-        return { items: visible.items.filter((it) => levels.has(it.id)), links: visible.links.filter((l) => levels.has(l.from) && levels.has(l.to)), types: visible.types };
+        return { items: visible.items.filter((it) => levels.has(it.id)), links: visible.links.filter((l) => levels.has(l.from) && levels.has(l.to)), types: visible.types, colours: visible.colours, icons: visible.icons };
       }, [visible, levels, treeLevels]);
       const laid = laidTree ?? laidFound;
       // Kept as it is, {} included (show everything); only the start is absent.

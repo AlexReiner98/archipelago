@@ -92,6 +92,39 @@ test("the rule: every behaviour's push is its energy's slope, and the energy onl
   assert.equal(descends(spin, g, S, gather).ok, false, "a push that is no energy's slope fails");
 });
 
+test("stack keeps the rule too", () => {
+  const S = { ...settings(), stack_about: 1, stack_depends_on: 2 };
+  const g = build(sample(200, 8), null);
+  seed(g, S);
+  for (let k = 0; k < 30; k++) step(g, S);
+  const gather = BEHAVIOURS.find((b) => b.name === "gather")!;
+  const v = descends(BEHAVIOURS.find((b) => b.name === "stack")!, g, S, gather);
+  assert.ok(v.slope <= CHECK.slope_off, `stack: off its energy's slope by ${(v.slope * 100).toFixed(1)}%`);
+  assert.equal(v.rises, 0, "stack: its energy never rose");
+  assert.ok(v.to < v.from, "stack: its energy fell");
+});
+
+test("stack lays a grid out: across in order on one row, each column straight down, however long", () => {
+  // A root and three turns across (after); under the second, a column of 40 (then); under the third, 2.
+  const across = ["s", "t1", "t2", "t3"];
+  const long = Array.from({ length: 40 }, (_, k) => `c${k}`), short = ["d0", "d1"];
+  const items = [...across, ...long, ...short].map((id) => ({ id, title: id, type: "work", status: "todo", closed: false }));
+  const links = [
+    ...across.slice(1).map((id, k) => ({ id: `a${k}`, type: "after", from: id, to: across[k]! })),
+    ...long.map((id, k) => ({ id: `l${k}`, type: "then", from: id, to: k ? long[k - 1]! : "t2" })),
+    ...short.map((id, k) => ({ id: `m${k}`, type: "then", from: id, to: k ? short[k - 1]! : "t3" })),
+  ];
+  const S = settings();
+  const { g } = settle({ items, links } as unknown as FieldIn, S);
+  const at = (id: string) => [g.x[g.idIx.get(id)!]!, g.y[g.idIx.get(id)!]!] as const;
+  const ys = across.map((id) => at(id)[1]), xs = across.map((id) => at(id)[0]);
+  assert.ok(Math.max(...ys) - Math.min(...ys) < S.stack_row! / 2, `one row: ${ys.map((v) => v.toFixed(0)).join(" ")}`);
+  assert.ok(xs.every((v, k) => !k || v - xs[k - 1]! > S.stack_col! / 2), `left to right: ${xs.map((v) => v.toFixed(0)).join(" ")}`);
+  const col = long.map((id) => at(id));
+  assert.ok(col.every(([x]) => Math.abs(x - at("t2")[0]) < S.stack_row! / 2), "the long column stays straight under its turn");
+  assert.ok(col.every(([, y], k) => y > (k ? col[k - 1]![1] : at("t2")[1])), "top to bottom in order");
+});
+
 test("collide leaves no particle on another, and part_of keeps a tree together", () => {
   const { g } = big();
   let overlaps = 0;

@@ -64,6 +64,8 @@ const host = await startBrowser({
     { id: "field", plugin: "plugins/field/index.ts" },
     // The view Shared plan: each agent's intents on a time line, what each built on, and what is held now (plugins/claim).
     { id: "claim", plugin: "plugins/claim/view.ts" },
+    // A run opened into a graph on the Landscape, from the exchange (plugins/trail).
+    { id: "trail", plugin: "plugins/trail/index.ts" },
     { id: "connect", plugin: "plugins/connect/view.ts" },
     // In the header: which map, commit and checkout this page talks to.
     { id: "serving", plugin: "plugins/serving/view.ts" },
