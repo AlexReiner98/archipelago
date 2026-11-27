@@ -68,15 +68,44 @@ and `records` are live runs only, `replayed` is the replays'.
 
 ## What it holds
 
-Every run's events, read back once and then watched, so each run can be
-judged again when a node changes. An act is held slim (`slimEvent` in
-[judge.ts](judge.ts)): its kind, who decided, whether it worked, the path
-fields of its input, and of its output the refusal fields or its start
-as a string of its own: 4,000 characters of a failed act (its words are
-the miss), 400 of one that worked (where a miss phrase is looked for).
-4,000 of every act filled the heap again as the journal grew. The whole bodies (screenshots,
-files read, command output) stay in the exchange's journal: held whole
-for every run, they filled a hosted map's 512 MB heap on load (27 Nov 2026).
+Per run, a digest of what judging reads (`RunDigest` in
+[judge.ts](judge.ts)), never the run's events:
+
+- its `cwd` and what it replays, from its first `begin`;
+- per node said there, its sayings added up: the first one's seq and
+  time, how many, whether one was a refusal, how many at each place, the
+  last one's time;
+- its misses (refusals, failed acts): seq, place, the paths the input
+  names, who refused or whose refusal denied it, and its words, each once
+  (the `wordsOf` of the first 4,000 characters of what it answered, all
+  that `covers` reads of them);
+- people's decisions: seq, place, paths, allowed or not;
+- for acts that worked, no output at all: only the set of places they
+  stood at and paths they named, and per node the seqs of its near misses,
+  found as each act comes in with the node's places and phrases then.
+
+Places, nodes and paths are kept once however often they repeat. Judging a
+run again (a node's place or `misses` changed) reads only its digest. A
+near miss is the one thing it can't decide from the digest, since it looks
+for a phrase in what an act that worked answered: when a node's places or
+phrases change, the runs it was said in where an act that worked stood at
+one of its places are read back from the exchange (`exchange.read.events`,
+a page at a time) and their near misses looked for again. Nothing else is
+read again: a node said at `session_start` reads nothing, a node at
+`tool:Bash` reads the runs it was said in. A change to the tree that
+changes no node's places or `misses` judges nothing again. A run whose
+`begin` came after an act naming a path is read again once, with its cwd.
+
+Why: the exchange keeps its journal on disk and only an index of it in
+memory (`FileLog`), and the log is the truth, so no plugin should hold a
+copy of it. Holding every act, even slim (its start: 400 characters of
+one that worked, 4,000 of one that failed), grew with the journal and
+filled a hosted map's 512 MB heap on load (27 Nov 2026). On a journal
+shaped like that map's (700 runs, 164,000 events, 305 MB, mostly acts with
+1.5 to 2 KB outputs) loading the verdict adds about 17 MB to the heap,
+where the slim copies added about 150 MB. Keeping the 400 characters of
+each act that worked, to find near misses without reading back, would add
+about 50 MB more.
 
 ## The record
 
@@ -93,8 +122,9 @@ and retires trial nodes by it.
 - `watch(on)`: called with `{ run }` when a run's verdicts may have
   changed, or `{}` when the tree did. Returns a disposer.
 
-It reads the whole record back on load and follows the exchange live; a
-run is judged again only when it (or the tree) changed. Verdicts aren't
+It reads the whole record back once on load, a page at a time, and follows
+the exchange live; a run is judged again only when it changed, or a node
+said in it did. A read waits for judging again that is under way. Verdicts aren't
 written to the graph yet: no action plugin exists to write them through.
 
 Judging is in [judge.ts](judge.ts), apart from the runtime.

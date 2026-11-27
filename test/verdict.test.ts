@@ -9,7 +9,7 @@ import exchange from "../plugins/exchange/index.ts";
 import graph from "../plugins/graph/index.ts";
 import verdict, { type VerdictRead } from "../plugins/verdict/index.ts";
 import { playAs, type Script } from "../plugins/scripted/index.ts";
-import { covers, judgeRun, listeningOf, namesMiss, OUTPUT_KEPT, OUTPUT_KEPT_WORKED, placeMatches, records, slimEvent } from "../plugins/verdict/judge.ts";
+import { covers, digestOf, judgeDigest, judgeRun, listeningOf, mayBeNear, namesMiss, OUTPUT_KEPT, OUTPUT_KEPT_WORKED, placeMatches, records, slimEvent } from "../plugins/verdict/judge.ts";
 
 const BASE = "mem:/plugins/";
 const T = (s: number) => `2026-11-20T14:00:${String(s).padStart(2, "0")}.000Z`;
@@ -362,4 +362,173 @@ test("the verdict keeps a slim copy of each act: path fields, refusal fields and
   assert.equal((refused.act as { input?: object }).input, undefined, "no path field: no input");
   const say = { ...base, kind: "say", node: "words/a", text: "Said." } as never;
   assert.equal(slimEvent(say), say, "an event with no act is kept as it is");
+});
+
+// ---------- what it holds: a digest per run, and reading a run again only where a changed node listens ----------
+
+test("a run's digest keeps no act's output: its near misses are found as it comes in", () => {
+  const near = listeningOf([{ id: "w/retry", at: ["tool:Bash"], misses: "server answered 429 empty body" }]);
+  const events = [
+    begin("d", 1),
+    said("d", 2, "w/retry", "tool:Bash"),
+    ev("d", 3, { kind: "act", place: "tool:Bash", act: { kind: "tool", by: "agent", input: { command: "curl" }, output: "Server answered 429 empty body; retried: 200 ".padEnd(5000, "x"), ok: true } }),
+    failedAct("d", 4, "tool:Edit", { file_path: `${CWD}\\a.ts` }, "Error: ".padEnd(9000, "y")),
+  ];
+  const d = digestOf("d", events, near);
+  assert.deepEqual(d.near.get("w/retry"), [3]);
+  assert.deepEqual([...d.worked], ["tool:Bash"]);
+  assert.deepEqual(d.misses.map((m) => [m.seq, m.paths, m.words]), [[4, [`${CWD}\\a.ts`], "".padEnd(OUTPUT_KEPT - 7, "y")]], "a miss keeps its words once each, from its slim output");
+  assert.ok(!JSON.stringify([[...d.said], d.misses, d.decisions]).includes("retried"), "nothing of a working act's output");
+  assert.deepEqual(judgeDigest(d, near), judgeRun("d", events, near));
+  assert.equal(mayBeNear(d, { at: ["tool:Bash"], misses: "server answered 429 empty body" }), true);
+  assert.equal(mayBeNear(d, { at: ["tool:Edit"], misses: "server answered 429 empty body" }), false, "no act worked there");
+  assert.equal(mayBeNear(d, { at: ["tool:Bash"], misses: "short" }), false, "no phrase to look for");
+});
+
+/**
+ * The verdict's world, stubbed: an exchange that counts each run's reads,
+ * a tree of nodes made from map items, and the items' `misses`.
+ */
+function world(runs: Record<string, ExchangeEvent[]>) {
+  const reads: Record<string, number> = {};
+  const live = new Set<(e: ExchangeEvent) => void>();
+  const treeOn = new Set<() => void>();
+  const graphOn = new Set<() => void>();
+  const items = new Map<string, Record<string, string>>();
+  const nodeList: { id: string; at: string[]; source?: string }[] = [];
+  let duringRead: ((run: string) => void) | undefined;
+  const append = (e: ExchangeEvent) => {
+    (runs[e.run] ??= []).push(e);
+    for (const on of live) on(e);
+  };
+  const stub: Plugin = {
+    id: "world",
+    apply(ctx) {
+      ctx.provide("exchange.read", () => ({
+        async runs() {
+          return { items: Object.keys(runs).reverse().map((run) => ({ run })) };
+        },
+        async events(run: string, page?: { after?: string; limit?: number }) {
+          reads[run] = (reads[run] ?? 0) + 1;
+          const start = Number(page?.after ?? 0);
+          const all = runs[run] ?? [];
+          const items = all.slice(start, start + (page?.limit ?? 100));
+          duringRead?.(run);
+          return start + items.length < all.length ? { items, next: String(start + items.length) } : { items };
+        },
+        async said() {
+          return { items: [] };
+        },
+      }));
+      ctx.provide("exchange.watch", () => ({
+        watch(_f: unknown, on: (e: ExchangeEvent) => void) {
+          live.add(on);
+          return () => live.delete(on);
+        },
+      }));
+      ctx.provide("agent.tree", () => ({
+        nodes: () => nodeList.map((n) => ({ ...n, plugin: "words", name: n.id, kind: "reflex", title: n.id })),
+        watch(on: () => void) {
+          treeOn.add(on);
+          return () => treeOn.delete(on);
+        },
+      }));
+      ctx.provide("graph.read", () => ({
+        async get(ids: string[]) {
+          return ids.map((id) => (items.has(id) ? { id, type: "note", fields: items.get(id)! } : null));
+        },
+      }));
+      ctx.provide("graph.watch", () => ({
+        watch(_f: unknown, on: () => void) {
+          graphOn.add(on);
+          return () => graphOn.delete(on);
+        },
+      }));
+    },
+  };
+  const rt = new Runtime();
+  const errors: unknown[] = [];
+  rt.onError = (_f, e) => errors.push(e);
+  const modules: Record<string, Plugin> = { "world.ts": stub, "verdict.ts": verdict, "view.ts": view };
+  const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)]! }) });
+  return {
+    errors,
+    reads,
+    items,
+    nodeList,
+    append,
+    onRead: (f: (run: string) => void) => (duringRead = f),
+    load: () => loader.apply(["world", "verdict", "view"].map((id) => ({ id, plugin: `${id}.ts` }))),
+    read: () => loader.fiber("view")!.ctx.get<VerdictRead>("verdict.read"),
+    misses: (source: string, misses: string) => {
+      items.set(source, { misses });
+      for (const on of [...graphOn]) on();
+    },
+    treeChanged: () => {
+      for (const on of [...treeOn]) on();
+    },
+  };
+}
+
+const bashOk = (run: string, seq: number, output: string) =>
+  ev(run, seq, { kind: "act", direction: "from_agent", place: "tool:Bash", act: { kind: "tool", by: "agent", input: { command: "curl" }, output, ok: true } });
+
+test("a node's change reads again only the runs it was said in where an act worked at its place", async () => {
+  const w = world({
+    r1: [begin("r1", 1), said("r1", 2, "w/retry", "tool:Bash"), bashOk("r1", 3, "Server answered 429 empty body; waited and retried: 200")],
+    r2: [begin("r2", 1), said("r2", 2, "w/retry", "tool:Bash"), okAct("r2", 3, "tool:Edit")],
+    r3: [begin("r3", 1), said("r3", 2, "w/other", "tool:Bash"), bashOk("r3", 3, "Server answered 429 empty body")],
+  });
+  w.nodeList.push({ id: "w/retry", at: ["tool:Bash"], source: "i_retry" }, { id: "w/other", at: ["tool:Bash"] });
+  w.items.set("i_retry", { misses: "zebra" });
+  await w.load();
+  const verdicts = w.read();
+  assert.deepEqual(w.reads, { r1: 1, r2: 1, r3: 1 }, "each run read once on load");
+  assert.equal((await verdicts.run("r1"))[0]!.verdict, "quiet");
+
+  // Its misses now name a phrase the Bash call in r1 answered: r1 is read again, and only r1.
+  w.misses("i_retry", "server answered 429 empty body");
+  assert.deepEqual((await verdicts.run("r1")).map((v) => [v.verdict, v.near]), [["held", 1]]);
+  assert.equal((await verdicts.run("r2"))[0]!.verdict, "quiet");
+  assert.deepEqual(w.reads, { r1: 2, r2: 1, r3: 1 }, "r2 had no act at its place that worked; r3 never said it");
+
+  // The tree changing with no node's places or misses changing reads nothing.
+  w.treeChanged();
+  await verdicts.records();
+  assert.deepEqual(w.reads, { r1: 2, r2: 1, r3: 1 });
+
+  // Misses with no phrase long enough clear its near misses without reading.
+  w.misses("i_retry", "429");
+  assert.equal((await verdicts.run("r1"))[0]!.verdict, "quiet");
+  assert.deepEqual(w.reads, { r1: 2, r2: 1, r3: 1 });
+
+  // Live, a near miss is found as the act comes in.
+  w.misses("i_retry", "server answered 429 empty body");
+  await verdicts.records();
+  w.append(bashOk("r2", 4, "server answered 429 empty body, then 200"));
+  assert.deepEqual((await verdicts.run("r2")).map((v) => [v.verdict, v.near]), [["held", 1]]);
+  assert.deepEqual(w.errors, []);
+});
+
+test("an event that comes live while a run is read back counts once; a begin after a path is read again with its cwd", async () => {
+  const read = (seq: number) =>
+    ev("r2", seq, { kind: "act", direction: "from_agent", place: "tool:Read", act: { kind: "tool", by: "agent", input: { file_path: `${CWD}\\spec\\agent.md` }, output: "String to replace not found in file.", ok: true } });
+  // The begin comes after the act that names a path: that act's place is relative to the cwd only once it is known.
+  const r2 = [said("r2", 1, "w/spec", "file:spec/agent.ts"), read(2), begin("r2", 3)];
+  const w = world({ r1: [begin("r1", 1), said("r1", 2, "w/other", "tool:Bash")], r2: [...r2] });
+  w.nodeList.push({ id: "w/spec", at: ["file:spec/**"], source: "i_spec" }, { id: "w/other", at: ["tool:Bash"] });
+  w.items.set("i_spec", { misses: "string to replace not found" });
+  let once = false;
+  w.onRead((run) => {
+    if (run !== "r1" || once) return;
+    once = true;
+    w.append(said("r1", 3, "w/other", "tool:Bash"));
+  });
+  await w.load();
+  const verdicts = w.read();
+  assert.equal((await verdicts.run("r1"))[0]!.said, 2, "the live one is taken after the read back, and once");
+  const want = judgeRun("r2", r2, listeningOf([{ id: "w/spec", at: ["file:spec/**"], misses: "string to replace not found" }]));
+  assert.deepEqual(want.map((v) => [v.verdict, v.near]), [["held", 1]]);
+  assert.deepEqual(await verdicts.run("r2"), want);
+  assert.deepEqual(w.errors, []);
 });

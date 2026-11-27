@@ -1,7 +1,8 @@
 /**
  * Judging, apart from the runtime: a run's exchange events and the nodes'
- * places in, a verdict per node said there out; verdicts in, a record per
- * node out. Imports only types and the agent plugin's place matching.
+ * places in, a digest of the run (what judging reads of it, `RunDigest`),
+ * and from it a verdict per node said there, out; verdicts in, a record
+ * per node out. Imports only types and the agent plugin's place matching.
  *
  * Per run, a node is judged from the first time it was said there (the
  * reflex record's meanings, 19 Nov 2026):
@@ -206,7 +207,7 @@ export const OUTPUT_KEPT = 4000;
 
 /**
  * How much of a working act's output a slim event keeps: where a node's miss
- * phrase is looked for (a near miss, `isNearOf`). An error's words come
+ * phrase is looked for (a near miss, found in `take`). An error's words come
  * first in what a tool answers; 4,000 characters of every act that worked
  * filled a hosted map's 512 MB heap as its journal grew (27 Nov 2026).
  */
@@ -314,15 +315,11 @@ export function cwdOf(events: ExchangeEvent[]): string | undefined {
   return typeof d.cwd === "string" && d.cwd ? d.cwd : undefined;
 }
 
+
 const isSaying = (e: ExchangeEvent) => (e.kind === "say" || e.kind === "refuse") && !!e.node;
 
-/** Whether a miss event is one of this node's: one it covers, and not its own. */
-function isMissOf(e: ExchangeEvent, node: string, listener: Listener, cwd?: string): boolean {
-  if (e.node === node || deniedBy(e) === node) return false;
-  const places = missPlaces(e, cwd);
-  if (!places) return false;
-  return covers(listener, places, missWords(e));
-}
+/** Whether the event is a person's decision (allow or deny a tool call, accept or reject a reply). */
+const isDecision = (e: ExchangeEvent) => e.kind === "act" && e.act?.kind === "decision" && e.act.by === "person";
 
 /** The phrases of a node's `misses` long enough to stand for that miss alone: its comma- or line-separated parts of 16 characters or more. */
 export function missPhrases(misses: string | undefined): string[] {
@@ -332,94 +329,275 @@ export function missPhrases(misses: string | undefined): string[] {
     .filter((p) => p.length >= 16);
 }
 
-/**
- * Whether an act that worked stands where the node listens and answered
- * with one of its miss's phrases, word for word: the situation came up
- * again and went right. Its input doesn't count (a search for the error
- * names it), nor a few words in common (any JSON output has "json").
- */
-function isNearOf(e: ExchangeEvent, node: string, listener: Listener, cwd?: string): boolean {
-  if (e.kind !== "act" || !e.act || e.act.ok === false || deniedBy(e) === node) return false;
-  const phrases = missPhrases(listener.misses);
-  if (!phrases.length) return false;
-  const places = [...(e.place ? [e.place] : []), ...filePlaces(e.act.input, cwd)];
-  if (!places.some((p) => listener.at.some((a) => placeMatches(a, p)))) return false;
-  const out = text(e.act.output).toLowerCase();
-  return phrases.some((p) => out.includes(p));
+// ---------- a run's digest: what judging reads of it, and no more ----------
+
+/** One node's sayings (and refusals) in a run, added up. */
+export interface Sayings {
+  /** The seq and time of its first saying. */
+  first: number;
+  said_at: Time;
+  said: number;
+  refused: boolean;
+  /** How many times at each place, in the order first said there. */
+  places: Map<Place, number>;
+  /** Its last saying's time. */
+  last: Time;
 }
 
-/** Whether the event is a person's decision (allow or deny a tool call, accept or reject a reply). */
-const isDecision = (e: ExchangeEvent) => e.kind === "act" && e.act?.kind === "decision" && e.act.by === "person";
+/** Something that went wrong in a run (a refusal, a failed act), as covering reads it. */
+interface Miss {
+  seq: number;
+  place?: Place;
+  /** The paths its input names, as given (made places with the run's cwd when judged). */
+  paths?: string[];
+  /** The node that refused, or the one whose refusal denied this act. */
+  node?: string;
+  denied?: string;
+  /**
+   * Its words (`wordsOf`), each once, space-separated: all `namesMiss` reads
+   * of them. A listener's `when` (a substring of the raw words) isn't looked
+   * for here: `listeningOf` gives none.
+   */
+  words: string;
+}
 
-/** One run's verdicts, one per node said in it, in the order each was first said. */
-export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listening): RunVerdict[] {
-  const sorted = [...events].filter((e) => e.run === run).sort((a, b) => a.seq - b.seq);
-  const cwd = cwdOf(sorted);
-  const sayings = new Map<string, ExchangeEvent[]>();
-  for (const e of sorted) {
-    if (!isSaying(e)) continue;
-    const list = sayings.get(e.node!) ?? [];
-    list.push(e);
-    sayings.set(e.node!, list);
+/** A person's decision: a label where it stands, and on the reply what judges every node said before. */
+interface Decision {
+  seq: number;
+  place?: Place;
+  paths?: string[];
+  ok: boolean;
+}
+
+/**
+ * What judging needs of one run, gathered as its events come in seq
+ * order: the run's cwd and what it replays, each node's sayings added up,
+ * its misses with their words, people's decisions, and where acts that
+ * worked stood. An act that worked keeps no output: its near misses for
+ * the nodes said before it are found as it comes in (`near`), with the
+ * nodes' places and phrases then. When a node's place or phrases change,
+ * the runs it was said in where an act worked at its places are read
+ * again from the exchange (plugins/verdict, `nearAgain`).
+ */
+export interface RunDigest {
+  run: RunId;
+  /** The highest seq taken: events come in seq order, so one seen again is skipped. */
+  last: number;
+  /** Whether its first `begin` came: cwd and replay_of are that one's. */
+  begun: boolean;
+  cwd?: string;
+  replay_of?: RunId;
+  /** Per node said in it, in the order first said. */
+  said: Map<string, Sayings>;
+  misses: Miss[];
+  decisions: Decision[];
+  /** Where acts that worked stood, and the paths they named: whether a node may have near misses here. */
+  worked: Set<Place>;
+  workedPaths: Set<string>;
+  /** Per node, the seqs of its near misses (an act that worked, after it was said, holding one of its phrases). */
+  near: Map<string, number[]>;
+  /** An act naming a path came before the first `begin`: its near misses were looked for without the run's cwd. */
+  lateBegin: boolean;
+}
+
+/** Keeps each string once, however many events repeat it. */
+export type Intern = (s: string) => string;
+const same: Intern = (s) => s;
+
+export function newDigest(run: RunId, begin?: { cwd?: string; replay_of?: RunId }): RunDigest {
+  return {
+    run,
+    last: 0,
+    begun: !!begin,
+    ...(begin?.cwd ? { cwd: begin.cwd } : {}),
+    ...(begin?.replay_of ? { replay_of: begin.replay_of } : {}),
+    said: new Map(),
+    misses: [],
+    decisions: [],
+    worked: new Set(),
+    workedPaths: new Set(),
+    near: new Map(),
+    lateBegin: false,
+  };
+}
+
+/** The paths an act's input names, as given. */
+function pathsOf(input: Json | undefined, intern: Intern): string[] | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const out: string[] = [];
+  for (const k of PATH_KEYS) {
+    const v = input[k];
+    if (typeof v === "string" && v) out.push(intern(v));
   }
+  return out.length ? out : undefined;
+}
+
+const placesOf = (place: Place | undefined, paths: string[] | undefined, cwd?: string): Place[] => [
+  ...(place ? [place] : []),
+  ...(paths ?? []).map((p) => `file:${relativePath(p, cwd)}`),
+];
+
+/** A text's words, each once, as one string of their own. */
+const digestWords = (text: string) => [...wordsOf(text)].join(" ");
+
+const phrasesOf = new WeakMap<Listener, string[]>();
+function phrases(listener: Listener): string[] {
+  let p = phrasesOf.get(listener);
+  if (!p) phrasesOf.set(listener, (p = missPhrases(listener.misses)));
+  return p;
+}
+
+/**
+ * Takes an event into its run's digest, the run's events in seq order
+ * (one seen before is skipped: false). Near misses are looked for with
+ * `listening` as it is now.
+ */
+export function take(d: RunDigest, e: ExchangeEvent, listening: Listening, intern: Intern = same): boolean {
+  if (e.run !== d.run || e.seq <= d.last) return false;
+  d.last = e.seq;
+  if (e.kind === "begin" && !d.begun) {
+    d.begun = true;
+    const cwd = cwdOf([e]);
+    const of = replayOf([e]);
+    if (cwd) d.cwd = cwd;
+    if (of) d.replay_of = of;
+    if (d.workedPaths.size) d.lateBegin = true;
+    return true;
+  }
+  if (isSaying(e)) {
+    const node = intern(e.node!);
+    let s = d.said.get(node);
+    if (!s) d.said.set(node, (s = { first: e.seq, said_at: e.time, said: 0, refused: false, places: new Map(), last: e.time }));
+    s.said++;
+    if (e.kind === "refuse") s.refused = true;
+    if (e.place) s.places.set(intern(e.place), (s.places.get(e.place) ?? 0) + 1);
+    if (e.time > s.last) s.last = e.time;
+  }
+  const slim = e.act ? slimEvent(e) : e;
+  const place = e.place ? intern(e.place) : undefined;
+  const paths = e.kind === "act" ? pathsOf(slim.act?.input, intern) : undefined;
+  if (missPlaces(slim) !== undefined) {
+    const node = e.node ? intern(e.node) : undefined;
+    const denied = deniedBy(slim);
+    d.misses.push({
+      seq: e.seq,
+      ...(place ? { place } : {}),
+      ...(paths ? { paths } : {}),
+      ...(node ? { node } : {}),
+      ...(denied ? { denied: intern(denied) } : {}),
+      words: digestWords(missWords(slim)),
+    });
+  }
+  if (isDecision(e)) d.decisions.push({ seq: e.seq, ...(place ? { place } : {}), ...(paths ? { paths } : {}), ok: e.act!.ok !== false });
+  if (e.kind === "act" && e.act && e.act.ok !== false) {
+    if (place) d.worked.add(place);
+    for (const p of paths ?? []) d.workedPaths.add(p);
+    const denied = deniedBy(slim);
+    let out: string | undefined;
+    let places: Place[] | undefined;
+    for (const [node, s] of d.said) {
+      if (s.first >= e.seq || denied === node) continue;
+      const listener = listening.get(node);
+      const want = listener ? phrases(listener) : [];
+      if (!want.length) continue;
+      places ??= placesOf(place, paths, d.cwd);
+      if (!places.some((p) => listener!.at.some((a) => placeMatches(a, p)))) continue;
+      out ??= text(slim.act!.output).toLowerCase();
+      if (!want.some((p) => out!.includes(p))) continue;
+      const list = d.near.get(node) ?? [];
+      list.push(e.seq);
+      d.near.set(node, list);
+    }
+  }
+  return true;
+}
+
+/** Whether an act that worked in the run stood where the listener listens: whether it may have near misses there. */
+export function mayBeNear(d: RunDigest, listener: Listener): boolean {
+  if (!phrases(listener).length) return false;
+  const at = (p: Place) => listener.at.some((a) => placeMatches(a, p));
+  for (const p of d.worked) if (at(p)) return true;
+  for (const p of d.workedPaths) if (at(`file:${relativePath(p, d.cwd)}`)) return true;
+  return false;
+}
+
+/** A run's digest from its events, in any order. */
+export function digestOf(run: RunId, events: ExchangeEvent[], listening: Listening, intern: Intern = same): RunDigest {
+  const sorted = events.filter((e) => e.run === run).sort((a, b) => a.seq - b.seq);
+  const begin = sorted.find((e) => e.kind === "begin");
+  const d = newDigest(run, begin ? { cwd: cwdOf([begin]), replay_of: replayOf([begin]) } : undefined);
+  for (const e of sorted) take(d, e, listening, intern);
+  return d;
+}
+
+/** One run's verdicts from its digest, one per node said in it, in the order each was first said. */
+export function judgeDigest(d: RunDigest, listening: Listening): RunVerdict[] {
+  const misses = d.misses.map((m) => ({ ...m, places: placesOf(m.place, m.paths, d.cwd) }));
+  const decisions = d.decisions.map((x) => ({ ...x, places: placesOf(x.place, x.paths, d.cwd) }));
   // A person's last decision on the run's reply judges every node said before it.
-  const decided = sorted.filter(isReplyDecision).pop();
-  const of = replayOf(sorted);
+  const decided = decisions.filter((x) => x.place === REPLY_AT).pop();
   const out: RunVerdict[] = [];
-  for (const [node, said] of sayings) {
-    const first = said[0]!;
-    const listener = listening.get(node) ?? { at: [...new Set(said.map((s) => s.place).filter((p): p is Place => !!p))] };
-    const misses = sorted.filter((e) => isMissOf(e, node, listener, cwd) || (e === decided && e.act?.ok === false && e.seq > first.seq));
+  for (const [node, s] of d.said) {
+    const listener = listening.get(node) ?? { at: [...s.places.keys()] };
+    const failedBy = misses.filter((m) => m.node !== node && m.denied !== node && covers(listener, m.places, m.words)).map((m) => m.seq);
+    if (decided && !decided.ok && decided.seq > s.first) failedBy.push(decided.seq);
+    failedBy.sort((a, b) => a - b);
     // Accepted after it was said: the reply it was said to was right.
-    const accepted = !!decided && decided.act?.ok !== false && decided.seq > first.seq;
-    const refused = said.some((s) => s.kind === "refuse");
-    const before = misses.filter((m) => m.seq < first.seq).length;
-    const afterList = misses.filter((m) => m.seq > first.seq);
-    const after = afterList.length;
-    const near = sorted.filter((e) => e.seq > first.seq && isNearOf(e, node, listener, cwd)).length;
-    const labelled = sorted
-      .filter((e) => e.seq > first.seq && isDecision(e))
-      .filter((e) => e.place === REPLY_AT || [...(e.place ? [e.place] : []), ...filePlaces(e.act!.input, cwd)].some((p) => listener.at.some((a) => placeMatches(a, p))))
+    const accepted = !!decided && decided.ok && decided.seq > s.first;
+    const before = failedBy.filter((seq) => seq < s.first).length;
+    const afterList = failedBy.filter((seq) => seq > s.first);
+    const near = (d.near.get(node) ?? []).filter((seq) => seq > s.first).length;
+    const labelled = decisions
+      .filter((x) => x.seq > s.first && (x.place === REPLY_AT || x.places.some((p) => listener.at.some((a) => placeMatches(a, p)))))
       .pop();
     out.push({
-      run,
+      run: d.run,
       node,
-      verdict: after ? "failed" : before || refused || near || accepted ? "held" : "quiet",
-      said: said.length,
-      first: first.seq,
-      said_at: first.time,
+      verdict: afterList.length ? "failed" : before || s.refused || near || accepted ? "held" : "quiet",
+      said: s.said,
+      first: s.first,
+      said_at: s.said_at,
       before,
-      after,
-      failed_by: afterList.map((m) => m.seq),
+      after: afterList.length,
+      failed_by: afterList,
       near,
-      ...(labelled ? { label: labelled.act!.ok === false ? ("deny" as const) : ("allow" as const) } : {}),
-      ...(of ? { replay_of: of } : {}),
+      ...(labelled ? { label: labelled.ok ? ("allow" as const) : ("deny" as const) } : {}),
+      ...(d.replay_of ? { replay_of: d.replay_of } : {}),
     });
   }
   return out;
 }
 
-/** Each node's record from runs' verdicts and the sayings behind them. */
-export function records(runs: { verdicts: RunVerdict[]; events: ExchangeEvent[] }[]): NodeRecord[] {
+/** One run's verdicts, one per node said in it, in the order each was first said. */
+export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listening): RunVerdict[] {
+  return judgeDigest(digestOf(run, events, listening), listening);
+}
+
+/** Each node's record from runs' verdicts and their nodes' sayings. */
+export function tally(runs: { verdicts: RunVerdict[]; said: Map<string, Sayings> }[]): NodeRecord[] {
   const by = new Map<string, NodeRecord>();
   const get = (node: string) => {
     let r = by.get(node);
     if (!r) by.set(node, (r = { node, said: 0, runs: 0, held: 0, failed: 0, quiet: 0, places: {} }));
     return r;
   };
-  for (const { verdicts, events } of runs) {
+  for (const { verdicts, said } of runs) {
     for (const v of verdicts) {
       const r = get(v.node);
       r.runs++;
       r[v.verdict]++;
     }
-    for (const e of events) {
-      if (!isSaying(e)) continue;
-      const r = get(e.node!);
-      r.said++;
-      if (e.place) r.places[e.place] = (r.places[e.place] ?? 0) + 1;
-      if (!r.last || e.time > r.last) r.last = e.time;
+    for (const [node, s] of said) {
+      const r = get(node);
+      r.said += s.said;
+      for (const [p, n] of s.places) r.places[p] = (r.places[p] ?? 0) + n;
+      if (!r.last || s.last > r.last) r.last = s.last;
     }
   }
   return [...by.values()];
+}
+
+/** Each node's record from runs' verdicts and the sayings behind them. */
+export function records(runs: { verdicts: RunVerdict[]; events: ExchangeEvent[] }[]): NodeRecord[] {
+  return tally(runs.map(({ verdicts, events }) => ({ verdicts, said: digestOf(events[0]?.run ?? "", events, new Map()).said })));
 }
