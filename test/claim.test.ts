@@ -18,7 +18,7 @@ import types from "../plugins/types/index.ts";
 import work from "../plugins/work/index.ts";
 import links from "../plugins/links/index.ts";
 import items from "../plugins/items/index.ts";
-import claim, { covers, norm, planWords, rounds, type ClaimRead, type Hold, type IntentView } from "../plugins/claim/index.ts";
+import claim, { absOf, covers, norm, planWords, rounds, type ClaimRead, type Hold, type IntentView } from "../plugins/claim/index.ts";
 
 const probe: Plugin = { id: "probe", inject: ["agent.run", "action.invoke"], apply() {} };
 const reader: Plugin = { id: "reader", inject: ["claim.read", "graph.read"], apply() {} };
@@ -417,4 +417,36 @@ test("on a hosted map, the branch comes from the run's facts: the folders are on
   await b.end();
   assert.deepEqual(env.errors, []);
   await env.loader.apply([]);
+});
+
+test("one file held from two repositories is one hold: by its absolute path", async () => {
+  const env = await boot(true);
+  // A works in one repository and claims a file in another, by its absolute path; B works in that other one.
+  const a = agentOf(env, "run-a", "Next", { cwd: "C:/Users/me/next", remote: "example.org/pat/next", branch: "plugin-folders" });
+  const b = agentOf(env, "run-b", "Apps", { cwd: "C:/Users/me/apps", remote: "example.org/pat/apps", branch: "main" });
+  await a.begin();
+  await b.begin();
+  assert.ok((await a.take(["C:/Users/me/apps/core.ts"], "move core here")).ok);
+  // B names it relative to its own folder, in its own repository's plan: still held.
+  assert.equal(await b.tool("Edit", "core.ts"), false);
+  assert.match(b.refusals[0]!, /Next holds/);
+  // And B hears A's hold in its plan, though it is in another repository's.
+  await b.prompt("Carry on");
+  assert.ok(b.heard.some((t) => t.includes("- Next on branch plugin-folders: C:/Users/me/apps/core.ts")));
+  // A file of the same name elsewhere is not held.
+  assert.equal(await b.tool("Edit", "lib/core.ts"), true);
+  // The other way: B's hold on a file A then names by its absolute path, Windows case aside.
+  assert.equal(await a.tool("Edit", "c:/users/me/apps/lib/core.ts"), false);
+  await a.end();
+  await b.end();
+  assert.deepEqual(env.errors, []);
+  await env.loader.apply([]);
+});
+
+test("absolute paths: from a path and its run's folder, drive paths in lower case", () => {
+  assert.equal(absOf("src/a.ts", "C:/Users/Me/Repo/"), "c:/users/me/repo/src/a.ts");
+  assert.equal(absOf("C:\\Users\\Me\\x.ts", "/home/me"), "c:/users/me/x.ts");
+  assert.equal(absOf("src/a.ts", "/home/me/repo"), "/home/me/repo/src/a.ts");
+  assert.equal(absOf("src/a.ts", "relative/folder"), undefined);
+  assert.equal(absOf("src/a.ts"), undefined);
 });

@@ -31,6 +31,7 @@ import type { FlavourDef, TypesDefine } from "../../spec/types.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import {
   covers,
+  absOf,
   heldByOther,
   INTENT,
   intentOf,
@@ -324,7 +325,7 @@ const claim: Plugin<ClaimConfig> = {
         if (replay(run)) return null;
         seen(run);
         expire();
-        const words = [howFor(run), planWords(holdsNow(), scopeOf(run), run.run)].filter(Boolean).join("\n\n");
+        const words = [howFor(run), planWords(holdsNow(), scopeOf(run), run.run, run.cwd)].filter(Boolean).join("\n\n");
         return words ? { say: words } : null;
       },
     });
@@ -345,7 +346,7 @@ const claim: Plugin<ClaimConfig> = {
         const files = m.places.filter((p) => p.startsWith("file:")).map((p) => norm(p.slice(5), run.cwd));
         const holds = holdsNow();
         for (const file of files) {
-          const other = heldByOther(holds, scope, file, run.run);
+          const other = heldByOther(holds, scope, file, run.run, absOf(file, run.cwd));
           if (!other) continue;
           if (!WRITES.has(tool)) return { say: `${other.title} holds ${file}${other.intent ? ` to ${other.intent}` : ""}: it may change under you.` };
           prevented++;
@@ -422,7 +423,7 @@ const claim: Plugin<ClaimConfig> = {
         const scope = scopeOf(r);
         const intent = input.intent.trim();
         const files = [...new Set(input.files.map((f) => norm(f, r.cwd)).filter(Boolean))];
-        const clashOf = () => files.map((f) => heldByOther(holdsNow(), scope, f, r.run)).find(Boolean);
+        const clashOf = () => files.map((f) => heldByOther(holdsNow(), scope, f, r.run, absOf(f, r.cwd))).find(Boolean);
         let clash = clashOf();
         // Holders this run waited for: it builds on their intents, and merges their branches when they are in another checkout.
         const merge = new Set<string>();

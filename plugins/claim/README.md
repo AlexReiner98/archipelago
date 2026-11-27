@@ -109,7 +109,8 @@ minutes apart (a tab per round, the latest first).
   the start of the one built on it.
 - **✕** where a write was turned away, with who held the file.
 - A **legend** under the time line says what each mark means.
-- Times are on the reader's own clock.
+- Times are on the reader's own clock. Files held and agents waiting are
+  counted in the latest round only: a past round holds nothing now.
 - **What happened**: the round in words, in order: who claimed what and
   why, which write was turned away and who held it, who waited for whom,
   who finished, and who got the files and built on whose work (told to
@@ -143,6 +144,16 @@ claims.
 |---|---|---|
 | `by` | `repo` | What two runs share: their repository (the `remote` fact), so worktrees and clones of one repository share one plan; a run with no remote shares its folder. `folder`: only the folder |
 | `quiet_min` | 15 | Minutes quiet before a run's holds go |
+
+## Files outside the repository
+
+A run may claim a file outside its own folder, in another repository. It is
+held in the run's own plan by its absolute path, and a run working in that
+other repository names it by a relative one in a plan of its own. The two
+meet by the file's absolute path (from each hold's path and its run's
+folder; a drive path compared in lower case, as Windows does): a write to it
+from either side is turned away, and the other side hears the hold in its
+plan.
 
 ## What it does not catch
 
