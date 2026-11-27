@@ -66,6 +66,16 @@ played again by the [replay](../replay/README.md) plugin) is judged the same
 way, and its verdict says `replay_of`. Its record is kept apart: `record`
 and `records` are live runs only, `replayed` is the replays'.
 
+## What it holds
+
+Every run's events, read back once and then watched, so each run can be
+judged again when a node changes. An act is held slim (`slimEvent` in
+[judge.ts](judge.ts)): its kind, who decided, whether it worked, the path
+fields of its input, and of its output the refusal fields or its first
+4,000 characters as a string of its own. The whole bodies (screenshots,
+files read, command output) stay in the exchange's journal: held whole
+for every run, they filled a hosted map's 512 MB heap on load (27 Nov 2026).
+
 ## The record
 
 Per node: `said`, `runs`, `held`, `failed`, `quiet`, `last`, and `places`

@@ -201,6 +201,40 @@ function filePlaces(input: Json | undefined, cwd?: string): Place[] {
   return out;
 }
 
+/** How much of an act's output a slim event keeps, as text: enough for a miss's words and its phrases. */
+export const OUTPUT_KEPT = 4000;
+
+/**
+ * What judging reads of an event, and no more: an act keeps its kind, who
+ * decided, whether it worked, the path fields of its input, and of its
+ * output the refusal fields (`refused`, `code`, `text`) or its first
+ * OUTPUT_KEPT characters as text. Whole bodies (a screenshot, a file read)
+ * stay in the exchange's journal; held whole for every run, they filled a
+ * map's heap.
+ */
+/**
+ * The first `n` characters as a string of their own. A slice in V8 can keep
+ * the whole string it was cut from alive; a copy through a Buffer doesn't.
+ */
+function cut(s: string, n = OUTPUT_KEPT): string {
+  return s.length <= n ? s : Buffer.from(s.slice(0, n), "utf8").toString("utf8");
+}
+
+export function slimEvent(e: ExchangeEvent): ExchangeEvent {
+  if (!e.act) return e;
+  const { input, output, ...rest } = e.act;
+  const paths = input && typeof input === "object" && !Array.isArray(input) ? Object.fromEntries(PATH_KEYS.flatMap((k) => (typeof input[k] === "string" ? [[k, input[k]]] : []))) : undefined;
+  let out: Json | undefined;
+  if (output && typeof output === "object" && !Array.isArray(output) && (typeof output.refused === "string" || typeof output.code === "string" || typeof output.text === "string")) {
+    out = Object.fromEntries(
+      (["refused", "code", "text"] as const).flatMap((k) => (output[k] === undefined ? [] : [[k, typeof output[k] === "string" ? cut(output[k] as string) : output[k]!]])),
+    );
+  } else if (output !== undefined && output !== null) {
+    out = cut(text(output));
+  }
+  return { ...e, act: { ...rest, ...(paths && Object.keys(paths).length ? { input: paths } : {}), ...(out !== undefined ? { output: out } : {}) } as ExchangeEvent["act"] };
+}
+
 /** The refusal code of a node that asks the agent something: not a miss. */
 export const ASK = "ask";
 
