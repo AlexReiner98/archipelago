@@ -29,6 +29,16 @@ export interface Served {
   /** The map's data folder. */
   data: string;
   started: string;
+  /** The plugin folders it loaded, where the list came from, and each named one it couldn't load (app/server.ts, runtime/folders.ts). */
+  plugins?: PluginFolders;
+}
+
+/** A server's plugin folders, as it says them: in its registry entry and `serving.about`. */
+export interface PluginFolders {
+  /** `flag` (--plugins), `env` (ARCHIPELAGO_PLUGINS) or `map` (the map's plugins.json); absent when it loads none. */
+  from?: "flag" | "env" | "map";
+  loaded: { name: string; dir: string }[];
+  missing: { dir: string; why: string }[];
 }
 
 /** A map's name: letters, digits, `.`, `_` and `-`, so it is a file name everywhere. */

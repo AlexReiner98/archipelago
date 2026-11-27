@@ -19,7 +19,7 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { alive, entryOf, homeOf, MAP_NAME, mapDir, serverFile, type Served } from "../plugins/claude-code/registry.ts";
 
-export { alive, homeOf, MAP_NAME, mapDir, serverFile, servedOf, type Served } from "../plugins/claude-code/registry.ts";
+export { alive, homeOf, MAP_NAME, mapDir, serverFile, servedOf, type PluginFolders, type Served } from "../plugins/claude-code/registry.ts";
 
 /** Where free ports are looked for: above the fixed live (5180) and dev (5280) ones. */
 export const PORTS_FROM = 5300;
@@ -227,6 +227,8 @@ export const LEDGERS = ["connect.json", "lean.json", "promotions.log"];
 export function snapshot(from: string, to: string, { takeover = false } = {}): void {
   mkdirSync(to, { recursive: true });
   for (const dir of ["files", "archives"]) if (existsSync(join(from, dir)) && !existsSync(join(to, dir))) cpSync(join(from, dir), join(to, dir), { recursive: true });
+  // The plugin folders it loads come along, so a copy of live loads what live does (runtime/folders.ts).
+  if (existsSync(join(from, "plugins.json")) && !existsSync(join(to, "plugins.json"))) copyFileSync(join(from, "plugins.json"), join(to, "plugins.json"));
   if (takeover) for (const f of LEDGERS) if (existsSync(join(from, f))) copyFileSync(join(from, f), join(to, f));
   copyMap(from, to);
 }

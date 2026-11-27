@@ -11,12 +11,13 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
-import { claim, defaultMap, freePort, holdPort, letPortGo, nameFrom, release, reporting, servers } from "../scripts/maps.ts";
+import { claim, defaultMap, freePort, holdPort, letPortGo, nameFrom, release, reporting, servers, snapshot } from "../scripts/maps.ts";
+import { remember, remembered } from "../runtime/folders.ts";
 import { saveLedger } from "../plugins/project-files/write.ts";
 import { adapterOf, entryOf, serverFile, type Served } from "../plugins/claude-code/registry.ts";
 import { proxy } from "../plugins/claude-code/proxy.ts";
 import { wanted } from "../plugins/connect/here.ts";
-import { lineOf } from "../plugins/serving/view.ts";
+import { foldersOf, lineOf } from "../plugins/serving/view.ts";
 // @ts-expect-error: plain JavaScript, read before any TypeScript runs; no types of its own.
 import { newEnough } from "../bin/node-min.mjs";
 
@@ -92,7 +93,7 @@ function serveMap(map: string): Promise<{ served?: Served; code?: number | null;
   return new Promise((ok) => {
     let out = "";
     const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", join(root, "app", "server.ts"), "--map", map, "--no-watch", "--no-write"], {
-      env: { ...process.env, ARCHIPELAGO_HOME: home, ARCHIPELAGO_PORT: "" },
+      env: { ...process.env, ARCHIPELAGO_HOME: home, ARCHIPELAGO_PORT: "", ARCHIPELAGO_PLUGINS: "" },
       windowsHide: true,
     });
     started.push(child);
@@ -388,4 +389,31 @@ test("the header says map, commit and checkout", () => {
   assert.match(lineOf({ commit: "abc1234+", port: 5180 })!.title, /changes not committed/);
   assert.equal(lineOf({ map: "dev", checkout: "C:\\Users\\me\\code\\archipelago\\" })?.text, "dev · archipelago");
   assert.equal(lineOf({}), undefined);
+});
+
+test("a map restarted with no variable set loads the plugin folders it remembers, and says the one that is gone", async () => {
+  const dir = join(home, "loop-folder");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "archipelago.json"), JSON.stringify({ name: "loop", server: [{ id: "tiny", plugin: "tiny.ts" }] }));
+  writeFileSync(join(dir, "tiny.ts"), 'export default { id: "tiny", apply() {} };\n');
+  const gone = join(home, "gone-folder");
+  remember(join(home, "maps", "gamma"), dir);
+  // The gone one, as a map that remembered a folder since moved would have it.
+  writeFileSync(join(home, "maps", "gamma", "plugins.json"), JSON.stringify({ folders: [dir, gone] }));
+  const s = await serveMap("gamma");
+  assert.ok(s.served, s.out);
+  assert.deepEqual(s.served.plugins, { from: "map", loaded: [{ name: "loop", dir }], missing: [{ dir: gone, why: "the folder isn't there" }] });
+  assert.match(s.out, /plugin folder loop: 1 server, 0 page entries, from .*loop-folder \(remembered by the map\)/);
+  assert.match(s.out, /plugin folder .*gone-folder \(remembered by the map\) is not loaded: the folder isn't there/);
+  // A copy of the map loads the same folders.
+  snapshot(join(home, "maps", "gamma"), join(home, "maps", "gamma-copy"));
+  assert.deepEqual(remembered(join(home, "maps", "gamma-copy")), [dir, gone]);
+});
+
+test("the Plugins view says which folders loaded, from where, and which didn't", () => {
+  assert.equal(foldersOf({}), undefined);
+  assert.equal(foldersOf({ folders: { loaded: [], missing: [] } }), undefined);
+  const f = foldersOf({ folders: { from: "map", loaded: [{ name: "loop", dir: "/home/me/archipelago-loop" }], missing: [{ dir: "/home/me/apps", why: "the folder isn't there" }] } });
+  assert.equal(f?.said, "1 loaded, remembered by the map (npm run map -- plugins); 1 not loaded");
+  assert.deepEqual(f?.rows, [{ name: "loop", dir: "/home/me/archipelago-loop" }, { dir: "/home/me/apps", why: "the folder isn't there" }]);
 });

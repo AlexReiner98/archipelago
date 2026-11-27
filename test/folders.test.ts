@@ -5,12 +5,12 @@
  * name rewritten to rooted paths.
  */
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { after, test } from "node:test";
-import { foldersOf, mounts, pageEntries, readFolder, readFolders, serverEntries } from "../runtime/folders.ts";
+import { chooseFolders, foldersOf, forget, loadFolders, missingLine, mounts, pageEntries, readFolder, readFolders, remember, remembered, REMEMBERED, serverEntries } from "../runtime/folders.ts";
 import { serve } from "../runtime/serve.ts";
 import { NodeHost } from "../runtime/node.ts";
 import { Refused } from "../spec/common.ts";
@@ -125,4 +125,46 @@ test("a server with no folders lists none", async () => {
   } finally {
     await s.close();
   }
+});
+
+test("the folders a server loads: --plugins first, then ARCHIPELAGO_PLUGINS, then the ones its map remembers", () => {
+  const data = join(tmp, "map-choose");
+  assert.deepEqual(chooseFolders({ data }), { dirs: [] });
+  const dir = folder("loop", { name: "loop" });
+  remember(data, dir);
+  assert.deepEqual(chooseFolders({ data }), { dirs: [dir], from: "map" });
+  assert.deepEqual(chooseFolders({ data, env: ["/home/me/a", "/home/me/b"].join(delimiter) }), { dirs: ["/home/me/a", "/home/me/b"], from: "env" });
+  assert.deepEqual(chooseFolders({ data, env: "/home/me/a", flag: ["/home/me/c"] }), { dirs: ["/home/me/c"], from: "flag" });
+  // An empty variable is no list: the map's own comes back.
+  assert.equal(chooseFolders({ data, env: "" }).from, "map");
+});
+
+test("a map remembers a folder once, by its path, and forgets it by path or name; one that won't load is refused", () => {
+  const data = join(tmp, "map-remember");
+  const a = folder("one", { name: "one" });
+  assert.equal(remember(data, a).name, "one");
+  remember(data, a);
+  assert.deepEqual(remembered(data), [a]);
+  assert.deepEqual(JSON.parse(readFileSync(join(data, REMEMBERED), "utf8")), { folders: [a] });
+  // Another folder with the same name is refused, naming the one it has.
+  const twin = folder("one-again", { name: "one" });
+  assert.throws(() => remember(data, twin), /already loads a folder named one/);
+  assert.throws(() => remember(data, join(tmp, "nowhere")), /no readable archipelago\.json/);
+  assert.deepEqual(remembered(data), [a]);
+  assert.equal(forget(data, "one"), a);
+  assert.deepEqual(remembered(data), []);
+  remember(data, a);
+  assert.equal(forget(data, a), a);
+  assert.equal(forget(data, a), undefined);
+});
+
+test("a folder that won't load is left out with why, the rest still load, and its line names it and where the list came from", () => {
+  const ok = folder("fine", { name: "fine" });
+  const gone = "/home/me/archipelago-loop";
+  const { folders, missing } = loadFolders([gone, ok, folder("fine-twin", { name: "fine" })]);
+  assert.deepEqual(folders.map((f) => f.name), ["fine"]);
+  assert.equal(missing.length, 2);
+  assert.equal(missing[0]!.why, "the folder isn't there");
+  assert.match(missing[1]!.why, /named fine too/);
+  assert.match(missingLine(missing[0]!, "map"), /^plugin folder .*archipelago-loop \(remembered by the map\) is not loaded: the folder isn't there$/);
 });

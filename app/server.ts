@@ -50,7 +50,11 @@
  * --plugins dir (ARCHIPELAGO_PLUGINS, folders split by the path delimiter)
  * loads a plugin folder kept outside this repository beside the plugins
  * here: its archipelago.json names its server and page entries
- * (runtime/folders.ts). Give it once for each folder.
+ * (runtime/folders.ts). Give it once for each folder. With neither, the
+ * server loads the folders its map remembers (<data>/plugins.json, set with
+ * `npm run map -- plugins add <dir>`). A folder that won't load is left out
+ * in one line; the rest start. Which folders loaded, and from where, are in
+ * the map's registry entry and `serving.about` (live:status, the Plugins view).
  *
  * Point Claude Code at the adapter (plugins/claude-code/README.md) and open
  * http://127.0.0.1:5180/app/.
@@ -62,7 +66,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { NodeHost } from "../runtime/node.ts";
 import { serve } from "../runtime/serve.ts";
-import { foldersOf, mounts, pageEntries, readFolders, serverEntries } from "../runtime/folders.ts";
+import { chooseFolders, FROM_WORDS, loadFolders, missingLine, mounts, pageEntries, serverEntries, type Folder } from "../runtime/folders.ts";
 import { pageAccess, serverTree } from "./tree.ts";
 import { temporaryPlace } from "../scripts/place.ts";
 import { claim, commitOf, freePort, hasMap, homeOf, letPortGo, MAP_NAME, mapDir, release, snapshot, sourceOf, takenLine, takenOf, update } from "../scripts/maps.ts";
@@ -78,16 +82,9 @@ const { values } = parseArgs({
     watch: { type: "boolean", default: process.env.ARCHIPELAGO_WATCH !== "0" },
     write: { type: "boolean", default: process.env.ARCHIPELAGO_WRITE !== "0" },
     checkout: { type: "string", default: process.env.ARCHIPELAGO_CHECKOUT || undefined },
-    plugins: { type: "string", multiple: true, default: foldersOf(process.env.ARCHIPELAGO_PLUGINS) },
+    plugins: { type: "string", multiple: true },
   },
 });
-let folders;
-try {
-  folders = readFolders(values.plugins);
-} catch (e) {
-  console.error(`refused: ${(e as Error).message}`);
-  process.exit(1);
-}
 const map = values.map;
 const commit = commitOf(root);
 if (map !== undefined && !MAP_NAME.test(map)) {
@@ -111,6 +108,21 @@ if (map) {
     console.log(`map ${map}: ${from.takeover ? "moved in" : "copied"} from ${from.dir}${from.takeover ? ", with the folders it had connected" : ""}`);
   }
 }
+// The plugin folders: --plugins, else ARCHIPELAGO_PLUGINS, else what the map remembers; one line for each that won't load.
+let chosen: ReturnType<typeof chooseFolders>;
+try {
+  chosen = chooseFolders({ flag: values.plugins, env: process.env.ARCHIPELAGO_PLUGINS, data });
+} catch (e) {
+  console.error(`plugin folders: ${(e as Error).message}; none loaded`);
+  chosen = { dirs: [] };
+}
+const { folders, missing } = loadFolders(chosen.dirs);
+for (const m of missing) console.error(missingLine(m, chosen.from));
+const pluginFolders = {
+  ...(chosen.from ? { from: chosen.from } : {}),
+  loaded: folders.map((f: Folder) => ({ name: f.name, dir: f.dir })),
+  missing,
+};
 const PAGE = values.port ? Number(values.port) : map ? await freePort() : 5180;
 // A port given, or the fixed one: refused in one line while it is taken, before anything is written.
 if (values.port || !map) {
@@ -121,7 +133,7 @@ if (values.port || !map) {
   }
 }
 if (map) {
-  update(map, process.pid, { port: PAGE });
+  update(map, process.pid, { port: PAGE, plugins: pluginFolders });
   process.on("exit", () => letPortGo(PAGE));
 }
 // A map kept somewhere that goes away goes with it: said once, at start (scripts/place.ts).
@@ -132,7 +144,7 @@ const tree = [...serverTree({
   data,
   port: PAGE,
   write: values.write,
-  serving: { root, ...(map ? { map } : {}), ...(commit ? { commit } : {}) },
+  serving: { root, ...(map ? { map } : {}), ...(commit ? { commit } : {}), folders: pluginFolders },
   ...(values.checkout ? { checkout: values.checkout } : {}),
 }), ...serverEntries(folders, { write: values.write, data })];
 
@@ -152,7 +164,7 @@ for (const s of host.loader.status()) {
 // Plugin folders' page files at /ext/<name>/, and their page entries at /app/plugins.json (runtime/folders.ts).
 const page = await serve({ port: PAGE, root, watch: values.watch, files: join(data, "files"), bridge: PAGE + 2, mounts: mounts(folders), plugins: pageEntries(folders), ...pageAccess({ port: PAGE }) });
 console.log(`${map ? `map ${map}: ` : ""}map on ${page.url}app/${values.watch ? "" : " (hot reload off)"}`);
-for (const f of folders) console.log(`plugin folder ${f.name}: ${f.server.length} server, ${f.page.length} page entries, from ${f.dir}`);
+for (const f of folders) console.log(`plugin folder ${f.name}: ${f.server.length} server, ${f.page.length} page entries, from ${f.dir}${chosen.from ? ` (${FROM_WORDS[chosen.from]})` : ""}`);
 
 const stop = async () => {
   await page.close();

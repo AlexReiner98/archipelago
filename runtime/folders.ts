@@ -15,10 +15,15 @@
  * name, `archipelago/spec/graph.ts`: Node finds it through the folder's
  * own `node_modules`, and the page server rewrites it to `/spec/graph.ts`.
  *
+ * Which folders a server loads: `--plugins`, else `ARCHIPELAGO_PLUGINS`,
+ * else the ones its map remembers, in `<data>/plugins.json` (`npm run map
+ * -- plugins add <dir>`), so a restart brings them back with no variable
+ * set. A folder that can't be read is left out, in one line (`loadFolders`).
+ *
  * Node only. A folder's plugins are trusted like any other: there is no
  * sandbox.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { delimiter, isAbsolute, join, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Entry } from "./loader.ts";
@@ -82,6 +87,108 @@ export function readFolders(dirs: string[]): Folder[] {
 
 /** `ARCHIPELAGO_PLUGINS` as a list of folders. */
 export const foldersOf = (env: string | undefined): string[] => (env ? env.split(delimiter).filter(Boolean) : []);
+
+/** The file in a map's data that names the folders it loads: `{ "folders": [<dir>, …] }`, each absolute. */
+export const REMEMBERED = "plugins.json";
+
+/** Where a server's folder list came from: `--plugins`, `ARCHIPELAGO_PLUGINS`, or the map's own `plugins.json`. */
+export type FoldersFrom = "flag" | "env" | "map";
+
+/** The folders a map remembers; none when it remembers none. Throws when the file is there but not a list. */
+export function remembered(data: string): string[] {
+  const file = join(data, REMEMBERED);
+  if (!existsSync(file)) return [];
+  const raw = JSON.parse(readFileSync(file, "utf8")) as { folders?: unknown };
+  if (!Array.isArray(raw.folders) || raw.folders.some((d) => typeof d !== "string")) throw new Error(`${file}: { "folders": [<dir>, …] }`);
+  return raw.folders as string[];
+}
+
+function rememberAll(data: string, dirs: string[]): void {
+  mkdirSync(data, { recursive: true });
+  writeFileSync(join(data, REMEMBERED), JSON.stringify({ folders: dirs }, null, 2) + "\n");
+}
+
+const same = (a: string, b: string) => (process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b);
+
+/** Adds a folder to the ones a map remembers, read first: refused (throws) when it won't load or its name is taken. Returns it as read. */
+export function remember(data: string, dir: string): Folder {
+  const f = readFolder(dir);
+  const dirs = remembered(data);
+  if (dirs.some((d) => same(resolve(d), f.dir))) return f;
+  for (const d of dirs) {
+    let other: Folder;
+    try {
+      other = readFolder(d);
+    } catch {
+      continue;
+    }
+    if (other.name === f.name) throw new Error(`the map already loads a folder named ${f.name}, from ${other.dir}: npm run map -- plugins rm ${other.dir}`);
+  }
+  rememberAll(data, [...dirs, f.dir]);
+  return f;
+}
+
+/** Takes a folder out of the ones a map remembers, by its folder or its name; the folder taken out, or undefined when none matched. */
+export function forget(data: string, dirOrName: string): string | undefined {
+  const dirs = remembered(data);
+  const hit = dirs.find((d) => same(resolve(d), resolve(dirOrName))) ?? dirs.find((d) => {
+    try {
+      return readFolder(d).name === dirOrName;
+    } catch {
+      return false;
+    }
+  });
+  if (hit) rememberAll(data, dirs.filter((d) => d !== hit));
+  return hit;
+}
+
+/** Which folders a server loads, and from where: `--plugins` when given, else `ARCHIPELAGO_PLUGINS` when set, else what the map remembers. */
+export function chooseFolders({ flag = [], env, data }: { flag?: string[]; env?: string; data: string }): { dirs: string[]; from?: FoldersFrom } {
+  if (flag.length) return { dirs: flag, from: "flag" };
+  const e = foldersOf(env);
+  if (e.length) return { dirs: e, from: "env" };
+  const m = remembered(data);
+  return m.length ? { dirs: m, from: "map" } : { dirs: [] };
+}
+
+/** A folder named but not loaded, and why. */
+export interface Missing {
+  dir: string;
+  why: string;
+}
+
+/** The folders a list names that load; each that doesn't (gone, no manifest, a twin's name) is left out with why, so the rest still start. */
+export function loadFolders(dirs: string[]): { folders: Folder[]; missing: Missing[] } {
+  const folders: Folder[] = [];
+  const missing: Missing[] = [];
+  for (const d of dirs.filter(Boolean)) {
+    const dir = resolve(d);
+    if (!existsSync(dir)) {
+      missing.push({ dir, why: "the folder isn't there" });
+      continue;
+    }
+    try {
+      const f = readFolder(dir);
+      const twin = folders.find((x) => x.name === f.name);
+      if (twin) missing.push({ dir, why: `${twin.dir} is named ${f.name} too, and came first` });
+      else folders.push(f);
+    } catch (e) {
+      missing.push({ dir, why: (e as Error).message });
+    }
+  }
+  return { folders, missing };
+}
+
+/** The line a server says for a folder it couldn't load. */
+export const missingLine = (m: Missing, from?: FoldersFrom) =>
+  `plugin folder ${m.dir}${from ? ` (${FROM_WORDS[from]})` : ""} is not loaded: ${m.why}`;
+
+/** How a person reads where a folder list came from. */
+export const FROM_WORDS: Record<FoldersFrom, string> = {
+  flag: "from --plugins",
+  env: "from ARCHIPELAGO_PLUGINS",
+  map: "remembered by the map",
+};
 
 /** What the server says of itself to a folder's entries. */
 export interface ServerOf {

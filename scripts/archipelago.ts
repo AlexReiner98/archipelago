@@ -15,6 +15,11 @@
  *        The first run joins the two (the map's own fields kept where a pair
  *        differs; --keep theirs keeps the other's). --dry says what would
  *        go, and writes nothing.
+ *   plugins [ls | add <dir> | rm <dir|name>] [--map name]
+ *        the plugin folders the map loads on every start (its plugins.json,
+ *        runtime/folders.ts): add reads the folder first and refuses one
+ *        that won't load. --plugins and ARCHIPELAGO_PLUGINS still win for a
+ *        start that gives them. Takes effect at the next start.
  *   go    [--folder dir] [--no-connect] [--no-open]
  *        jump in: map live set up and running (live:setup, live:start, each
  *        only when needed), the folder you are in connected to it, its page
@@ -39,7 +44,8 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { httpEnd, syncMaps, type Report } from "../plugins/sync/run.ts";
-import { defaultMap, hasMap, homeOf, MAP_NAME, mapDir, reporting, servedOf, serverFile, servers, alive } from "./maps.ts";
+import { forget, FROM_WORDS, readFolder, remember, remembered } from "../runtime/folders.ts";
+import { defaultMap, hasMap, homeOf, MAP_NAME, mapDir, reporting, servedOf, serverFile, servers, alive, type Served } from "./maps.ts";
 
 const here = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const home = homeOf();
@@ -127,6 +133,15 @@ async function connectHere(bridge: number, folder: string): Promise<string> {
   }
 }
 
+/** What a running server says of its plugin folders, a line each (its registry entry). */
+function pluginLines(p: Served["plugins"]): string[] {
+  if (!p) return [];
+  return [
+    ...p.loaded.map((f) => `plugin folder ${f.name} from ${f.dir}${p.from ? ` (${FROM_WORDS[p.from]})` : ""}`),
+    ...p.missing.map((m) => `plugin folder ${m.dir} not loaded: ${m.why}`),
+  ];
+}
+
 /** Opens a page in the default browser; quietly does nothing where it can't. */
 function openPage(url: string): void {
   const [cmd, args] = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
@@ -204,6 +219,46 @@ switch (verb) {
       const where = s.running ? (s.port ? page(s.port) : "starting") : "stopped (stale entry)";
       const folders = reporting(s.data);
       console.log(`${s.map}\t${where}\t${s.commit ?? ""}\t${s.checkout}${folders.length ? `\n\treported to by ${folders.join(", ")}` : ""}`);
+      if (s.running) for (const line of pluginLines(s.plugins)) console.log(`\t${line}`);
+    }
+    break;
+  }
+  case "plugins": {
+    const sub = positionals[1] ?? "ls";
+    const map = values.map ?? defaultMap(here);
+    if (!MAP_NAME.test(map)) {
+      console.log(`refused: "${map}" is not a map name (letters, digits, ".", "_" and "-")`);
+      process.exit(1);
+    }
+    const data = mapDir(map, home);
+    const arg = positionals[2];
+    try {
+      if (sub === "add" && arg) {
+        const f = remember(data, resolve(process.env.INIT_CWD ?? process.cwd(), arg));
+        console.log(`map ${map} loads plugin folder ${f.name} from ${f.dir} on every start${servedOf(map, home) ? `: restart it to load it now (npm run map -- down ${map})` : ""}`);
+      } else if (sub === "rm" && arg) {
+        const gone = forget(data, resolve(process.env.INIT_CWD ?? process.cwd(), arg)) ?? forget(data, arg);
+        console.log(gone ? `map ${map} no longer loads ${gone}${servedOf(map, home) ? ": restart it to leave it out now" : ""}` : `map ${map} doesn't load ${arg}`);
+        if (!gone) process.exitCode = 1;
+      } else if (sub === "ls") {
+        const dirs = remembered(data);
+        if (!dirs.length) console.log(`map ${map} remembers no plugin folder (npm run map -- plugins add <dir>)`);
+        for (const d of dirs) {
+          try {
+            console.log(`${readFolder(d).name}\t${d}`);
+          } catch (e) {
+            console.log(`(won't load)\t${d}: ${(e as Error).message}`);
+          }
+        }
+        if (process.env.ARCHIPELAGO_PLUGINS) console.log(`ARCHIPELAGO_PLUGINS is set here: a start from this shell loads those instead`);
+        for (const line of pluginLines(servedOf(map, home)?.plugins)) console.log(`running: ${line}`);
+      } else {
+        console.log("npm run map -- plugins [ls | add <dir> | rm <dir|name>] [--map name]");
+        process.exitCode = 1;
+      }
+    } catch (e) {
+      console.log(`refused: ${(e as Error).message}`);
+      process.exitCode = 1;
     }
     break;
   }
@@ -276,6 +331,6 @@ switch (verb) {
     break;
   }
   default:
-    console.log("npm run map -- serve|up [--map name] [--from map|dir] [--port n] [--no-write] [--no-watch] | down <map> | ls | sync <map|url> [--map name] [--dry] [--keep theirs] [--token t] | go [--folder dir] [--no-connect] [--no-open]");
+    console.log("npm run map -- serve|up [--map name] [--from map|dir] [--port n] [--no-write] [--no-watch] | down <map> | ls | plugins [ls | add <dir> | rm <dir|name>] [--map name] | sync <map|url> [--map name] [--dry] [--keep theirs] [--token t] | go [--folder dir] [--no-connect] [--no-open]");
     process.exitCode = 1;
 }

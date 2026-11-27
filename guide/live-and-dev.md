@@ -39,6 +39,30 @@ Live runs from its own worktree, so
 `connect.here` with no folder connects it, not the worktree. Sessions
 started here then report to live by name, at whatever port it takes.
 
+### Plugin folders
+
+Plugins kept outside this repository, such as the learning loop
+(`archipelago-loop`: verdicts, the Context interface, the skill and memory
+writers) or `archipelago-apps`, are plugin folders
+([runtime/README.md](../runtime/README.md), "Plugin folders"). Live
+remembers which ones it loads:
+
+```
+npm run map -- plugins add ../archipelago-loop --map live
+npm run live:stop && npm run live:start
+```
+
+The list is kept in `~/.archipelago/maps/live/plugins.json`, so every
+`live:start`, `promote` and `archipelago` brings the folders back, with no
+`ARCHIPELAGO_PLUGINS` set. `live:status` names each folder loaded and where
+the list came from, and says so in one line when none is: a live without
+the loop has no verdicts and no Context interface. A folder that has gone
+gets one line when live starts, and the rest still load. A dev map copied
+from live (`npm run map -- serve`) loads the same folders;
+`npm run map -- plugins add <dir>` with no `--map` adds one to the
+branch's map. `--plugins` or `ARCHIPELAGO_PLUGINS`, when given, win for
+that start.
+
 An older live kept its map in `<worktree>/app/.data/` and ran on 5180. The
 first `live:start` with no map `live` yet stops that server and moves its
 data in (`--from`), with the folders it had connected: their hooks and MCP
