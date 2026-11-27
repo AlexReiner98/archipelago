@@ -300,8 +300,10 @@ const plugin: Plugin = {
       const plan: PlanView = { ...whole, intents: shown.intents };
       const intents = plan.intents;
       const agents = new Set(intents.map((i) => i.run)).size;
-      const held = state.holds.filter((x) => x.scope === plan.scope).length;
-      const waiting = (state.waits ?? []).filter((w) => w.scope === plan.scope).length;
+      // Held and waiting are now: they belong to the latest round, never to one that is over.
+      const latest = at === all.length - 1;
+      const held = latest ? state.holds.filter((x) => x.scope === plan.scope).length : 0;
+      const waiting = latest ? (state.waits ?? []).filter((w) => w.scope === plan.scope).length : 0;
       const turned = state.turned.filter((t) => t.scope === plan.scope && Date.parse(t.time) >= shown.start - ROUND_GAP && Date.parse(t.time) <= shown.end + ROUND_GAP);
       const built = intents.reduce((n, i) => n + i.after.length, 0);
       return html`<div class="sp">
@@ -323,7 +325,7 @@ const plugin: Plugin = {
           <span class="sp-tally"><b>${agents}</b>agent${agents === 1 ? "" : "s"}</span>
           <span class="sp-tally"><b>${intents.length}</b>intent${intents.length === 1 ? "" : "s"}</span>
           <span class="sp-tally"><b>${built}</b>built on another</span>
-          <span class="sp-tally"><b>${held}</b>file${held === 1 ? "" : "s"} held</span>
+          ${latest ? html`<span class="sp-tally"><b>${held}</b>file${held === 1 ? "" : "s"} held</span>` : null}
           ${waiting ? html`<span class="sp-tally"><b>${waiting}</b>waiting</span>` : null}
           <span class="sp-tally"><b>${turned.length}</b>write${turned.length === 1 ? "" : "s"} turned away</span>
         </div>
