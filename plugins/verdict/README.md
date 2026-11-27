@@ -71,8 +71,10 @@ and `records` are live runs only, `replayed` is the replays'.
 Every run's events, read back once and then watched, so each run can be
 judged again when a node changes. An act is held slim (`slimEvent` in
 [judge.ts](judge.ts)): its kind, who decided, whether it worked, the path
-fields of its input, and of its output the refusal fields or its first
-4,000 characters as a string of its own. The whole bodies (screenshots,
+fields of its input, and of its output the refusal fields or its start
+as a string of its own: 4,000 characters of a failed act (its words are
+the miss), 400 of one that worked (where a miss phrase is looked for).
+4,000 of every act filled the heap again as the journal grew. The whole bodies (screenshots,
 files read, command output) stay in the exchange's journal: held whole
 for every run, they filled a hosted map's 512 MB heap on load (27 Nov 2026).
 
