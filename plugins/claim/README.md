@@ -73,8 +73,9 @@ Two agents in two worktrees of one repository, each on its own branch,
 never see each other's edits: they collide at merge, as a text conflict or
 as code that merges cleanly and breaks. Holds are kept per repository (the
 `remote` fact), so the second agent is still turned away at its first
-write. The plugin reads each run's branch from its folder, and when the
-holder works in another checkout the refusal and `claim.take` say to merge
+write. Each run's branch is its `branch` fact, which the Claude Code hook
+reads where the session runs, so a hosted map knows it too (else the plugin
+reads the folder, where it can). When the holder works in another checkout the refusal and `claim.take` say to merge
 its branch once it lets go, so the second agent builds on the first one's
 work instead of beside it. An agent in a worktree should commit when it is
 done, or there is nothing to merge.
@@ -108,6 +109,7 @@ minutes apart (a tab per round, the latest first).
   the start of the one built on it.
 - **✕** where a write was turned away, with who held the file.
 - A **legend** under the time line says what each mark means.
+- Times are on the reader's own clock.
 - **What happened**: the round in words, in order: who claimed what and
   why, which write was turned away and who held it, who waited for whom,
   who finished, and who got the files and built on whose work (told to

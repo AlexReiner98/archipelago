@@ -76,6 +76,8 @@ export interface HookInput {
   trigger?: string;
   /** Added by the command hook, not Claude Code: origin of the session's folder as host/owner/name. */
   git_remote?: string;
+  /** The branch checked out in the session's folder, read by the hook where the folder is (hook.ts). */
+  git_branch?: string;
   /** Notification: what kind (`permission_prompt`, `idle_prompt`, …) and its text. */
   notification_type?: string;
   message?: string;
@@ -340,13 +342,15 @@ export function runStart(input: HookInput, actor: Actor): RunStart {
 
 /**
  * Edition 5 facts the hook input carries: a subagent's type, and the remote
- * the hook read where the session runs (`git_remote`, as host/owner/name), so
- * a server that can't see the folder still knows the repository.
+ * and branch the hook read where the session runs (`git_remote`, as
+ * host/owner/name, and `git_branch`), so a server that can't see the folder
+ * still knows the repository and the branch.
  */
 function startFacts(input: HookInput, sub: boolean): Record<string, string> {
   const facts: Record<string, string> = {};
   if (sub && typeof input.agent_type === "string" && input.agent_type) facts.agent_type = input.agent_type;
   if (typeof input.git_remote === "string" && input.git_remote) facts.remote = input.git_remote;
+  if (typeof input.git_branch === "string" && input.git_branch) facts.branch = input.git_branch;
   const path = transcriptPath(input, sub);
   if (path) facts.transcript = path;
   return facts;

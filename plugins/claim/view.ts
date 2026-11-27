@@ -98,7 +98,9 @@ const STYLE = sheet(`
 .sp-empty { color:var(--dim); max-width:62ch; line-height:1.5; }
 `);
 
-const clock = (iso: string) => iso.slice(11, 19);
+/** A time as the person reads it: their own clock, 24-hour. */
+const local = (t: string | number, seconds = true) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", ...(seconds ? { second: "2-digit" } : {}), hour12: false });
+const clock = (iso: string) => local(iso);
 const span = (ms: number) => (ms < 90_000 ? `${Math.round(ms / 1000)} s` : ms < 90 * 60_000 ? `${Math.round(ms / 60_000)} min` : `${(ms / 3_600_000).toFixed(1)} h`);
 
 const plugin: Plugin = {
@@ -209,7 +211,7 @@ const plugin: Plugin = {
           ${curves.map((c) => html`<span key=${`e${c.key}`} class="sp-end" style=${{ left: `${c.x2}%`, top: `${c.y2}px` }} title="built on the intent this curve comes from"></span>`)}
           ${live ? html`<div class="sp-now" style=${{ left: `${x(now)}%` }} title="now"></div>` : null}
         </div>
-        <div class="sp-axis"><span>${new Date(t0).toISOString().slice(11, 19)}</span><span>${span(t1 - t0)}</span><span>${live ? "now" : new Date(t1).toISOString().slice(11, 19)}</span></div>
+        <div class="sp-axis"><span>${local(t0)}</span><span>${span(t1 - t0)}</span><span>${live ? "now" : local(t1)}</span></div>
         <div class="sp-legend">
           <span><i class="sp-key sp-key-doing"></i>holding its files</span>
           <span><i class="sp-key sp-key-done"></i>done</span>
@@ -313,7 +315,7 @@ const plugin: Plugin = {
               .slice(0, 10)
               .map(({ r, k }) => {
                 const n = new Set(r.intents.map((i) => i.run)).size;
-                return html`<button key=${k} class="sp-tab" aria-pressed=${k === at} onClick=${() => setRound(k)} title=${`round ${k + 1} of ${all.length}`}>${k === all.length - 1 ? "latest · " : ""}${new Date(r.start).toISOString().slice(11, 16)} · ${n} agent${n === 1 ? "" : "s"}</button>`;
+                return html`<button key=${k} class="sp-tab" aria-pressed=${k === at} onClick=${() => setRound(k)} title=${`round ${k + 1} of ${all.length}`}>${k === all.length - 1 ? "latest · " : ""}${local(r.start, false)} · ${n} agent${n === 1 ? "" : "s"}</button>`;
               })}</div>`
           : null}
         <div class="sp-head">

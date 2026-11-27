@@ -11,7 +11,8 @@
  * It adds `git_remote`: origin of the session's folder as host/owner/name,
  * read here, where the folder is, so a server elsewhere still knows the
  * repository (the git plugin's `remote`). No credentials leave: only the host
- * and path.
+ * and path. And `git_branch`, the branch checked out there, for the same
+ * reason (the `branch` fact): a hosted map can't read it from the folder.
  *
  * It adds `archipelago_transcript` too, for a server that can't open the
  * session's transcript (it runs elsewhere): the next page of it, read here
@@ -84,13 +85,35 @@ export function normalRemote(raw: string): string | undefined {
   return host && path ? `${host.toLowerCase()}/${path}` : undefined;
 }
 
-/** The hook input with `git_remote` added, when its folder has an origin. */
-export function withRemote(body: string, git = (cwd: string) => execFileSync("git", ["-C", cwd, "remote", "get-url", "origin"], { encoding: "utf8", timeout: 1000, windowsHide: true, stdio: ["ignore", "pipe", "ignore"] })): string {
+const gitIn = (cwd: string, args: string[]) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8", timeout: 1000, windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+
+/**
+ * The hook input with `git_remote` added, when its folder has an origin, and
+ * `git_branch`, when a branch is checked out there (not a detached HEAD).
+ * Each read on its own: a folder with no origin still says its branch.
+ */
+export function withRemote(
+  body: string,
+  git = (cwd: string) => gitIn(cwd, ["remote", "get-url", "origin"]),
+  branchOf = (cwd: string) => gitIn(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]),
+): string {
   try {
     const input = JSON.parse(body) as Record<string, unknown>;
-    if (typeof input.cwd !== "string" || !input.cwd || input.git_remote) return body;
-    const remote = normalRemote(git(input.cwd));
-    return remote ? JSON.stringify({ ...input, git_remote: remote }) : body;
+    if (typeof input.cwd !== "string" || !input.cwd) return body;
+    const add: Record<string, string> = {};
+    if (!input.git_remote) {
+      try {
+        const remote = normalRemote(git(input.cwd));
+        if (remote) add.git_remote = remote;
+      } catch {}
+    }
+    if (!input.git_branch) {
+      try {
+        const branch = branchOf(input.cwd).trim();
+        if (branch && branch !== "HEAD") add.git_branch = branch;
+      } catch {}
+    }
+    return Object.keys(add).length ? JSON.stringify({ ...input, ...add }) : body;
   } catch {
     return body;
   }
