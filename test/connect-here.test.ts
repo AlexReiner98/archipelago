@@ -177,6 +177,9 @@ test("a map moved in from an older server's data takes its folders over; a map c
   assert.ok((await old.invoke(HERE, { folder: proj })).ok);
   await until(() => existsSync(settings) && existsSync(mcp));
   assert.ok(commands(JSON.parse(await readFile(settings, "utf8"))).every((c) => c.includes(HOOK)));
+  // The writer saves its ledger after the files: copied before, live wouldn't know the old entries as the old map's.
+  await old.invoke(STATUS, {});
+  assert.ok(existsSync(join(oldData, "connect.json")), "the old ledger is kept before it is copied");
   snapshot(oldData, liveData, { takeover: true });
 
   // Map live, moved in from that data folder: its writer replaces the old entries with its own.

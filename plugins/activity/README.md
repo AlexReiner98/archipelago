@@ -19,6 +19,10 @@ their new values (∅ cleared).
   `history.list` (100 a page, "older changes" for the next). Both follow
   live: `exchange.watch` for runs, `graph.watch` for changes. Titles of the
   items touched are read by id through `graph.read`.
+- "since" on a change set opens the Then view ([history](../history/README.md))
+  from just before it: what changed on the map since, item by item. It sets
+  the page key `history.from` and the view; without the history view
+  loaded, nothing opens.
 - Undo runs `history.undo` through `action.invoke`, on the person's
   authority; on an undo the button says redo. A refusal shows under the
   set, such as `graph.conflict` when a later change moved the same field.

@@ -11,8 +11,9 @@ import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader, type Entry as TreeEntry } from "../runtime/loader.ts";
 import action from "../plugins/action/index.ts";
 import graph from "../plugins/graph/index.ts";
-import history, { netFacts } from "../plugins/history/index.ts";
+import history, { difference, netFacts } from "../plugins/history/index.ts";
 import { Journal, type Entry, type Snapshot } from "../plugins/history/journal.ts";
+import { counts, pickAt, shown } from "../plugins/history/then.ts";
 
 const BASE = "mem:/plugins/";
 
@@ -291,8 +292,104 @@ test("a journal begun after the map's first changes keeps a checkpoint of the wh
     assert.deepEqual([state.seq, state.items, state.next], [3, [{ id: "a", fields: { type: "task", title: "A" } }], "a"]);
     const v = await call("history.verify");
     assert.deepEqual([v.complete, v.from, v.items, v.differ], [true, 3, 2, 0]);
+    // Before the checkpoint the log can't say; from it on, it can.
+    const early = await invoke.invoke({ action: "history.at", input: { at: 2 }, authority: { of: "agent", basis: "test" }, reason: "test" });
+    assert.equal(!early.ok && early.refused.code, "history.before");
+    const d = await call("history.diff", { from: 3 });
+    assert.deepEqual((d.items as { id: string; fields: Json }[]).map((x) => [x.id, x.fields]), [["b", [{ field: "title", after: "B" }]]]);
     await loader.apply([]);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("history.at: the map as a set left it, by seq, change id or time; refused before the log or inside a fold", async () => {
+  const h = await setup();
+  try {
+    const a = await h.ok(h.write(["+", "ann", "type", "record"], ["+", "ann", "title", "Ann works at Acme"], ["+", "ann", "status", "current"]));
+    const b = await h.ok(h.write(["+", "glx", "type", "record"], ["+", "glx", "title", "Ann works at Globex"], ["+", "glx", "status", "current"], ["-", "ann", "status", "current"], ["+", "ann", "status", "superseded"]));
+    type At = { at: { seq: number; time?: string }; items: { id: string; fields: Record<string, Json> }[]; missing?: string[]; next?: string };
+    const then = (await h.ok(h.call<Json>("history.at", { at: a.change!, ids: ["ann", "glx"] }))).output as unknown as At;
+    assert.equal(then.at.seq, a.committed!.seq);
+    assert.deepEqual(then.items, [{ id: "ann", fields: { type: "record", title: "Ann works at Acme", status: "current" } }]);
+    assert.deepEqual(then.missing, ["glx"]);
+    const now = (await h.ok(h.call<Json>("history.at", { limit: 1 }))).output as unknown as At;
+    assert.deepEqual([now.at.seq, now.items.map((i) => i.id), now.next], [b.committed!.seq, ["ann"], "ann"]);
+    assert.equal(now.items[0]!.fields.status, "superseded");
+    const page2 = (await h.ok(h.call<Json>("history.at", { after: "ann" }))).output as unknown as At;
+    assert.deepEqual(page2.items.map((i) => i.id), ["glx"]);
+    // By time: the last set committed at or before it.
+    const byTime = (await h.ok(h.call<Json>("history.at", { at: a.committed!.committed }))).output as unknown as At;
+    assert.ok(byTime.at.seq >= a.committed!.seq && byTime.at.time! <= a.committed!.committed);
+    const before = (await h.ok(h.call<Json>("history.at", { at: "2000-01-01" }))).output as unknown as At;
+    assert.deepEqual([before.at.seq, before.items], [0, []]);
+    const bad = await h.call("history.at", { at: "yesterday-ish" });
+    assert.equal(!bad.ok && bad.refused.code, "history.point");
+  } finally {
+    await h.stop();
+  }
+  const f = await setup({ keep: 2, fold: 2 });
+  try {
+    for (let i = 0; i < 6; i++) await f.ok(f.write(["+", `e${i}`, "type", "task"]));
+    const snaps = (await f.ok(f.call<Json>("history.snapshots", {}))).output as unknown as Page<Snapshot>;
+    const s = snaps.items.at(-1)!;
+    const inside = await f.call("history.at", { at: s.first });
+    assert.equal(!inside.ok && inside.refused.code, "history.compacted");
+    const edge = (await f.ok(f.call<Json>("history.at", { at: s.last, ids: ["e0", "e1", "e2"] }))).output as unknown as { items: { id: string }[] };
+    assert.deepEqual(edge.items.map((i) => i.id), ["e0", "e1"]);
+  } finally {
+    await f.stop();
+  }
+});
+
+test("history.diff: item by item between two points, made, changed or gone, with the sets between; same value back is no change", async () => {
+  const h = await setup();
+  try {
+    const a = await h.ok(h.write(["+", "ann", "type", "record"], ["+", "ann", "title", "Ann works at Acme"], ["+", "ann", "status", "current"], ["+", "tmp", "type", "task"]));
+    const b = await h.ok(h.write(["+", "glx", "type", "record"], ["+", "glx", "title", "Ann works at Globex"], ["-", "ann", "status", "current"], ["+", "ann", "status", "superseded"]));
+    await h.ok(h.write(["+", "tmp", "title", "x"]));
+    await h.ok(h.write(["-", "tmp", "title", "x"]));
+    const c = await h.ok(h.write(["-", "tmp", "type", "task"]));
+    type Diff = { from: { seq: number }; to: { seq: number }; sets: number; total: number; items: { id: string; change: string; title?: string; fields: { field: string; before?: Json; after?: Json }[]; changes: string[] }[]; next?: string };
+    const d = (await h.ok(h.call<Json>("history.diff", { from: a.change! }))).output as unknown as Diff;
+    assert.deepEqual([d.from.seq, d.to.seq, d.sets, d.total], [a.committed!.seq, c.committed!.seq, 4, 3]);
+    assert.deepEqual(d.items.map((x) => [x.id, x.change]), [["ann", "changed"], ["glx", "made"], ["tmp", "gone"]]);
+    assert.deepEqual(d.items[0]!.fields, [{ field: "status", before: "current", after: "superseded" }]);
+    assert.equal(d.items[0]!.title, "Ann works at Acme");
+    assert.deepEqual(d.items[0]!.changes, [b.change]);
+    assert.equal(d.items[2]!.changes.length, 3);
+    const paged = (await h.ok(h.call<Json>("history.diff", { from: a.change!, limit: 2 }))).output as unknown as Diff;
+    assert.deepEqual([paged.items.map((x) => x.id), paged.next], [["ann", "glx"], "glx"]);
+    // A title set and cleared in between nets to nothing for it on its own.
+    const mid = (await h.ok(h.call<Json>("history.diff", { from: b.change!, to: `c${c.committed!.seq - 1}` }))).output as unknown as Diff;
+    assert.deepEqual([mid.sets, mid.total], [2, 0]);
+    const order = await h.call("history.diff", { from: c.change!, to: a.change! });
+    assert.equal(!order.ok && order.refused.code, "history.order");
+    // Undo shows as the reverse: from before the undone set to after its undo, nothing.
+    const u = await h.ok(h.call("history.undo", { change: b.change! }));
+    const round = (await h.ok(h.call<Json>("history.diff", { from: `c${b.committed!.seq - 1}`, to: u.change! }))).output as unknown as Diff;
+    assert.deepEqual(round.items.map((x) => [x.id, x.change]), [["tmp", "gone"]]);
+  } finally {
+    await h.stop();
+  }
+});
+
+test("difference: fields compared at two points; made, gone, changed; none when the same", () => {
+  assert.equal(difference("x", { type: "t", a: 1 }, { type: "t", a: 1 }), null);
+  assert.deepEqual(difference("x", undefined, { type: "t", title: "X" }), { id: "x", change: "made", type: "t", title: "X", fields: [{ field: "type", after: "t" }, { field: "title", after: "X" }] });
+  assert.deepEqual(difference("x", { type: "t" }, undefined)?.change, "gone");
+  assert.deepEqual(difference("x", { type: "t", a: [1] }, { type: "t", a: [2] })?.fields, [{ field: "a", before: [1], after: [2] }]);
+});
+
+test("the Then view's words: quick picks, a value in a few words, counts by kind", () => {
+  const now = Date.parse("2026-11-27T15:30:00Z");
+  assert.equal(pickAt("hour", now), "2026-11-27T14:30:00.000Z");
+  assert.equal(pickAt("week", now), "2026-11-20T15:30:00.000Z");
+  const today = new Date(pickAt("today", now));
+  assert.deepEqual([today.getHours(), today.getMinutes(), today.getDate() === new Date(now).getDate()], [0, 0, true]);
+  assert.equal(shown(undefined), "∅");
+  assert.equal(shown("current"), "current");
+  assert.equal(shown({ a: 1 }), '{"a":1}');
+  assert.equal(shown("x".repeat(80), 10), `${"x".repeat(9)}…`);
+  assert.deepEqual(counts([{ change: "made" }, { change: "gone" }, { change: "made" }]), { made: 2, changed: 0, gone: 1 });
 });

@@ -37,7 +37,9 @@ data: a grouping is a link or a query.
 Every change goes through a declared action, whether a person or an agent
 makes it ([action](../spec/action.md)). The history plugin writes each
 change set in full, and undo applies its inverse. There are no gates:
-every change applies, and anything can be undone.
+every change applies, and anything can be undone. The log is the truth, so
+the map at any point it holds can be read back (`history.at`), and what
+changed between two points (`history.diff`, the view Then).
 
 ## The agent service and the exchange
 
