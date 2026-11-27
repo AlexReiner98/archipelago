@@ -192,9 +192,11 @@ says nothing and the agent carries on.
 to copy, this server's own ([connect](../connect/README.md)).
 
 hook.ts adds `git_remote`: origin of the session's folder as
-`host/owner/name`, read where the session runs (no credentials leave). The
-run begins with it as its `remote` fact, so a server that can't see the
-folder still knows the repository ([git](../git/README.md)).
+`host/owner/name`, read where the session runs (no credentials leave), and
+`git_branch`, the branch checked out there (none for a detached HEAD). The
+run begins with them as its `remote` and `branch` facts, so a server that
+can't see the folder still knows the repository and the branch
+([git](../git/README.md), [claim](../claim/README.md)).
 
 The run's transcript is its `transcript` fact: the hook's
 `transcript_path`, and for a subagent its own file (`agent_transcript_path`,

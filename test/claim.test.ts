@@ -44,7 +44,7 @@ async function boot(withClaim: boolean) {
 }
 
 /** One agent of the two: begins, and plays its calls one at a time so the test can interleave them. */
-function agentOf(env: Awaited<ReturnType<typeof boot>>, id: string, title: string, at: { cwd: string; remote?: string } = { cwd: CWD }) {
+function agentOf(env: Awaited<ReturnType<typeof boot>>, id: string, title: string, at: { cwd: string; remote?: string; branch?: string } = { cwd: CWD }) {
   const CWD = at.cwd;
   const { run, invoke } = env.as(id);
   let t = 0;
@@ -59,7 +59,7 @@ function agentOf(env: Awaited<ReturnType<typeof boot>>, id: string, title: strin
     heard,
     refusals,
     async begin() {
-      await run.begin({ run: id, agent: { id: `e_${id}`, kind: "agent" }, harness: "test", reaches: [], title, cwd: CWD, ...(at.remote ? { facts: { remote: at.remote } } : {}) });
+      await run.begin({ run: id, agent: { id: `e_${id}`, kind: "agent" }, harness: "test", reaches: [], title, cwd: CWD, ...(at.remote || at.branch ? { facts: { ...(at.remote ? { remote: at.remote } : {}), ...(at.branch ? { branch: at.branch } : {}) } } : {}) });
       hear(await run.reach({ run: id, places: ["session_start"], time: time() }));
     },
     /** The turn's reply ends: the agent stops and waits for its person. */
@@ -393,6 +393,26 @@ test("a hold lasts a turn: when the holder's reply ends, the one waiting gets th
   // A, in its next turn, finds them held by B.
   await a.prompt("Now tidy greet");
   assert.equal(await a.tool("Edit", "src/greet.ts"), false);
+  await a.end();
+  await b.end();
+  assert.deepEqual(env.errors, []);
+  await env.loader.apply([]);
+});
+
+test("on a hosted map, the branch comes from the run's facts: the folders are on another machine", async () => {
+  const env = await boot(true);
+  const remote = "example.org/pat/shop";
+  // Folders the server can't read: only the facts the hook sent say the branch.
+  const a = agentOf(env, "run-a", "Rename greet", { cwd: "/home/me/elsewhere/wa", remote, branch: "rename" });
+  const b = agentOf(env, "run-b", "Add farewell", { cwd: "/home/me/elsewhere/wb", remote, branch: "farewell" });
+  await a.begin();
+  await b.begin();
+  await a.take(["src/greet.ts"], "rename greet");
+  assert.equal(env.plan().holds[0]!.branch, "rename");
+  assert.equal(await b.tool("Edit", "src/greet.ts"), false);
+  assert.match(b.refusals[0]!, /on branch rename: .*git merge rename/);
+  await settle();
+  assert.equal(env.plan().plans[0]!.intents[0]!.branch, "rename");
   await a.end();
   await b.end();
   assert.deepEqual(env.errors, []);

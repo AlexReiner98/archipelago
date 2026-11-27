@@ -181,9 +181,12 @@ const claim: Plugin<ClaimConfig> = {
       const remote = typeof r.facts?.remote === "string" ? r.facts.remote : undefined;
       return config.by !== "folder" && remote ? REPO + remote : norm(r.cwd ?? "");
     };
-    // A run's branch, read once from its folder: a run in another checkout gets a holder's change only by merging its branch.
+    // A run's branch: the `branch` fact its start gave (the hook reads it where the folder is, so a hosted map
+    // has it too), else read once from its folder here. A run in another checkout gets a holder's change only by
+    // merging its branch.
     const branches = new Map<string, string | undefined>();
     const branchOf = (r: RunInfo): string | undefined => {
+      if (typeof r.facts?.branch === "string" && r.facts.branch && r.facts.branch !== "HEAD") return r.facts.branch;
       if (branches.has(r.run)) return branches.get(r.run);
       let b: string | undefined;
       try {

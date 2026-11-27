@@ -468,16 +468,34 @@ test("the command forwarder prints the adapter's answer, and nothing when it is 
 
 test("the forwarder adds the folder's remote; a folder with no origin, or bad input, goes as it came", () => {
   const body = (o: object) => JSON.stringify(o);
-  assert.equal(JSON.parse(withRemote(body({ cwd: "C:/r" }), () => "git@github.com:a/b.git\n")).git_remote, "github.com/a/b");
-  assert.equal(withRemote(body({ cwd: "C:/r" }), () => { throw new Error("not a repo"); }), body({ cwd: "C:/r" }));
-  assert.equal(withRemote(body({}), () => "https://github.com/a/b"), body({}));
-  assert.equal(withRemote("not json", () => "https://github.com/a/b"), "not json");
+  const no = () => {
+    throw new Error("not a repo");
+  };
+  assert.equal(JSON.parse(withRemote(body({ cwd: "C:/r" }), () => "git@github.com:a/b.git\n", no)).git_remote, "github.com/a/b");
+  assert.equal(withRemote(body({ cwd: "C:/r" }), no, no), body({ cwd: "C:/r" }));
+  assert.equal(withRemote(body({}), () => "https://github.com/a/b", () => "main"), body({}));
+  assert.equal(withRemote("not json", () => "https://github.com/a/b", () => "main"), "not json");
 });
 
-test("the hook's remote is a fact of the run it begins", async () => {
+test("the forwarder adds the folder's branch too, so a server elsewhere knows it; a detached HEAD gives none", () => {
+  const body = (o: object) => JSON.stringify(o);
+  const sent = JSON.parse(withRemote(body({ cwd: "C:/r" }), () => "https://github.com/a/b", () => "claude/fix-it\n"));
+  assert.deepEqual([sent.git_remote, sent.git_branch], ["github.com/a/b", "claude/fix-it"]);
+  // No origin: the branch still goes.
+  const noOrigin = () => {
+    throw new Error("no origin");
+  };
+  assert.equal(JSON.parse(withRemote(body({ cwd: "C:/r" }), noOrigin, () => "main")).git_branch, "main");
+  assert.equal(JSON.parse(withRemote(body({ cwd: "C:/r" }), () => "https://github.com/a/b", () => "HEAD")).git_branch, undefined);
+});
+
+test("the hook's remote and branch are facts of the run it begins", async () => {
   const { calls, go } = fake();
   await go({ hook_event_name: "SessionStart", git_remote: "github.com/a/b" });
   assert.deepEqual((calls[0]![1] as RunStart).facts, { remote: "github.com/a/b" });
+  const branched = fake();
+  await branched.go({ hook_event_name: "SessionStart", git_remote: "github.com/a/b", git_branch: "claude/fix-it" });
+  assert.deepEqual((branched.calls[0]![1] as RunStart).facts, { remote: "github.com/a/b", branch: "claude/fix-it" });
   const sub = fake();
   await sub.go({ hook_event_name: "SubagentStart", agent_id: "x", agent_type: "Explore", git_remote: "github.com/a/b" });
   assert.deepEqual((sub.calls[0]![1] as RunStart).facts, { agent_type: "Explore", remote: "github.com/a/b" });

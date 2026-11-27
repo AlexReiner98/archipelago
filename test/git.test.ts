@@ -58,6 +58,11 @@ test("a remote the start gave is used where git can't see the folder (a hosted s
   const b = await run.begin({ ...start("r2", "C:/here"), facts: { remote: "git@GitHub.com:example/archipelago-next.git" } });
   assert.equal(b.facts?.repo, a.facts?.repo);
   assert.equal(b.facts?.branch, "main");
+  // A branch the start gave is kept where git can't see the folder, and wins over the folder's own.
+  const away = await run.begin({ ...start("r4", "C:/elsewhere"), facts: { remote: "github.com/example/archipelago-next", branch: "claude/fix-it" } });
+  assert.equal(away.facts?.branch, "claude/fix-it");
+  const here = await run.begin({ ...start("r5", "C:/here"), facts: { branch: "claude/other" } });
+  assert.equal(here.facts?.branch, "claude/other");
   // Not a remote: git reads the folder as before.
   const c = await run.begin({ ...start("r3", "C:/here"), facts: { remote: "nonsense" } });
   assert.notEqual(c.facts?.repo, a.facts?.repo);

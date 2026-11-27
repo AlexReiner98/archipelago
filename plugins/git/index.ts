@@ -156,10 +156,13 @@ const git: Plugin<GitConfig> = {
       async facts(info) {
         // A remote the run's start gave (the hook read it where the session runs): used as it is, so a
         // server that can't see the folder still finds the repo item. Else git reads the folder here.
+        // So is a branch it gave: git reads the folder only for what the start didn't say.
         const given = givenRemote(info.facts?.remote);
+        const givenBranch = typeof info.facts?.branch === "string" && info.facts.branch ? info.facts.branch : undefined;
         const cwd = typeof info.facts?.cwd === "string" ? info.facts.cwd : info.cwd;
-        if (!cwd && !given) return null;
-        const [url, branch] = cwd ? await Promise.all([given ? undefined : run(cwd, ["remote", "get-url", "origin"]), run(cwd, ["rev-parse", "--abbrev-ref", "HEAD"])]) : [undefined, undefined];
+        if (!cwd && !given && !givenBranch) return null;
+        const [url, read] = cwd ? await Promise.all([given ? undefined : run(cwd, ["remote", "get-url", "origin"]), givenBranch ? undefined : run(cwd, ["rev-parse", "--abbrev-ref", "HEAD"])]) : [undefined, undefined];
+        const branch = givenBranch ?? read;
         const out: Facts = {};
         const remote = given ?? (url ? normalRemote(url) : undefined);
         if (remote) {
