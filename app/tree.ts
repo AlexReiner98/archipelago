@@ -116,6 +116,10 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
     { id: "game", plugin: "plugins/game/index.ts" },
     // A game explained in plain words by the typed call's model (ARCHIPELAGO_MODEL), through game:explain's nodes.
     { id: "explain", plugin: "plugins/game/explain.ts" },
+    // Reciprocal frames kept on the map: a frame, its beams, each solve a record about it (plugins/reciprocal).
+    { id: "reciprocal", plugin: "plugins/reciprocal/map.ts" },
+    // Review issues about items, raised by hand or by checking a record that measures them (plugins/review).
+    { id: "review", plugin: "plugins/review/index.ts" },
     { id: "page", plugin: "plugins/page/index.ts" },
     { id: "views", plugin: "plugins/views/index.ts" },
     { id: "switch", plugin: "plugins/switch/server.ts" },

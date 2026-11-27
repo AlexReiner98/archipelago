@@ -1,7 +1,7 @@
 /**
  * The app, page side: the browser runtime and its config tree. The bridge
  * provides the server's capabilities here; the style, renderer, here, frame, views (the picker),
- * harness, activity, history (the Then view: what changed between two points in the log), find, command, field (home), connect (a new map's first step), gate (a host's sign-in, drawn over the map), serving (which map, commit and checkout, in the header), sync (what the map syncs with, in the header), item, docs (the Plugins view), guide (the Guide) and switch (its on/off switches) plugins make the page. The bridge is two ports above the page
+ * harness, activity, history (the Then view: what changed between two points in the log), find, command, field (home), reciprocal (a reciprocal frame kept on the map), review (issues beside it), connect (a new map's first step), gate (a host's sign-in, drawn over the map), serving (which map, commit and checkout, in the header), sync (what the map syncs with, in the header), item, docs (the Plugins view), guide (the Guide) and switch (its on/off switches) plugins make the page. The bridge is two ports above the page
  * (5180 serves the page and 5182 the bridge, 5280 and 5282 for dev), or at
  * `/bridge/` on the page's own origin when a host in front serves both. `host` is on window, so a plugin can be turned
  * off from the console: `host.loader.edit(t => (t.find(e => e.id === "harness").disabled = true, t))`.
@@ -67,6 +67,9 @@ const host = await startBrowser({
     { id: "item", plugin: "plugins/item/index.ts" },
     // A game's payoff matrix, in Games and on its item page (plugins/game).
     { id: "game", plugin: "plugins/game/view.ts" },
+    // A reciprocal frame solved and kept on the map (plugins/reciprocal), and the review issues beside it (plugins/review).
+    { id: "reciprocal", plugin: "plugins/reciprocal/index.ts" },
+    { id: "review", plugin: "plugins/review/view.ts" },
     // The look of a tool people work in, after Impeccable's Operate mode: on the Games page first (plugins/operate).
     { id: "operate", plugin: "plugins/operate/view.ts", config: { scope: ".gm" } },
     { id: "style-view", plugin: "plugins/style/view.ts" },
