@@ -23,6 +23,21 @@ const MCP_URL = "http://127.0.0.1:5381/mcp";
 const REPO = JSON.parse(await readFile(new URL("../plugins/claude-code/settings.json", import.meta.url), "utf8"));
 const probe: Plugin = { id: "probe", inject: ["action.invoke"], apply() {} };
 const wait = (ms = 200) => new Promise((r) => setTimeout(r, ms));
+/**
+ * Until `ok` holds, looking every 25 ms for up to 10 s: the writer works after
+ * the change commits, and under a full suite's load that takes longer than any
+ * fixed wait. Throws if it never holds; the assertions after say what is wrong.
+ */
+async function until(ok: () => boolean | Promise<boolean>, ms = 10_000): Promise<void> {
+  const end = Date.now() + ms;
+  for (;;) {
+    try {
+      if (await ok()) return;
+    } catch {}
+    if (Date.now() > end) return;
+    await wait(25);
+  }
+}
 
 async function tree(dir: string, opts: { writes: boolean; folder?: string; data?: string; map?: string; maps?: string }) {
   const home = join(dir, "home");
@@ -77,7 +92,7 @@ test("connect.here writes a folder's settings beside the person's and the contex
   try {
     const on = await invoke(HERE, { folder: proj });
     assert.ok(on.ok, JSON.stringify(on));
-    await wait();
+    await until(async () => existsSync(join(proj, ".mcp.json")) && (await disk()).hooks.Stop.length === 2);
     const s = await disk();
     assert.equal(s.hooks.Stop.length, 2, "the person's Stop hook stays beside ours");
     assert.deepEqual(s.enabledMcpjsonServers, [NAME]);
@@ -91,7 +106,7 @@ test("connect.here writes a folder's settings beside the person's and the contex
 
     // Away: what it added goes, the rest stays as it was.
     assert.ok((await invoke(AWAY, { folder: proj })).ok);
-    await wait();
+    await until(() => !existsSync(join(proj, ".mcp.json")));
     assert.deepEqual(await disk(), theirs);
     assert.ok(!existsSync(join(proj, ".mcp.json")), "the file it made goes");
     assert.equal(await readFile(exclude, "utf8"), excludeBefore);
@@ -99,15 +114,15 @@ test("connect.here writes a folder's settings beside the person's and the contex
     // On again, then undo: history takes it back like any change.
     const again = await invoke(HERE, { folder: proj });
     assert.ok(again.ok && again.change, JSON.stringify(again));
-    await wait();
+    await until(() => existsSync(join(proj, ".mcp.json")));
     assert.ok(existsSync(join(proj, ".mcp.json")));
     assert.ok((await invoke("history.undo", { change: again.change })).ok);
-    await wait();
+    await until(() => !existsSync(join(proj, ".mcp.json")));
     assert.ok(!existsSync(join(proj, ".mcp.json")), "undone: taken out");
 
     // On, then the server stops: unloading takes it all out, so no folder keeps hooks to a server that isn't there.
     assert.ok((await invoke(HERE, { folder: proj }, "agent")).ok, "an agent may connect a folder too: the change says it was the agent");
-    await wait();
+    await until(() => existsSync(join(proj, ".mcp.json")));
     assert.ok(existsSync(join(proj, ".mcp.json")));
     await loader.apply([]);
     assert.deepEqual(await disk(), theirs);
@@ -160,7 +175,7 @@ test("a map moved in from an older server's data takes its folders over; a map c
   // An older live, by port, connects the folder; then it is stopped hard: no unload, its entries stay.
   const old = await tree(dir, { writes: true, data: oldData, maps });
   assert.ok((await old.invoke(HERE, { folder: proj })).ok);
-  await wait();
+  await until(() => existsSync(settings) && existsSync(mcp));
   assert.ok(commands(JSON.parse(await readFile(settings, "utf8"))).every((c) => c.includes(HOOK)));
   snapshot(oldData, liveData, { takeover: true });
 
@@ -168,7 +183,10 @@ test("a map moved in from an older server's data takes its folders over; a map c
   const live = await tree(dir, { writes: true, data: liveData, map: "live", maps });
   const fork = { loader: undefined as undefined | Awaited<ReturnType<typeof tree>>["loader"] };
   try {
-    await wait();
+    await until(async () => {
+      const t = await readFile(settings, "utf8");
+      return t.includes("--map live") && !t.includes(HOOK);
+    });
     const s = JSON.parse(await readFile(settings, "utf8"));
     const cmds = commands(s);
     assert.ok(cmds.length > 0);
