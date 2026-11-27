@@ -26,16 +26,17 @@ import htm from "htm";
 import type { Json } from "../../spec/common.ts";
 import type { HereDeclare, HereRead, HereSet } from "../../spec/here.ts";
 import { KEYS } from "../../spec/here.ts";
-import type { SlotFill } from "../../spec/slot.ts";
+import { fillKey, type SlotFill, type SlotRead } from "../../spec/slot.ts";
 import { sheet } from "../../spec/style.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
-import { colourOf, colours } from "../harness/live.ts";
+import { colourOf, colours } from "./colours.ts";
 import type { ClaimRead } from "./index.ts";
 import { ROUND_GAP, rounds, scopeTitle, type Hold, type IntentView, type PlanState, type PlanView } from "./plan.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
 export const PLAN_KEY = "claim.plan";
+/** The Context interface's view, from the learning loop's plugin folder: a run opens there when it is loaded. */
 const HARNESS = "harness/view";
 /** A lane's height, px: the curves between lanes are drawn in these units. */
 const LANE = 46;
@@ -107,7 +108,7 @@ const span = (ms: number) => (ms < 90_000 ? `${Math.round(ms / 1000)} s` : ms < 
 const plugin: Plugin = {
   id: "claim",
   about: "The shared plan agents agreed on, kept on the map: each agent's intents on a time line, what each built on, and what is held now.",
-  inject: ["claim.read", "here.read", "here.set", "here.declare", "slot.fill"],
+  inject: ["claim.read", "here.read", "here.set", "here.declare", "slot.fill", "slot.read"],
   apply(ctx: Context) {
     const read = ctx.get<ClaimRead>("claim.read");
     const here = ctx.get<HereRead>("here.read");
@@ -176,7 +177,11 @@ const plugin: Plugin = {
         }),
       );
 
-      const open = (run: string) => (set.set(KEYS.run, run), set.set(KEYS.view, HARNESS));
+      const views = ctx.get<SlotRead>("slot.read");
+      const open = (run: string) => {
+        set.set(KEYS.run, run);
+        if (views.fills("center").some((f) => fillKey(f) === HARNESS)) set.set(KEYS.view, HARNESS);
+      };
       return html`<div class="sp-board">
         <div>${lanes.map(
           (l) => html`<div key=${l.run} class="sp-who" onClick=${() => open(l.run)} title=${`open ${l.title} in the Sensory interface`}>

@@ -83,9 +83,27 @@ export function readFolders(dirs: string[]): Folder[] {
 /** `ARCHIPELAGO_PLUGINS` as a list of folders. */
 export const foldersOf = (env: string | undefined): string[] => (env ? env.split(delimiter).filter(Boolean) : []);
 
+/** What the server says of itself to a folder's entries. */
+export interface ServerOf {
+  /** Whether it writes files outside its data (skills, settings): an entry that says `"writes": true` is off when not. */
+  write?: boolean;
+  /** The map's data folder, given to each entry whose config is an object (or none) as `config.data`: where it keeps a ledger, say. */
+  data?: string;
+}
+
+const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+
 /** The server's entries for the folders, each plugin a file URL. */
-export const serverEntries = (folders: Folder[]): Entry[] =>
-  folders.flatMap((f) => f.server.map((e) => (e.plugin ? { ...e, plugin: pathToFileURL(join(f.dir, e.plugin)).href } : e)));
+export const serverEntries = (folders: Folder[], server: ServerOf = {}): Entry[] =>
+  folders.flatMap((f) =>
+    f.server.map((raw) => {
+      const { writes, ...e } = raw as Entry & { writes?: boolean };
+      const out: Entry = e.plugin ? { ...e, plugin: pathToFileURL(join(f.dir, e.plugin)).href } : { ...e };
+      if (writes && server.write === false) out.disabled = true;
+      if (server.data !== undefined && e.plugin && (e.config === undefined || isObject(e.config))) out.config = { data: server.data, ...(e.config ?? {}) };
+      return out;
+    }),
+  );
 
 /** Where the page server serves a folder. */
 export const mountOf = (name: string) => `/ext/${name}/`;

@@ -29,12 +29,11 @@ import { META } from "../../spec/common.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import { refuse } from "../../runtime/guard.ts";
 
-/** The keys served. Each is injected, so the bridge waits for all of them. */
+/** The core's keys served. Each is injected, so the bridge waits for all of them. */
 export const KEYS = [
   "agent.tree",
   "exchange.read",
   "exchange.watch",
-  "verdict.read",
   "action.list",
   "action.invoke",
   "graph.read",
@@ -42,14 +41,27 @@ export const KEYS = [
   "graph.watch",
   "types.read",
   "types.mark",
-  "profile.read",
-  "profile.hears",
   "docs.read",
   "claim.read",
 ] as const;
 
 /** Reads a client keeps a copy of, refreshed when the key's `watch` fires. */
 export const SYNC: Record<string, string> = { "agent.tree": "nodes", "action.list": "list", "types.read": "all", "types.mark": "marks" };
+
+/** `bridge.serve`'s key: how a plugin from elsewhere has the bridge serve a key of its own. */
+export const SERVE = "bridge.serve";
+
+/**
+ * `bridge.serve`: a key served to the page besides the core's, handed over
+ * by a plugin that injects it (a plugin folder's, such as the learning
+ * loop's `verdict.read`). It is served until that plugin unloads, or the
+ * Dispose; `sync` names a synchronous read the client keeps a copy of.
+ * A page reads the keys as it loads (`/caps`): one served later is there
+ * on its next load.
+ */
+export interface BridgeServe {
+  serve(key: string, cap: object, sync?: string): Dispose;
+}
 
 export interface BridgeConfig {
   port?: number;
@@ -96,10 +108,22 @@ const bridge: Plugin<BridgeConfig> = {
   async apply(ctx: Context, config: BridgeConfig = {}) {
     const as = config.actor ? ctx.intercept({ [META.actor]: config.actor }) : ctx;
     const streams = new Map<string, { res: ServerResponse; watches: Map<number, Dispose> }>();
+    // Keys served besides the core's, each by the plugin that handed it over (bridge.serve).
+    const more = new Map<string, { cap: Record<string, unknown>; sync?: string }>();
+    ctx.provide(SERVE, (_caller, from): BridgeServe => ({
+      serve: (key, cap, sync) => {
+        if ((KEYS as readonly string[]).includes(key) || more.has(key)) throw new Error(`${key} is served already`);
+        return from.effect(() => {
+          more.set(key, { cap: cap as Record<string, unknown>, ...(sync ? { sync } : {}) });
+          return () => void more.delete(key);
+        });
+      },
+    }));
 
     const method = (key: string, name: string, from: Context = as): ((...a: unknown[]) => unknown) => {
-      if (!(KEYS as readonly string[]).includes(key)) throw new Error(`${key} is not served`);
-      const cap = from.get<Record<string, unknown>>(key);
+      const served = more.get(key)?.cap;
+      if (!served && !(KEYS as readonly string[]).includes(key)) throw new Error(`${key} is not served`);
+      const cap = served ?? from.get<Record<string, unknown>>(key);
       const fn = Object.hasOwn(cap, name) ? cap[name] : undefined;
       if (typeof fn !== "function") throw new Error(`${key} has no method ${name}`);
       return fn as (...a: unknown[]) => unknown;
@@ -124,7 +148,11 @@ const bridge: Plugin<BridgeConfig> = {
       if (req.method === "OPTIONS") return res.writeHead(204).end();
       const path = (req.url ?? "/").split("?")[0];
       try {
-        if (req.method === "GET" && path === "/caps") return send(res, 200, { keys: KEYS, sync: SYNC });
+        if (req.method === "GET" && path === "/caps") {
+          const sync = { ...SYNC };
+          for (const [k, m] of more) if (m.sync) sync[k] = m.sync;
+          return send(res, 200, { keys: [...KEYS, ...more.keys()], sync });
+        }
         if (req.method === "GET" && path === "/events") {
           const id = Math.random().toString(36).slice(2);
           res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });

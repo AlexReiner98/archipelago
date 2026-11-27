@@ -93,6 +93,10 @@ names it and lists its entries, paths relative to it:
   plugins import, never a second copy. The folder's own `node_modules`
   (`npm install <this checkout>`, which links it) is only for its type
   check and its tests.
+- A server entry that says `"writes": true` (it writes files outside the
+  map's data, such as skills or settings) is off on a server that doesn't
+  write (`--no-write`, `npm run dev`). Each server entry whose config is an
+  object, or absent, is given the map's data folder as `config.data`.
 - A folder's page files are not watched: a change to one needs a reload.
 - No sandbox: a folder's plugins are trusted as this repository's are.
 

@@ -3,7 +3,7 @@
 Not a plugin: the shared writer that plugins use to put what is on the map
 into files that belong to someone else, a project's
 `.claude/settings.local.json`, its `.mcp.json`, git's exclude. Two writers
-use it: [lean](../lean/README.md)'s, for what a context filter leaves out,
+use it: [lean](https://github.com/AlexReiner98/archipelago-loop/blob/main/lean/README.md)'s, for what a context filter leaves out,
 and [connect](../connect/README.md)'s, for a connected folder's hooks and
 MCP server. Both can write into the same file, and neither touches the
 other's entries.

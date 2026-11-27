@@ -23,7 +23,7 @@ parent run ── call run (harness: "call", parent)
 
 It begins the run (`harness: "call"`, `parent`), reaches the places through
 `agent.run`, so what is said there is chosen as it is for an agent: nodes
-listening there, held back by gates (the [profile](../profile/README.md)
+listening there, held back by gates (the [profile](https://github.com/AlexReiner98/archipelago-loop/blob/main/profile/README.md)
 plugin's context filters), each say on the exchange. `ask` gets the run and what was
 said (`{node, text}`), sends it with its request, and answers `{text,
 subject?, usage?}`. The answer is a `reply` act at `reply_end`: its output
@@ -47,7 +47,7 @@ version, the call's run is begun again, a `decision` act by the person at
 `reply_end` is recorded (rejected: `ok: false`), and it ends again
 ([spec/agent.md](../../spec/agent.md), edition 11). A change of mind is
 recorded too; the same decision twice is not. The
-[verdict](../verdict/README.md) plugin judges every node said to the call by
+[verdict](https://github.com/AlexReiner98/archipelago-loop/blob/main/verdict/README.md) plugin judges every node said to the call by
 the last one: rejected fails them, accepted holds them. On load, the newest
 200 runs' calls are followed again.
 
@@ -57,7 +57,7 @@ the last one: rejected fails them, accepted holds them. On load, the newest
 
 ## In the window
 
-The [context](../context/README.md) plugin counts a call's subject as a
+The [context](https://github.com/AlexReiner98/archipelago-loop/blob/main/context/README.md) plugin counts a call's subject as a
 source of its own (`subject`, one part per type, its tokens as given), and,
 with no transcript, the answer's `usage` as the model's own total.
 A [typed call](https://github.com/AlexReiner98/archipelago-apps/blob/main/typed/README.md) (in archipelago-apps) is a call whose answer is held to the

@@ -26,13 +26,15 @@ https://github.com/user-attachments/assets/33d78d55-55c4-43cb-be13-d03aef9581a8
 A base to build on: model a domain as types, then add the views and tools
 that work on it. Each of these is a plugin on the same map:
 
-- **The Context interface**: each Claude Code session, live or replayed, on
-  the tree of what the map told it, where, by which plugin, and whether it
-  worked.
-- **Context filters**: an item on the map that decides what a session is
-  told. A session joins one by its match rule, such as `cwd:*landing-page`.
 - **Plans, decisions and rules**: kept as items and links you and your agents
   both read and change.
+- **The shared plan**: agents working on one repository hold the files
+  they write, and wait for each other, on the map.
+- **The learning loop** ([archipelago-loop](https://github.com/AlexReiner98/archipelago-loop)), a plugin folder of its
+  own: the Context interface (each Claude Code session, live or replayed, on
+  the tree of what the map told it, where, and whether it worked), context
+  filters that decide what a session is told, and the nodes that grow and
+  retire from what worked.
 
 More is coming over the next weeks, built on the map in the open.
 
@@ -118,8 +120,9 @@ claude --settings plugins/claude-code/settings.json --mcp-config plugins/claude-
 ```
 
 Either way, its hooks report each prompt, tool call and answer, and its MCP server gives
-the agent the map's tools. Open **the Context interface** to watch the run
-live, and give the session something to plan:
+the agent the map's tools. Activity shows the run live (with the
+[learning loop](https://github.com/AlexReiner98/archipelago-loop) loaded, the Context interface shows what it was told
+too). Give the session something to plan:
 
 > Plan the next release of this project on the map: each step an item,
 > linked in the order they depend on each other.
@@ -137,13 +140,11 @@ and the MCP server to your user config
   `127.0.0.1`, and the server calls nothing outside it: no telemetry, no
   account.
 - The map is kept in `app/.data/`. Delete that folder and the map is gone.
-- A file outside it is written only once you put it on the map: a skill
-  or memory file adopted onto the map is written from its words from then
-  on (and goes back as it was when the plugin that writes it unloads), and
-  a context filter's `leave_out` goes into its runs'
-  `<folder>/.claude/settings.local.json`, and a folder connected from the
-  page gets the map's hooks and MCP server in its `.claude/settings.local.json`
-  and `.mcp.json`, kept out of git. Each is taken out again, leaving what
+- A file outside it is written only once you put it on the map: a folder
+  connected from the page gets the map's hooks and MCP server in its
+  `.claude/settings.local.json` and `.mcp.json`, kept out of git (the
+  [learning loop](https://github.com/AlexReiner98/archipelago-loop), when loaded, also writes the skill and memory
+  files adopted onto the map, and what a context filter leaves out). Each is taken out again, leaving what
   was there, when it is undone or the server shuts down (Ctrl+C). `npm run dev` writes
   none of them.
 - Connecting every session adds Archipelago's hooks to
@@ -167,8 +168,8 @@ plugin.
 
 ## Status
 
-Early. The graph, its plugins and the **Context interface** for Claude Code
-are the first build. More plugins follow in the open, each a new thing built
+Early. The graph and its plugins are the first build; the **Context
+interface** for Claude Code is in the [learning loop](https://github.com/AlexReiner98/archipelago-loop). More plugins follow in the open, each a new thing built
 on the same map.
 
 ## Contributing

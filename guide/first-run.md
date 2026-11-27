@@ -30,7 +30,9 @@ app made for one session, or a session's own worktree.
 ## Look around
 
 - The view picker at the top switches views: **Landscape** (the map, home),
-  **Context interface** (what is said to agents), **Plugins** and this **Guide**.
+  **Activity**, **Shared plan**, **Plugins** and this **Guide**. The
+  **Context interface** (what is said to agents) comes with the
+  learning loop (`archipelago-loop`), a plugin folder of its own.
 - Ctrl+K (⌘K) opens the find line from any view: type a view's name or an
   item's, and Enter goes to it.
 - Nothing is locked. Every change is an action, and `history.undo` takes
@@ -56,7 +58,9 @@ by the map, and asks you to restart it with them.
 
 The session's hooks report each prompt, tool call and answer to the
 adapter, and its MCP server gives the agent the map's tools. Open
-**Context interface**: the run appears live, with what the map said and where.
+**Activity**: the run appears live, with what it changed. With the
+learning loop (`archipelago-loop`) loaded, the **Context interface** shows what the map
+said to it and where.
 [plugins/claude-code/README.md](../plugins/claude-code/README.md) has the
 details, and how to report every session.
 

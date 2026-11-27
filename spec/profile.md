@@ -8,6 +8,11 @@ Edition 5 (20 Nov 2026); `profile.hears` edition 11 (25 Nov 2026). The spec owns
 plugin that keeps profiles can be replaced. What a profile is on the map,
 how it matches and how it holds nodes are that plugin's.
 
+The plugin that keeps them is the learning loop's
+([archipelago-loop](https://github.com/AlexReiner98/archipelago-loop/blob/main/profile/README.md)), a plugin folder
+of its own since 27 Nov 2026. Without it, nothing provides these keys, and
+what injects them waits.
+
 ## Capability
 
 | Key | Gives |

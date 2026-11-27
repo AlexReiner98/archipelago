@@ -7,7 +7,6 @@ import { Loader, type Entry } from "../runtime/loader.ts";
 import agent from "../plugins/agent/index.ts";
 import exchange from "../plugins/exchange/index.ts";
 import graph from "../plugins/graph/index.ts";
-import verdict, { type VerdictRead } from "../plugins/verdict/index.ts";
 import scripted, { eventsOf, playAs, scriptOf, type ScriptedPlay, type Script } from "../plugins/scripted/index.ts";
 
 const T = (s: number) => `2026-11-24T10:00:${String(s).padStart(2, "0")}.000Z`;
@@ -32,7 +31,7 @@ const nodesPlugin = (id: string): Plugin<{ nodes: NodeSpec[] }> => ({
   },
 });
 
-const probe: Plugin = { id: "probe", inject: ["agent.run", "exchange.read", "verdict.read", "scripted.play"], apply() {} };
+const probe: Plugin = { id: "probe", inject: ["agent.run", "exchange.read", "scripted.play"], apply() {} };
 
 const NODES: NodeSpec[] = [
   { name: "brief", at: ["session_start"], say: "Read the brief." },
@@ -47,7 +46,7 @@ async function setup(extra: NodeSpec[] = []) {
   rt.onError = (_f, e) => errors.push(e);
   const modules: Record<string, Plugin<any>> = {
     "graph.ts": graph, "exchange.ts": exchange, "agent.ts": agent, "nodes.ts": nodesPlugin("nodes"), "later.ts": nodesPlugin("later"),
-    "verdict.ts": verdict, "scripted.ts": scripted, "probe.ts": probe,
+    "scripted.ts": scripted, "probe.ts": probe,
   };
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   const entries = (more: NodeSpec[]): Entry[] => [
@@ -56,7 +55,6 @@ async function setup(extra: NodeSpec[] = []) {
     { id: "agent", plugin: "agent.ts" },
     { id: "nodes", plugin: "nodes.ts", config: { nodes: NODES } },
     ...(more.length ? [{ id: "later", plugin: "later.ts", config: { nodes: more } }] : []),
-    { id: "verdict", plugin: "verdict.ts" },
     { id: "scripted", plugin: "scripted.ts" },
     { id: "probe", plugin: "probe.ts" },
   ];
@@ -66,7 +64,6 @@ async function setup(extra: NodeSpec[] = []) {
     loader, errors, entries, p,
     play: () => p().get<ScriptedPlay>("scripted.play"),
     read: () => p().get<ExchangeRead>("exchange.read"),
-    verdicts: () => p().get<VerdictRead>("verdict.read"),
   };
 }
 
@@ -86,8 +83,9 @@ const SCRIPT: Script = {
 /** An event without what a replay changes: its id, run and seq. */
 const shape = (e: ExchangeEvent) => [e.kind, e.place ?? "", e.node ?? "", e.text ?? "", e.act ? JSON.stringify(e.act) : ""].join(" | ");
 
-test("a script plays a whole run on agent.run: what was said, refused and judged comes out", async () => {
-  const { errors, play, read, verdicts } = await setup();
+// How the played runs are judged is the learning loop's verdict (archipelago-loop, test/verdict-scripted.test.ts).
+test("a script plays a whole run on agent.run: what was said and refused comes out", async () => {
+  const { errors, play, read } = await setup();
   const played = await play().play(SCRIPT, { run: "s1" });
 
   assert.equal(played.info.harness, "scripted");
@@ -114,8 +112,6 @@ test("a script plays a whole run on agent.run: what was said, refused and judged
   assert.deepEqual([denied.act!.ok, denied.act!.output], [false, { refused: "nodes/curl", text: "Use the change tool, not curl." }]);
   assert.equal(events.find((e) => e.kind === "act" && e.place === "prompt")!.act!.by, "person");
 
-  const v = await verdicts().run("s1");
-  assert.deepEqual(v.map((x) => [x.node, x.verdict]), [["nodes/brief", "quiet"], ["nodes/trap", "failed"], ["nodes/curl", "held"], ["nodes/check", "quiet"]]);
   assert.deepEqual(errors, []);
 });
 
@@ -179,7 +175,7 @@ test("scriptOf rebuilds the quiet reaches of a run the Claude Code adapter recor
 });
 
 test("a played run, replayed, records the same exchange under a new run", async () => {
-  const { errors, play, read, verdicts } = await setup();
+  const { errors, play, read } = await setup();
   await play().play(SCRIPT, { run: "s1" });
   const replay = await play().replay("s1", { run: "s1-replay" });
   assert.equal(replay.info.title, "Replay of Edit a page");
@@ -188,10 +184,6 @@ test("a played run, replayed, records the same exchange under a new run", async 
   const [was, now] = await Promise.all([eventsOf(read(), "s1"), eventsOf(read(), "s1-replay")]);
   const body = (es: ExchangeEvent[]) => es.filter((e) => e.kind !== "begin" && e.kind !== "end").map(shape);
   assert.deepEqual(body(now), body(was));
-  assert.deepEqual(
-    (await verdicts().run("s1-replay")).map((x) => [x.node, x.verdict]),
-    (await verdicts().run("s1")).map((x) => [x.node, x.verdict]),
-  );
   // Replaying the replay changes nothing either.
   await play().replay("s1-replay", { run: "s1-again" });
   assert.deepEqual(body(await eventsOf(read(), "s1-again")), body(was));
@@ -199,18 +191,16 @@ test("a played run, replayed, records the same exchange under a new run", async 
   assert.deepEqual(errors, []);
 });
 
-test("a recorded run replayed with a node added since: it is heard where the run went quiet, and judged", async () => {
+test("a recorded run replayed with a node added since: it is heard where the run went quiet", async () => {
   const first = await setup();
   await first.play().play(SCRIPT, { run: "s1" });
   const recorded = await eventsOf(first.read(), "s1");
   await first.loader.apply([]);
 
   // Another map, with a node at the Write's file, where nothing spoke in the recorded run.
-  const { errors, p, read, verdicts } = await setup([{ name: "docs", at: ["file:docs/*.md"], say: "The docs folder is read only here." }]);
+  const { errors, p, read } = await setup([{ name: "docs", at: ["file:docs/*.md"], say: "The docs folder is read only here." }]);
   const played = await playAs(p(), scriptOf(recorded), { run: "r2" });
   assert.deepEqual(played.said.find((s) => s.node === "later/docs")?.places, ["tool:Write", "file:docs/a.md"]);
-  const v = await verdicts().run("r2");
-  assert.equal(v.find((x) => x.node === "later/docs")?.verdict, "failed", "the Write still failed after it was said");
   // The recorded acts are played as they were.
   const acts = (es: ExchangeEvent[]) => es.filter((e) => e.kind === "act").map((e) => [e.place, e.time, JSON.stringify(e.act)]);
   assert.deepEqual(acts((await read().events("r2")).items), acts(recorded));

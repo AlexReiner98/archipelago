@@ -9,7 +9,7 @@ reflex's condition) speaks only when the moment's input holds that text.
 ## Any item, through its context filter link
 
 Any item, of any type, is said like a node when an `in_context_filter` link (the
-[profile](../profile/README.md) plugin's) gives it places. The link is the
+[profile](https://github.com/AlexReiner98/archipelago-loop/blob/main/profile/README.md) plugin's) gives it places. The link is the
 node's `source`, and its name: `words/<link id>`. It says the item's
 `words`, or else its `note`, under the item's title. Its kind is how
 it is said, the link's `kind` (`instruction`: standing), else what the item
@@ -63,7 +63,7 @@ itself isn't told as a retirement. A node heard at the same moment the change no
 
 A node whose item has `held` (a reason) is held as written: `words.set`,
 `words.title` and `words.retire` refuse it, with the reason (`words.held`). The
-[written](../written/README.md) plugin sets it for the files the map writes.
+[written](https://github.com/AlexReiner98/archipelago-loop/blob/main/written/README.md) plugin sets it for the files the map writes.
 
 `config.seed` lists nodes made through `words.add` when the graph has none.
 Injects `graph.read`, `graph.watch`, `agent.node`, `action.register`,
