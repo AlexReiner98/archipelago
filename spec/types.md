@@ -61,6 +61,32 @@ a loop (`schema.cycle`, naming the loop). Only what a set touches is
 judged: a loop already on the graph is refused once a set changes one of
 its links, not before. A kind stays held while any plugin holds it.
 
+## Fitting a new idea
+
+How a plugin puts a new idea on the map without a new base or a new kind
+of field (decided 27 Nov 2026, on a reciprocal-frame solver that fit
+without either). The words plugin's seed says these where a run writes a
+plugin (`app/tree.ts`, "A new idea fits the schema").
+
+- **A base by behaviour.** A thing in a model or a design (a point, a
+  beam, a part) is a record: current until superseded. A new base is for
+  new statuses, and that is the spec owner's call.
+- **A field before a flavour.** `kind` on the base first; a flavour, on
+  trial, once the idea needs fields of its own.
+- **A relation is a kind of link**, with a few fields of its own if it
+  needs them (a beam's diameter). A grouping is `part_of`, never a field.
+  An order or a tree is an acyclic kind (`types.acyclic`).
+- **Geometry is `json`**, its shape and unit in the field's `doc` (a point
+  `[x,y,z]` in cm), not a new kind of field.
+- **The graph holds what was chosen, not what was computed.** Inputs and
+  decisions are items. A solve, a layout or a simulation is rebuilt from
+  them, or kept as one record `about` its input that the next one
+  supersedes; never an item per particle or per frame.
+- **Every write is a declared action** (`items.create`, `items.set`,
+  `items.link`), so it is journaled and undone like any other, and every
+  read is bounded. `schema.check {facts}` says whether facts fit before
+  they are sent.
+
 ## Names
 
 Type names are unprefixed (`work`, `part_of`), so data moved from another
