@@ -93,6 +93,7 @@ const STYLE = sheet(`
 .sp-held td { padding:3px 14px 3px 0; vertical-align:top; }
 .sp-held td.sp-file { font-family:var(--mono, monospace); font-size:var(--text-s, 12px); }
 .sp-chip { display:inline-block; margin-right:8px; white-space:nowrap; }
+.sp-unheard { opacity:.65; font-style:italic; }
 .sp-line { padding:2px 0; font-size:var(--text-s, 12px); }
 .sp-dim { color:var(--dim); }
 .sp-empty { color:var(--dim); max-width:62ch; line-height:1.5; }
@@ -264,7 +265,9 @@ const plugin: Plugin = {
       const files = [...new Set([...holds.map((x) => x.file), ...waits.flatMap((w) => w.files)])].sort();
       if (!files.length) return null;
       const chip = (x: Hold) =>
-        html`<span class="sp-chip" style=${{ color: hue(x.run) }} title=${x.how === "claimed" ? `claimed${x.intent ? `: ${x.intent}` : ""}` : "held on its first write"}>${x.how === "claimed" ? "●" : "○"} ${x.title}</span>`;
+        x.unheard
+          ? html`<span class="sp-chip sp-unheard" style=${{ color: hue(x.run) }} title=${`claimed${x.intent ? `: ${x.intent}` : ""}. The map has not heard from this run since it restarted: the hold ends on its own, and any agent may end it now (claim.release)`}>◍ ${x.title} · not heard since restart</span>`
+          : html`<span class="sp-chip" style=${{ color: hue(x.run) }} title=${x.how === "claimed" ? `claimed${x.intent ? `: ${x.intent}` : ""}` : "held on its first write"}>${x.how === "claimed" ? "●" : "○"} ${x.title}</span>`;
       return html`<div class="sp-h">Held now</div>
         <table class="sp-held"><tbody>${files.map(
           (f) =>

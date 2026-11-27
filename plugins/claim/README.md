@@ -55,8 +55,8 @@ shows it on the run that was turned away.
 | Action | Input | Does |
 |---|---|---|
 | `claim.take` | `files` (≤ 50; a folder ends in `/`), `intent`, `wait_s?` (≤ 25) | Puts an intent on the plan (the run's open intent with the same words grows instead). When another run holds any of the files: with `wait_s`, waits that long for them, queued, then claims and `depends_on` what it waited for, answering `merge: [branch]` when that was in another checkout; else, or still held, refused, writing nothing |
-| `claim.drop` | `files?` | Lets go of those, or of all; an intent left with no files is done or dropped |
-| `claim.release` | `run` | Marks a run's open intents done. The plugin calls it when a run's reply ends, or the run ends or goes quiet; a run may call it for itself only |
+| `claim.drop` | `files?` | Lets go of those, or of all; an intent left with no files is done or dropped. A run the server has not heard from since it restarted still drops its own |
+| `claim.release` | `run` | Marks a run's open intents done. The plugin calls it when a run's reply ends, or the run ends, goes quiet or stays unheard; a run may call it for itself, and for another run only when that one is not live (unheard or quiet), else `claim.not_yours` |
 
 An agent calls them through the MCP `act` tool. Only a call from a run can
 claim.
@@ -116,7 +116,7 @@ minutes apart (a tab per round, the latest first).
   who finished, and who got the files and built on whose work (told to
   `git merge` its branch first). A new line flashes as it comes in.
 - Under it, **Held now**, file by file (● claimed, ○ held on its first
-  write, ◌ waiting).
+  write, ◌ waiting, ◍ claimed by a run not heard since the map restarted).
 
 The page key `claim.plan` holds the same data for any other look or query.
 
@@ -129,6 +129,21 @@ A turn: it goes when the run's reply ends (`reply_end`), when the run ends
 or has been quiet for `quiet_min` minutes (15, as a session counts as live),
 or when the run drops it. The intent stays on the map, done or dropped, as
 the plan's record, and a next turn claims again.
+
+### After a restart
+
+The runs a server hears live in its memory; the intents are on the map. A
+server that restarts finds intents still `doing` from runs it has not heard
+yet. A run that is still working is heard again at its next step (a
+prompt, a tool call on a file, a reply's end) and keeps its holds. One that
+is not heard within `unheard_s` (120 s, from the later of its claim and the
+server's start) lets go on its own, its intents done. Until then its holds
+are marked `unheard`: the plan an agent hears and a refusal say so and name
+`claim.release {"run": …}`, which any run may call for a run that is not
+live, and **Held now** shows them as ◍. A run that was not heard still drops
+its own claims with `claim.drop`. A release that fails (the map did not
+answer) is tried again at the next expiry instead of leaving the hold for
+good.
 
 A turn, not a session: a session in the desktop app stays open for hours,
 and a hold for its life would turn every other agent on the repository away
@@ -144,6 +159,7 @@ claims.
 |---|---|---|
 | `by` | `repo` | What two runs share: their repository (the `remote` fact), so worktrees and clones of one repository share one plan; a run with no remote shares its folder. `folder`: only the folder |
 | `quiet_min` | 15 | Minutes quiet before a run's holds go |
+| `unheard_s` | 120 | Seconds a run this server has not heard from (since a restart) keeps its holds |
 
 ## Files outside the repository
 

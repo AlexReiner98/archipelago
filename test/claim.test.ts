@@ -31,16 +31,24 @@ async function boot(withClaim: boolean) {
   const modules: Record<string, Plugin> = { graph, action, types, work, links, items, exchange, agent, claim, probe, reader };
   const BASE = "mem:/plugins/";
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
-  const ids = ["graph", "action", "types", "work", "links", "items", "exchange", "agent", ...(withClaim ? ["claim", "reader"] : []), "probe"];
-  await loader.apply(ids.map((id): Entry => ({ id, plugin: id })));
+  const tree = (on: boolean, config?: unknown) =>
+    ["graph", "action", "types", "work", "links", "items", "exchange", "agent", ...(on ? ["claim", "reader"] : []), "probe"].map((id): Entry => ({ id, plugin: id, ...(id === "claim" && config ? { config } : {}) }));
+  await loader.apply(tree(withClaim));
   await rt.settle();
+  /** The server restarts: the claim plugin comes back knowing no run, while the map keeps its intents. */
+  const restart = async (config?: unknown) => {
+    await loader.apply(tree(false));
+    await rt.settle();
+    await loader.apply(tree(true, config));
+    await rt.settle();
+  };
   const as = (run: string) => {
     const ctx = loader.fiber("probe")!.ctx.intercept({ actor: { id: `e_${run}`, kind: "agent" }, run });
     return { run: ctx.get<AgentRun>("agent.run"), invoke: ctx.get<ActionInvoke>("action.invoke") };
   };
   const plan = () => loader.fiber("reader")!.ctx.get<ClaimRead>("claim.read").plan();
   const read = () => loader.fiber("reader")!.ctx.get<GraphRead>("graph.read");
-  return { loader, errors, as, plan, graph: read };
+  return { loader, errors, as, plan, graph: read, restart };
 }
 
 /** One agent of the two: begins, and plays its calls one at a time so the test can interleave them. */
@@ -158,6 +166,71 @@ test("a claim taken first keeps the other agent out before it writes anything, a
   assert.ok((await b.take(["src/app.ts"], "add farewell")).ok);
   const plan = env.plan();
   assert.deepEqual(plan.holds.map((h) => [h.run, h.file, h.how]).sort(), [["run-a", "README.md", "claimed"], ["run-b", "docs/notes.md", "on_write"], ["run-b", "src/app.ts", "claimed"]]);
+  assert.deepEqual(env.errors, []);
+  await env.loader.apply([]);
+});
+
+test("after a restart, a run the map has not heard from can still drop its own claims", async () => {
+  const env = await boot(true);
+  const a = agentOf(env, "run-a", "Rename greet");
+  await a.begin();
+  assert.ok((await a.take(["src/greet.ts"], "rename greet")).ok);
+  await env.restart();
+  // The intent is still open on the map, from a run this server has not heard.
+  assert.deepEqual(env.plan().holds.map((h) => [h.run, h.file, h.unheard]), [["run-a", "src/greet.ts", true]]);
+  const dropped = await a.drop();
+  assert.ok(dropped.ok, JSON.stringify(dropped));
+  assert.deepEqual(env.plan().holds, []);
+  assert.deepEqual(env.errors, []);
+  await env.loader.apply([]);
+});
+
+test("after a restart, holds of a run the map does not hear again end on their own; one heard again keeps them", async () => {
+  const env = await boot(true);
+  const a = agentOf(env, "run-a", "Rename greet");
+  const b = agentOf(env, "run-b", "Add farewell");
+  const c = agentOf(env, "run-c", "Fix docs");
+  await a.begin();
+  await c.begin();
+  assert.ok((await a.take(["src/greet.ts"], "rename greet")).ok);
+  assert.ok((await c.take(["README.md"], "fix docs")).ok);
+  await env.restart({ unheard_s: 0.2 });
+  // B starts after the restart and hears A's hold as unheard, with how to end it.
+  await b.begin();
+  await b.prompt("Add a farewell");
+  assert.ok(b.heard.some((t) => t.includes("- Rename greet: src/greet.ts (rename greet) [not heard since the map restarted")));
+  const refused = await b.take(["src/greet.ts"], "add farewell");
+  assert.ok(!refused.ok && refused.refused.message.includes(`claim.release {"run": "run-a"}`));
+  // C is heard again (its next step): it keeps its hold. A is not.
+  await c.prompt("Carry on");
+  await new Promise((ok) => setTimeout(ok, 300));
+  env.plan(); // a read lets unheard holds go
+  await new Promise((ok) => setTimeout(ok, 20));
+  assert.deepEqual(env.plan().holds.map((h) => [h.run, h.file]), [["run-c", "README.md"]]);
+  assert.ok((await b.take(["src/greet.ts"], "add farewell")).ok);
+  const intents = await env.graph().of("intent", { limit: 10 });
+  assert.deepEqual(intents.items.map((i) => [i.fields.run, i.fields.status]).sort(), [["run-a", "done"], ["run-b", "doing"], ["run-c", "doing"]]);
+  assert.deepEqual(env.errors, []);
+  await env.loader.apply([]);
+});
+
+test("any run can end the claims of a run that is not live, never of a live one", async () => {
+  const env = await boot(true);
+  const a = agentOf(env, "run-a", "Rename greet");
+  const b = agentOf(env, "run-b", "Add farewell");
+  await a.begin();
+  assert.ok((await a.take(["src/greet.ts"], "rename greet")).ok);
+  await b.begin();
+  const release = () => b.invoke.invoke({ action: "claim.release", input: { run: "run-a" }, authority: { of: "agent", basis: "test" }, reason: "test" });
+  // A is live: B is refused.
+  const live = await release();
+  assert.ok(!live.ok && live.refused.code === "claim.not_yours");
+  await env.restart();
+  await b.prompt("Add a farewell");
+  // A is not heard since the restart: B may end its claim.
+  const ended = await release();
+  assert.ok(ended.ok, JSON.stringify(ended));
+  assert.deepEqual(env.plan().holds, []);
   assert.deepEqual(env.errors, []);
   await env.loader.apply([]);
 });

@@ -34,6 +34,8 @@ export interface Hold {
   where?: string;
   /** The intent on the map this hold is part of; none for a hold on first write. */
   item?: Id;
+  /** Its run has not been heard by this server (it restarted since the claim): the hold goes on its own soon, and anyone may end it. */
+  unheard?: true;
 }
 
 /** A write turned away because another run held the file. */
@@ -177,7 +179,8 @@ export function planWords(holds: Hold[], scope: string, run: string, cwd?: strin
   const lines = [...others.values()].map((hs) => {
     const intents = [...new Set(hs.map((h) => h.intent).filter(Boolean))];
     const on = hs[0]!.branch ? ` on branch ${hs[0]!.branch}` : "";
-    return `- ${hs[0]!.title}${on}: ${hs.map((h) => h.file).join(", ")}${intents.length ? ` (${intents.join("; ")})` : ""}`;
+    const unheard = hs[0]!.unheard ? ` [not heard since the map restarted: it ends on its own, or act claim.release {"run": "${hs[0]!.run}"}]` : "";
+    return `- ${hs[0]!.title}${on}: ${hs.map((h) => h.file).join(", ")}${intents.length ? ` (${intents.join("; ")})` : ""}${unheard}`;
   });
   return `Other agents are working in this ${scope.startsWith(REPO) ? "repository" : "folder"} now. The shared plan, what each holds:\n${lines.join("\n")}\nDon't edit those files; pick work that doesn't touch them, or say what you need from them.`;
 }

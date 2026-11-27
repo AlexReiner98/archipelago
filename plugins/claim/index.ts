@@ -57,6 +57,8 @@ export const QUIET_MIN = 15;
 
 /** The longest one claim.take waits for a held file, in seconds: under a harness's tool call timeout, so the agent sees the answer and can call again. */
 export const WAIT_MAX = 25;
+/** Seconds a run this server has not heard from keeps its holds (a hold left on the map by a server that restarted): counted from the later of its claim and the server's start. A live run is heard again at its next step. */
+export const UNHEARD_S = 120;
 const WAKE_MS = 5_000;
 
 /** Intents kept to show, per plan: the open ones and the latest closed. */
@@ -105,6 +107,8 @@ export interface ClaimConfig {
   by?: "folder" | "repo";
   /** Minutes quiet before a run's holds go. */
   quiet_min?: number;
+  /** Seconds a run this server has not heard from keeps its holds. */
+  unheard_s?: number;
 }
 
 const newId = () => `i_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -125,6 +129,9 @@ const claim: Plugin<ClaimConfig> = {
     const invoke = ctx.get<ActionInvoke>("action.invoke");
 
     const quietMs = (config.quiet_min ?? QUIET_MIN) * 60_000;
+    const unheardMs = (config.unheard_s ?? UNHEARD_S) * 1000;
+    // A server that restarts knows no run: the open intents on the map are from runs it has yet to hear.
+    const started = Date.now();
     const runs = new Map<string, { info: RunInfo; last: number }>();
     /** Plans by scope, and the intents to show: the map's, as last read or written. */
     const plans = new Map<string, { id: Id; title: string }>();
@@ -147,7 +154,8 @@ const claim: Plugin<ClaimConfig> = {
       const out: Hold[] = [];
       for (const i of intents.values()) {
         if (i.status !== "doing") continue;
-        for (const file of i.files) out.push({ scope: i.scope, file, run: i.run, title: i.agent, intent: i.title, how: "claimed", since: i.since, ...(i.branch ? { branch: i.branch } : {}), ...(i.folder ? { where: i.folder } : {}), item: i.id });
+        const unheard = !runs.has(i.run);
+        for (const file of i.files) out.push({ scope: i.scope, file, run: i.run, title: i.agent, intent: i.title, how: "claimed", since: i.since, ...(i.branch ? { branch: i.branch } : {}), ...(i.folder ? { where: i.folder } : {}), item: i.id, ...(unheard ? { unheard: true as const } : {}) });
       }
       return [...out, ...loose];
     };
@@ -201,6 +209,9 @@ const claim: Plugin<ClaimConfig> = {
       other.branch && norm(other.where ?? "") !== norm(r.cwd ?? "")
         ? ` They work in another checkout, on branch ${other.branch}: their change reaches yours only by merge. Once they let go, run \`git merge ${other.branch}\` before you edit, so your work builds on theirs.`
         : "";
+    /** Words for a hold whose run this server has not heard from: it goes on its own, or anyone ends it now. */
+    const unheardWords = (h: Hold) =>
+      h.unheard ? ` The map has not heard from that run since it restarted: its holds go on their own within ${Math.round(unheardMs / 1000)} s, or end them now with act claim.release {"run": "${h.run}"}.` : "";
     const seen = (r: RunInfo) => {
       const had = runs.get(r.run);
       runs.set(r.run, { info: r, last: Date.now() });
@@ -225,16 +236,22 @@ const claim: Plugin<ClaimConfig> = {
         releasing.add(run);
         void invoke
           .invoke({ action: "claim.release", input: { run }, authority: { of: "agent", basis: "the run ended or went quiet" }, reason: "A run's claims end with it" })
-          // Once per run: a refusal leaves its intents open on the map, where a person can close them.
-          .then((out) => void (out.ok && releasing.delete(run)))
-          .catch(() => undefined);
+          // Tried again at the next expiry when it failed: a hold the map could not close is not left for good.
+          .catch(() => undefined)
+          .finally(() => releasing.delete(run));
       } else if (loose.length !== before) changed();
     };
-    // Runs that went quiet let go, each time the plan is read; so do intents of runs this server never saw, once quiet that long.
+    // Runs that went quiet let go, each time the plan is read. So do the intents of runs this server has not heard from
+    // (left open on the map by a server that restarted), once unheard that long after the claim and the server's start.
     const expire = () => {
       const now = Date.now();
       for (const [run, r] of runs) if (now - r.last > quietMs) (runs.delete(run), told.delete(run), release(run));
-      for (const i of intents.values()) if (i.status === "doing" && !runs.has(i.run) && now - Date.parse(i.since) > quietMs) release(i.run);
+      for (const i of intents.values()) if (i.status === "doing" && !runs.has(i.run) && now - Math.max(Date.parse(i.since) || 0, started) > unheardMs) release(i.run);
+    };
+    /** A run is live while this server hears it: seen, and not quiet. */
+    const live = (run: string) => {
+      const r = runs.get(run);
+      return !!r && Date.now() - r.last <= quietMs;
     };
     const holdLoose = (r: RunInfo, file: string) => {
       const branch = branchOf(r);
@@ -354,7 +371,7 @@ const claim: Plugin<ClaimConfig> = {
           turned = [{ scope, file, run: run.run, title: runName(run), holder: other.run, holder_title: other.title, intent: other.intent, tool, time: m.time }, ...turned].slice(0, TURNED_KEEP);
           changed();
           return {
-            refuse: `${other.title} holds ${file}${other.intent ? ` (${other.intent})` : ""}. The shared plan gives it to them while they work. To wait for it, act claim.take {"files": ["${file}", …every other file you will change], "intent": "…", "wait_s": ${WAIT_MAX}}: it answers once they let go (call it again while it says they still hold it), then re-read the file, since it changed.${mergeWords(run, other)} Or pick work that doesn't touch it.`,
+            refuse: `${other.title} holds ${file}${other.intent ? ` (${other.intent})` : ""}.${unheardWords(other)} The shared plan gives it to them while they work. To wait for it, act claim.take {"files": ["${file}", …every other file you will change], "intent": "…", "wait_s": ${WAIT_MAX}}: it answers once they let go (call it again while it says they still hold it), then re-read the file, since it changed.${mergeWords(run, other)} Or pick work that doesn't touch it.`,
             code: "claim.held",
           };
         }
@@ -395,6 +412,13 @@ const claim: Plugin<ClaimConfig> = {
       if (!r) throw new Refused({ code: "claim.no_run", message: "Only an agent in a run can hold files: call this from a session the map knows.", by: { plugin: "claim" } });
       r.last = Date.now();
       return r.info;
+    };
+    /** The run that calls, to let go: one this server has not heard from yet (it restarted since the claim) still lets go of its own intents, by their folder. */
+    const ownerOf = (call: ActionContext): { run: string; cwd?: string } => {
+      const id = call.caller.run;
+      const open = id && !runs.has(id) ? [...intents.values()].find((i) => i.run === id && i.status === "doing") : undefined;
+      if (!id || !open) return runOf(call);
+      return { run: id, ...(open.folder ? { cwd: open.folder } : {}) };
     };
     const openOf = (run: string) => [...intents.values()].filter((i) => i.run === run && i.status === "doing");
     /** The facts that close an intent, and the view after. */
@@ -459,7 +483,7 @@ const claim: Plugin<ClaimConfig> = {
         if (clash) {
           throw new Refused({
             code: "claim.held",
-            message: `${clash.title} holds ${clash.file}${clash.intent ? ` (${clash.intent})` : ""}${input.wait_s ? `, still, after ${Math.round(input.wait_s)}s` : ""}. Call claim.take again with \`wait_s\` (up to ${WAIT_MAX}) to keep waiting, or claim other files.${mergeWords(r, clash)}`,
+            message: `${clash.title} holds ${clash.file}${clash.intent ? ` (${clash.intent})` : ""}${input.wait_s ? `, still, after ${Math.round(input.wait_s)}s` : ""}.${unheardWords(clash)} Call claim.take again with \`wait_s\` (up to ${WAIT_MAX}) to keep waiting, or claim other files.${mergeWords(r, clash)}`,
             by: { plugin: "claim" },
             detail: { holder: clash.run, file: clash.file },
           });
@@ -517,7 +541,7 @@ const claim: Plugin<ClaimConfig> = {
       doc: "Takes the files off the run's intents; an intent left with none is done when the run wrote any of them, else dropped.",
       input: { type: "object", properties: { files: { type: "array", items: { type: "string" }, maxItems: 50 } } },
       async run(input: { files?: string[] }, call) {
-        const r = runOf(call);
+        const r = ownerOf(call);
         const files = input.files?.map((f) => norm(f, r.cwd));
         const facts: Fact[] = [];
         const now = new Date().toISOString();
@@ -542,11 +566,11 @@ const claim: Plugin<ClaimConfig> = {
     reg.register({
       name: "claim.release",
       title: "A run's turn is over: its intents on the shared plan are done",
-      doc: "The claim plugin calls it when a run's reply ends, or the run ends or goes quiet. A run may call it for itself, never for another.",
+      doc: "The claim plugin calls it when a run's reply ends, or the run ends or goes quiet. A run may call it for itself, and for another only when that one is not live: unheard by this server (a hold left by a restart) or quiet.",
       input: { type: "object", required: ["run"], properties: { run: { type: "string" } } },
       async run(input: { run: string }, call) {
-        if (call.caller.run && call.caller.run !== input.run)
-          throw new Refused({ code: "claim.not_yours", message: "A run can end only its own claims: claim.drop lets go of yours.", by: { plugin: "claim" } });
+        if (call.caller.run && call.caller.run !== input.run && live(input.run))
+          throw new Refused({ code: "claim.not_yours", message: "That run is live: only it can end its claims. Wait for its files with claim.take and wait_s; claim.drop lets go of yours.", by: { plugin: "claim" } });
         const now = new Date().toISOString();
         const open = openOf(input.run);
         const facts = open.flatMap((i) => close(i, "done", now));
