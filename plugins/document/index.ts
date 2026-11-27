@@ -20,7 +20,7 @@ import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import { sheet } from "../../spec/style.ts";
 import type { FindIndex } from "../find/index.ts";
-import { mark } from "../map/marks.ts";
+import { mark } from "./marks.ts";
 import { inline, parse, type Block, type Span } from "../item/note.ts";
 import { outline, sections, workLine, type Node } from "./outline.ts";
 

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { headings, ordered, outline, restates, sections, workLine, type Node, type Row, type Source, type Wire } from "../plugins/document/outline.ts";
+import type { TypeInfo } from "../spec/types.ts";
+import { COMMON } from "../spec/types.ts";
+import { markToken, side } from "../plugins/document/marks.ts";
+import { MARKS } from "../plugins/style/tokens.ts";
 
 /** A small map: rows by id, links, and which rows are closed. */
 function map(rows: [string, string, string, string?, boolean?][], links: [string, string, string][]): Source {
@@ -59,4 +63,25 @@ test("work reads its first paragraph whole when its title is that paragraph cut 
   const first = "Run the import on a copy, check the counts per type and spot-check twenty notes.";
   assert.equal(workLine("Run the import on a copy, check the counts per type and…", `${first}\n\nMore.`), first);
   assert.equal(workLine("Finish phase one", "Current outline for phase one."), "Finish phase one");
+});
+
+test("marks come from the base and the status's side, never the type's name", () => {
+  const base = (name: string, open: string[], closed: string[]): TypeInfo => ({ name, base: name, statuses: { open, closed }, fields: COMMON, trial: false, plugin: name });
+  const TYPES = new Map([
+    ["work", base("work", ["todo", "doing"], ["done", "dropped"])],
+    ["question", base("question", ["open"], ["decided", "dropped"])],
+    ["bug", { ...base("work", ["todo", "doing"], ["done", "dropped"]), name: "bug", trial: true }],
+  ]);
+  const bases = { work: "square", question: "diamond", profile: "hexagon" } as const;
+  const w = TYPES.get("work")!;
+  const bug = TYPES.get("bug")!;
+  assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => side(w, s)), ["fresh", "moving", "done", "gone"]);
+  const drawn = (t: string) => MARKS[t as keyof typeof MARKS];
+  assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => markToken(bases, w, s)), ["glyph-square-fresh", "glyph-square-moving", "glyph-square-done", "glyph-square-gone"]);
+  assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => drawn(markToken(bases, w, s))), ['"□"', '"◧"', '"■"', '"■"'], "the style draws each side");
+  assert.equal(markToken(bases, bug, "done"), markToken(bases, w, "done"), "a flavour is marked as its base");
+  assert.equal(drawn(markToken(bases, TYPES.get("question")!, "open")), '"◇"');
+  // Edition 10: a base its plugin draws as a hexagon has the hexagon's letters.
+  assert.equal(markToken(bases, { ...w, name: "profile", base: "profile" }, "todo"), "glyph-hexagon-fresh");
+  assert.equal(drawn("glyph-hexagon-fresh"), '"⬡"');
 });
