@@ -7,7 +7,8 @@
  * never its tables' last thousand sets:
  *
  *   status of both ──▶ each one's log since the other last had it
- *     first run ──▶ join: both logs replayed, items paired by id or by
+ *     first run ──▶ join: both logs replayed (from a checkpoint where a log
+ *                   begins late), items paired by id or by
  *                   type and title, the kept side's fields where they differ
  *     after     ──▶ plugins' new items paired or copied; everyone else's
  *                   sets, ids swapped through the pairs ──▶ plan (merge.ts)
@@ -60,7 +61,7 @@ export interface Report {
   /** What both changed, with the item's title, and which side's change stayed. */
   conflicts: (Conflict & { title?: string })[];
   /** Sets the other map refused (its schema holds them): which, and why. */
-  refused: { to: Side; set: string; code: string; message: string }[];
+  refused: { to: Side; set: string; item?: Id; code: string; message: string }[];
   dry: boolean;
 }
 
@@ -84,12 +85,28 @@ interface Log {
   own: Committed[];
   read: number;
   cursor?: string;
+  /** A first read from a checkpoint: the whole map at its seq, the sets read coming after it. */
+  base?: Map<Id, Fields>;
 }
 
 /** A map's log after `cursor`, from its journal; refused where the log has a hole or doesn't reach back to the start. */
 async function logOf(end: End, name: string, peer: string, cursor?: string): Promise<Log> {
   const log: Log = { all: [], sets: [], own: [], read: 0 };
   let after = cursor;
+  if (!cursor) {
+    // A first read: from the first change, or else from the latest checkpoint and what came after it.
+    const peek = await output<{ items: Committed[]; checkpoint?: { seq: number } }>(end, "history.since", { limit: 1 });
+    if (peek.items[0] && peek.items[0].seq > 1 && peek.checkpoint) {
+      log.base = new Map();
+      let at: string | undefined;
+      do {
+        const page = await output<{ items: { id: Id; fields: Fields }[]; next?: string }>(end, "history.state", { limit: LIMIT_MAX, ...(at ? { after: at } : {}) });
+        for (const it of page.items) log.base.set(it.id, it.fields);
+        at = page.next;
+      } while (at);
+      after = String(peek.checkpoint.seq);
+    }
+  }
   for (;;) {
     const page = await output<{ items: Committed[]; next?: string; begins?: number }>(end, "history.since", { limit: LIMIT_MAX, ...(after ? { after } : {}) });
     if (!log.read && page.items.length) {
@@ -98,7 +115,7 @@ async function logOf(end: End, name: string, peer: string, cursor?: string): Pro
         throw new Error(
           after
             ? `${name}'s log jumps from ${after} to ${first}: what came between was folded or lost, so it can't be sent`
-            : `${name}'s log begins at ${first}, not at its first change: run history.verify there, and give it a log from the start before a first sync`,
+            : `${name}'s log begins at ${first}, not at its first change, and has no checkpoint: run history.checkpoint there before a first sync`,
         );
       }
     }
@@ -187,21 +204,33 @@ export async function syncMaps(a: End, b: End, opts: { dry?: boolean; keep?: Sid
     dry: !!opts.dry,
   };
   const apply = async (to: End, side: Side, writes: Write[], reason: string, authority: Authority, from: Status, set: string) => {
-    for (const chunk of chunks(writes)) {
-      if (!chunk.length) continue;
-      const r = await invoke<{ facts: number }>(to, "sync.apply", { writes: chunk as unknown as Json }, reason, authority, actorOf(from.id));
-      const mine = side === "a" ? report.b : report.a;
+    const mine = side === "a" ? report.b : report.a;
+    const send = (ws: Write[]) => invoke<{ facts: number }>(to, "sync.apply", { writes: ws as unknown as Json }, reason, authority, actorOf(from.id));
+    const sent = (r: Outcome<{ facts: number }>, item?: Id) => {
       if (r.ok) {
         mine.sent++;
         mine.facts += (r.output as { facts: number }).facts;
-      } else report.refused.push({ to: side, set, code: r.refused.code, message: r.refused.message });
+      } else report.refused.push({ to: side, set, ...(item ? { item } : {}), code: r.refused.code, message: r.refused.message });
+    };
+    for (const chunk of chunks(writes)) {
+      if (!chunk.length) continue;
+      const r = await send(chunk);
+      const ids = [...new Set(chunk.map((w) => w.id))];
+      if (r.ok || r.refused.code !== "schema.quarantined" || ids.length < 2) {
+        sent(r);
+        continue;
+      }
+      // One item that doesn't fit holds the whole set: stop holding it, and send each item alone, so only what doesn't fit is held.
+      const held = (r.refused.detail as { quarantine?: string } | undefined)?.quarantine;
+      if (held) await invoke(to, "schema.drop", { quarantine: held }, "sync: sent again an item at a time, so only what doesn't fit is held", RUN);
+      for (const id of ids) sent(await send(chunk.filter((w) => w.id === id)), id);
     }
   };
 
   if (!ca && !cb) {
     // The first run: both logs replayed whole, made one.
     const keep = opts.keep ?? "a";
-    const j = join(replay(la.all), replay(lb.all), keep);
+    const j = join(replay(la.all, la.base), replay(lb.all, lb.base), keep);
     for (const p of j.pairs) known(p[0], p[1]), fresh.push(p);
     report.joined = { same: j.same, differed: j.differed, kept: keep, copied: j.copied, ambiguous: j.ambiguous };
     if (!opts.dry) {

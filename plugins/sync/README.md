@@ -17,9 +17,10 @@ server's bridge by url, its token in `--token` or `ARCHIPELAGO_SYNC_TOKEN`
 The log is the truth (decided 27 Nov 2026, [history](../history/README.md)),
 so a map sends its log: the change sets in its journal after the cursor the
 other map last had (`history.since`), never the graph's last thousand. A
-log with a hole (folded, or lost) is refused, and so is a first sync from a
-log that doesn't reach back to the map's first change: `history.verify`
-says which.
+log with a hole (folded, or lost) is refused. A first sync reads a log
+from the map's first change, or, where its journal began late, from the
+checkpoint history keeps of the whole map (`history.state`) and the sets
+after it; a log with neither is refused, and `history.verify` says which.
 
 ```
 sync.status on both ──▶ each map's log since the other last had it
@@ -34,8 +35,10 @@ took it: its actor is `agent:sync/<the other map's id>`, its authority the
 first set's, its reason `From <map>: <the first reason>`. So the journal
 keeps it, the Activity view shows it, and `history.undo` takes it back. An
 undo is a change like any other, so it syncs too. Those copies are left out
-when the map sends its log back. A set the other map's schema refuses is
-held there (`schema.quarantined`) and named in the report.
+when the map sends its log back. Where the other map's schema refuses a set
+(`schema.quarantined`), the held set is dropped and its items are sent one
+at a time, so only the item that doesn't fit is held there; the report
+names each.
 
 ## The first run: a join
 

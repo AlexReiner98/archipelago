@@ -12,6 +12,9 @@ import graph from "../plugins/graph/index.ts";
 import history from "../plugins/history/index.ts";
 import interchange from "../plugins/interchange/index.ts";
 import sync from "../plugins/sync/index.ts";
+import types from "../plugins/types/index.ts";
+import work from "../plugins/work/index.ts";
+import schema from "../plugins/schema/index.ts";
 import { factsFor, plan } from "../plugins/sync/merge.ts";
 import { syncMaps, type End } from "../plugins/sync/run.ts";
 import { lineOf, runOf } from "../plugins/sync/view.ts";
@@ -21,17 +24,18 @@ const OWNER: Actor = { id: "person:owner", kind: "person" };
 const tick = () => new Promise((r) => setTimeout(r, 3));
 
 /** A map in memory: graph, actions, history, interchange and sync; an End onto it, and helpers to change it as a person. */
-async function map(name: string, opts: { keep?: number; fold?: number; history?: boolean; graphKeep?: number } = {}) {
+async function map(name: string, opts: { keep?: number; fold?: number; history?: boolean; graphKeep?: number; schema?: boolean } = {}) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
   let probe!: Context;
   const p: Plugin = { id: "probe", inject: ["graph.read", "action.invoke"], apply(ctx) { probe = ctx; } };
-  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "history.ts": history, "interchange.ts": interchange, "sync.ts": sync, "probe.ts": p };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "history.ts": history, "interchange.ts": interchange, "sync.ts": sync, "probe.ts": p, "types.ts": types, "work.ts": work, "schema.ts": schema };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const tree = (withHistory: boolean) => [
     { id: "graph", plugin: "graph.ts", ...(opts.graphKeep ? { config: { keep: opts.graphKeep } } : {}) },
     { id: "action", plugin: "action.ts" },
+    ...(opts.schema ? [{ id: "types", plugin: "types.ts" }, { id: "work", plugin: "work.ts" }, { id: "schema", plugin: "schema.ts" }] : []),
     ...(withHistory ? [{ id: "history", plugin: "history.ts", config: { ...(opts.keep ? { keep: opts.keep } : {}), ...(opts.fold ? { fold: opts.fold } : {}) } }] : []),
     { id: "interchange", plugin: "interchange.ts" },
     { id: "sync", plugin: "sync.ts", config: { name } },
@@ -276,7 +280,7 @@ test("a map's plugins do their own work: their sets aren't copied, what they mak
   await b.stop();
 });
 
-test("a log with a hole is refused, never synced around; a first sync needs a log from the start", async () => {
+test("a log with a hole is refused, never synced around; a log begun late is read from its checkpoint", async () => {
   const a = await map("local", { keep: 1, fold: 1 }), b = await map("hosted");
   await syncMaps(a.end, b.end);
   for (const t of ["one", "two", "three", "four"]) await a.write(make(`w_${t}`, t));
@@ -288,11 +292,14 @@ test("a log with a hole is refused, never synced around; a first sync needs a lo
   await c.write(make("second", "Kept by the graph"));
   await c.addHistory();
   await c.write(make("after", "After it"));
-  await assert.rejects(syncMaps(c.end, d.end), /late's log begins at 2, not at its first change/);
+  const r = await syncMaps(c.end, d.end);
+  assert.deepEqual(r.joined?.copied, { toA: 0, toB: 3 }, "the checkpoint's two items and the one made after");
+  assert.equal((await d.fields("early"))?.title, "Before the journal");
+  assert.equal((await d.fields("after"))?.title, "After it");
   for (const m of [a, b, c, d]) await m.stop();
 });
 
-test("history.verify: the log rebuilds the tables; a log that began late says so", async () => {
+test("history.verify: the log rebuilds the tables; a log begun late rebuilds them from the checkpoint made on load", async () => {
   const a = await map("local");
   await a.write(make("x", "X"));
   await a.set("x", "title", "X, renamed");
@@ -310,9 +317,8 @@ test("history.verify: the log rebuilds the tables; a log that began late says so
   const w = await c.invoke("history.verify", {});
   assert.ok(w.ok);
   if (w.ok) {
-    const o = w.output as { complete: boolean; begins: number; differ: number; examples: { field: string }[] };
-    assert.deepEqual([o.complete, o.begins, o.differ], [false, 2, 1]);
-    assert.deepEqual(o.examples.map((e) => e.field).sort(), ["status", "type"], "the log never saw the item made, only its title change");
+    const o = w.output as { complete: boolean; begins: number; from: number; differ: number; items: number };
+    assert.deepEqual([o.complete, o.begins, o.from, o.differ, o.items], [true, 2, 2, 0, 2], "the checkpoint at 2 holds what the journal never saw made");
   }
   await a.stop();
   await c.stop();
@@ -326,4 +332,21 @@ test("sets made before the journal was on the chain are taken into the log from 
   assert.ok(v.ok);
   if (v.ok) assert.deepEqual(v.output, { complete: true, begins: 1, now: 1, sets: 1, items: 1, differ: 0, examples: [] });
   await c.stop();
+});
+
+test("an item the other map's schema doesn't take is held there alone; the rest of the set lands", async () => {
+  const a = await map("local"), b = await map("hosted", { schema: true });
+  await a.write(make("ok1", "Fits"));
+  await a.write([...make("bad", "Has an old field"), ["+", "bad", "packs", ["x"]]]);
+  await a.write(make("ok2", "Fits too"));
+  const r = await syncMaps(a.end, b.end);
+  assert.deepEqual(r.refused.map((f) => [f.item, f.code]), [["bad", "schema.quarantined"]]);
+  assert.equal((await b.fields("ok1"))?.title, "Fits");
+  assert.equal((await b.fields("ok2"))?.title, "Fits too");
+  assert.equal(await b.fields("bad"), null);
+  const held = await b.invoke("schema.quarantined", { state: "held" });
+  assert.ok(held.ok);
+  if (held.ok) assert.equal((held.output as { items: unknown[] }).items.length, 1, "the whole set was dropped, only the misfit is held");
+  await a.stop();
+  await b.stop();
 });

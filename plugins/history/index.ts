@@ -17,7 +17,7 @@ import type { ActionContext, ActionRegister, UndoInput } from "../../spec/action
 import { UNDO } from "../../spec/action.ts";
 import type { Json } from "../../spec/common.ts";
 import { Refused } from "../../spec/common.ts";
-import type { GraphRead, GraphStage } from "../../spec/graph.ts";
+import type { GraphAll, GraphRead, GraphStage } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import { Journal } from "./journal.ts";
@@ -38,7 +38,7 @@ const by = { plugin: "history" };
 const history: Plugin<HistoryConfig> = {
   id: "history",
   about: "Keeps every change to the map, and undoes any of them.",
-  inject: ["graph.stage", "graph.read", "action.register"],
+  inject: ["graph.stage", "graph.read", "graph.all", "action.register"],
   async apply(ctx: Context, config: HistoryConfig = {}) {
     if (config.db) {
       const { mkdir } = await import("node:fs/promises");
@@ -49,6 +49,27 @@ const history: Plugin<HistoryConfig> = {
     const keep = config.keep === undefined ? undefined : Math.max(1, config.keep);
     const fold = Math.max(1, config.fold ?? 1000);
     const graph = ctx.get<GraphRead>("graph.read");
+    const all = ctx.get<GraphAll>("graph.all");
+
+    /**
+     * The whole map at one seq, read a page at a time (graph.all). A change
+     * committed while it reads moves the seq, so it reads again, up to five
+     * times; then it says so.
+     */
+    const checkpoint = async () => {
+      for (let tries = 0; tries < 5; tries++) {
+        const seq = Number(await graph.now());
+        const items: [string, Record<string, Json>][] = [];
+        let after: string | undefined;
+        do {
+          const page = await all.all({ limit: LIMIT_MAX, ...(after ? { after } : {}) });
+          for (const it of page.items) items.push([it.id, { type: it.type, ...it.fields }]);
+          after = page.next;
+        } while (after);
+        if (Number(await graph.now()) === seq) return journal.keepCheckpoint(seq, items);
+      }
+      throw new Refused({ code: "history.busy", message: "The map kept changing while it was read whole: try the checkpoint again.", by });
+    };
     ctx.effect(() => () => journal.close());
 
     ctx.get<GraphStage>("graph.stage").stage(async (change, next) => {
@@ -67,11 +88,22 @@ const history: Plugin<HistoryConfig> = {
     // while the plugin was off) are taken from the graph's recent sets, so the log misses none it still has.
     {
       let after = String(journal.last());
+      let hole = false;
       for (;;) {
         const page = await graph.since({ after, limit: LIMIT_MAX });
+        // The graph no longer holds what came after the journal's last set: the log has a hole.
+        if (after !== "0" && page.items[0] && page.items[0].seq > Number(after) + 1 && Number(after) === journal.last()) hole = true;
         for (const c of page.items) journal.record(c);
         if (!page.next || !page.items.length) break;
         after = page.next;
+      }
+      // A log that doesn't reach back to the first change, or has a hole, starts again from the whole map now.
+      if (hole || !journal.reachesBack()) {
+        try {
+          await checkpoint();
+        } catch (err) {
+          ctx.runtime.report(ctx.fiber, err);
+        }
       }
     }
 
@@ -129,7 +161,30 @@ const history: Plugin<HistoryConfig> = {
       async run(input: { limit?: number; after?: string }) {
         const page = journal.since({ limit: input.limit, after: input.after });
         const begins = journal.begins();
-        return { ...page, ...(begins !== undefined ? { begins } : {}) } as unknown as Json;
+        const cp = journal.checkpoint();
+        return { ...page, ...(begins !== undefined ? { begins } : {}), ...(cp ? { checkpoint: { seq: cp.seq, items: cp.items, at: cp.at } } : {}) } as unknown as Json;
+      },
+    });
+
+    register.register({
+      name: "history.checkpoint",
+      title: "Keep the whole map at this seq",
+      doc: "Reads every item (graph.all, a page at a time) and keeps them as the log's checkpoint at the seq they were read at: from then on the log is the checkpoint and every entry after it. Made on load when the log doesn't reach back to the first change. Writes nothing to the map.",
+      input: { type: "object", properties: {} },
+      async run() {
+        return (await checkpoint()) as unknown as Json;
+      },
+    });
+
+    register.register({
+      name: "history.state",
+      title: "The latest checkpoint's items",
+      doc: "The whole map at the latest checkpoint's seq, a page of items at a time (`{ id, fields }`, by id), with that `seq`. Nothing when there is none. Writes nothing.",
+      input: { type: "object", properties: pageInput },
+      async run(input: { limit?: number; after?: string }) {
+        const cp = journal.checkpoint();
+        if (!cp) return { items: [] };
+        return { seq: cp.seq, ...journal.checkpointItems(cp.n, { limit: input.limit, after: input.after }) } as unknown as Json;
       },
     });
 
@@ -139,7 +194,7 @@ const history: Plugin<HistoryConfig> = {
       doc: "Replays the journal (snapshots, then entries) into items and compares each with the graph's tables, read by id, LIMIT_MAX at a time. `complete`: the log begins at the first change and holds every one the graph committed. `differ`: how many items the tables hold otherwise than the log makes them, with up to 20. Writes nothing.",
       input: { type: "object", properties: {} },
       async run() {
-        const { items, sets } = journal.replay();
+        const { items, sets, from } = journal.replay();
         const begins = journal.begins();
         const last = journal.since({ after: String(Number(await graph.now()) - 1), limit: 1 }).items[0]?.seq;
         const now = Number(await graph.now());
@@ -163,7 +218,7 @@ const history: Plugin<HistoryConfig> = {
             if (off) count++;
           });
         }
-        return { complete: begins === 1 && last === now, ...(begins !== undefined ? { begins } : {}), now, sets, items: items.size, differ: count, examples: differ } as unknown as Json;
+        return { complete: journal.reachesBack() && last === now, ...(begins !== undefined ? { begins } : {}), ...(from !== undefined ? { from } : {}), now, sets, items: items.size, differ: count, examples: differ } as unknown as Json;
       },
     });
 

@@ -271,7 +271,7 @@ switch (verb) {
         console.log(`    ${c.title ?? c.id}${c.field ? ` · ${c.field}` : ""}: ${won}'s (${r.a.name}: ${said(c.a)}, ${r.b.name}: ${said(c.b)})`);
       }
     }
-    for (const f of r.refused) console.log(`  refused on ${f.to === "a" ? r.a.name : r.b.name}: set ${f.set}, ${f.code}: ${f.message}`);
+    for (const f of r.refused) console.log(`  refused on ${f.to === "a" ? r.a.name : r.b.name}: ${f.item ? `item ${f.item} of ` : ""}set ${f.set}, ${f.code}: ${f.message}`);
     if (!r.dry) console.log("  each copy is a change set by agent:sync/<the other map>: history.undo takes it back");
     break;
   }

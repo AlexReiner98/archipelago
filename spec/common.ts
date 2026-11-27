@@ -143,7 +143,7 @@ export class Refused extends Error {
 export type Edition = number;
 
 /** The edition these files are. */
-export const EDITION: Edition = 11;
+export const EDITION: Edition = 12;
 
 /** Every edition up to this one is accepted: what it says is frozen (test/spec-frozen.json). */
 export const ACCEPTED: Edition = 11;

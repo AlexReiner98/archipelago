@@ -13,6 +13,7 @@ last sets, for watchers. This is what every other plugin sees of it. Types: [gra
 | `graph.watch` | Live watch |
 | `graph.stage` | Add a stage to the write chain |
 | `graph.commit` | Enter the write chain (the action plugin only) |
+| `graph.all` (12) | Every item, a page at a time |
 
 ## Items and links
 
@@ -28,10 +29,16 @@ statuses are the schema plugin's, enforced in the write chain.
 | `of(type, page)` | a page |
 | `links(id, {type, dir}, page)` | a page |
 | `since(page)` | a page of committed change sets |
+| `all(page)` (`graph.all`, edition 12) | a page of items, in the order each was first made |
 | `now()` | a cursor |
 
 A page is at most `LIMIT_MAX` (500). No read returns the whole graph. A
 query language, search or views are plugins built on these.
+
+`graph.all` is for a checkpoint of the log: the whole map at one seq, for
+a map whose journal doesn't reach back to its first change
+([history](../plugins/history/README.md)). It is its own capability, so
+`graph.read` keeps its edition 1 meaning.
 
 ## Watch
 

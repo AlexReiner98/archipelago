@@ -38,6 +38,7 @@ export const KEYS = [
   "action.list",
   "action.invoke",
   "graph.read",
+  "graph.all",
   "graph.watch",
   "types.read",
   "types.mark",

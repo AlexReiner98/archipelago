@@ -252,3 +252,47 @@ test("the log is the truth: kept whole unless keep is set, read oldest first by 
     await f.stop();
   }
 });
+
+test("a journal begun after the map's first changes keeps a checkpoint of the whole map on load; the log is it and what came after", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "history-cp-"));
+  const db = join(dir, "graph.sqlite");
+  try {
+    // The map runs without history: the graph keeps only its last set.
+    {
+      const rt = new Runtime();
+      const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "probe.ts": probe };
+      const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
+      await loader.apply([{ id: "graph", plugin: "graph.ts", config: { db, keep: 1 } }, { id: "action", plugin: "action.ts" }, { id: "probe", plugin: "probe.ts" }]);
+      const invoke = loader.fiber("probe")!.ctx.intercept({ actor: { id: "agent:test", kind: "agent" } }).get<ActionInvoke>("action.invoke");
+      for (const f of [[["+", "a", "type", "task"]], [["+", "b", "type", "task"]], [["+", "a", "title", "A"]]] as Fact[][]) {
+        const o = await invoke.invoke({ action: "probe.write", input: { facts: f } as unknown as Json, authority: { of: "agent", basis: "test" }, reason: "before history" });
+        assert.ok(o.ok);
+      }
+      await loader.apply([]);
+    }
+    const rt = new Runtime();
+    const errors: unknown[] = [];
+    rt.onError = (_f, e) => errors.push(e);
+    const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "history.ts": history, "probe.ts": probe };
+    const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
+    await loader.apply([{ id: "graph", plugin: "graph.ts", config: { db, keep: 1 } }, { id: "action", plugin: "action.ts" }, { id: "history", plugin: "history.ts" }, { id: "probe", plugin: "probe.ts" }]);
+    await rt.settle();
+    assert.deepEqual(errors, []);
+    const invoke = loader.fiber("probe")!.ctx.intercept({ actor: { id: "agent:test", kind: "agent" } }).get<ActionInvoke>("action.invoke");
+    const call = async (action: string, input: Json = {}) => {
+      const o = await invoke.invoke({ action, input, authority: { of: "agent", basis: "test" }, reason: "test" });
+      if (!o.ok) assert.fail(o.refused.message);
+      return o.output as Record<string, Json>;
+    };
+    await call("probe.write", { facts: [["+", "b", "title", "B"]] } as unknown as Json);
+    const since = await call("history.since");
+    assert.deepEqual([since.begins, since.checkpoint], [3, { seq: 3, items: 2, at: (since.checkpoint as { at: string }).at }]);
+    const state = await call("history.state", { limit: 1 });
+    assert.deepEqual([state.seq, state.items, state.next], [3, [{ id: "a", fields: { type: "task", title: "A" } }], "a"]);
+    const v = await call("history.verify");
+    assert.deepEqual([v.complete, v.from, v.items, v.differ], [true, 3, 2, 0]);
+    await loader.apply([]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

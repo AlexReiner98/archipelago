@@ -1,6 +1,6 @@
 /**
  * The graph plugin: items and links in a SQLite store (store.ts), and the
- * write chain. Provides graph.read, graph.watch, graph.stage and
+ * write chain. Provides graph.read, graph.all (edition 12), graph.watch, graph.stage and
  * graph.commit (spec/graph.md).
  *
  * The tables are the log's projection (the log is the truth, history's
@@ -12,7 +12,7 @@
 import type { Committed, Proposed } from "../../spec/changeset.ts";
 import type { Caller, Cursor, Dispose } from "../../spec/common.ts";
 import { byPosition } from "../../spec/common.ts";
-import type { GraphCommit, GraphRead, GraphStage, GraphWatch, Stage, WatchFilter } from "../../spec/graph.ts";
+import type { GraphAll, GraphCommit, GraphRead, GraphStage, GraphWatch, Stage, WatchFilter } from "../../spec/graph.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import { Store } from "./store.ts";
 
@@ -96,6 +96,12 @@ const graph: Plugin<GraphConfig> = {
       },
       async now() {
         return store.now();
+      },
+    }));
+
+    ctx.provide<GraphAll>("graph.all", () => ({
+      async all(page) {
+        return store.all(page);
       },
     }));
 
