@@ -4,10 +4,10 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import exchange, { Journal, Log } from "../plugins/exchange/index.ts";
+import exchange, { FileLog, Log } from "../plugins/exchange/index.ts";
 import type { ExchangeAppend, ExchangeEvent, ExchangeRead } from "../spec/exchange.ts";
 import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
@@ -117,10 +117,33 @@ test("with a journal, an act's body stays in the file and a page reads it back w
     const after = (await again.read.events("r")).items;
     assert.deepEqual(after, before);
     assert.equal((await again.read.events("r", { after: "3", limit: 1 })).items[0]!.act !== undefined, true);
-    const j = new Journal(file);
-    const held = new Log(j.keep);
-    await j.load(held);
-    assert.equal(held.runs.get("r")!.filter((e) => e.act).length, 0);
+    // What memory keeps of the record is where each event's line is: numbers, never an event.
+    const held = new FileLog(file);
+    await held.load();
+    assert.equal(held.count, 4);
+    assert.deepEqual(held.runs.get("r"), [0, 1, 2, 3]);
+    assert.deepEqual(held.info("r")?.title, "R");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("with a journal, reads come back from the file: by node newest first, a run's summary from its begins, and lines from before ids were written", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "exchange-"));
+  try {
+    const file = join(dir, "exchange.jsonl");
+    // A line written before events carried an id and a seq.
+    writeFileSync(file, JSON.stringify({ run: "old", time: "2026-11-20T09:00:00Z", direction: "to_agent", kind: "say", node: "words/a", text: "First" }) + String.fromCharCode(10));
+    const p = await pluginOver(file);
+    await p.append.append(begin("r", "2026-11-24T09:00:00Z", "R"));
+    await p.append.append(say("r", "2026-11-24T09:01:00Z"));
+    await p.append.append(end("r", "2026-11-24T09:02:00Z"));
+    const said = (await p.read.said("words/a")).items;
+    assert.deepEqual(said.map((e) => [e.run, e.id, e.seq]), [["r", "r:2", 2], ["old", "old:1", 1]]);
+    const again = await pluginOver(file);
+    const runs = (await again.read.runs()).items;
+    assert.deepEqual(runs.map((r) => [r.run, r.title, r.ended, r.last]), [["r", "R", "2026-11-24T09:02:00Z", "2026-11-24T09:02:00Z"]]);
+    assert.deepEqual((await again.read.events("old")).items.map((e) => e.text), ["First"]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

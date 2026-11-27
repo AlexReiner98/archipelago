@@ -52,21 +52,23 @@ const history: Plugin<HistoryConfig> = {
     const all = ctx.get<GraphAll>("graph.all");
 
     /**
-     * The whole map at one seq, read a page at a time (graph.all). A change
-     * committed while it reads moves the seq, so it reads again, up to five
-     * times; then it says so.
+     * The whole map at one seq, read a page at a time (graph.all) and written
+     * as it is read, so memory holds one page, never the map. A change
+     * committed while it reads moves the seq: the draft goes and it reads
+     * again, up to five times; then it says so.
      */
     const checkpoint = async () => {
       for (let tries = 0; tries < 5; tries++) {
         const seq = Number(await graph.now());
-        const items: [string, Record<string, Json>][] = [];
+        const draft = journal.beginCheckpoint();
         let after: string | undefined;
         do {
           const page = await all.all({ limit: LIMIT_MAX, ...(after ? { after } : {}) });
-          for (const it of page.items) items.push([it.id, { type: it.type, ...it.fields }]);
+          journal.addCheckpointItems(draft, page.items.map((it) => [it.id, { type: it.type, ...it.fields }]));
           after = page.next;
         } while (after);
-        if (Number(await graph.now()) === seq) return journal.keepCheckpoint(seq, items);
+        if (Number(await graph.now()) === seq) return journal.endCheckpoint(draft, seq);
+        journal.dropCheckpoint(draft);
       }
       throw new Refused({ code: "history.busy", message: "The map kept changing while it was read whole: try the checkpoint again.", by });
     };

@@ -312,26 +312,46 @@ export class Journal {
     return this.db.prepare("SELECT n, seq, at, items FROM checkpoints ORDER BY n DESC LIMIT 1").get() as Checkpoint | undefined;
   }
 
-  /** Keeps the whole map at `seq`: each item's fields, `type` among them. */
-  keepCheckpoint(seq: number, items: Iterable<[string, Record<string, Json>]>): Checkpoint {
+  /**
+   * A checkpoint is written a page of items at a time, each page in its own
+   * transaction (other writes come between), under a draft number that no
+   * reader takes for a checkpoint; `endCheckpoint` makes it one, at the seq
+   * the items were read at, and `dropCheckpoint` takes a draft away.
+   */
+  beginCheckpoint(): number {
+    return -(Date.now() * 1000 + Math.floor(Math.random() * 1000));
+  }
+
+  addCheckpointItems(draft: number, items: [string, Record<string, Json>][]): void {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const add = this.db.prepare("INSERT INTO checkpoint_items (n, id, fields) VALUES (?, ?, ?)");
+      for (const [id, fields] of items) add.run(draft, id, JSON.stringify(fields));
+      this.db.exec("COMMIT");
+    } catch (err) {
+      this.db.exec("ROLLBACK");
+      throw err;
+    }
+  }
+
+  endCheckpoint(draft: number, seq: number): Checkpoint {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       const at = new Date().toISOString();
-      const { lastInsertRowid } = this.db.prepare("INSERT INTO checkpoints (seq, at, items) VALUES (?, ?, 0)").run(seq, at);
+      const count = (this.db.prepare("SELECT count(*) AS c FROM checkpoint_items WHERE n = ?").get(draft) as { c: number }).c;
+      const { lastInsertRowid } = this.db.prepare("INSERT INTO checkpoints (seq, at, items) VALUES (?, ?, ?)").run(seq, at, count);
       const n = Number(lastInsertRowid);
-      const add = this.db.prepare("INSERT INTO checkpoint_items (n, id, fields) VALUES (?, ?, ?)");
-      let count = 0;
-      for (const [id, fields] of items) {
-        add.run(n, id, JSON.stringify(fields));
-        count++;
-      }
-      this.db.prepare("UPDATE checkpoints SET items = ? WHERE n = ?").run(count, n);
+      this.db.prepare("UPDATE checkpoint_items SET n = ? WHERE n = ?").run(n, draft);
       this.db.exec("COMMIT");
       return { n, seq, at, items: count };
     } catch (err) {
       this.db.exec("ROLLBACK");
       throw err;
     }
+  }
+
+  dropCheckpoint(draft: number): void {
+    this.db.prepare("DELETE FROM checkpoint_items WHERE n = ?").run(draft);
   }
 
   /** A checkpoint's items, a page at a time, by id. */
