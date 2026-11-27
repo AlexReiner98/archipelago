@@ -6,7 +6,6 @@
 import { join } from "node:path";
 import type { Entry } from "../runtime/loader.ts";
 import { localOrigins } from "../runtime/guard.ts";
-import type { OtelConfig } from "../plugins/otel/index.ts";
 
 /**
  * What a fresh map says before anyone has written a node: only what fits
@@ -56,34 +55,10 @@ export interface TreeOptions {
   origins?: string[];
   /** More Host values they answer (a proxy in front that keeps its own). */
   hosts?: string[];
-  /** Where the otel plugin sends the exchange as spans (plugins/otel). Absent: it sends nothing. */
-  otel?: OtelConfig;
   /** The checkout people work in, when it isn't the one the server runs from (the live server's): what the page offers to connect. */
   checkout?: string;
   /** Which code and map this server is, for the page's header (plugins/serving): its checkout, its map when it serves one by name, its commit. */
   serving?: { root?: string; map?: string; commit?: string };
-}
-
-/**
- * The otel plugin's config from the environment: the standard
- * `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT`, its
- * `OTEL_EXPORTER_OTLP_HEADERS` (`k=v,k=v`) and `OTEL_SERVICE_NAME`; the words
- * go only with `ARCHIPELAGO_OTEL_CONTENT=1`.
- */
-export function otelFromEnv(env: Record<string, string | undefined>): OtelConfig {
-  const endpoint = env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || env.OTEL_EXPORTER_OTLP_ENDPOINT;
-  if (!endpoint) return {};
-  const headers: Record<string, string> = {};
-  for (const part of (env.OTEL_EXPORTER_OTLP_HEADERS ?? "").split(",")) {
-    const i = part.indexOf("=");
-    if (i > 0) headers[decodeURIComponent(part.slice(0, i).trim())] = decodeURIComponent(part.slice(i + 1).trim());
-  }
-  return {
-    endpoint,
-    ...(Object.keys(headers).length ? { headers } : {}),
-    ...(env.OTEL_SERVICE_NAME ? { service: env.OTEL_SERVICE_NAME } : {}),
-    include_content: env.ARCHIPELAGO_OTEL_CONTENT === "1",
-  };
 }
 
 /** What the page server is given, so that it answers the same as the adapter and the bridge. */
@@ -95,7 +70,7 @@ export function pageAccess({ port: PAGE, origins = [], hosts = [] }: Pick<TreeOp
  * The server's config tree. A host that runs the server its own way (more
  * plugins, another front) starts from this tree and adds to it.
  */
-export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], otel = {}, checkout, serving = {} }: TreeOptions): Entry[] {
+export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], checkout, serving = {} }: TreeOptions): Entry[] {
   // The app's own origin is the page's: the adapter and the bridge answer it, and a host's in front.
   const access = pageAccess({ port: PAGE, origins, hosts });
   // A map served by name: the folders connected to it report by that name, so they follow it to any port (plugins/connect).
@@ -150,8 +125,6 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
     { id: "scripted", plugin: "plugins/scripted/index.ts" },
     { id: "replay", plugin: "plugins/replay/index.ts" },
     { id: "since", plugin: "plugins/since/index.ts" },
-    // The exchange as OpenTelemetry spans to a collector: off until `otel.endpoint` names one (otelFromEnv).
-    { id: "otel", plugin: "plugins/otel/index.ts", config: otel },
     {
       id: "claude-code",
       plugin: "plugins/claude-code/index.ts",
@@ -170,8 +143,6 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
     },
     // Which map, commit and checkout this is, for the page's header. A host in front shows no folder of its machine.
     { id: "serving", plugin: "plugins/serving/index.ts", config: { port: PAGE, ...(map ? { map } : {}), ...(serving.commit ? { commit: serving.commit } : {}), ...(serving.root && !hosted ? { checkout: serving.root } : {}) } },
-    // A host's way in to its maps (plugins/gate): off until a host in front names where it answers (`at`).
-    { id: "gate", plugin: "plugins/gate/index.ts" },
     { id: "docs", plugin: "plugins/docs/index.ts" },
     { id: "docs-tool", plugin: "plugins/docs/tool.ts" },
     { id: "words-tool", plugin: "plugins/words/tool.ts" },
