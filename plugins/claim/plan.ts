@@ -132,16 +132,45 @@ export function covers(held: string, file: string): boolean {
   return false;
 }
 
-/** The hold of another run that covers this file in this scope, if any. */
-export function heldByOther(holds: Hold[], scope: string, file: string, run: string): Hold | undefined {
-  return holds.find((h) => h.scope === scope && h.run !== run && covers(h.file, file));
+/** Whether a path is absolute: `/…`, or a drive (`C:/…`). */
+const absolute = (p: string) => /^(\/|[a-z]:\/)/i.test(p);
+
+/**
+ * A file's absolute path, from its path and the folder of the run that named
+ * it, to compare across repositories: `/`, no trailing `/` on the folder, and
+ * a drive path in lower case (Windows doesn't tell `C:/A` from `c:/a`). None
+ * when neither is absolute.
+ */
+export function absOf(file: string, where?: string): string | undefined {
+  const f = file.replaceAll("\\", "/");
+  const p = absolute(f) ? f : where && absolute(where.replaceAll("\\", "/")) ? `${where.replaceAll("\\", "/").replace(/\/+$/, "")}/${f}` : undefined;
+  return p && /^[a-z]:\//i.test(p) ? p.toLowerCase() : p;
+}
+
+/**
+ * The hold of another run that covers this file, if any: in this scope by its
+ * path there, or in any scope by its absolute path. A file outside the run's
+ * repository is held in that run's plan by its absolute path, while a run in
+ * the file's own repository names it by a relative one: the absolute path is
+ * what the two share.
+ */
+export function heldByOther(holds: Hold[], scope: string, file: string, run: string, abs?: string): Hold | undefined {
+  return holds.find((h) => {
+    if (h.run === run) return false;
+    if (h.scope === scope && covers(h.file, file)) return true;
+    const held = abs ? absOf(h.file, h.where) : undefined;
+    return !!held && covers(held, abs!);
+  });
 }
 
 /** The plan as one block of words for an agent: what the other runs hold, by run. Empty when nobody else holds anything. */
-export function planWords(holds: Hold[], scope: string, run: string): string {
+export function planWords(holds: Hold[], scope: string, run: string, cwd?: string): string {
   const others = new Map<string, Hold[]>();
+  // Holds in another repository's plan on files in this run's folder count too.
+  const here = cwd ? absOf("", cwd) : undefined;
   for (const h of holds) {
-    if (h.scope !== scope || h.run === run) continue;
+    const mine = h.scope === scope || (!!here && !!absOf(h.file, h.where)?.startsWith(here));
+    if (!mine || h.run === run) continue;
     others.set(h.run, [...(others.get(h.run) ?? []), h]);
   }
   if (!others.size) return "";
