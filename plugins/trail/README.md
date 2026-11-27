@@ -34,7 +34,9 @@ picked in Activity). A click on a session's pentagon on the Landscape sets
   said or done.
 - **Bounded.** Events are read a page at a time (`LIMIT_MAX`), at most
   `TRAIL_PAGES` (40) pages, and the latest `TRAIL_LIMIT` (400) are kept.
-  What came before them is one count, `earlier`.
+  What came before them is one count, `earlier`. The run's title comes from
+  `exchange.read.runs`, also a page at a time, at most `RUN_PAGES` (4) pages
+  newest first; a run older than that is drawn by its id.
 - **Live.** A live run's new events are added as they come, and the trail is
   set again at most every half second.
 - **Picking.** A click on a tool call that touched items on the map goes to

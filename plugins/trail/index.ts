@@ -198,9 +198,19 @@ const trail: Plugin = {
   },
 };
 
-/** The run's facts, from the latest runs (its title), or none if it is not among them. */
-async function findRun(read: ExchangeRead, run: string): Promise<RunInfo | undefined> {
-  return (await read.runs({ limit: 50 })).items.find((r) => r.run === run);
+/** Pages of runs looked through for a run's facts, at most. */
+export const RUN_PAGES = 4;
+
+/** The run's facts (its title), from the runs a page at a time, newest first, or none if it is not in the first `pages`. */
+export async function findRun(read: ExchangeRead, run: string, pages = RUN_PAGES): Promise<RunInfo | undefined> {
+  let after: string | undefined;
+  for (let p = 0; p < pages; p++) {
+    const page = await read.runs({ limit: LIMIT_MAX, ...(after ? { after } : {}) });
+    const hit = page.items.find((r) => r.run === run);
+    if (hit || !page.next) return hit;
+    after = page.next;
+  }
+  return undefined;
 }
 
 export default trail;

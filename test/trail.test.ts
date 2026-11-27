@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { idsIn, latest, toolTitle, trailOf } from "../plugins/trail/index.ts";
+import { findRun, idsIn, latest, toolTitle, trailOf } from "../plugins/trail/index.ts";
 import { TRAIL_TYPES, withTrail } from "../plugins/field/trail.ts";
 import type { FieldIn } from "../plugins/field/graph.ts";
 import type { RunInfo } from "../spec/agent.ts";
@@ -88,6 +88,23 @@ test("latest: the run's latest events, read a page at a time, and how many came 
   assert.ok(asked.every((n) => n <= 500), "every page within LIMIT_MAX");
   const short = await latest(read, "r1", 400, 1);
   assert.equal(short.events.at(-1)!.seq, 500, "no more pages than asked");
+});
+
+test("findRun: a run's facts from the runs a page at a time, newest first, never past the pages given", async () => {
+  const runs = Array.from({ length: 1200 }, (_, k) => ({ run: `r${1200 - k}`, title: `run ${1200 - k}` }) as unknown as RunInfo);
+  const asked: number[] = [];
+  const read = {
+    async runs(page: { limit?: number; after?: string } = {}) {
+      const from = Number(page.after ?? 0), limit = page.limit ?? 100;
+      asked.push(limit);
+      return { items: runs.slice(from, from + limit), ...(from + limit < runs.length ? { next: String(from + limit) } : {}) };
+    },
+  } as unknown as ExchangeRead;
+  assert.equal((await findRun(read, "r1100"))?.title, "run 1100");
+  assert.equal((await findRun(read, "r150"))?.title, "run 150", "on the third page");
+  assert.equal(await findRun(read, "r150", 2), undefined, "not past the pages given");
+  assert.equal(await findRun(read, "nope"), undefined);
+  assert.ok(asked.every((n) => n <= 500), "every page within LIMIT_MAX");
 });
 
 const map: FieldIn = {
