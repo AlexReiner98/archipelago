@@ -393,3 +393,42 @@ test("the Then view's words: quick picks, a value in a few words, counts by kind
   assert.equal(shown("x".repeat(80), 10), `${"x".repeat(9)}…`);
   assert.deepEqual(counts([{ change: "made" }, { change: "gone" }, { change: "made" }]), { made: 2, changed: 0, gone: 1 });
 });
+
+test("a checkpoint is written a page at a time: a map of 1,200 items, read in three pages, is whole", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "history-cp-pages-"));
+  const db = join(dir, "graph.sqlite");
+  try {
+    {
+      const rt = new Runtime();
+      const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "probe.ts": probe };
+      const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
+      await loader.apply([{ id: "graph", plugin: "graph.ts", config: { db, keep: 1 } }, { id: "action", plugin: "action.ts" }, { id: "probe", plugin: "probe.ts" }]);
+      const invoke = loader.fiber("probe")!.ctx.intercept({ actor: { id: "agent:test", kind: "agent" } }).get<ActionInvoke>("action.invoke");
+      const facts: Fact[] = [];
+      for (let i = 0; i < 1200; i++) facts.push(["+", `i${String(i).padStart(4, "0")}`, "type", "task"]);
+      for (const f of [facts, [["+", "i0000", "title", "First"]] as Fact[]]) {
+        const o = await invoke.invoke({ action: "probe.write", input: { facts: f } as unknown as Json, authority: { of: "agent", basis: "test" }, reason: "before history" });
+        assert.ok(o.ok);
+      }
+      await loader.apply([]);
+    }
+    const rt = new Runtime();
+    const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "history.ts": history, "probe.ts": probe };
+    const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
+    await loader.apply([{ id: "graph", plugin: "graph.ts", config: { db, keep: 1 } }, { id: "action", plugin: "action.ts" }, { id: "history", plugin: "history.ts" }, { id: "probe", plugin: "probe.ts" }]);
+    await rt.settle();
+    const invoke = loader.fiber("probe")!.ctx.intercept({ actor: { id: "agent:test", kind: "agent" } }).get<ActionInvoke>("action.invoke");
+    const call = async (action: string, input: Json = {}) => {
+      const o = await invoke.invoke({ action, input, authority: { of: "agent", basis: "test" }, reason: "test" });
+      if (!o.ok) assert.fail(o.refused.message);
+      return o.output as Record<string, Json>;
+    };
+    const since = await call("history.since");
+    assert.deepEqual((since.checkpoint as { items: number }).items, 1200);
+    const v = await call("history.verify");
+    assert.deepEqual([v.complete, v.items, v.differ], [true, 1200, 0]);
+    await loader.apply([]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

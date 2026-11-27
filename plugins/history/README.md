@@ -11,7 +11,7 @@ change that failed. Kept in SQLite (`config.db`), or in memory without one.
 | `history.undo` `{ change }` | Writes the inverse of a committed set as a new one, marked `undoes` |
 | `history.list` `{ item?, run?, limit?, after? }` | Entries newest first; `item` narrows to the sets touching one item (its fields, or a link to or from it), else `run` to one run's. Writes nothing |
 | `history.since` `{ after?, limit? }` | Entries oldest first, after a seq: the log as it was written, a page at a time, with `begins`, the first seq the journal holds. Writes nothing |
-| `history.checkpoint` `{}` | Keeps the whole map at the seq it reads it at (`graph.all`, a page at a time; read again if a change lands meanwhile): from then on the log is the checkpoint and every entry after it. Writes nothing to the map |
+| `history.checkpoint` `{}` | Keeps the whole map at the seq it reads it at (`graph.all`, a page at a time, each page written as it is read, so memory holds one page; read again if a change lands meanwhile): from then on the log is the checkpoint and every entry after it. Writes nothing to the map |
 | `history.state` `{ after?, limit? }` | The latest checkpoint's items, `{ id, fields }` by id, a page at a time, with its `seq`. Writes nothing |
 | `history.verify` `{}` | Replays the log (snapshots, then entries) into items and compares each with the graph's tables, read by id: `complete` (the log begins at the first change and holds the last), `differ` and up to 20 `examples`. Writes nothing |
 | `history.at` `{ at?, ids?, limit?, after? }` | The map as it was at a point: the log replayed to it, items `{ id, fields }` (by `ids`, with `missing`, else every item by id, a page at a time). Writes nothing |

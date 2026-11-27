@@ -2,13 +2,15 @@
  * The exchange plugin: one event per say, refusal and act, kept and streamed.
  * Provides exchange.append, exchange.read and exchange.watch (spec/exchange.md).
  *
- * Events are kept in memory and, when `config.journal` names a file, appended
- * to it as JSON lines and read back on load, so the record outlives a restart.
- * With a journal, an act's body (its input and output, nearly all of the
- * record's bytes) stays in the file: memory keeps where its line is, and a
- * page of events reads the bodies it holds back from there. Loading streams
- * the file a line at a time, so the heap holds neither the whole text nor
- * every act.
+ * Without a journal (a test, a page), events are kept in memory (`Log`).
+ * When `config.journal` names a file, events are appended to it as JSON
+ * lines and read back on load, so the record outlives a restart, and memory
+ * keeps no event at all (`FileLog`): only where each one's line is, which
+ * runs and nodes it belongs to, and each run's summary (its begins merged,
+ * its end, its last time). A page of events is read back from the file, a
+ * line at a time. Loading streams the file the same way. So the heap holds
+ * an index of the record, never the record: a hosted map's journal of
+ * 180,000 events (300 MB) is a few MB of it.
  */
 import type { RunId, RunInfo } from "../../spec/agent.ts";
 import type { Dispose, Page, PageRequest } from "../../spec/common.ts";
@@ -29,6 +31,7 @@ export interface ExchangeConfig {
 }
 
 type Watcher = { filter: ExchangeFilter; on: (event: ExchangeEvent) => void };
+type NewEvent = Omit<ExchangeEvent, "id" | "seq"> & Partial<Pick<ExchangeEvent, "id" | "seq">>;
 
 function limitOf(page?: PageRequest): number {
   return Math.max(1, Math.min(page?.limit ?? 100, LIMIT_MAX));
@@ -50,23 +53,48 @@ function pageOf<T>(list: T[], page?: PageRequest): Page<T> {
   return end < list.length ? { items, next: String(end) } : { items };
 }
 
-/** The record itself, apart from the runtime, so it can be read back from a journal. */
-export class Log {
+/** What the plugin needs of a record, in memory or in a file. */
+interface Record {
+  readonly order: Set<RunId>;
+  info(run: RunId): RunInfo | undefined;
+  /** Records an event; `done` once it is kept (written, with a journal). */
+  append(e: NewEvent): { event: ExchangeEvent; done: Promise<void> };
+  events(run: RunId, page?: PageRequest): Promise<Page<ExchangeEvent>>;
+  said(node: string, page?: PageRequest): Promise<Page<ExchangeEvent>>;
+}
+
+/** A run's summary as its events arrive: begins merged, the first's start, an end after the last begin, the last time. */
+class RunSummary {
+  private merged: RunInfo | undefined;
+  private started: string | undefined;
+  private ended: string | undefined;
+  private last: string | undefined;
+  see(e: ExchangeEvent): void {
+    if (e.kind === "begin" && e.detail) {
+      const d = e.detail as unknown as RunInfo;
+      if (!this.merged) this.started = d.started;
+      this.merged = Object.assign({}, this.merged, d);
+      this.ended = undefined;
+    } else if (e.kind === "end" && this.merged) this.ended = e.time;
+    this.last = e.time;
+  }
+  info(): RunInfo | undefined {
+    if (!this.merged) return undefined;
+    return { ...this.merged, started: this.started!, ...(this.ended ? { ended: this.ended } : {}), ...(this.last ? { last: this.last } : {}) };
+  }
+}
+
+/** The record in memory, for a map with no journal. */
+export class Log implements Record {
   /** Events per run, in seq order. */
   readonly runs = new Map<RunId, ExchangeEvent[]>();
   /** Runs by their last event: the one that acted last is last. */
   readonly order = new Set<RunId>();
   /** Events per node, oldest first. */
   readonly byNode = new Map<string, ExchangeEvent[]>();
+  private readonly summaries = new Map<RunId, RunSummary>();
 
-  /** `keep` gives what is held for an event (the journal drops an act's body); `add` still answers the whole event. */
-  private readonly keep: (e: ExchangeEvent) => ExchangeEvent;
-
-  constructor(keep: (e: ExchangeEvent) => ExchangeEvent = (e) => e) {
-    this.keep = keep;
-  }
-
-  add(e: Omit<ExchangeEvent, "id" | "seq"> & Partial<Pick<ExchangeEvent, "id" | "seq">>): ExchangeEvent {
+  add(e: NewEvent): ExchangeEvent {
     let list = this.runs.get(e.run);
     if (!list) {
       list = [];
@@ -76,13 +104,15 @@ export class Log {
     this.order.add(e.run);
     const seq = e.seq ?? list.length + 1;
     const event: ExchangeEvent = { ...e, seq, id: e.id ?? `${e.run}:${seq}` };
-    const held = this.keep(event);
-    list.push(held);
+    list.push(event);
     if (event.node) {
       const n = this.byNode.get(event.node) ?? [];
-      n.push(held);
+      n.push(event);
       this.byNode.set(event.node, n);
     }
+    const s = this.summaries.get(e.run) ?? new RunSummary();
+    s.see(event);
+    this.summaries.set(e.run, s);
     return event;
   }
 
@@ -93,51 +123,76 @@ export class Log {
    * is open again.
    */
   info(run: RunId): RunInfo | undefined {
-    const list = this.runs.get(run) ?? [];
-    const begins = list.filter((e) => e.kind === "begin" && e.detail);
-    if (!begins.length) return undefined;
-    const first = begins[0]!.detail as unknown as RunInfo;
-    const merged = Object.assign({}, ...begins.map((b) => b.detail)) as RunInfo;
-    const begun = list.lastIndexOf(begins[begins.length - 1]!);
-    const end = list.slice(begun + 1).find((e) => e.kind === "end");
-    const last = list[list.length - 1]?.time;
-    return { ...merged, started: first.started, ...(end ? { ended: end.time } : {}), ...(last ? { last } : {}) };
+    return this.summaries.get(run)?.info();
+  }
+
+  append(e: NewEvent) {
+    return { event: this.add(e), done: Promise.resolve() };
+  }
+
+  async events(run: RunId, page?: PageRequest) {
+    return pageOf(this.runs.get(run) ?? [], page);
+  }
+
+  async said(node: string, page?: PageRequest) {
+    return pageOf([...(this.byNode.get(node) ?? [])].reverse(), page);
   }
 }
 
-/** Where an event's line is in the journal: its first byte and its length, newline left out. */
-type Span = { at: number; len: number };
-
 /**
- * The journal file: appended to, read back a line at a time on load, and
- * read at a line's place for an act's body. `size` is where the next line
- * goes, counted as each is queued, so a span is known before it is written.
+ * The record in a journal file. Memory holds, per event, where its line is
+ * (its first byte and its length) and its seq; per run and per node, its
+ * events' numbers in order; and each run's summary. Events are read back
+ * from the file a page at a time.
  */
-export class Journal {
+export class FileLog implements Record {
+  readonly file: string;
+  readonly order = new Set<RunId>();
+  /** Event numbers per run, in seq order, and per node, oldest first. */
+  readonly runs = new Map<RunId, number[]>();
+  readonly byNode = new Map<string, number[]>();
+  private readonly summaries = new Map<RunId, RunSummary>();
+  /** Per event, by its number: where its line starts, how long it is (newline left out), its seq. */
+  private readonly at: number[] = [];
+  private readonly len: number[] = [];
+  private readonly seqs: number[] = [];
+  /** Where the next line goes, counted as each is queued, so a line's place is known before it is written. */
   private size = 0;
   private queue: Promise<unknown> = Promise.resolve();
-  /** Each act's line, by event id: its body is read from there. */
-  private readonly spans = new Map<string, Span>();
-
-  readonly file: string;
 
   constructor(file: string) {
     this.file = file;
   }
 
-  /**
-   * What memory holds of an event: an act without its body. Its span is set
-   * on load before `add`, and on append right after it with nothing awaited
-   * between, so no read finds an act with neither.
-   */
-  readonly keep = (e: ExchangeEvent): ExchangeEvent => {
-    if (!e.act) return e;
-    const { act: _body, ...rest } = e;
-    return rest;
-  };
+  /** Indexes an event at its line's place. */
+  private index(e: ExchangeEvent, at: number, len: number): void {
+    const n = this.at.length;
+    this.at.push(at);
+    this.len.push(len);
+    this.seqs.push(e.seq);
+    const list = this.runs.get(e.run) ?? [];
+    list.push(n);
+    this.runs.set(e.run, list);
+    if (e.node) {
+      const byNode = this.byNode.get(e.node) ?? [];
+      byNode.push(n);
+      this.byNode.set(e.node, byNode);
+    }
+    this.order.delete(e.run);
+    this.order.add(e.run);
+    const s = this.summaries.get(e.run) ?? new RunSummary();
+    s.see(e);
+    this.summaries.set(e.run, s);
+  }
 
-  /** Streams the file into `into`, a line at a time. A missing file is an empty record. */
-  async load(into: Log): Promise<void> {
+  /** An event as the record gives it: a seq and an id even on a line from before they were written. */
+  private complete(e: ExchangeEvent, seq: number): ExchangeEvent {
+    const s = e.seq ?? seq;
+    return { ...e, seq: s, id: e.id ?? `${e.run}:${s}` };
+  }
+
+  /** Streams the file in, a line at a time. A missing file is an empty record. */
+  async load(): Promise<void> {
     const { createReadStream } = await import("node:fs");
     const { stat } = await import("node:fs/promises");
     try {
@@ -150,9 +205,8 @@ export class Journal {
     const take = (line: Buffer, start: number) => {
       const text = line.toString("utf8");
       if (!text.trim()) return;
-      const e = eventNow(JSON.parse(text) as ExchangeEvent);
-      if (e.act && e.id) this.spans.set(e.id, { at: start, len: line.length });
-      into.add(e);
+      const raw = eventNow(JSON.parse(text) as ExchangeEvent);
+      this.index(this.complete(raw, (this.runs.get(raw.run)?.length ?? 0) + 1), start, line.length);
     };
     for await (const chunk of createReadStream(this.file) as AsyncIterable<Buffer>) {
       const buf = rest.length ? Buffer.concat([rest, chunk]) : chunk;
@@ -168,39 +222,57 @@ export class Journal {
     this.size = at + rest.length;
   }
 
-  /** Appends an event; its span is known at once, its bytes once the queue reaches it. */
-  append(e: ExchangeEvent): Promise<void> {
-    const line = Buffer.from(JSON.stringify(e) + "\n", "utf8");
-    const span = { at: this.size, len: line.length - 1 };
+  info(run: RunId): RunInfo | undefined {
+    return this.summaries.get(run)?.info();
+  }
+
+  /** Appends an event: indexed at once, its bytes written once the queue reaches it. */
+  append(e: NewEvent) {
+    const seq = e.seq ?? (this.runs.get(e.run)?.length ?? 0) + 1;
+    const event: ExchangeEvent = { ...e, seq, id: e.id ?? `${e.run}:${seq}` };
+    const line = Buffer.from(JSON.stringify(event) + "\n", "utf8");
+    this.index(event, this.size, line.length - 1);
     this.size += line.length;
-    if (e.act) this.spans.set(e.id, span);
     const done = this.queue.then(async () => {
       const { appendFile } = await import("node:fs/promises");
       await appendFile(this.file, line);
     });
     this.queue = done.catch(() => {});
-    return done;
+    return { event, done };
   }
 
-  /** The events with their acts' bodies read back from the file, one open for the page. */
-  async whole(events: ExchangeEvent[]): Promise<ExchangeEvent[]> {
-    const need = events.filter((e) => e.kind === "act" && !e.act && this.spans.has(e.id));
-    if (!need.length) return events;
+  /** Events by their numbers, read back from the file, one open for them all. */
+  private async read(numbers: number[]): Promise<ExchangeEvent[]> {
+    if (!numbers.length) return [];
     await this.queue;
     const { open } = await import("node:fs/promises");
     const fh = await open(this.file, "r");
-    const bodies = new Map<string, ExchangeEvent["act"]>();
     try {
-      for (const e of need) {
-        const { at, len } = this.spans.get(e.id)!;
-        const buf = Buffer.alloc(len);
-        await fh.read(buf, 0, len, at);
-        bodies.set(e.id, (JSON.parse(buf.toString("utf8")) as ExchangeEvent).act);
+      const out: ExchangeEvent[] = [];
+      for (const n of numbers) {
+        const buf = Buffer.alloc(this.len[n]!);
+        await fh.read(buf, 0, buf.length, this.at[n]!);
+        out.push(this.complete(eventNow(JSON.parse(buf.toString("utf8")) as ExchangeEvent), this.seqs[n]!));
       }
+      return out;
     } finally {
       await fh.close();
     }
-    return events.map((e) => (bodies.has(e.id) ? { ...e, act: bodies.get(e.id) } : e));
+  }
+
+  async events(run: RunId, page?: PageRequest) {
+    const p = pageOf(this.runs.get(run) ?? [], page);
+    return { ...p, items: await this.read(p.items) };
+  }
+
+  async said(node: string, page?: PageRequest) {
+    const p = pageOf([...(this.byNode.get(node) ?? [])].reverse(), page);
+    return { ...p, items: await this.read(p.items) };
+  }
+
+  /** How many events it indexes. */
+  get count(): number {
+    return this.at.length;
   }
 }
 
@@ -208,16 +280,17 @@ const exchange: Plugin<ExchangeConfig> = {
   id: "exchange",
   about: "Records everything said to agents and everything they do, in order.",
   async apply(ctx: Context, config: ExchangeConfig = {}) {
-    const journal = config.journal ? new Journal(config.journal) : undefined;
-    const record = new Log(journal?.keep);
-    await journal?.load(record);
-    const write = journal ? (e: ExchangeEvent) => journal.append(e) : undefined;
-    const whole = async (p: Page<ExchangeEvent>): Promise<Page<ExchangeEvent>> => (journal ? { ...p, items: await journal.whole(p.items) } : p);
+    let record: Record;
+    if (config.journal) {
+      const file = new FileLog(config.journal);
+      await file.load();
+      record = file;
+    } else record = new Log();
     const watchers = new Set<Watcher>();
 
     ctx.provide<ExchangeAppend>("exchange.append", () => ({
       async append(e) {
-        const event = record.add(e);
+        const { event, done } = record.append(e);
         for (const w of [...watchers]) {
           if (!matches(w.filter, event)) continue;
           try {
@@ -226,7 +299,7 @@ const exchange: Plugin<ExchangeConfig> = {
             ctx.runtime.report(ctx.fiber, err);
           }
         }
-        await write?.(event);
+        await done;
         return event;
       },
     }));
@@ -240,10 +313,10 @@ const exchange: Plugin<ExchangeConfig> = {
         return pageOf(infos, page);
       },
       async events(run, page) {
-        return whole(pageOf(record.runs.get(run) ?? [], page));
+        return record.events(run, page);
       },
       async said(node, page) {
-        return whole(pageOf([...(record.byNode.get(node) ?? [])].reverse(), page));
+        return record.said(node, page);
       },
     }));
 
