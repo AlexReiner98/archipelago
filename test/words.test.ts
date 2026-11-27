@@ -18,6 +18,7 @@ import words from "../plugins/words/index.ts";
 import wordsTool from "../plugins/words/tool.ts";
 import type { McpHost, ToolDef } from "../plugins/mcp/host.ts";
 import type { Context } from "../runtime/core.ts";
+import { SEED } from "../app/tree.ts";
 
 const BASE = "mem:/plugins/";
 const T = "2026-11-20T14:00:00.000Z";
@@ -89,6 +90,20 @@ test("a seeded node speaks its words; an edit through words.set is what the next
 
   const next = await p.run.reach({ run: "r1", places: ["file:spec/agent.ts"], time: T });
   assert.deepEqual(next.said.map((s) => s.text), ["spec/ is Owner's."]);
+  await loader.apply([]);
+});
+
+test("the app's seed says how a new idea fits the schema where a plugin is written, and nowhere else", async () => {
+  const { rt, loader, errors, as } = setup();
+  await loader.apply(tree(undefined, SEED));
+  await rt.settle();
+  assert.deepEqual(errors, []);
+  const p = as({ id: "e_agent", kind: "agent" });
+  let n = 0;
+  const fit = (file: string) => p.run.reach({ run: `r${++n}`, places: [`file:${file}`], time: T }).then((r) => r.said.some((s) => s.text.includes("Fit a plugin's data")));
+  assert.equal(await fit("plugins/frames/index.ts"), true, "a plugin in this repository");
+  assert.equal(await fit("packs/x/plugins/beams/index.ts"), true, "a plugin folder further down");
+  assert.equal(await fit("app/server.ts"), false);
   await loader.apply([]);
 });
 

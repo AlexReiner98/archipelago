@@ -28,6 +28,20 @@ export const SEED = [
     words: "The map refuses .env files: they hold secrets.",
     refuse: true,
   },
+  {
+    title: "A new idea fits the schema",
+    kind: "rule",
+    at: ["file:plugins/**", "file:**/plugins/**"],
+    words: [
+      "Fit a plugin's data to the types there are before defining any (spec/types.md, Fitting a new idea):",
+      "a thing in a model or design is a record (current until superseded); a field (`kind`) before a flavour, and a flavour only adds fields;",
+      "a relation is a kind of link, with a few fields if it needs them, and a grouping is `part_of`, never a field;",
+      "geometry is a json field with its shape and unit in its doc ([x,y,z] in cm), not a new kind of field;",
+      "the graph holds what was chosen, not what was computed: a solve or layout is rebuilt from the items, or kept as one record about them that the next supersedes, never an item per particle or frame;",
+      "write only through declared actions (items.create, items.set, items.link), read in bounded pages, and ask schema.check whether facts fit before sending them.",
+      "A new base or kind of field is a question for the spec's owner.",
+    ].join(" "),
+  },
 ];
 
 
