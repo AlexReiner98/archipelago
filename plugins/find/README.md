@@ -21,7 +21,7 @@ As you type, the line offers what fits the word being typed
 (suggest.ts), terms first and then items:
 
 - a key (`ty` → `type:`), a side, a type, a status; after a key, its
-  values; after `in:` `near:` `id:`, items by title.
+  values; after `in:` `near:` `id:`, items by title; after `as_of:`, today's date to edit.
 - items whose titles hold every word. Picking one jumps to it.
 
 ↑↓ move, Enter picks, Escape closes. A term goes into the line.
@@ -41,8 +41,20 @@ the query, it opens Map.
 | `in:<id>` | the item and all that is part_of it (an id, or a title, underscores for spaces) |
 | `near:<id>` | the item and what it is linked to (an id, or a title: `near:Frontend`) |
 | `id:<id>` | the item |
+| `as_of:<date>` | records true in the world then: `as_of` on or before it, and no `valid_to` or one after it; an item with no `as_of` fails it ([record](../record/README.md)) |
 
 An empty line is `is:open`. At most 150 items come back, and the links
 among them. Writes nothing.
+
+## Why nothing
+
+A query that finds nothing says why, in its result: `missing`, the words no
+title in its pool holds (the pool is the map, or what `in:` `near:` `id:`
+give); or else `empty_by`, the term that left nothing (`id:nope`,
+`status:blocked`, `as_of:2010-01-01`). When every word is in some title but
+no one title holds them all, it names neither. There are no synonyms:
+matching stays strict, so "nothing" is an honest "not on the map under that
+word", and the reader picks another word. The line shows it beside its count
+(`no title holds “zebra”`), and mcp's `query` answer carries both fields.
 
 The suggestions list and the count follow the query once it holds still for `LIST_WAIT_MS` (220), so typing does not flicker them; the list fades in over 140 ms as it opens and out over `LIST_OUT_MS` (140) as it closes.

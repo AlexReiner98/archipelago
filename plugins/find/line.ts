@@ -28,6 +28,7 @@ export const STYLE = sheet(`
 .fd { position:relative; display:flex; align-items:center; gap:var(--space-3); flex:1; min-width:0; }
 .fd input { flex:1; min-width:0; font:inherit; background:var(--control); color:var(--fg); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-1) var(--space-3); }
 .fd .n { color:var(--dim); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.fd .why { color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:18em; }
 .fd-list.out { animation:fd-out var(--fd-out, .14s) ease-in both; pointer-events:none; }
 @keyframes fd-out { to { opacity:0; transform:translateY(-3px); } }
 .fd-list { animation:fd-in .14s ease-out both; position:absolute; top:calc(100% + var(--space-1)); left:0; right:0; z-index:20; background:var(--panel); border:1px solid var(--control-line); border-radius:var(--radius); padding:var(--space-1) 0; white-space:nowrap; box-shadow:0 4px 14px color-mix(in srgb, var(--fg) 14%, transparent); }
@@ -64,6 +65,14 @@ export interface LineDeps {
 export function commandList(list: Suggestion[], offers: Suggestion[]): Suggestion[] {
   const at = list.findIndex((s) => s.kind === "item");
   return at < 0 ? [...list, ...offers] : [...list.slice(0, at), ...offers, ...list.slice(at)];
+}
+
+/** Why a query came back with nothing: the words no title holds, or the term that left nothing. */
+export function why(r: Result | undefined): string | undefined {
+  if (!r) return undefined;
+  if (r.missing?.length) return `no title holds ${r.missing.map((w) => `“${w}”`).join(", ")}`;
+  if (r.empty_by) return `${r.empty_by} leaves nothing`;
+  return undefined;
 }
 
 /** How long the query holds still before the suggestions and the count follow it, in ms: typing does not flicker them. */
@@ -197,13 +206,14 @@ export function makeLine(d: LineDeps) {
           autoFocus=${!!command}
           value=${q}
           placeholder=${command ? "Go to a view or an item, or find: words, is:open, type:…" : "find: words, is:open, type:question, in:<id>"}
-          title="words match titles · is:open is:closed · status:x · type:x · in:<id> · near:<id> · context:<title> arranges the Landscape into that context filter's tree · Ctrl+K jumps"
+          title="words match titles · is:open is:closed · status:x · type:x · in:<id> · near:<id> · as_of:<date> records true then · context:<title> arranges the Landscape into that context filter's tree · Ctrl+K jumps"
           onInput=${(e: Event) => type((e.target as HTMLInputElement).value)}
           onFocus=${() => setOpen(true)}
           onBlur=${() => !command && setOpen(false)}
           onKeyDown=${key}
         />
         ${!command && html`<span class="n">${n ? `${n.items.length}${n.more ? ` of ${n.items.length + n.more}` : ""}` : ""}</span>`}
+        ${!command && why(n) && html`<span class="why" title=${why(n)}>${why(n)}</span>`}
         ${list.length > 0 &&
         html`<div class="fd-list">${list.map((s, i) => [i === firstItem && i > 0 && html`<div class="fd-sep" key="sep" />`, row(s, i)])}</div>`}
         ${list.length === 0 && leaving.length > 0 && html`<div class="fd-list out" style=${`--fd-out:${LIST_OUT_MS}ms`}>${leaving.map((s, i) => row(s, i))}</div>`}
