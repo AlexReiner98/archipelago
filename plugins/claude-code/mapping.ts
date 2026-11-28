@@ -44,7 +44,7 @@
 import { transcriptPath } from "./slim.ts";
 import type { Act, AgentRun, Answer, Moment, Place, RunStart } from "../../spec/agent.ts";
 import type { Actor, Json, Time } from "../../spec/common.ts";
-import { refusalTold, told, type Speakers } from "./context.ts";
+import { CONTEXT_MAX, refusalTold, told, type Speakers } from "./context.ts";
 
 export const HARNESS = "claude-code";
 
@@ -129,18 +129,18 @@ export function trim(value: Json | undefined, max = TEXT_MAX): Json | undefined 
 }
 
 /** Everything said, as one block for the model, each node's words under its tag (context.ts). */
-export function spoken(answer: Answer, speakers?: Speakers, places?: Place[]): string | undefined {
-  return told(answer.said, speakers, places);
+export function spoken(answer: Answer, speakers?: Speakers, places?: Place[], budget = CONTEXT_MAX): string | undefined {
+  return told(answer.said, speakers, places, budget);
 }
 
-function contextOf(event: string, answer: Answer, speakers?: Speakers, places?: Place[]): HookOutput {
-  const text = spoken(answer, speakers, places);
+function contextOf(event: string, answer: Answer, speakers?: Speakers, places?: Place[], budget = CONTEXT_MAX): HookOutput {
+  const text = spoken(answer, speakers, places, budget);
   return text ? { hookSpecificOutput: { hookEventName: event, additionalContext: text } } : {};
 }
 
-/** The refusal's words, with what else was said after them, each under its node's tag. */
-export function refusalText(answer: Answer, speakers?: Speakers): string {
-  return refusalTold(answer, speakers);
+/** The refusal's words, with what else was said after them, each under its node's tag, in the budget. */
+export function refusalText(answer: Answer, speakers?: Speakers, places?: Place[], budget = CONTEXT_MAX): string {
+  return refusalTold(answer, speakers, places, budget);
 }
 
 /** The run a hook belongs to, as the adapter knows it. */
@@ -185,6 +185,8 @@ export function promptTitle(prompt: string): string | undefined {
 
 export interface Options {
   actor: Actor;
+  /** A hook's context (and a refusal's reason) at most, in characters (context.ts `fitted`). Default CONTEXT_MAX. */
+  contextMax?: number;
   now?: () => Time;
   /** The reply's text when the hook doesn't carry it (read from the transcript). */
   lastReply?: (input: HookInput) => Promise<string | undefined>;
@@ -389,8 +391,9 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
   };
   const act = (a: Omit<Act, "run" | "time">) => agent.act({ run, time: now(), ...a });
   const who = options.speakers;
-  const context = (event: string, answer: Answer, places?: Place[]) => contextOf(event, answer, who, places);
-  const refusalText = (answer: Answer) => refusalTold(answer, who);
+  const budget = options.contextMax ?? CONTEXT_MAX;
+  const context = (event: string, answer: Answer, places?: Place[]) => contextOf(event, answer, who, places, budget);
+  const refusalText = (answer: Answer, places?: Place[]) => refusalTold(answer, who, places, budget);
   // A subagent's loads are in its own transcript, which its hooks don't name until it stops.
   if (run === input.session_id) await reachLoads(input, port, options, reach);
 
@@ -433,7 +436,7 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
       if (answer.refused) {
         const { node, text, code } = answer.refused;
         await act({ place: "reply_end", kind: "reply", by: "agent", ...(reply !== undefined ? { input: trim(reply) } : {}), output: { refused: node, text, ...(code ? { code } : {}) }, ok: false });
-        return { decision: "block", reason: refusalText(answer) };
+        return { decision: "block", reason: refusalText(answer, ["reply_end"]) };
       }
       await act({ place: "reply_end", kind: "reply", by: "agent", ...(reply !== undefined ? { output: trim(reply) } : {}), ok: true });
       await agent.end(run, now());
@@ -449,13 +452,14 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
       }
       const answer = await reach(["prompt"], input.prompt ?? "");
       await act({ place: "prompt", kind: "prompt", by: "person", input: input.prompt ?? "", ok: !answer.refused });
-      if (answer.refused) return { decision: "block", reason: refusalText(answer) };
-      return context("UserPromptSubmit", answer);
+      if (answer.refused) return { decision: "block", reason: refusalText(answer, ["prompt"]) };
+      return context("UserPromptSubmit", answer, ["prompt"]);
     }
     case "PreToolUse": {
       const tool = input.tool_name ?? "unknown";
       if (input.tool_use_id) port.seen?.add(input.tool_use_id);
-      const answer = await reach(toolPlaces(tool, input.tool_input, input.cwd), trim(input.tool_input));
+      const places = toolPlaces(tool, input.tool_input, input.cwd);
+      const answer = await reach(places, trim(input.tool_input));
       if (answer.refused) {
         // The tool won't run, so no PostToolUse: the refused call is the act.
         await act({
@@ -470,11 +474,11 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
           hookSpecificOutput: {
             hookEventName: "PreToolUse",
             permissionDecision: "deny",
-            permissionDecisionReason: refusalText(answer),
+            permissionDecisionReason: refusalText(answer, places),
           },
         };
       }
-      return context("PreToolUse", answer);
+      return context("PreToolUse", answer, places);
     }
     case "PostToolUse":
     case "PostToolUseFailure": {
@@ -487,11 +491,11 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
         const denied = failed && REJECTED.test(String(input.error ?? ""));
         await act({ place: `tool:${tool}`, kind: "decision", by: "person", input: trim(input.tool_input) ?? null, output: denied ? "deny" : "allow", ok: !denied });
         // A denied call never ran: the person's decision is the act.
-        if (denied) return context(event, await reach([`tool_result:${tool}`], output ?? undefined));
+        if (denied) return context(event, await reach([`tool_result:${tool}`], output ?? undefined), [`tool_result:${tool}`]);
       }
       await act({ place: `tool:${tool}`, kind: "tool", by: "agent", input: trim(input.tool_input) ?? null, output: output ?? null, ok: !failed && !isError(input.tool_response) });
       const answer = await reach([`tool_result:${tool}`], output ?? undefined);
-      return context(event, answer);
+      return context(event, answer, [`tool_result:${tool}`]);
     }
     case "Stop": {
       await replayFailures(input, run, port, options, act);
@@ -501,7 +505,7 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
         // The reply was held back: it is the input of a denied act, like a denied tool call.
         const { node, text, code } = answer.refused;
         await act({ place: "reply_end", kind: "reply", by: "agent", ...(reply !== undefined ? { input: trim(reply) } : {}), output: { refused: node, text, ...(code ? { code } : {}) }, ok: false });
-        return { decision: "block", reason: refusalText(answer) };
+        return { decision: "block", reason: refusalText(answer, ["reply_end"]) };
       }
       await act({ place: "reply_end", kind: "reply", by: "agent", ...(reply !== undefined ? { output: trim(reply) } : {}), ok: true });
       return {};
