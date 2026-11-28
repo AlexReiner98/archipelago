@@ -14,7 +14,7 @@
  * | SessionEnd       | end                                                    | nothing                      |
  * | SubagentStart    | begin the subagent's run (parent: the session's), reach session_start | additionalContext |
  * | SubagentStop     | as Stop, on the subagent's run and transcript, then end it | block (keeps it going)   |
- * | PreCompact       | reach compact (what is said after is a re-saying)       | nothing                      |
+ * | PreCompact       | reach compact (what is said after is a re-saying)       | what was said, as plain text (`instructions`) |
  * | PermissionRequest | note the ask; the person's answer becomes a `decision` act | nothing (the dialog shows) |
  * | Notification     | act `notice` at prompt: the run waits on the person     | nothing                      |
  *
@@ -86,6 +86,19 @@ export interface HookInput {
 
 /** What the hook prints. Empty: nothing to say. */
 export type HookOutput = Record<string, Json>;
+
+/**
+ * The one answer printed as plain text, not JSON: at PreCompact, Claude Code
+ * takes a command hook's plain stdout as instructions for the summary it
+ * writes. The server answers it as `text/plain`, which hook.ts prints as it is.
+ */
+export const INSTRUCTIONS = "instructions";
+
+/** The plain text a hook's answer prints, when it is one (PreCompact's `instructions`). */
+export function plainOf(output: HookOutput): string | undefined {
+  const t = output[INSTRUCTIONS];
+  return typeof t === "string" ? t : undefined;
+}
 
 /** Tool input fields that name the file the tool will touch. */
 const FILE_FIELDS = ["file_path", "notebook_path"];
@@ -402,8 +415,10 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
 
   switch (event) {
     case "PreCompact": {
-      await reach(["compact"], { trigger: input.trigger ?? "auto" });
-      return {};
+      // What the nodes at compact say steers the summary: the run's task, what it holds, what it was told.
+      const answer = await reach(["compact"], { trigger: input.trigger ?? "auto" });
+      const text = spoken(answer, who, ["compact"], budget);
+      return text ? { [INSTRUCTIONS]: text } : {};
     }
     case "PermissionRequest": {
       // The harness is about to ask the person. Their answer is recorded when it shows (settleAsks, PostToolUse).

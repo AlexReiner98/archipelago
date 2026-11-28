@@ -45,6 +45,7 @@ run.
 |---|---|---|
 | `claim/plan` | `session_start`, `prompt` | When another agent is live on the same repository: how to claim (once), and what the others hold, with their branches. Alone, it says nothing |
 | `claim/turn` | `reply_end` | Says nothing: as a run's reply ends, it lets go of what it holds, its intents done |
+| `claim/kept` | `compact` | As the run's context is about to be compacted: its open intents with their files, and the files it wrote this turn, for the summary to keep (`keptWords`). Holding nothing, it says nothing |
 | `claim/held` | `file:**` | A write (`Edit`, `Write`, `MultiEdit`, `NotebookEdit`) to a file another live run holds is refused (`claim.held`), naming the holder and its intent, and its branch to merge when it works in another checkout. A read of one is told. A write to a file nobody holds holds it for the writer. A run that started first hears how to claim here, once, when a second agent starts beside it |
 
 A refusal is a miss like any other on the exchange: the sensory interface

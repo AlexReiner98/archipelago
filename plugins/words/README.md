@@ -51,7 +51,7 @@ node's whole words; no input, the listed nodes one line each. Injects
 The plugin remembers, per run since its last `compact`, what each of its
 nodes said to it (its whole words, or its line) and what the words tool
 handed it (`words.heard`, a plugin-own key it provides). One more node,
-`words/changed` ("Changed since heard", at `prompt` and `compact`), tells
+`words/changed` ("Changed since heard", at `prompt`), tells
 a run at its next prompt what changed in the nodes it heard, one line
 each: a rewording with the new words, a retired (or emptied, or gone) node
 as no longer applying. A node told that way doesn't say the same new words
@@ -60,6 +60,11 @@ prompt, a reworded node says its new words itself, and the agent plugin
 records that say `reworded`. A node item moved to an ordinary type, said
 now by its context filter link, is compared with what that link says: the move
 itself isn't told as a retirement. A node heard at the same moment the change node reads (said at that same prompt) is checked next time, never told as retired. At most 200 runs are held.
+
+At `compact`, `words/heard` ("What the map told this run") names the
+nodes the run heard, by title and id (at most 40, the rest counted:
+`heardWords`), so the summary Claude Code writes keeps what the run was
+told, and then forgets them: after a compaction nothing is in the context.
 
 A node whose item has `held` (a reason) is held as written: `words.set`,
 `words.title` and `words.retire` refuse it, with the reason (`words.held`). The

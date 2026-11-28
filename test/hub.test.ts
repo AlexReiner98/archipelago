@@ -40,6 +40,9 @@ test("a run's hub is every item its task is part of, at any depth", async () => 
   const start = { run: "r1", agent: { id: "e_agent", kind: "agent" as const }, harness: "test", reaches: [] };
   assert.equal((await run.begin(start)).facts?.hub, undefined);
   assert.deepEqual((await run.begin({ ...start, task })).facts?.hub, [mid, top]);
+  // At compact, the task and what it is part of, nearest first, for the summary to keep.
+  const said = await run.reach({ run: "r1", places: ["compact"], time: "2026-11-20T14:00:00.000Z" });
+  assert.deepEqual(said.said, [{ node: "hub/task", text: `Keep in the summary this run's task: Write the page (${task}, todo), part of Launch (${mid}), then Business (${top}).` }]);
   assert.deepEqual(errors, []);
   await loader.apply([]);
 });

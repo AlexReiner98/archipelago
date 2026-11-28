@@ -6,7 +6,7 @@
  *
  * One HTTP server, the plugin's effect (it closes when the plugin unloads):
  * - `POST /hook`: Claude Code's http hooks post their input here and print
- *   the answer (see mapping.ts).
+ *   the answer (see mapping.ts): JSON, but PreCompact's, which is plain text.
  * - `POST /mcp`: a streamable-HTTP MCP server (see mcp.ts), serving the
  *   tools plugins add through `mcp.host`, which this plugin provides. A client
  *   without hooks gets an `Mcp-Session-Id` on `initialize`, and its session
@@ -35,7 +35,7 @@ import type { ExchangeRead } from "../../spec/exchange.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 import { refuse, type LocalAccess } from "../../runtime/guard.ts";
-import { handle, lastAssistantText, refusalText, runIdOf, spoken, trim, type HookInput, type HookOutput, type Load, type RecordedCall, type RunPort } from "./mapping.ts";
+import { handle, lastAssistantText, plainOf, refusalText, runIdOf, spoken, trim, type HookInput, type HookOutput, type Load, type RecordedCall, type RunPort } from "./mapping.ts";
 import { rpc, type JsonRpc } from "./mcp.ts";
 import { TRANSCRIPT_FIELD, TRANSCRIPT_HEADER, transcriptPath, type Sent } from "./slim.ts";
 
@@ -411,7 +411,11 @@ const claudeCode: Plugin<ClaudeCodeConfig> = {
             delete input.transcript_path;
             delete input.agent_transcript_path;
           }
-          return send(res, 200, await hook(input));
+          const out = await hook(input);
+          // PreCompact's answer is plain text: Claude Code's instructions for the summary.
+          const plain = plainOf(out);
+          if (plain !== undefined) return void res.writeHead(200, { "content-type": "text/plain; charset=utf-8" }).end(plain);
+          return send(res, 200, out);
         }
         if (path === "/mcp") {
           const header = req.headers["mcp-session-id"];

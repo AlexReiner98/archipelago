@@ -295,13 +295,18 @@ test("reworded where the run hears it before a prompt: the node's new words, rec
 
   // After a compact nothing is in the context: a change is not told, the node says its words as new.
   await p.invoke.invoke({ action: "words.set", input: { node: node!.source!, words: "Third." }, authority: owner, reason: "reword" });
-  await p.run.reach({ run: "r1", places: ["compact"], time: T });
+  // At the compact, the node's title is named for the summary to keep (words/heard).
+  const kept = `Keep in the summary the titles of the map's nodes this run was told (their words come back through get):
+- Spec (${node!.source})`;
+  assert.deepEqual((await p.run.reach({ run: "r1", places: ["compact"], time: T })).said, [{ node: "words/heard", text: kept }]);
   assert.deepEqual((await p.run.reach({ run: "r1", places: ["prompt"], time: T })).said, []);
+  assert.deepEqual((await p.run.reach({ run: "r1", places: ["compact"], time: T })).said, [], "nothing heard since: nothing named");
 
   const says = (await p.exchange.events("r1")).items.filter((e) => e.kind === "say");
   assert.deepEqual(says.map((e) => [e.text, (e.detail as { reworded?: boolean } | undefined)?.reworded ?? false]), [
     ["Ask Owner first.", false],
     ["spec/ is Owner's.", true],
+    [kept, false],
   ]);
   assert.deepEqual(errors, []);
   await loader.apply([]);
@@ -363,4 +368,18 @@ test("a node heard while the change node was reading (said at the same moment) i
   assert.ok(heard.has("n_b"), "and it stays heard, to be checked next time");
   const gone = new Map([["n_a", null], ["n_b", null]]);
   assert.deepEqual(changes(heard, gone as never, "TRIAL"), ['"A" no longer applies: it was retired on the map.', '"B" no longer applies: it was retired on the map.'], "read and gone: retired");
+});
+
+test("heardWords: the titles of the nodes a run heard, named at compact, the rest counted", async () => {
+  const { heardWords } = await import("../plugins/words/heard.ts");
+  assert.equal(heardWords(new Map()), "");
+  const heard = new Map([
+    ["n_one", { text: "a", title: "One", listed: false }],
+    ["n_two", { text: "b", title: "Two", listed: true }],
+    ["n_three", { text: "c", title: "Three", listed: false }],
+  ]);
+  assert.equal(
+    heardWords(heard, 2),
+    "Keep in the summary the titles of the map's nodes this run was told (their words come back through get):\n- One (n_one)\n- Two (n_two), its line only\n- and 1 more",
+  );
 });

@@ -93,9 +93,36 @@ promise it. The harness view's window (plugins/transcript) shows these counts.
 | SessionEnd | `end` (and of any subagent run still open) | nothing |
 | SubagentStart | `begin` the subagent's run, reach `session_start` (input `{source: "subagent", agent_type}`) | what was said, as context |
 | SubagentStop | as Stop, on the subagent's run and its own transcript, then `end` it | block on a refusal: the subagent keeps going |
-| PreCompact | reach `compact` (input `{trigger}`): the agent plugin records it, and marks what is said again after it as re-said | nothing |
+| PreCompact | reach `compact` (input `{trigger}`): the agent plugin records it, and marks what is said again after it as re-said | what was said there, as plain text: Claude Code's instructions for the summary it writes (below) |
 | PermissionRequest | note the ask; the person's answer becomes a `decision` act at `tool:<name>` | nothing: the dialog shows |
 | Notification | act `notice` at `prompt` (input `{type, message}`): the run waits on the person | nothing |
+
+## At a compaction
+
+Claude Code takes a PreCompact command hook's plain stdout (exit 0) as
+instructions for the summary it writes, kept under 10,000 characters. So
+what the nodes at `compact` say is handed on there, each under its tag, in
+the same budget as any hook's context: the server answers it as
+`text/plain` (`instructions` in [mapping.ts](mapping.ts), `plainOf`), and
+[hook.ts](hook.ts) prints it as it is. The map decides what the summary
+keeps; the adapter only hands it on. Three nodes speak there now:
+
+| Node | Says |
+|---|---|
+| `hub/task` | the run's task, by title, id and status, and what it is part of |
+| `claim/kept` | the run's open claims, their intent and files, and the files written this turn |
+| `words/heard` | the titles and ids of the map's nodes the run was told |
+
+```
+PreCompact ─▶ reach compact ─▶ hub/task, claim/kept, words/heard ─▶ text/plain ─▶ hook.ts stdout ─▶ the summary keeps them
+SessionStart (compact) ─▶ reach session_start ─▶ re-said
+```
+
+The summary then carries the task, the claims and what was told across the
+compaction, whatever comes back at `session_start` after. PreCompact must
+be a command hook: an http hook's plain text answer is a hook error. A
+manual `/compact` with its own focus still reaches `compact` the same way;
+how Claude Code joins the two isn't documented.
 
 ## The person's decisions
 

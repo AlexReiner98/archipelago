@@ -523,3 +523,14 @@ test("absolute paths: from a path and its run's folder, drive paths in lower cas
   assert.equal(absOf("src/a.ts", "relative/folder"), undefined);
   assert.equal(absOf("src/a.ts"), undefined);
 });
+
+test("keptWords: what a run holds, said at compact so the summary keeps it", async () => {
+  const { keptWords } = await import("../plugins/claim/index.ts");
+  assert.equal(keptWords([], []), "", "nothing held: nothing said");
+  const intent = { id: "i_mw0demo0item1", scope: "repo:example.org/me/r", run: "r1", agent: "a", title: "rename greet", files: ["src/greet.ts", "src/"], status: "doing", since: "2026-11-20T14:00:00.000Z", after: [] };
+  const loose = [{ scope: "repo:example.org/me/r", file: "README.md", run: "r1", title: "a", intent: "", how: "on_write" as const, since: "2026-11-20T14:00:00.000Z" }];
+  assert.equal(
+    keptWords([intent], loose),
+    "Keep in the summary the files this run holds on the shared plan, and what for:\n- rename greet: src/greet.ts, src/ (claimed, i_mw0demo0item1)\n- written this turn: README.md",
+  );
+});
