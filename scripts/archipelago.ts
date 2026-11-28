@@ -6,7 +6,13 @@
  *        this checkout's code serving the map, in this terminal
  *   up    [--map name] [same options]   the same, detached: it outlives the terminal or preview that started it
  *   down  <map>                         stops the map's server
- *   ls                                  every server: map, port, commit, checkout, the folders that report to it
+ *   ls                                  every server: map, port, commit, checkout, the folders that report to it;
+ *                                       remote maps; and which map is current (*)
+ *   use   [name]                        the switch: the map every session connected to `current` reaches, from
+ *                                       its next call (<home>/current). No name: says which it is.
+ *   remote [ls | add <name> <url> [--token-env VAR] | rm <name>]
+ *        maps served elsewhere, reached at their address (their /mcp and
+ *        /hook), with the token read from VAR at each call: never written.
  *   sync  <map|url> [--map name] [--dry] [--keep theirs] [--token t]
  *        syncs the map (default live) with another, both ways: what each
  *        changed since they last synced, the later change winning field by
@@ -45,7 +51,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { httpEnd, syncMaps, type Report } from "../plugins/sync/run.ts";
 import { forget, FROM_WORDS, readFolder, remember, remembered } from "../runtime/folders.ts";
-import { defaultMap, hasMap, homeOf, MAP_NAME, mapDir, reporting, servedOf, serverFile, servers, alive, type Served } from "./maps.ts";
+import { addRemote, currentOf, defaultMap, hasMap, homeOf, MAP_NAME, mapDir, remotes, removeRemote, reporting, servedOf, serverFile, servers, useMap, alive, type Served } from "./maps.ts";
 
 const here = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const home = homeOf();
@@ -64,6 +70,7 @@ const { values, positionals } = parseArgs({
     dry: { type: "boolean", default: false },
     token: { type: "string" },
     keep: { type: "string" },
+    "token-env": { type: "string" },
   },
 });
 const verb = positionals[0] ?? "ls";
@@ -211,15 +218,57 @@ switch (verb) {
   }
   case "ls": {
     const all = servers(home).sort((a, b) => a.map.localeCompare(b.map));
-    if (!all.length) {
-      console.log(`no server runs a map (${join(home, "servers")})`);
-      break;
-    }
+    const far = remotes(home);
+    const current = currentOf(home);
+    const mark = (map: string) => (map === current ? "* " : "  ");
+    if (!all.length && !far.length) console.log(`no server runs a map (${join(home, "servers")})`);
     for (const s of all) {
       const where = s.running ? (s.port ? page(s.port) : "starting") : "stopped (stale entry)";
       const folders = reporting(s.data);
-      console.log(`${s.map}\t${where}\t${s.commit ?? ""}\t${s.checkout}${folders.length ? `\n\treported to by ${folders.join(", ")}` : ""}`);
+      console.log(`${mark(s.map)}${s.map}\t${where}\t${s.commit ?? ""}\t${s.checkout}${folders.length ? `\n\treported to by ${folders.join(", ")}` : ""}`);
       if (s.running) for (const line of pluginLines(s.plugins)) console.log(`\t${line}`);
+    }
+    for (const r of far) console.log(`${mark(r.map)}${r.map}\tremote ${r.url}${r.token_env ? `\ttoken from ${r.token_env}${process.env[r.token_env] ? "" : " (not set here)"}` : ""}`);
+    console.log(current ? `current: ${current} (* above): every session connected to "current" reaches it` : "no map is current: npm run map -- use <name> sets one");
+    break;
+  }
+  case "use": {
+    const name = positionals[1];
+    if (!name) {
+      const c = currentOf(home);
+      console.log(c ? `current: ${c}` : "no map is current: npm run map -- use <name>");
+      break;
+    }
+    const r = useMap(name, home);
+    if (!r.ok) {
+      console.log(`refused: ${r.why}`);
+      process.exit(1);
+    }
+    const running = r.remote || servedOf(name, home);
+    console.log(`current: ${name}${r.was && r.was !== name ? ` (was ${r.was})` : ""}. Every session connected to "current" reaches it from its next call${running ? "" : `; it isn't running: npm run map -- up --map ${name}`}.`);
+    break;
+  }
+  case "remote": {
+    const sub = positionals[1] ?? "ls";
+    const name = positionals[2];
+    const url = positionals[3];
+    const tokenEnv = values["token-env"];
+    if (sub === "add" && name && url) {
+      const r = addRemote(name, url, tokenEnv, home);
+      console.log(r.ok ? `remote map ${name}: ${url}${tokenEnv ? `, token from ${tokenEnv}` : ", no token"}. npm run map -- use ${name} makes it current.` : `refused: ${r.why}`);
+      if (!r.ok) process.exitCode = 1;
+    } else if (sub === "rm" && name) {
+      const was = currentOf(home) === name;
+      const gone = removeRemote(name, home);
+      console.log(gone ? `remote map ${name} forgotten${was ? ": no map is current now" : ""}` : `no remote map ${name}`);
+      if (!gone) process.exitCode = 1;
+    } else if (sub === "ls") {
+      const far = remotes(home);
+      if (!far.length) console.log("no remote map (npm run map -- remote add <name> <url> [--token-env VAR])");
+      for (const r of far) console.log(`${r.map}\t${r.url}${r.token_env ? `\ttoken from ${r.token_env}` : ""}`);
+    } else {
+      console.log("npm run map -- remote [ls | add <name> <url> [--token-env VAR] | rm <name>]");
+      process.exitCode = 1;
     }
     break;
   }
@@ -331,6 +380,6 @@ switch (verb) {
     break;
   }
   default:
-    console.log("npm run map -- serve|up [--map name] [--from map|dir] [--port n] [--no-write] [--no-watch] | down <map> | ls | plugins [ls | add <dir> | rm <dir|name>] [--map name] | sync <map|url> [--map name] [--dry] [--keep theirs] [--token t] | go [--folder dir] [--no-connect] [--no-open]");
+    console.log("npm run map -- serve|up [--map name] [--from map|dir] [--port n] [--no-write] [--no-watch] | down <map> | ls | use [name] | remote [ls | add <name> <url> [--token-env VAR] | rm <name>] | plugins [ls | add <dir> | rm <dir|name>] [--map name] | sync <map|url> [--map name] [--dry] [--keep theirs] [--token t] | go [--folder dir] [--no-connect] [--no-open]");
     process.exitCode = 1;
 }

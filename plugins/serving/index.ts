@@ -8,14 +8,16 @@
  *   `checkout` the folder the code runs from, absent behind a host;
  *   `folders` the plugin folders it loaded, where the list came from
  *   (`flag`, `env` or `map`) and each named one that didn't load, absent
- *   behind a host. Read only.
+ *   behind a host; `switch.current`, for a map served by name, the map the
+ *   switch names (registry.ts `currentOf`, `npm run map -- use`), read at
+ *   each call, so the page says whether sessions report here. Read only.
  *
- * Config: `map`, `commit`, `checkout`, `port`, `folders` (app/tree.ts sets them).
+ * Config: `map`, `commit`, `checkout`, `port`, `folders`, `sayCurrent` (app/tree.ts sets them).
  * Injects action.register.
  */
 import type { ActionRegister } from "../../spec/action.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
-import type { PluginFolders } from "../claude-code/registry.ts";
+import { currentOf, type PluginFolders } from "../claude-code/registry.ts";
 
 export const ABOUT = "serving.about";
 
@@ -25,9 +27,16 @@ export interface ServingConfig {
   checkout?: string;
   port?: number;
   folders?: PluginFolders;
+  /** Whether to say the switch (this machine's `current`): a local server only. */
+  sayCurrent?: boolean;
 }
 
-export type About = ServingConfig;
+/**
+ * What `serving.about` answers: the config, and for a map served by name the
+ * switch (`switch.current`: the map every session connected to `current`
+ * reaches, absent when none is), read at each call.
+ */
+export type About = Omit<ServingConfig, "sayCurrent"> & { switch?: { current?: string } };
 
 const serving: Plugin<ServingConfig> = {
   id: "serving",
@@ -47,7 +56,9 @@ const serving: Plugin<ServingConfig> = {
       doc: "The map's name (when served by name), the commit, the checkout, the page's port, and the plugin folders it loaded (and from where). Read only.",
       input: { type: "object", properties: {} },
       async run() {
-        return about as unknown as Record<string, string | number>;
+        if (!about.map || !config.sayCurrent) return about as unknown as Record<string, string | number>;
+        const current = currentOf();
+        return { ...about, switch: current ? { current } : {} } as unknown as Record<string, string | number>;
       },
     });
   },

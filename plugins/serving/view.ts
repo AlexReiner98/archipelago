@@ -26,18 +26,27 @@ const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown 
 export const ABOUT = "serving.about";
 
 /** The header's words and title, or nothing to show. */
-export function lineOf(a: About | undefined): { text: string; title: string } | undefined {
+export function lineOf(a: About | undefined): { text: string; title: string; current?: boolean } | undefined {
   if (!a || (!a.map && !a.commit && !a.checkout && !a.port)) return undefined;
   const folder = a.checkout?.replace(/[\\/]+$/, "").split(/[\\/]/).pop();
   const map = a.map ?? (a.port ? `:${a.port}` : undefined);
-  const text = [map, a.commit, folder].filter(Boolean).join(" · ");
+  const sw = a.map && a.switch ? a.switch : undefined;
+  const current = sw ? sw.current === a.map : undefined;
+  const text = [map, current ? "current" : undefined, a.commit, folder].filter(Boolean).join(" · ");
   const title = [
     a.map ? `Map ${a.map}` : "A map with no name",
     a.port ? `on port ${a.port}` : "",
+    sw
+      ? current
+        ? "\nThe current map: every session connected to “current” reports here"
+        : sw.current
+          ? `\nNot the current map: sessions connected to “current” report to ${sw.current} (npm run map -- use ${a.map} switches them here)`
+          : `\nNo map is current: sessions connected to “current” report nowhere (npm run map -- use ${a.map})`
+      : "",
     a.commit ? `\nCommit ${a.commit.replace(/\+$/, "")}${a.commit.endsWith("+") ? ", with changes not committed" : ""}` : "",
     a.checkout ? `\nCode from ${a.checkout}` : "",
-  ].join(" ").replace(/ \n/g, "\n").trim();
-  return { text, title };
+  ].filter(Boolean).join(" ").replace(/ \n/g, "\n").trim();
+  return { text, title, ...(current !== undefined ? { current } : {}) };
 }
 
 const FROM: Record<string, string> = {
@@ -61,6 +70,7 @@ const STYLE = sheet(`
 .sv-folders .sv-dir { color:var(--dim); font-family:var(--mono, monospace); font-size:var(--text-s); overflow-wrap:anywhere; }
 .sv-folders .sv-why { color:var(--failed); }
 .sv-line { color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:28em; }
+.sv-line.sv-elsewhere { color:var(--failed); }
 `);
 
 const servingView: Plugin = {
@@ -78,16 +88,24 @@ const servingView: Plugin = {
 
     const Line = () => {
       const l = lineOf(useAbout());
-      return l ? html`<span class="sv-line" title=${l.title}>${l.text}</span>` : null;
+      return l ? html`<span class=${l.current === false ? "sv-line sv-elsewhere" : "sv-line"} data-current=${l.current === undefined ? "" : String(l.current)} title=${l.title}>${l.text}</span>` : null;
     };
 
+    /** Asked once, then again when the page comes back into view: the switch may have moved meanwhile. */
     const useAbout = () => {
       const [about, setAbout] = useState<About | undefined>();
       useEffect(() => {
         let live = true;
         void ask().then((a) => live && setAbout(a));
+        const again = () => {
+          if (document.visibilityState !== "visible") return;
+          asked = undefined;
+          void ask().then((a) => live && setAbout(a));
+        };
+        document.addEventListener("visibilitychange", again);
         return () => {
           live = false;
+          document.removeEventListener("visibilitychange", again);
         };
       }, []);
       return about;

@@ -11,10 +11,10 @@ import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { after, test } from "node:test";
-import { claim, defaultMap, freePort, holdPort, letPortGo, nameFrom, release, reporting, servers, snapshot } from "../scripts/maps.ts";
+import { addRemote, claim, defaultMap, freePort, holdPort, letPortGo, nameFrom, release, remotes, removeRemote, reporting, servers, snapshot, useMap } from "../scripts/maps.ts";
 import { remember, remembered } from "../runtime/folders.ts";
 import { saveLedger } from "../plugins/project-files/write.ts";
-import { adapterOf, entryOf, serverFile, type Served } from "../plugins/claude-code/registry.ts";
+import { adapterOf, currentFile, currentOf, entryOf, reachOf, serverFile, type Served } from "../plugins/claude-code/registry.ts";
 import { proxy } from "../plugins/claude-code/proxy.ts";
 import { wanted } from "../plugins/connect/here.ts";
 import { foldersOf, lineOf } from "../plugins/serving/view.ts";
@@ -39,7 +39,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** A fake adapter: answers /hook and /mcp, and records what it was sent. */
 async function adapter(sessionId = "s1") {
-  const seen: { path: string; body: any; session?: string }[] = [];
+  const seen: { path: string; body: any; session?: string; auth?: string }[] = [];
   const known = new Set<string>();
   const read = (req: IncomingMessage) => new Promise<string>((ok) => {
     let b = "";
@@ -49,7 +49,8 @@ async function adapter(sessionId = "s1") {
   const server: Server = createServer(async (req, res) => {
     const body = JSON.parse((await read(req)) || "{}");
     const session = req.headers["mcp-session-id"] as string | undefined;
-    seen.push({ path: req.url!, body, ...(session ? { session } : {}) });
+    const auth = req.headers.authorization;
+    seen.push({ path: req.url!, body, ...(session ? { session } : {}), ...(auth ? { auth } : {}) });
     if (req.url === "/hook") return res.end(JSON.stringify({ heard: sessionId }));
     if (session && !known.has(session)) {
       res.statusCode = 404;
@@ -75,10 +76,10 @@ async function adapter(sessionId = "s1") {
 }
 
 /** Runs the hook script for a map, as a connected folder's hook would. */
-function hook(map: string, input: object): Promise<{ out: string; code: number | null }> {
+function hook(map: string, input: object, env: Record<string, string> = {}): Promise<{ out: string; code: number | null }> {
   return new Promise((ok) => {
     const child = spawn(process.execPath, [join(root, "plugins", "claude-code", "hook.ts"), "--map", map], {
-      env: { ...process.env, ARCHIPELAGO_HOME: home, ARCHIPELAGO_TRANSCRIPT: "off", ARCHIPELAGO_TOKEN: "" },
+      env: { ...process.env, ARCHIPELAGO_HOME: home, ARCHIPELAGO_TRANSCRIPT: "off", ARCHIPELAGO_TOKEN: "", ...env },
       windowsHide: true,
     });
     let out = "";
@@ -367,6 +368,110 @@ test("the MCP proxy answers with no tools while its map is down, and says its to
   assert.deepEqual(((await p.handle({ jsonrpc: "2.0", id: 4, method: "tools/list" })) as any).result.tools, [{ name: "tool-of-up" }]);
   p.close();
   await up.close();
+});
+
+/** A map's data as useMap sees it: a folder with its graph. */
+const kept = (map: string) => {
+  mkdirSync(join(home, "maps", map), { recursive: true });
+  writeFileSync(join(home, "maps", map, "graph.sqlite"), "");
+};
+
+test("the switch names one map: kept here or remote, refused otherwise, and never the word current", () => {
+  rmSync(currentFile(home), { force: true });
+  assert.equal(currentOf(home), undefined);
+  assert.equal(reachOf("current", home), undefined, "no map is current: nothing is reached");
+  assert.match((useMap("nowhere", home) as { why: string }).why, /no map nowhere here/);
+  assert.equal(useMap("current", home).ok, false);
+  kept("first");
+  assert.deepEqual(useMap("first", home), { ok: true, remote: false });
+  assert.equal(currentOf(home), "first");
+  kept("second");
+  assert.deepEqual(useMap("second", home), { ok: true, was: "first", remote: false });
+  // A remote map: its address and the variable its token is in, never the token.
+  assert.match((addRemote("second", "https://maps.example.org", undefined, home) as { why: string }).why, /kept here already/);
+  assert.match((addRemote("far", "https://maps.example.org", "sk-not-a-name!", home) as { why: string }).why, /not a variable's name/);
+  assert.deepEqual(addRemote("far", "https://maps.example.org/", "FAR_TOKEN", home), { ok: true });
+  const file = readFileSync(join(home, "remotes", "far.json"), "utf8");
+  assert.deepEqual(JSON.parse(file), { url: "https://maps.example.org", token_env: "FAR_TOKEN" });
+  assert.deepEqual(useMap("far", home), { ok: true, was: "second", remote: true });
+  assert.deepEqual(reachOf("current", home, { FAR_TOKEN: "t0ken" }), { map: "far", mcp: "https://maps.example.org/mcp", hook: "https://maps.example.org/hook", token: "t0ken", remote: true });
+  assert.deepEqual(reachOf("far", home, {}), { map: "far", mcp: "https://maps.example.org/mcp", hook: "https://maps.example.org/hook", remote: true }, "its variable unset: no token");
+  assert.deepEqual(remotes(home).map((r) => r.map), ["far"]);
+  // Forgetting the current remote leaves no map current, rather than a name that leads nowhere.
+  assert.equal(removeRemote("far", home), true);
+  assert.equal(currentOf(home), undefined);
+  assert.equal(removeRemote("far", home), false);
+});
+
+test("a hook connected to current follows the switch from one map to the next, and says when none is current", async () => {
+  rmSync(currentFile(home), { force: true });
+  const start = await hook("current", { hook_event_name: "SessionStart", source: "startup", session_id: "x", cwd: home });
+  assert.match(JSON.parse(start.out).systemMessage, /^No map is current.*npm run map -- use/);
+  const a = await adapter("a");
+  const b = await adapter("b");
+  kept("hook-a");
+  kept("hook-b");
+  put(entry("hook-a", a.page));
+  put(entry("hook-b", b.page));
+  useMap("hook-a", home);
+  assert.match((await hook("current", { hook_event_name: "UserPromptSubmit", session_id: "x", cwd: home })).out, /"a"/);
+  useMap("hook-b", home);
+  assert.match((await hook("current", { hook_event_name: "UserPromptSubmit", session_id: "x", cwd: home })).out, /"b"/);
+  assert.deepEqual([a.seen.length, b.seen.length], [1, 1]);
+  // The current map stopped: the line names it.
+  put(entry("hook-b", b.page, 999999));
+  assert.match(JSON.parse((await hook("current", { hook_event_name: "SessionStart", source: "startup", session_id: "x", cwd: home })).out).systemMessage, /^Map hook-b isn't running/);
+  // A remote one: its /hook, with the token from its variable.
+  const far = await adapter("far");
+  addRemote("hook-far", `http://127.0.0.1:${far.port}`, "HOOK_FAR_TOKEN", home);
+  useMap("hook-far", home);
+  assert.match((await hook("current", { hook_event_name: "UserPromptSubmit", session_id: "x", cwd: home }, { HOOK_FAR_TOKEN: "t0ken" })).out, /"far"/);
+  assert.equal(far.seen[0]!.auth, "Bearer t0ken");
+  removeRemote("hook-far", home);
+  await a.close();
+  await b.close();
+  await far.close();
+});
+
+test("the MCP proxy connected to current opens a session on the map the switch moves to, a remote one with its token", async () => {
+  const one = await adapter("one");
+  kept("px-one");
+  put(entry("px-one", one.page));
+  useMap("px-one", home);
+  const p = proxy({ map: "current", home, send() {} });
+  await p.handle({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", clientInfo: { name: "claude-code" } } });
+  await p.handle({ jsonrpc: "2.0", method: "notifications/initialized" });
+  assert.deepEqual(((await p.handle({ jsonrpc: "2.0", id: 2, method: "tools/list" })) as any).result.tools, [{ name: "tool-of-one" }]);
+  const far = await adapter("far");
+  process.env.PX_FAR_TOKEN = "t0ken";
+  addRemote("px-far", `http://127.0.0.1:${far.port}`, "PX_FAR_TOKEN", home);
+  useMap("px-far", home);
+  assert.deepEqual(((await p.handle({ jsonrpc: "2.0", id: 3, method: "tools/list" })) as any).result.tools, [{ name: "tool-of-far" }]);
+  assert.deepEqual(far.seen.map((s) => s.body.method), ["initialize", "notifications/initialized", "tools/list"]);
+  assert.ok(far.seen.every((s) => s.auth === "Bearer t0ken"), "every call to the remote map carries its token");
+  assert.ok(one.seen.every((s) => !s.auth), "the local map is sent no token");
+  // None current: the proxy says so, and how to name one.
+  removeRemote("px-far", home);
+  assert.match(((await p.handle({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "x" } })) as any).error.message, /^No map is current/);
+  delete process.env.PX_FAR_TOKEN;
+  p.close();
+  await one.close();
+  await far.close();
+});
+
+test("the header says whether its map is the current one", () => {
+  const a = { map: "live", commit: "abc1234", checkout: "/home/me/code/archipelago", port: 5300 };
+  assert.deepEqual(lineOf({ ...a, switch: { current: "live" } }), {
+    text: "live · current · abc1234 · archipelago",
+    title: "Map live on port 5300\nThe current map: every session connected to “current” reports here\nCommit abc1234\nCode from /home/me/code/archipelago",
+    current: true,
+  });
+  const other = lineOf({ ...a, map: "try", switch: { current: "live" } })!;
+  assert.equal(other.text, "try · abc1234 · archipelago");
+  assert.equal(other.current, false);
+  assert.match(other.title, /Not the current map: sessions connected to “current” report to live \(npm run map -- use try/);
+  assert.match(lineOf({ ...a, switch: {} })!.title, /No map is current/);
+  assert.equal(lineOf(a)!.current, undefined, "a server that doesn't say the switch: nothing about it");
 });
 
 test("a folder connected to a map by name holds the map's name, never a port", () => {

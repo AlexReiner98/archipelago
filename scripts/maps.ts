@@ -17,9 +17,9 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync,
 import { createServer } from "node:net";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { alive, entryOf, homeOf, MAP_NAME, mapDir, serverFile, type Served } from "../plugins/claude-code/registry.ts";
+import { alive, CURRENT, currentFile, currentOf, entryOf, homeOf, MAP_NAME, mapDir, remoteFile, remoteOf, serverFile, type Remote, type Served } from "../plugins/claude-code/registry.ts";
 
-export { alive, homeOf, MAP_NAME, mapDir, serverFile, servedOf, type PluginFolders, type Served } from "../plugins/claude-code/registry.ts";
+export { alive, CURRENT, currentOf, homeOf, MAP_NAME, mapDir, reachOf, remoteOf, serverFile, servedOf, type PluginFolders, type Remote, type Served } from "../plugins/claude-code/registry.ts";
 
 /** Where free ports are looked for: above the fixed live (5180) and dev (5280) ones. */
 export const PORTS_FROM = 5300;
@@ -259,6 +259,56 @@ export function reporting(data: string): string[] {
     return Object.keys(ledger)
       .filter((f) => /[\\/]\.mcp\.json$/.test(f))
       .map((f) => f.slice(0, -"/.mcp.json".length));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Sets the switch (`<home>/current`, registry.ts): the one map every session
+ * given `current` reaches from its next call. The map must be there, kept
+ * here (its data) or remote (its entry); refused otherwise.
+ */
+export function useMap(name: string, home = homeOf()): { ok: true; was?: string; remote: boolean } | { ok: false; why: string } {
+  if (!MAP_NAME.test(name) || name === CURRENT) return { ok: false, why: `"${name}" is not a map name (letters, digits, ".", "_" and "-"; not "${CURRENT}")` };
+  const remote = !!remoteOf(name, home);
+  if (!remote && !hasMap(mapDir(name, home))) return { ok: false, why: `no map ${name} here: npm run map -- ls lists them, and npm run map -- remote add ${name} <url> names one served elsewhere` };
+  const was = currentOf(home);
+  mkdirSync(home, { recursive: true });
+  writeFileSync(currentFile(home), `${name}\n`);
+  return { ok: true, ...(was ? { was } : {}), remote };
+}
+
+/**
+ * Names a map served elsewhere (`<home>/remotes/<name>.json`): its address,
+ * and the variable its token is read from. The token itself is never
+ * written. Refused for a name a map kept here already has.
+ */
+export function addRemote(name: string, url: string, tokenEnv?: string, home = homeOf()): { ok: true } | { ok: false; why: string } {
+  if (!MAP_NAME.test(name) || name === CURRENT) return { ok: false, why: `"${name}" is not a map name` };
+  if (!/^https?:\/\/[^\s]+$/.test(url)) return { ok: false, why: `"${url}" is not an http(s) address` };
+  if (tokenEnv !== undefined && !/^[A-Z_][A-Z0-9_]*$/i.test(tokenEnv)) return { ok: false, why: `"${tokenEnv}" is not a variable's name: give the variable that holds the token, never the token` };
+  if (hasMap(mapDir(name, home))) return { ok: false, why: `a map ${name} is kept here already: pick another name for the remote one` };
+  mkdirSync(join(home, "remotes"), { recursive: true });
+  writeFileSync(remoteFile(name, home), `${JSON.stringify({ url: url.replace(/\/+$/, ""), ...(tokenEnv ? { token_env: tokenEnv } : {}) }, null, 2)}\n`);
+  return { ok: true };
+}
+
+/** Forgets a remote map; true when there was one. The switch, if it named it, then names nothing. */
+export function removeRemote(name: string, home = homeOf()): boolean {
+  if (!remoteOf(name, home)) return false;
+  rmSync(remoteFile(name, home), { force: true });
+  if (currentOf(home) === name) rmSync(currentFile(home), { force: true });
+  return true;
+}
+
+/** Every remote map named here. */
+export function remotes(home = homeOf()): Remote[] {
+  try {
+    return readdirSync(join(home, "remotes"))
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => remoteOf(f.slice(0, -5), home))
+      .filter((r): r is Remote => !!r);
   } catch {
     return [];
   }

@@ -121,7 +121,7 @@ export function serverTree({ data, port: PAGE, write, origins = [], hosts = [], 
       disabled: !write || hosted,
     },
     // Which map, commit and checkout this is, for the page's header. A host in front shows no folder of its machine.
-    { id: "serving", plugin: "plugins/serving/index.ts", config: { port: PAGE, ...(map ? { map } : {}), ...(serving.commit ? { commit: serving.commit } : {}), ...(serving.root && !hosted ? { checkout: serving.root } : {}), ...(serving.folders && !hosted ? { folders: serving.folders } : {}) } },
+    { id: "serving", plugin: "plugins/serving/index.ts", config: { port: PAGE, ...(map ? { map } : {}), ...(serving.commit ? { commit: serving.commit } : {}), ...(serving.root && !hosted ? { checkout: serving.root } : {}), ...(serving.folders && !hosted ? { folders: serving.folders } : {}), ...(!hosted ? { sayCurrent: true } : {}) } },
     // A failure says to look in the server's log: the file a map started with `npm run map` writes. A host in front names no file of its machine.
     { id: "docs", plugin: "plugins/docs/index.ts", ...(hosted ? {} : { config: { log: join(data, "server.log") } }) },
     { id: "docs-tool", plugin: "plugins/docs/tool.ts" },

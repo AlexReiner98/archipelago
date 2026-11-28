@@ -218,6 +218,24 @@ under `ARCHIPELAGO_HOME`), and two scripts read it on every call:
 A folder connected from such a map's page holds these
 ([connect](../connect/README.md)).
 
+### The current map: one switch
+
+`current` in place of a name (`hook.ts --map current`, `proxy.ts current`,
+or `proxy.ts` with no name) follows the switch: `~/.archipelago/current`,
+one map's name, set with `npm run map -- use <name>`. Both scripts read it
+again on every call, so a switch moves every running session at once, with
+nothing to restart. User-level hooks and MCP server set to `current` are
+the one place that decides which map a session on this machine reports to.
+
+A map may be served elsewhere: `npm run map -- remote add <name> <url>
+--token-env VAR` keeps `~/.archipelago/remotes/<name>.json` (its address,
+and the variable its token is in, never the token). Such a map is reached
+at `<url>/mcp` and `<url>/hook`, with the token as `Authorization: Bearer`,
+read from the variable at each call. `registry.ts` `reachOf` answers, for a
+name or `current`, where a map is reached now; `npm run map -- ls` marks the
+current map with `*`, and each map's page says whether it is the current
+one ([serving](../serving/README.md)).
+
 ## Running it
 
 ```

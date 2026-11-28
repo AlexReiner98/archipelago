@@ -118,7 +118,27 @@ npm run map -- up --map live          # detached: outlives the terminal or previ
 npm run map -- ls                     # every server: map, port, commit, checkout, the folders that report to it
 npm run map -- down try
 npm run map -- go                     # jump in: live running, the folder you are in connected, its page open
+npm run map -- use live               # the switch: the map every session connected to `current` reports to
+npm run map -- remote add hosted https://maps.example.org --token-env MAP_TOKEN   # a map served elsewhere
 ```
+
+### One switch for which map
+
+`npm run map -- use <name>` names the current map (`~/.archipelago/current`).
+User-level hooks and MCP server set to `current` follow it on every call, so
+one command moves every session on the machine, running ones included:
+
+```json
+"command": "node \"<clone>/plugins/claude-code/hook.ts\" --map current"
+"archipelago": { "type": "stdio", "command": "node", "args": ["<clone>/plugins/claude-code/proxy.ts", "current"] }
+```
+
+A remote map (`remote add`) is reached at its address with its token, read
+from the variable named, never written to a file. `npm run map -- ls` marks
+the current map with `*`; a map's page says **current** in its header, or
+names the map that is. A folder connected to a map by name (below) stays on
+that map whatever the switch says. Any other server entry naming a map (an
+`.mcp.json` with a map's address, a connector) is a second switch: remove it.
 
 `npm link` in a clone puts all of this on the PATH as `archipelago`
 ([bin/archipelago.mjs](../bin/archipelago.mjs)): `archipelago ls`,
@@ -129,6 +149,8 @@ npm run map -- go                     # jump in: live running, the folder you ar
 | Code | a checkout at a commit, holding no data | wherever it is cloned |
 | Map | a named data folder | `~/.archipelago/maps/<name>/` (`ARCHIPELAGO_HOME`) |
 | Server | one code serving one map, on any free port | `~/.archipelago/servers/<name>.json` while it runs |
+| Remote map | a map served elsewhere: its address, the variable its token is in | `~/.archipelago/remotes/<name>.json` |
+| Switch | the current map's name | `~/.archipelago/current` |
 | Connection | "this folder reports to map *name*", never a port | the folder's `.claude/settings.local.json` and `.mcp.json` |
 
 - A second server for a map that runs is refused, naming the one that does.
