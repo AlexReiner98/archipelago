@@ -43,6 +43,7 @@ const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS peers (id TEXT PRIMARY KEY, name TEXT NOT NULL, cursor TEXT, synced TEXT, report TEXT);
 CREATE TABLE IF NOT EXISTS pairs (peer TEXT NOT NULL, mine TEXT NOT NULL, theirs TEXT NOT NULL, PRIMARY KEY (peer, mine));
+CREATE TABLE IF NOT EXISTS merged (id TEXT PRIMARY KEY, keep TEXT NOT NULL);
 `;
 
 class Store {
@@ -82,6 +83,26 @@ class Store {
     this.db.exec("BEGIN");
     try {
       for (const [mine, theirs] of pairs) add.run(peer, mine, theirs);
+      this.db.exec("COMMIT");
+    } catch (err) {
+      this.db.exec("ROLLBACK");
+      throw err;
+    }
+  }
+  /** Items merged away on this map (items.merge), each with where it went: a page at a time, by id. */
+  merged(after: string | undefined, limit: number): { items: [string, string][]; next?: string } {
+    const rows = this.db.prepare("SELECT id, keep FROM merged WHERE id > ? ORDER BY id LIMIT ?").all(after ?? "", limit + 1) as { id: string; keep: string }[];
+    const items = rows.slice(0, limit).map((r) => [r.id, r.keep] as [string, string]);
+    return rows.length > limit ? { items, next: items.at(-1)![0] } : { items };
+  }
+  merge(merged: [string, string][], unmerged: string[] = []): void {
+    // A known keep is never overwritten by an unknown one.
+    const add = this.db.prepare("INSERT INTO merged (id, keep) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET keep = excluded.keep WHERE excluded.keep <> ''");
+    this.db.exec("BEGIN");
+    try {
+      for (const [id, keep] of merged) add.run(id, keep);
+      const back = this.db.prepare("DELETE FROM merged WHERE id = ?");
+      for (const id of unmerged) back.run(id);
       this.db.exec("COMMIT");
     } catch (err) {
       this.db.exec("ROLLBACK");
@@ -138,15 +159,22 @@ const sync: Plugin<SyncConfig> = {
           cursor: { type: "string" },
           report: {},
           pairs: { type: "array", description: `[mine, theirs]: an item made on each map with its own id; at most ${LIMIT_MAX} a call` },
-          only: { type: "boolean", description: "Keep the pairs only: the cursor and report stay as they are" },
+          merged: { type: "array", description: `[dropped, kept]: an item merged away on this map (items.merge) and where it went, "" where unknown; at most ${LIMIT_MAX} a call` },
+          unmerged: { type: "array", description: "Ids merged away here that are back (the merge undone): merged no more" },
+          only: { type: "boolean", description: "Keep the pairs (and merges) only: the cursor and report stay as they are" },
         },
         required: ["peer", "name"],
       },
-      async run(input: { peer: string; name: string; cursor?: string; report?: Json; pairs?: Json[]; only?: boolean }) {
+      async run(input: { peer: string; name: string; cursor?: string; report?: Json; pairs?: Json[]; merged?: Json[]; unmerged?: Json[]; only?: boolean }) {
         if (!input.peer || input.peer === store.id) throw new Refused({ code: "sync.peer", message: "Name another map's sync id as the peer.", by });
         const pairs = (input.pairs ?? []).filter((p): p is [string, string] => Array.isArray(p) && p.length === 2 && typeof p[0] === "string" && typeof p[1] === "string");
         if (pairs.length > LIMIT_MAX) throw new Refused({ code: "sync.too_many", message: `At most ${LIMIT_MAX} pairs a call.`, by });
         if (pairs.length) store.pair(input.peer, pairs);
+        const merged = (input.merged ?? []).filter((p): p is [string, string] => Array.isArray(p) && p.length === 2 && typeof p[0] === "string" && !!p[0] && typeof p[1] === "string" && p[0] !== p[1]);
+        if (merged.length > LIMIT_MAX) throw new Refused({ code: "sync.too_many", message: `At most ${LIMIT_MAX} merges a call.`, by });
+        const unmerged = (input.unmerged ?? []).filter((x): x is string => typeof x === "string");
+        if (unmerged.length > LIMIT_MAX) throw new Refused({ code: "sync.too_many", message: `At most ${LIMIT_MAX} ids a call.`, by });
+        if (merged.length || unmerged.length) store.merge(merged, unmerged);
         if (input.only) return { ok: true, pairs: pairs.length };
         store.mark({ id: input.peer, name: input.name, ...(input.cursor ? { cursor: input.cursor } : {}), synced: new Date().toISOString(), ...(input.report !== undefined ? { report: input.report } : {}) });
         return { ok: true, pairs: pairs.length };
@@ -160,6 +188,16 @@ const sync: Plugin<SyncConfig> = {
       input: { type: "object", properties: { peer: { type: "string" }, after: { type: "string" }, limit: { type: "number" } }, required: ["peer"] },
       async run(input: { peer: string; after?: string; limit?: number }) {
         return store.pairs(input.peer, input.after, Math.max(1, Math.min(input.limit ?? LIMIT_MAX, LIMIT_MAX))) as unknown as Json;
+      },
+    });
+
+    register.register({
+      name: "sync.merged",
+      title: "Items merged away on this map",
+      doc: "Each item an items.merge took away here, and the item it went into (\"\" where the merge didn't say): a peer's later change to it lands there. A page at a time. Writes nothing.",
+      input: { type: "object", properties: { after: { type: "string" }, limit: { type: "number" } } },
+      async run(input: { after?: string; limit?: number }) {
+        return store.merged(input.after, Math.max(1, Math.min(input.limit ?? LIMIT_MAX, LIMIT_MAX))) as unknown as Json;
       },
     });
 

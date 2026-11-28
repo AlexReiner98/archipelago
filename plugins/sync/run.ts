@@ -25,15 +25,18 @@ import { actorOf, type Peer } from "./index.ts";
 import {
   birthsOf,
   join,
+  mergesOf,
   noPairs,
   ownWork,
   plan,
+  redirect,
   replay,
   swapSet,
   swapValue,
   swapWrite,
   type Conflict,
   type Fields,
+  type Merged,
   type Pairs,
   type Planned,
   type Side,
@@ -66,6 +69,8 @@ export interface Report {
   joined?: { same: number; differed: number; kept: Side; copied: { toA: number; toB: number }; ambiguous: number };
   /** Items a map's own plugins made: paired with the other map's own, or copied where it has none. */
   plugins?: { paired: number; copied: number };
+  /** Sets that changed an item the other map had merged away (items.merge): written onto the item it went into, on both maps. */
+  merged?: { sets: number };
   /** What both changed, with the item's title, and which side's change stayed. */
   conflicts: (Conflict & { title?: string })[];
   /** Sets the other map refused (its schema holds them): which, and why. */
@@ -153,6 +158,24 @@ async function pairsOf(end: End, peer: string): Promise<[Id, Id][]> {
   return out;
 }
 
+/**
+ * Items merged away on a map, in its own ids: what its store keeps, and the
+ * merges in this run's log. One that is on the map again (the merge undone)
+ * is left out.
+ */
+async function mergedOf(end: End, log: Log): Promise<Merged> {
+  const out: Merged = new Map();
+  let after: string | undefined;
+  do {
+    const page = await output<{ items: [Id, Id][]; next?: string }>(end, "sync.merged", { limit: LIMIT_MAX, ...(after ? { after } : {}) });
+    for (const [d, k] of page.items) out.set(d, k);
+    after = page.next;
+  } while (after);
+  for (const set of log.sets) for (const [d, k] of mergesOf(set)) if (k || !out.get(d)) out.set(d, k);
+  if (out.size) for (const [id, now] of await itemsOf(end, [...out.keys()])) if (now) out.delete(id);
+  return out;
+}
+
 /** Items by id, every field with `type`, LIMIT_MAX at a time. */
 async function itemsOf(end: End, ids: Id[]): Promise<Map<Id, Fields | null>> {
   const out = new Map<Id, Fields | null>();
@@ -203,6 +226,9 @@ export async function syncMaps(a: End, b: End, opts: { dry?: boolean; keep?: Sid
   for (const [x, y] of await pairsOf(a, sb.id)) known(x, y);
   for (const [y, x] of await pairsOf(b, sa.id)) known(x, y);
   const fresh: [Id, Id][] = [];
+  /** Items merged away on each map, both in a's ids (after a first run). */
+  let mergedA: Merged = new Map(), mergedB: Merged = new Map();
+  const unmerged = new Set<Id>();
 
   const report: Report = {
     a: { id: sa.id, name: sa.name, read: la.read, sent: 0, facts: 0 },
@@ -290,8 +316,27 @@ export async function syncMaps(a: End, b: End, opts: { dry?: boolean; keep?: Sid
     const copiesToB = await born(la, b, lb, pairs.ab, "a");
     const copiesToA = await born(lb, a, la, pairs.ba, "b");
 
+    // Items merged away: a set of one map that changed an item the other merged away changes the item it went into.
+    const swapped = (m: Merged, ids: ReadonlyMap<Id, Id>): Merged => new Map([...m].map(([d, k]) => [ids.get(d) ?? d, k ? (ids.get(k) ?? k) : ""]));
+    mergedA = await mergedOf(a, la);
+    mergedB = swapped(await mergedOf(b, lb), pairs.ba);
+    const bSets = lb.sets.map((s) => swapSet(s, pairs.ba));
+    // A set that brings a merged item back (the merge undone) ends that merge: its changes are the item's own again.
+    for (const s of [...la.sets, ...bSets]) {
+      for (const [op, id, field] of s.facts) {
+        if (op !== "+" || field !== "type" || !(mergedA.has(id) || mergedB.has(id))) continue;
+        mergedA.delete(id), mergedB.delete(id), unmerged.add(id);
+      }
+    }
+    const moved = new Set<string>();
+    const onto = (sets: Committed[], m: Merged) => sets.map((s) => {
+      const r = redirect(s, m);
+      if (r) moved.add(s.id);
+      return r ?? s;
+    });
     // Everyone else's sets, in a's ids, merged.
-    const p = plan(la.sets, lb.sets.map((s) => swapSet(s, pairs.ba)));
+    const p = plan(onto(la.sets, mergedB), onto(bSets, mergedA));
+    if (moved.size) report.merged = { sets: moved.size };
     report.conflicts = p.conflicts;
     if (!opts.dry) {
       // An item brought back whole carries the sender's fields, read now, in the taker's ids.
@@ -308,12 +353,20 @@ export async function syncMaps(a: End, b: End, opts: { dry?: boolean; keep?: Sid
         }));
       };
       // To a: b's plugin copies (b's ids, kept), then b's sets (already in a's ids).
-      for (const { set, writes } of [...(await filled(b, copiesToA, new Map(), pairs.ba)), ...(await filled(b, p.toA, pairs.ab, pairs.ba))]) {
+      const fromB = await filled(b, p.toA, pairs.ab, pairs.ba), fromA = await filled(a, p.toB, new Map(), new Map());
+      for (const { set, writes } of [...(await filled(b, copiesToA, new Map(), pairs.ba)), ...fromB]) {
         await apply(a, "a", writes, `From ${sb.name}: ${set.header.reason}`, set.header.authority, sb, set.id);
       }
       // To b: a's plugin copies, then a's sets, each swapped into b's ids.
-      for (const { set, writes } of [...(await filled(a, copiesToB, new Map(), new Map())), ...(await filled(a, p.toB, new Map(), new Map()))]) {
+      for (const { set, writes } of [...(await filled(a, copiesToB, new Map(), new Map())), ...fromA]) {
         await apply(b, "b", writes.map((w) => swapWrite(w, pairs.ab)), `From ${sa.name}: ${set.header.reason}`, set.header.authority, sa, set.id);
+      }
+      // A set moved onto the item another map merged into goes back to its own map there too, so both hold it.
+      for (const { set, writes } of fromB) {
+        if (moved.has(set.id)) await apply(b, "b", writes.map((w) => swapWrite(w, pairs.ab)), `From ${sa.name}, onto the item ${sb.name}'s change was merged into: ${set.header.reason}`, set.header.authority, sa, set.id);
+      }
+      for (const { set, writes } of fromA) {
+        if (moved.has(set.id)) await apply(a, "a", writes, `From ${sb.name}, onto the item ${sa.name}'s change was merged into: ${set.header.reason}`, set.header.authority, sb, set.id);
       }
     }
   }
@@ -333,6 +386,16 @@ export async function syncMaps(a: End, b: End, opts: { dry?: boolean; keep?: Sid
     const chunk = fresh.slice(i, i + LIMIT_MAX);
     await output(a, "sync.mark", { peer: sb.id, name: sb.name, pairs: chunk as unknown as Json, only: true });
     await output(b, "sync.mark", { peer: sa.id, name: sa.name, pairs: chunk.map(([x, y]) => [y, x]) as unknown as Json, only: true });
+  }
+  // Each map keeps every merge either knows, in its own ids: a later run from any other map lands its changes on keep.
+  // One brought back is merged no more on either.
+  const merges: [Id, Id][] = [...new Map([...mergedB, ...mergedA])];
+  const back = [...unmerged];
+  for (let i = 0; i < Math.max(merges.length, back.length); i += LIMIT_MAX) {
+    const chunk = merges.slice(i, i + LIMIT_MAX), gone = back.slice(i, i + LIMIT_MAX);
+    const inB = (id: Id) => pairs.ab.get(id) ?? id;
+    await output(a, "sync.mark", { peer: sb.id, name: sb.name, merged: chunk as unknown as Json, unmerged: gone, only: true });
+    await output(b, "sync.mark", { peer: sa.id, name: sa.name, merged: chunk.map(([d, k]) => [inB(d), k ? inB(k) : ""]) as unknown as Json, unmerged: gone.map(inB), only: true });
   }
   const summary = (mine: "a" | "b") => ({ at: new Date().toISOString(), ...report, mine }) as unknown as Json;
   // Each map's cursor is its log's end as read: what the run wrote there comes after, and is a copy from the other, left out next time.

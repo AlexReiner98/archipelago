@@ -348,3 +348,78 @@ export function join(a: ReadonlyMap<Id, Fields>, b: ReadonlyMap<Id, Fields>, kee
   for (const [id, f] of b) if (!ba.has(id)) (out.toA.push({ id, whole: swapValue(f, ba) as Fields }), out.copied.toA++);
   return out;
 }
+
+/** Where an item merged away went: its keep, or `""` where the merge didn't say. */
+export type Merged = Map<Id, Id>;
+
+/**
+ * The merges an `items.merge` set made (plugins/items): `[drop, keep]`. Drop
+ * is the item, not a link, the set takes away whole; keep is the item
+ * whose type the set says again (retracted, then asserted), else where
+ * drop's links went, or the item that took its fields; `""` where the set
+ * says none of these.
+ */
+export function mergesOf(set: Committed): [Id, Id][] {
+  if (set.header.action !== "items.merge") return [];
+  const gone = new Set<Id>(), links = new Set<Id>(), added = new Set<Id>();
+  for (const [op, id, field] of set.facts) {
+    if (op === "-" && field === "type") gone.add(id);
+    if (field === "from" || field === "to") links.add(id);
+    if (op === "+") added.add(id);
+  }
+  // Keep's type said again (retracted, then asserted) names keep, whatever else the set holds.
+  const named = set.facts.find(([op, id, field]) => op === "+" && field === "type" && gone.has(id) && !links.has(id))?.[1];
+  const out: [Id, Id][] = [];
+  for (const drop of gone) {
+    if (links.has(drop) || added.has(drop)) continue;
+    let keep = named ?? "";
+    set.facts.forEach(([op, id, field, value], i) => {
+      const prev = set.facts[i - 1];
+      if (!keep && op === "+" && (field === "from" || field === "to") && typeof value === "string" && prev && prev[0] === "-" && prev[1] === id && prev[2] === field && prev[3] === drop) keep = value;
+    });
+    if (!keep) keep = [...added].find((id) => id !== drop && !links.has(id) && !gone.has(id)) ?? "";
+    out.push([drop, keep]);
+  }
+  return out;
+}
+
+/** A merged id followed to where it is now, through later merges. */
+export function mergedTo(id: Id, merged: Merged): Id | undefined {
+  let at = merged.get(id);
+  for (let n = 0; at && merged.has(at) && n < 20; n++) at = merged.get(at);
+  return at;
+}
+
+/**
+ * A set with every merged-away item swapped for its keep, in its facts and
+ * its values (a link's ends): a peer's later edit to a dropped item lands on
+ * the item it was merged into, never bringing the dropped one back. A fact
+ * on a dropped item whose keep isn't known is left out, and so is a peer
+ * taking the dropped item away (it is gone already; keep stays). `null` where the set
+ * names no merged item. A merge itself is never redirected.
+ */
+export function redirect(set: Committed, merged: Merged): Committed | null {
+  if (!merged.size || set.header.action === "items.merge") return null;
+  let touched = false;
+  const to = new Map<Id, Id>();
+  for (const id of merged.keys()) to.set(id, mergedTo(id, merged) ?? "");
+  const swap = (v: Json): Json => {
+    if (typeof v === "string" && to.get(v)) return (touched = true), to.get(v)!;
+    if (Array.isArray(v)) return v.map(swap);
+    if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swap(x)]));
+    return v;
+  };
+  // A peer taking the dropped item away too: it is gone here already, and keep stays.
+  const away = new Set(set.facts.flatMap(([op, id, field]) => (op === "-" && field === "type" && to.has(id) ? [id] : [])));
+  const facts: Fact[] = [];
+  for (const [op, id, field, value] of set.facts) {
+    const into = to.get(id);
+    if (into === "" || away.has(id)) {
+      touched = true;
+      continue;
+    }
+    if (into) touched = true;
+    facts.push([op, into ?? id, field, swap(value)]);
+  }
+  return touched ? { ...set, facts } : null;
+}

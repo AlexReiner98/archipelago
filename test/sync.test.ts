@@ -15,6 +15,8 @@ import sync from "../plugins/sync/index.ts";
 import types from "../plugins/types/index.ts";
 import work from "../plugins/work/index.ts";
 import schema from "../plugins/schema/index.ts";
+import items from "../plugins/items/index.ts";
+import links from "../plugins/links/index.ts";
 import { factsFor, plan } from "../plugins/sync/merge.ts";
 import { syncMaps, type End } from "../plugins/sync/run.ts";
 import { lineOf, runOf } from "../plugins/sync/view.ts";
@@ -24,18 +26,19 @@ const OWNER: Actor = { id: "person:owner", kind: "person" };
 const tick = () => new Promise((r) => setTimeout(r, 3));
 
 /** A map in memory: graph, actions, history, interchange and sync; an End onto it, and helpers to change it as a person. */
-async function map(name: string, opts: { keep?: number; fold?: number; history?: boolean; graphKeep?: number; schema?: boolean } = {}) {
+async function map(name: string, opts: { keep?: number; fold?: number; history?: boolean; graphKeep?: number; schema?: boolean; items?: boolean } = {}) {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
   let probe!: Context;
   const p: Plugin = { id: "probe", inject: ["graph.read", "action.invoke"], apply(ctx) { probe = ctx; } };
-  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "history.ts": history, "interchange.ts": interchange, "sync.ts": sync, "probe.ts": p, "types.ts": types, "work.ts": work, "schema.ts": schema };
+  const modules: Record<string, Plugin> = { "graph.ts": graph, "action.ts": action, "history.ts": history, "interchange.ts": interchange, "sync.ts": sync, "probe.ts": p, "types.ts": types, "work.ts": work, "schema.ts": schema, "items.ts": items, "links.ts": links };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const tree = (withHistory: boolean) => [
     { id: "graph", plugin: "graph.ts", ...(opts.graphKeep ? { config: { keep: opts.graphKeep } } : {}) },
     { id: "action", plugin: "action.ts" },
-    ...(opts.schema ? [{ id: "types", plugin: "types.ts" }, { id: "work", plugin: "work.ts" }, { id: "schema", plugin: "schema.ts" }] : []),
+    ...(opts.schema || opts.items ? [{ id: "types", plugin: "types.ts" }, { id: "work", plugin: "work.ts" }, { id: "schema", plugin: "schema.ts" }] : []),
+    ...(opts.items ? [{ id: "links", plugin: "links.ts" }, { id: "items", plugin: "items.ts" }] : []),
     ...(withHistory ? [{ id: "history", plugin: "history.ts", config: { ...(opts.keep ? { keep: opts.keep } : {}), ...(opts.fold ? { fold: opts.fold } : {}) } }] : []),
     { id: "interchange", plugin: "interchange.ts" },
     { id: "sync", plugin: "sync.ts", config: { name } },
@@ -364,4 +367,69 @@ test("a map that names itself nothing is called by where it was reached", async 
   assert.equal(r.b.name, "app.example/sync");
   await a.stop();
   await b.stop();
+});
+
+test("a merge on one map, and the other's later edit to the dropped item: the edit lands on keep on both maps, never bringing drop back; an undo unmerges on both", async () => {
+  const a = await map("local", { items: true }), b = await map("hosted", { items: true });
+  await a.write([...make("hub", "Hub"), ...make("k", "Pat's notes"), ...make("d", "Pat notes"), ["+", "l1", "type", "part_of"], ["+", "l1", "from", "d"], ["+", "l1", "to", "hub"]]);
+  await syncMaps(a.end, b.end);
+  assert.equal((await b.fields("d"))?.title, "Pat notes");
+
+  const merged = await a.invoke("items.merge", { keep: "k", drop: "d" });
+  assert.ok(merged.ok, JSON.stringify(merged));
+  await tick();
+  await b.set("d", "note", "Said on hosted, after the merge");
+  const r = await syncMaps(a.end, b.end);
+  assert.deepEqual(r.merged, { sets: 1 });
+  for (const m of [a, b]) {
+    assert.equal(await m.fields("d"), null, "drop stays gone");
+    assert.equal((await m.fields("k"))?.note, "Said on hosted, after the merge", "the edit is on keep");
+    assert.equal((await m.fields("l1"))?.from, "k", "the link went to keep");
+  }
+  // Each map keeps the merge beside its pairs, so a later run from anywhere lands on keep too.
+  for (const m of [a, b]) {
+    const kept = await m.invoke("sync.merged", {});
+    assert.deepEqual(kept.ok && kept.output, { items: [["d", "k"]] });
+  }
+  const again = await syncMaps(a.end, b.end);
+  assert.deepEqual([again.a.sent, again.b.sent, again.conflicts.length], [0, 0, 0]);
+
+  // history.undo of the merge unmerges, on both maps; drop is itself again, and an edit to it stays on it.
+  const undo = await a.invoke("history.undo", { change: merged.ok ? merged.change! : "" });
+  assert.ok(undo.ok, JSON.stringify(undo));
+  await tick();
+  await syncMaps(a.end, b.end);
+  for (const m of [a, b]) {
+    assert.equal((await m.fields("d"))?.title, "Pat notes");
+    assert.equal((await m.fields("l1"))?.from, "d");
+    const kept = await m.invoke("sync.merged", {});
+    assert.deepEqual(kept.ok && kept.output, { items: [] }, "merged no more");
+  }
+  await b.set("d", "note", "On drop, unmerged");
+  await syncMaps(a.end, b.end);
+  assert.equal((await a.fields("d"))?.note, "On drop, unmerged");
+  assert.equal((await a.fields("k"))?.note, "Said on hosted, after the merge");
+  await a.stop();
+  await b.stop();
+});
+
+test("a merge reaches a third map as a copy: that map's later edit to the dropped item lands on keep too, from the merge its peer kept", async () => {
+  const a = await map("local", { items: true }), b = await map("hosted"), c = await map("laptop");
+  await a.write([...make("k", "Pat's notes"), ...make("d", "Pat notes")]);
+  await syncMaps(a.end, b.end);
+  await syncMaps(b.end, c.end);
+  assert.ok((await a.invoke("items.merge", { keep: "k", drop: "d" })).ok);
+  await tick();
+  await syncMaps(a.end, b.end);
+  await c.set("d", "note", "Said on the laptop");
+  const r = await syncMaps(b.end, c.end);
+  assert.deepEqual(r.merged, { sets: 1 });
+  for (const m of [b, c]) {
+    assert.equal(await m.fields("d"), null);
+    assert.equal((await m.fields("k"))?.note, "Said on the laptop");
+  }
+  await syncMaps(a.end, b.end);
+  assert.equal((await a.fields("k"))?.note, "Said on the laptop");
+  assert.equal(await a.fields("d"), null);
+  for (const m of [a, b, c]) await m.stop();
 });
