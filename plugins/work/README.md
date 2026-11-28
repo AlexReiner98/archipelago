@@ -8,7 +8,7 @@ one plugin each, so any one can be turned off or replaced. Each injects
 |---|---|---|---|---|
 | work | work | todo, doing | done, dropped | kind, priority, due, seen_working, to_see, tokens_estimated, tokens_used |
 | question | question | open | decided, dropped | kind, options, outcome, rationale, decided_on |
-| record | record | current | superseded | kind, value, unit, as_of, published |
+| record | record | current | superseded | kind, value, unit, as_of, valid_to, published |
 | actor | actor | active | inactive | kind (person, agent) |
 
 `links` defines `part_of`, `depends_on`, `waits_on` (to an actor, with

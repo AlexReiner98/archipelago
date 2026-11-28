@@ -231,3 +231,56 @@ test("find runs a query: words, sides, a type or its base, in: at any depth, nea
   assert.equal(capped.items.length, 2);
   assert.equal(capped.more, 2);
 });
+
+test("as_of:<date> keeps records true in the world then: as_of on or before it, valid_to absent or after", async () => {
+  const { RECORD } = await import("../plugins/record/index.ts");
+  assert.equal(RECORD.fields.valid_to?.kind, "date", "the record base has valid_to beside as_of");
+  const at = (id: string, title: string, as_of?: string, valid_to?: string): Row => ({
+    id,
+    type: "record",
+    fields: { title, status: "current", ...(as_of ? { as_of } : {}), ...(valid_to ? { valid_to } : {}) },
+  });
+  const rows = [
+    at("old", "Pat works at Acme", "2019-03-01", "2021-01-15"),
+    at("now", "Pat works at Globex", "2021-02-01"),
+    at("past", "Pat studies", "2015-09-01", "2019-03-01"),
+    at("none", "Pat likes tea"),
+  ];
+  const index = { items: new Map(rows.map((r) => [r.id, r])), links: new Map<string, Wire>(), type: () => undefined };
+  const ids = (q: string) => run(index, q).items.map((r) => r.id);
+  assert.deepEqual(parse("as_of:2021-06-01 pat"), { words: ["pat"], as_of: "2021-06-01" });
+  assert.deepEqual(parse("as_of:2021-06-01"), { words: [], as_of: "2021-06-01" }, "a term of its own: not is:open");
+  assert.deepEqual(ids("as_of:2020-06-01"), ["old"]);
+  assert.deepEqual(ids("as_of:2021-06-01"), ["now"]);
+  assert.deepEqual(ids("as_of:2019-03-01"), ["old"], "valid_to is the first day it is no longer so");
+  assert.deepEqual(ids("as_of:2021-01-15 works"), [], "between jobs, neither");
+  assert.ok(!ids("as_of:2030-01-01").includes("none"), "no as_of fails the term");
+  assert.deepEqual(run(index, "as_of:2010-01-01").empty_by, "as_of:2010-01-01", "the term that left nothing is named");
+  assert.deepEqual(ids("as_of:someday"), [], "not a date: nothing");
+});
+
+test("a query that finds nothing says why: the words no title holds, or the term that left nothing", async () => {
+  const { why } = await import("../plugins/find/line.ts");
+  const missing = run(QIX, "map zebra quagga");
+  assert.deepEqual(missing.items, []);
+  assert.deepEqual(missing.missing, ["zebra", "quagga"], "map is in a title, so only the others are named");
+  assert.equal(why(missing), "no title holds “zebra”, “quagga”");
+  const both = run(QIX, "map canvas");
+  assert.deepEqual(both.items, [], "each word is in some title, but no title holds both");
+  assert.equal(both.missing, undefined);
+  assert.equal(both.empty_by, undefined);
+  assert.equal(why(both), undefined);
+  assert.equal(run(QIX, "map type:question").empty_by, undefined, "type:question holds items, so no one term left nothing");
+  assert.equal(run(QIX, "status:blocked").empty_by, "status:blocked");
+  assert.equal(run(QIX, "id:nope map").empty_by, "id:nope", "a pool term naming nothing comes first");
+  assert.deepEqual(run(QIX, "in:hub else").missing, ["else"], "missing is over the pool: Something else is outside hub");
+  const found = run(QIX, "map");
+  assert.equal(found.missing, undefined);
+  assert.equal(why(found), undefined);
+});
+
+test("the line offers as_of: with today's date to edit", () => {
+  const terms = suggest(QIX, "as_of:").filter((s) => s.kind === "term").map((s) => (s.kind === "term" ? s.term : ""));
+  assert.deepEqual(terms, [`as_of:${new Date().toISOString().slice(0, 10)}`]);
+  assert.ok(suggest(QIX, "as").some((s) => s.kind === "term" && s.term === "as_of:"));
+});

@@ -39,7 +39,7 @@ export function offered(offers: Iterable<Offer>, line: string, limit = 4): Sugge
   return [...offers].flatMap((o) => o.list(words, limit).map((r) => ({ kind: "offer" as const, of: o.of, ...r })));
 }
 
-const KEYS = ["is", "status", "type", "in", "near", "id"] as const;
+const KEYS = ["is", "status", "type", "in", "near", "id", "as_of"] as const;
 const KEY_HINT: Record<(typeof KEYS)[number], string> = {
   is: "open or closed",
   status: "a status",
@@ -47,6 +47,7 @@ const KEY_HINT: Record<(typeof KEYS)[number], string> = {
   in: "an item and its parts",
   near: "an item and its neighbours",
   id: "one item",
+  as_of: "records true on a date",
 };
 
 /** The line with its last word replaced by `term`, ready for the next word (a key waits for its value). */
@@ -92,6 +93,8 @@ export function suggest(index: Index, line: string, limit = 6): Suggestion[] {
     if (k === "is") for (const s of ["open", "closed"]) s.startsWith(v) && terms.push(term("side", `is:${s}`));
     if (k === "type") for (const t of typeNames) t.startsWith(v) && terms.push(term("type", `type:${t}`));
     if (k === "status") for (const s of statuses) s.startsWith(v) && terms.push(term("status", `status:${s}`));
+    // A date: today's, as the shape to edit.
+    if (k === "as_of" && !v) terms.push(term("key", `as_of:${v || new Date().toISOString().slice(0, 10)}`, "a date, YYYY-MM-DD"));
     if (k === "in" || k === "near" || k === "id") {
       const byId = v ? [...index.items.values()].filter((r) => r.id.toLowerCase().startsWith(v)) : [];
       for (const r of [...byId, ...titled(index, v ? [v] : [], limit)].slice(0, limit))
