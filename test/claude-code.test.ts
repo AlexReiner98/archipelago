@@ -12,13 +12,20 @@ import agent from "../plugins/agent/index.ts";
 import graph from "../plugins/graph/index.ts";
 import exchange from "../plugins/exchange/index.ts";
 import claudeCode, { HOOKLESS } from "../plugins/claude-code/index.ts";
-import { handle, lastAssistantText, promptTitle, relativePath, toolPlaces, transcriptPath, unseenFailures, type HookInput, type RunPort } from "../plugins/claude-code/mapping.ts";
+import { handle, lastAssistantText, plainOf, promptTitle, relativePath, toolPlaces, transcriptPath, unseenFailures, type HookInput, type RunPort } from "../plugins/claude-code/mapping.ts";
 import { rpc } from "../plugins/claude-code/mcp.ts";
 import { withRemote } from "../plugins/claude-code/hook.ts";
 import { CONTEXT_MAX, fitted, ordered, refusalTold, tagOf, taggedText, told, type Speakers } from "../plugins/claude-code/context.ts";
 import mcpPlugin from "../plugins/mcp/index.ts";
 import types from "../plugins/types/index.ts";
 import type { ToolDef } from "../plugins/mcp/host.ts";
+import work from "../plugins/work/index.ts";
+import links from "../plugins/links/index.ts";
+import items from "../plugins/items/index.ts";
+import hub from "../plugins/hub/index.ts";
+import claim from "../plugins/claim/index.ts";
+import words from "../plugins/words/index.ts";
+import type { ActionInvoke } from "../spec/action.ts";
 
 const T = "2026-11-20T15:00:00.000Z";
 const actor = { id: "claude-code", kind: "agent" as const };
@@ -177,9 +184,74 @@ test("a subagent is a run of its own, whose parent is the session's run", async 
 
 test("PreCompact reaches compact with what started it", async () => {
   const { calls, go } = fake();
-  assert.deepEqual(await go({ hook_event_name: "PreCompact", trigger: "manual" }), {});
+  assert.deepEqual(await go({ hook_event_name: "PreCompact", trigger: "manual" }), {}, "nothing said: nothing printed");
   const m = calls[1]![1] as Moment;
   assert.deepEqual([m.places, m.input], [["compact"], { trigger: "manual" }]);
+});
+
+test("PreCompact hands on what the nodes at compact say, as the summary's instructions", async () => {
+  const said = { node: "hub/task", text: "Keep in the summary this run's task: Ship it (i_mw0demo0item1)." };
+  const { go } = fake((m) => (m.places.includes("compact") ? { said: [said] } : { said: [] }));
+  assert.deepEqual(await go({ hook_event_name: "PreCompact", trigger: "auto" }), { instructions: said.text });
+  assert.equal(plainOf({ instructions: "x" }), "x");
+  assert.equal(plainOf({ hookSpecificOutput: {} }), undefined);
+});
+
+/** A compaction over HTTP, with the real nodes at `compact`: the hook prints the run's task, its claims and what it was told, as plain text. */
+test("a compaction: the hook answers the task, the claims and the nodes told, and the start is said again after", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "cc-"));
+  const probe: Plugin = { id: "probe", inject: ["agent.run", "action.invoke"], apply() {} };
+  const rt = new Runtime();
+  const errors: unknown[] = [];
+  rt.onError = (_f, e) => errors.push(e);
+  let port = 0;
+  const modules: Record<string, Plugin> = { graph, action, types, work, links, items, exchange, agent, hub, claim, words, cc: claudeCode, probe };
+  const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
+  const seed = [{ title: "Spec is versioned", kind: "instruction", at: ["session_start"], words: "The spec is versioned." }];
+  await loader.apply([
+    ...["graph", "action", "types", "work", "links", "items", "exchange", "agent", "hub", "claim"].map((id) => ({ id, plugin: id })),
+    { id: "words", plugin: "words", config: { seed } },
+    { id: "claude-code", plugin: "cc", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "probe", plugin: "probe" },
+  ]);
+  await rt.settle();
+  try {
+    const hook = async (event: string, more: object = {}) => {
+      const r = await fetch(`http://127.0.0.1:${port}/hook`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hook_event_name: event, session_id: "sess-1", cwd: dir, ...more }) });
+      return { type: r.headers.get("content-type") ?? "", text: await r.text() };
+    };
+    const ctx = loader.fiber("probe")!.ctx.intercept({ actor, run: "sess-1" });
+    const invoke = ctx.get<ActionInvoke>("action.invoke");
+    const made = await invoke.invoke<{ id: string }>({ action: "items.create", input: { type: "work", title: "Steer the summary" }, authority: { of: "human", basis: "test" }, reason: "test" });
+    assert.ok(made.ok);
+    const task = made.ok ? made.output.id : "";
+
+    const start = await hook("SessionStart", { source: "startup" });
+    assert.match(JSON.parse(start.text).hookSpecificOutput.additionalContext, /The spec is versioned\./);
+    // The run says its task (as the MCP run tool does), and claims its files.
+    await ctx.get<AgentRun>("agent.run").begin({ run: "sess-1", agent: actor, harness: "claude-code", reaches: [], cwd: dir, task });
+    const took = await invoke.invoke({ action: "claim.take", input: { files: ["plugins/claude-code/"], intent: "print what compact says" }, authority: { of: "agent", basis: "test" }, reason: "test" });
+    assert.ok(took.ok, JSON.stringify(took));
+
+    const compact = await hook("PreCompact", { trigger: "auto" });
+    assert.match(compact.type, /^text\/plain/, "plain stdout: Claude Code's instructions for the summary");
+    const lines = compact.text.split("\n");
+    assert.equal(lines[0], `[This run's task] Keep in the summary this run's task: Steer the summary (${task}, todo).`);
+    assert.ok(lines.includes("[What this run holds]"));
+    assert.ok(lines.some((l) => /^- print what compact says: plugins\/claude-code\/ \(claimed, i_/.test(l)), compact.text);
+    assert.ok(lines.includes("[What the map told this run]"));
+    assert.ok(lines.some((l) => /^- Spec is versioned \(n_/.test(l)), compact.text);
+    assert.ok(compact.text.length < CONTEXT_MAX);
+
+    // After it, the start is said again.
+    const again = await hook("SessionStart", { source: "compact" });
+    assert.match(JSON.parse(again.text).hookSpecificOutput.additionalContext, /The spec is versioned\./);
+    await hook("SessionEnd", { reason: "exit" });
+    assert.deepEqual(errors, []);
+  } finally {
+    await loader.apply([]);
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("a notice: the harness asked the person, and the run waits on them", async () => {

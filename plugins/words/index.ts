@@ -29,9 +29,9 @@ import { Refused } from "../../spec/common.ts";
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
-import { changes, Hearing, HEARD, listing, SAY_HOW, sayHow, wholeWords, type SayHow, type WordsHeard } from "./heard.ts";
+import { changes, Hearing, HEARD, heardWords, listing, SAY_HOW, sayHow, wholeWords, type SayHow, type WordsHeard } from "./heard.ts";
 
-export { HEARD, listing, TOOL } from "./heard.ts";
+export { HEARD, heardWords, listing, TOOL } from "./heard.ts";
 
 export const TYPE = "node";
 /** A link that brings any item into a context filter; with places (`at`) it is said there (the profile plugin defines it). */
@@ -419,18 +419,28 @@ const words: Plugin<WordsConfig> = {
       }
     }
 
-    // What changed in the nodes a run heard, told at its next prompt; a compaction forgets what it heard.
+    // A compaction is coming: the titles of the nodes the run heard go into the summary, then it forgets them (edition 3's `compact`).
+    agent.node({
+      name: "heard",
+      kind: "reflex",
+      title: "What the map told this run",
+      at: ["compact"],
+      repeat: "every",
+      speak(moment) {
+        const words = heardWords(hearing.of(moment.run));
+        hearing.forget(moment.run);
+        return words ? { say: words } : null;
+      },
+    });
+
+    // What changed in the nodes a run heard, told at its next prompt.
     agent.node({
       name: "changed",
       kind: "reflex",
       title: "Changed since heard",
-      at: ["prompt", "compact"],
+      at: ["prompt"],
       repeat: "every",
       async speak(moment) {
-        if (moment.places.includes("compact")) {
-          hearing.forget(moment.run);
-          return null;
-        }
         const heard = hearing.of(moment.run);
         if (!heard.size) return null;
         const ids = [...heard.keys()];

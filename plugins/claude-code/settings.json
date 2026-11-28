@@ -87,8 +87,8 @@
       {
         "hooks": [
           {
-            "type": "http",
-            "url": "http://127.0.0.1:5281/hook"
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/plugins/claude-code/hook.ts\" http://127.0.0.1:5281/hook"
           }
         ]
       }

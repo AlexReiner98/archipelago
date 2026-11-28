@@ -69,6 +69,22 @@ export class Hearing {
   }
 }
 
+/** Titles named at most at `compact`; the rest are counted. */
+export const HEARD_NAMED = 40;
+
+/**
+ * The nodes a run heard, by title and id, said at `compact` so the summary
+ * keeps them: after it the run knows what it was told, and `get` gives a
+ * node's words again. Nothing heard: nothing said.
+ */
+export function heardWords(heard: Map<Id, Heard>, most = HEARD_NAMED): string {
+  if (!heard.size) return "";
+  const all = [...heard.entries()];
+  const lines = all.slice(0, most).map(([id, h]) => `- ${h.title} (${id})${h.listed ? ", its line only" : ""}`);
+  if (all.length > most) lines.push(`- and ${all.length - most} more`);
+  return ["Keep in the summary the titles of the map's nodes this run was told (their words come back through get):", ...lines].join("\n");
+}
+
 /** A node's whole words as said: a trial's after its mark. */
 export function wholeWords(item: Item, trialMark: string): string {
   const text = typeof item.fields.words === "string" ? item.fields.words.trim() : "";

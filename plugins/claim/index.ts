@@ -61,6 +61,19 @@ export const WAIT_MAX = 25;
 export const UNHEARD_S = 120;
 const WAKE_MS = 5_000;
 
+/**
+ * What a run holds, said at `compact` so the summary keeps it: each open
+ * intent with its files, then the files held on first write. Nothing held:
+ * nothing said.
+ */
+export function keptWords(open: IntentView[], loose: Hold[]): string {
+  const lines = [
+    ...open.map((i) => `- ${i.title}: ${i.files.join(", ")} (claimed, ${i.id})`),
+    ...(loose.length ? [`- written this turn: ${loose.map((h) => h.file).join(", ")}`] : []),
+  ];
+  return lines.length ? ["Keep in the summary the files this run holds on the shared plan, and what for:", ...lines].join("\n") : "";
+}
+
 /** Intents kept to show, per plan: the open ones and the latest closed. */
 export const SHOW_PER_PLAN = 40;
 /** Plans shown, the latest first. */
@@ -402,6 +415,21 @@ const claim: Plugin<ClaimConfig> = {
         seen(run);
         release(run.run);
         return null;
+      },
+    });
+
+    // A compaction is coming: what the run holds goes into the summary, so it still knows after (edition 3's `compact`).
+    node.node({
+      name: "kept",
+      kind: "reflex",
+      title: "What this run holds",
+      at: ["compact"],
+      repeat: "every",
+      speak(_m, run) {
+        if (replay(run)) return null;
+        seen(run);
+        const words = keptWords(openOf(run.run), loose.filter((h) => h.run === run.run));
+        return words ? { say: words } : null;
       },
     });
 
