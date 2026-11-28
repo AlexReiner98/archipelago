@@ -15,7 +15,7 @@ import claudeCode, { HOOKLESS } from "../plugins/claude-code/index.ts";
 import { handle, lastAssistantText, promptTitle, relativePath, toolPlaces, transcriptPath, unseenFailures, type HookInput, type RunPort } from "../plugins/claude-code/mapping.ts";
 import { rpc } from "../plugins/claude-code/mcp.ts";
 import { withRemote } from "../plugins/claude-code/hook.ts";
-import { ordered, tagOf, taggedText, told, type Speakers } from "../plugins/claude-code/context.ts";
+import { CONTEXT_MAX, fitted, ordered, refusalTold, tagOf, taggedText, told, type Speakers } from "../plugins/claude-code/context.ts";
 import mcpPlugin from "../plugins/mcp/index.ts";
 import types from "../plugins/types/index.ts";
 import type { ToolDef } from "../plugins/mcp/host.ts";
@@ -750,6 +750,78 @@ test("each node's words come under a short tag naming it: its title, never a pat
   assert.deepEqual(ordered(said, kinds, ["session_start"]).map((s) => s.node), ["words/a", "words/b", "since/heard"], "standing words first, by node, then what changes");
   assert.deepEqual(ordered(said, kinds, ["prompt"]), said, "elsewhere, the answer's order");
   assert.equal(told([], kinds), undefined);
+});
+
+test("under the budget every node is said whole; past it, standing words are listed a line each with how to get them", () => {
+  const who: Speakers = (id) =>
+    ({
+      "words/std1": { title: "Standing one", kind: "instruction", source: "i_mwstand0001" },
+      "words/std2": { title: "Standing two", kind: "instruction", source: "i_mwstand0002" },
+      "words/nosrc": { title: "No item", kind: "instruction" },
+      "since/heard": { title: "Since you last heard", kind: "reflex" },
+    })[id];
+  const said = [
+    { node: "since/heard", text: "Two things changed." },
+    { node: "words/std2", text: "B ".repeat(300) },
+    { node: "words/std1", text: "A ".repeat(300) },
+    { node: "words/nosrc", text: "C ".repeat(300) },
+  ];
+  const whole = fitted(said, who, ["session_start"], 10_000)!;
+  assert.deepEqual(whole.listed, [], "under budget: nothing listed");
+  assert.equal(whole.text, told(said, who, ["session_start"], 10_000));
+  assert.ok(whole.text.startsWith("[No item]") && whole.text.includes("[Standing one]"));
+  assert.ok(CONTEXT_MAX < 10_000, "the default is under Claude Code's cut");
+
+  const cut = fitted(said, who, ["session_start"], 1000)!;
+  assert.ok(cut.text.length <= 1000, `${cut.text.length}`);
+  assert.ok(cut.text.includes("[Since you last heard] Two things changed."), "what this place asked for is said whole");
+  assert.ok(cut.text.startsWith("[No item] C"), "standing words said whole while each fits, by node, first as at any start");
+  assert.ok(cut.text.indexOf("[No item] C") < cut.text.indexOf("[Since you last heard]"));
+  assert.deepEqual(cut.listed, ["words/std1", "words/std2"], "the rest are listed");
+  assert.match(cut.text, /\[More from the map\] .*2 of its 4 nodes/);
+  assert.ok(cut.text.includes('- [Standing two] in full: get {"ids":["i_mwstand0002"]}'), "a node from an item: get on it");
+  assert.ok(cut.text.includes('- [Standing one] in full: get {"ids":["i_mwstand0001"]}'));
+
+  const tiny = fitted(said, who, ["session_start"], 300)!;
+  assert.ok(tiny.text.length <= 300, `${tiny.text.length}`);
+  assert.deepEqual(tiny.listed, ["words/nosrc", "words/std1", "words/std2", "since/heard"], "nothing fits whole: every node a line");
+  assert.match(tiny.text, /- and \d+ more: hear/, "lines that don't fit are counted, not dropped unsaid");
+  const roomy = fitted(said, who, ["session_start"], 700)!;
+  assert.ok(roomy.text.includes('- [No item] in full: hear {"place":"session_start"}'), roomy.text);
+
+  const refused = refusalTold({ said, refused: { node: "words/std1", text: "Not that." } }, who, ["prompt"], 500);
+  assert.ok(refused.startsWith("[Standing one] Not that."), "a refusal is said first and whole");
+  assert.ok(refused.length <= 500);
+});
+
+test("a hook answer over the budget keeps the map's words in it: the refusal and the place's words whole, the rest a line each", async () => {
+  const big = (n: string) => ({ node: `words/${n}`, text: `${n} `.repeat(2000) });
+  const who: Speakers = (id) => (id.startsWith("words/") ? { title: `Rule ${id.slice(6)}`, kind: "instruction", source: `i_mw${id.slice(6)}000000` } : { title: "Here", kind: "reflex" });
+  const answers = (m: Moment): Answer =>
+    m.places[0] === "session_start"
+      ? { said: [big("aa"), big("bb"), { node: "here/now", text: "Your task is x." }] }
+      : m.places.includes("file:.env")
+        ? { said: [big("cc")], refused: { node: "here/now", text: "Not .env." } }
+        : { said: [] };
+  const run: AgentRun = { begin: async (s) => ({ ...s, started: T }), reach: async (m) => answers(m), act: async () => {}, end: async () => {} };
+  const go = (input: Partial<HookInput> & { hook_event_name: string }, contextMax?: number) =>
+    handle({ session_id: "s1", cwd: "/home/me/repo", ...input }, { agent: run, begun: false }, { actor, now: () => T, speakers: who, ...(contextMax ? { contextMax } : {}) });
+
+  const start = (await go({ hook_event_name: "SessionStart", source: "startup" })) as any;
+  const text = start.hookSpecificOutput.additionalContext as string;
+  assert.ok(text.length <= CONTEXT_MAX, `${text.length} over ${CONTEXT_MAX}`);
+  assert.ok(text.includes("[Here] Your task is x."), "this place's own words, whole");
+  assert.ok(text.includes("[Rule aa] aa aa"), "a standing node that fits, whole");
+  assert.ok(text.includes('- [Rule bb] in full: get {"ids":["i_mwbb000000"]}'), "the one that doesn't, a line");
+
+  const small = (await go({ hook_event_name: "SessionStart", source: "startup" }, 2000)) as any;
+  assert.ok((small.hookSpecificOutput.additionalContext as string).length <= 2000, "the budget is a config value");
+
+  const denied = (await go({ hook_event_name: "PreToolUse", tool_name: "Edit", tool_input: { file_path: "/home/me/repo/.env" } }, 2000)) as any;
+  const reason = denied.hookSpecificOutput.permissionDecisionReason as string;
+  assert.ok(reason.startsWith("[Here] Not .env."), "the refusal first, whole");
+  assert.ok(reason.length <= 2000);
+  assert.ok(reason.includes('- [Rule cc] in full: get {"ids":["i_mwcc000000"]}'));
 });
 
 test("two runs with the same nodes get the same leading text at session_start, whatever order the plugins loaded in", async () => {

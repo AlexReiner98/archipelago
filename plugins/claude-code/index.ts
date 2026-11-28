@@ -28,7 +28,7 @@ import { Refused } from "../../spec/common.ts";
 import type { McpHost, ToolDef, ToolResult, ToolRun } from "../mcp/host.ts";
 import { HOST } from "../mcp/host.ts";
 import type { AgentRun, AgentTree, Place } from "../../spec/agent.ts";
-import type { Speakers } from "./context.ts";
+import { CONTEXT_MAX, type Speakers } from "./context.ts";
 import type { Actor, Json, Time } from "../../spec/common.ts";
 import { META } from "../../spec/common.ts";
 import type { ExchangeRead } from "../../spec/exchange.ts";
@@ -69,6 +69,11 @@ export interface ClaudeCodeConfig extends LocalAccess {
   files?: boolean;
   /** Minutes a hook-less MCP session may be quiet before it is ended, and its run with it. Default 10. */
   idleMinutes?: number;
+  /**
+   * A hook's context at most, in characters. Default 9000 (CONTEXT_MAX), under the 10,000 Claude Code keeps
+   * before it moves the rest to a file: past it, nodes are listed a line each (context.ts `fitted`).
+   */
+  contextMax?: number;
 }
 
 /**
@@ -199,7 +204,7 @@ const claudeCode: Plugin<ClaudeCodeConfig> = {
     /** Who a node is, as loaded now: its title tags its words, its kind orders session_start. */
     const speakers: Speakers = (id) => {
       const n = tree.nodes().find((x) => x.id === id);
-      return n && { title: n.title, kind: n.kind };
+      return n && { title: n.title, kind: n.kind, ...(n.source ? { source: n.source } : {}) };
     };
     /** The run's tool acts on the record, from `since` on. */
     const recorded = async (run: string, since?: Time): Promise<RecordedCall[]> => {
@@ -258,6 +263,7 @@ const claudeCode: Plugin<ClaudeCodeConfig> = {
         loadedSaid,
         home,
         speakers,
+        ...(config.contextMax !== undefined ? { contextMax: config.contextMax } : {}),
         // A node to say the load, when a plugin declares `loaded.note`; nothing is lost when none does.
         note: async (l: Load) => {
           if (!actions.list().some((a) => a.name === "loaded.note")) return;
@@ -286,6 +292,7 @@ const claudeCode: Plugin<ClaudeCodeConfig> = {
     };
 
     const sessions = new Map<string, Session>();
+    const budget = config.contextMax ?? CONTEXT_MAX;
     const now = () => new Date().toISOString();
     /** A call from a session's client: the adapter reaches and records what the hooks would. */
     const sessionCall = (s: Session, tool: ToolDef, args: { [key: string]: Json }, run: ToolRun): Promise<ToolResult> => {
@@ -296,7 +303,7 @@ const claudeCode: Plugin<ClaudeCodeConfig> = {
           await st.agent.begin({ run: s.run, agent: s.actor, harness: s.client, reaches: MCP_REACHES, title: s.client });
           st.begun = true;
           said.push(HOOKLESS);
-          said.push(spoken(await st.agent.reach({ run: s.run, places: ["session_start"], time: now() }), speakers, ["session_start"]));
+          said.push(spoken(await st.agent.reach({ run: s.run, places: ["session_start"], time: now() }), speakers, ["session_start"], budget));
         }
         const place = `tool:${prefix}${tool.name}`;
         const input = trim(args) ?? null;
@@ -304,9 +311,9 @@ const claudeCode: Plugin<ClaudeCodeConfig> = {
         if (before.refused) {
           const { node, text, code } = before.refused;
           await st.agent.act({ run: s.run, place, time: now(), kind: "tool", by: "agent", input, output: { refused: node, text, ...(code ? { code } : {}) }, ok: false });
-          return { text: [refusalText(before, speakers), ...said].filter(Boolean).join("\n\n"), isError: true };
+          return { text: [refusalText(before, speakers, [place], budget), ...said].filter(Boolean).join("\n\n"), isError: true };
         }
-        said.push(spoken(before, speakers));
+        said.push(spoken(before, speakers, [place], budget));
         let out: ToolResult;
         try {
           out = await tool.call(args, run);
@@ -314,7 +321,7 @@ const claudeCode: Plugin<ClaudeCodeConfig> = {
           out = { text: `${tool.name} failed: ${(err as Error)?.message ?? String(err)}`, isError: true };
         }
         await st.agent.act({ run: s.run, place, time: now(), kind: "tool", by: "agent", input, output: trim(out.text) ?? null, ok: !out.isError });
-        said.push(spoken(await st.agent.reach({ run: s.run, places: [`tool_result:${prefix}${tool.name}`], time: now(), input: trim(out.text) ?? null }), speakers));
+        said.push(spoken(await st.agent.reach({ run: s.run, places: [`tool_result:${prefix}${tool.name}`], time: now(), input: trim(out.text) ?? null }), speakers, [`tool_result:${prefix}${tool.name}`], budget));
         const words = said.filter(Boolean);
         return words.length ? { ...out, text: `${out.text}\n\n${words.join("\n\n")}` } : out;
       });

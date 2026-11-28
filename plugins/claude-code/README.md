@@ -34,6 +34,35 @@ changed since it last heard) comes after them. So the start of what the map
 says is the same from run to run with the same nodes. Elsewhere the order is
 the answer's (config-tree order).
 
+### A budget
+
+Claude Code keeps about 10,000 characters of a hook's `additionalContext`;
+past that the model gets a short preview and the rest goes to a file it is
+not made to read. So the block is kept under a budget, `contextMax`
+characters (default 9,000, `CONTEXT_MAX`), and the same budget holds for a
+refusal's reason. Under it, every node's words are whole. Past it
+(`fitted`):
+
+- a refusal is said first, whole;
+- then the other nodes said at this place, then the standing words, are
+  said whole in the answer's order, each while it still fits;
+- every node left over is one line: its tag and how to get its words in
+  full, `get` on the map item it was made from, else `hear` on the place.
+
+```
+[More from the map] The words here pass this hook's 9000 characters, so 2 of its 7 nodes are one line each. Get any of them in full with the tool its line names.
+- [Branch up to date before merge] in full: get {"ids":["e_5mrg7up2"]}
+- [Plugins stay revertible] in full: hear {"place":"session_start"}
+```
+
+Those said whole keep the order above (standing words first at
+`session_start`); the lines come after them. If even the lines don't fit,
+the last ones become one line that counts them. Only the hook's text is cut:
+the exchange still records each node's say whole, so a listed node is held
+back the next time like any node said once in the context, and it is the
+agent's to ask for. Which nodes went out as a line is not yet on the
+exchange; that needs a spec change (an edition after 12).
+
 The Context interface's run pane shows, on an opened say or refusal, the
 whole block as the agent got it, rebuilt with the same `context.ts` from the
 moment's events (with the nodes' titles as loaded now). Words said at
@@ -230,6 +259,7 @@ forwards as before and sends no transcript.
 
 | Setting | Default | |
 |---|---|---|
+| `contextMax` | 9000 | A hook's context, and a refusal's reason, at most, in characters ("A budget"). Past it, nodes are listed a line each |
 | `files` | true | Whether a transcript a hook names is opened on this server's disk (also the last reply, read from it). A server elsewhere sets false: a hook's path names a file on another machine, and it reads only the pages the hook sends. The path isn't kept either: such a run has no `transcript` fact |
 
 ## Every session
