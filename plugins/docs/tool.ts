@@ -25,6 +25,7 @@ export function brief(docs: PluginDoc[]): string {
       if (d.actions.length) parts.push(`actions ${d.actions.map((a) => a.name).join(", ")}`);
       if (d.places.length) parts.push(`speaks at ${d.places.length} place${d.places.length === 1 ? "" : "s"}`);
       if (d.missing?.length) parts.push(`waits for ${d.missing.join(", ")}`);
+      if (d.error) parts.push(`failed: ${d.error}${d.where?.file ?? d.where?.module ? ` (at ${d.where.file ?? d.where.module})` : ""}`);
       return parts.join("; ");
     })
     .join("\n");

@@ -75,6 +75,8 @@ const host = await startBrowser({
     { id: "column", plugin: "plugins/examples/column.ts", disabled: true },
     { id: "document", plugin: "plugins/document/index.ts" },
     { id: "item", plugin: "plugins/item/index.ts" },
+    // On the item page: merge it with its twin, after a confirm that says what stays and what goes (plugins/items).
+    { id: "items", plugin: "plugins/items/view.ts" },
     { id: "style-view", plugin: "plugins/style/view.ts" },
     { id: "docs", plugin: "plugins/docs/view.ts" },
     { id: "guide", plugin: "plugins/docs/guide.ts" },

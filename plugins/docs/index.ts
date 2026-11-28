@@ -29,10 +29,12 @@ import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import type { LoaderTree } from "../../spec/loader.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { TypesRead } from "../../spec/types.ts";
-import type { Context, Plugin } from "../../runtime/core.ts";
+import type { Context, Plugin, Runtime } from "../../runtime/core.ts";
+import { stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { guide, read } from "./files.ts";
-import { activityOf, digest, KEY, reference, type DocsRead, type PluginDoc } from "./read.ts";
+import { origins, type Git, type Origins } from "./origin.ts";
+import { activityOf, digest, failures, KEY, reference, Seen, type DocsRead, type Origin, type PluginDoc } from "./read.ts";
 
 export { KEY, type DocsRead } from "./read.ts";
 
@@ -46,6 +48,10 @@ export interface DocsConfig {
   side?: string;
   /** How often a change of a plugin's state is looked for (ms). Default 1000. */
   every?: number;
+  /** The server's log file, when it may write one (`<data>/server.log`): a failure says to look there. */
+  log?: string;
+  /** Runs git, for where each plugin came from (origin.ts); replaced in tests. */
+  git?: Git;
 }
 
 /** How many items of each kind the map holds, from one bounded page each. */
@@ -72,6 +78,25 @@ async function active(exchange: ExchangeRead, docs: PluginDoc[]): Promise<void> 
     const a = by.get(d.id);
     if (a) d.activity = a;
   }
+}
+
+/** Each plugin's origin, from its fiber's module, or for one that failed to import, the module its entry names. */
+async function placed(origins: Origins, runtime: Runtime, docs: PluginDoc[]): Promise<void> {
+  const byPosition = new Map<string, string>();
+  for (const f of runtime.fibers) if (f.source && f.parent === runtime.rootFiber) byPosition.set(f.position().join("."), f.source);
+  const sourceOf = (d: PluginDoc) => byPosition.get(d.position.join(".")) ?? (d.where?.module ? new URL(d.where.module, ROOT).href : undefined);
+  const sources = docs.map(sourceOf);
+  const got = await origins.of(sources.filter((s): s is string => !!s)).catch(() => new Map<string, Origin>());
+  docs.forEach((d, i) => {
+    const o = sources[i] && got.get(sources[i]!);
+    if (o) d.origin = o;
+  });
+}
+
+/** Where the server's errors go: its log file when this process writes it (it changed since it started), else its output. */
+async function logOf(file: string | undefined, started: number): Promise<string> {
+  const s = file ? await stat(file).catch(() => undefined) : undefined;
+  return s && s.mtimeMs >= started - 5000 ? file! : "the server's output, in the terminal it runs in";
 }
 
 const docs: Plugin<DocsConfig> = {
@@ -120,11 +145,41 @@ const docs: Plugin<DocsConfig> = {
       return () => clearInterval(timer);
     });
 
+    // When each failure was first seen: looked for when the tree changes and on every tick.
+    const seen = new Seen();
+    const look = () => seen.note(failures(ctx.runtime, side, loader.status()));
+    look();
+    loader.watch(() => (look(), fire()));
+    ctx.effect(() => {
+      const timer = setInterval(look, every);
+      return () => clearInterval(timer);
+    });
+    const sourced = origins(ROOT, config.git ? { git: config.git } : {});
+    const started = Date.now();
+    const log = () => logOf(config.log, started);
+
     ctx.provide<DocsRead>(KEY, (_caller, from) => ({
       plugins: async () => {
-        const docs = reference(ctx.runtime, { side, root: ROOT, actions: actions.list(), nodes: tree.nodes(), types: types.all(), entries: loader.status() });
-        await Promise.all([counted(graph, docs), active(exchange, docs)]);
+        look();
+        const docs = reference(ctx.runtime, {
+          side,
+          root: ROOT,
+          actions: actions.list(),
+          nodes: tree.nodes(),
+          types: types.all(),
+          entries: loader.status(),
+          tree: loader.tree(),
+          seen: seen.at,
+          log: await log(),
+        });
+        await Promise.all([counted(graph, docs), active(exchange, docs), placed(sourced, ctx.runtime, docs)]);
         return docs;
+      },
+      origins: async (folders) => {
+        const names = [...new Set(folders)].filter((f) => /^[\w.-]+$/.test(f)).slice(0, 200);
+        const urls = names.map((f) => new URL(`plugins/${f}/README.md`, ROOT).href);
+        const got = await sourced.of(urls);
+        return Object.fromEntries(names.flatMap((f, i) => (got.has(urls[i]!) ? [[f, got.get(urls[i]!)!]] : [])));
       },
       guide: () => guide(fileURLToPath(ROOT)),
       chapter: (path) => read(fileURLToPath(ROOT), path),

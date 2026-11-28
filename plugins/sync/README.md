@@ -84,6 +84,34 @@ After the join, the later change wins, **field by field**, by commit time:
   and a set left with nothing to write is skipped.
 
 There are no holds: every change applies, and anything can be undone.
+
+## Two items merged into one
+
+A merge (`items.merge`, plugins/items) takes `drop` away and re-points
+its links to `keep`. Without more, a peer's later edit to drop would
+bring it back whole (above). So each map keeps, beside its pairs, the
+items merged away on it and where each went (`sync.merged`):
+
+- A run finds the merges in a map's log (sets made by `items.merge`:
+  drop is the item taken away, keep the item whose type the set says
+  again) and adds them to what that map's store holds.
+- A set of one map that changes an item the other merged away is
+  written onto keep: its facts and the ids in its values (a link's ends)
+  swapped, the way pairs swap. A peer taking drop away too is left out:
+  keep stays. The set goes back to its own map too, onto that map's keep,
+  so both hold the change. The report says how many (`merged.sets`).
+- At the end each map keeps every merge either knew, in its own ids, so a
+  third map that got the merge as a copy (not an `items.merge` set) is
+  still redirected the next time.
+- An undo of the merge brings drop back: a set that gives a merged item
+  its type again ends that merge on both maps, and a drop that is on its
+  map again is never redirected.
+
+The pairs that name drop are kept as they are: the merge itself, and its
+undo, still travel through them.
+
+A merge on one map before the first sync is that map's alone: the join
+pairs and copies what each map holds then.
 Commit times come from each map's own clock.
 
 ## Actions
@@ -93,9 +121,10 @@ Commit times come from each map's own clock.
 | `sync.status` `{}` | This map's sync id and name, and each peer: its cursor, when they last synced, and that run's report. Writes nothing |
 | `sync.apply` `{ writes }` | Makes `{ id, field, value? }`, `{ id, whole: fields }` and `{ id, remove: true }` true here, as one change set |
 | `sync.pairs` `{ peer, after?, limit? }` | Ids paired with a peer's, `[this map's, the peer's]`, a page at a time. Writes nothing |
-| `sync.mark` `{ peer, name, cursor?, report?, pairs?, only? }` | Keeps how far a peer has had this map's log, the run's report, and new pairs (at most 500 a call; `only`: the pairs alone). Writes nothing to the map |
+| `sync.merged` `{ after?, limit? }` | Items merged away on this map, `[drop, keep]`, a page at a time. Writes nothing |
+| `sync.mark` `{ peer, name, cursor?, report?, pairs?, merged?, unmerged?, only? }` | Keeps how far a peer has had this map's log, the run's report, new pairs and merges, and merges undone (at most 500 a call; `only`: those alone). Writes nothing to the map |
 
-The map's id, the cursors and the pairs are in `sync.sqlite` beside the
+The map's id, the cursors, the pairs and the merges are in `sync.sqlite` beside the
 map, not in the graph: they are about syncing, not the map's content, and
 would sync themselves otherwise.
 

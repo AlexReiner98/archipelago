@@ -49,8 +49,8 @@ export const DESCRIPTIONS: Record<string, string> = {
     "Leave input out to see what an action takes.",
   get: "Items by id: every field, and their links with the item at the other end.",
   query:
-    "Find items. find: words match titles; is:open, is:closed, type:<type or base>, status:<s>, in:<id> (what is part of it), near:<id>. " +
-    "walk follows links from what is found. At most limit come back.",
+    "Find items. find: words in titles; is:open, is:closed, type:<type or base>, status:<s>, in:<id>, near:<id>, as_of:<date> (records true then). " +
+    "walk follows links. At most limit come back. Found nothing: missing names words no title holds.",
   tell: "Say what you concluded: said, one short line; about, the ids of the items it concerns. It is kept as a record; replaces supersedes an earlier one.",
   run: "Say what this run is: its title, the task it took on, the run that started it; end: true when it is over.",
 };
@@ -460,7 +460,9 @@ const mcp: Plugin<McpConfig> = {
           rows = rows.slice(0, limit);
           const kept = new Set(rows.map((r) => r.id));
           const ls = [...links.values()].filter((l) => kept.has(l.from) && kept.has(l.to)).map((l) => ({ id: l.id, type: l.type, from: l.from, to: l.to }));
-          return ok({ items: rows.map(brief), links: ls, ...(more ? { more } : {}) });
+          // Why nothing (or less): the words no title holds, or the term that left nothing.
+          const why = { ...(found.missing ? { missing: found.missing } : {}), ...(found.empty_by ? { empty_by: found.empty_by } : {}) };
+          return ok({ items: rows.map(brief), links: ls, ...(more ? { more } : {}), ...why });
         },
       },
       {

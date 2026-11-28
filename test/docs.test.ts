@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { test } from "node:test";
 import type { ActionInfo, ActionList } from "../spec/action.ts";
 import type { AgentTree, NodeInfo } from "../spec/agent.ts";
@@ -9,8 +12,9 @@ import { Runtime, type Plugin } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
 import docs, { KEY, type DocsRead } from "../plugins/docs/index.ts";
 import tool, { brief } from "../plugins/docs/tool.ts";
-import { byFolder, countsOf, fieldsOf, foundation, listsOf, matches, stateWords, usedBy, uses } from "../plugins/docs/cards.ts";
-import { activityOf, folderOf, keyDoc, reference, shownConfig, type PluginDoc } from "../plugins/docs/read.ts";
+import { ago, byFolder, countsOf, failureOf, fieldsOf, foundation, listsOf, matches, originWords, stateWords, usedBy, uses } from "../plugins/docs/cards.ts";
+import { origins } from "../plugins/docs/origin.ts";
+import { activityOf, failureKey, folderOf, keyDoc, reference, Seen, shortPath, shownConfig, stackOf, type PluginDoc } from "../plugins/docs/read.ts";
 import type { ExchangeRead, ExchangeWatch } from "../spec/exchange.ts";
 import type { GraphRead, GraphWatch } from "../spec/graph.ts";
 import type { McpHost, ToolDef } from "../plugins/mcp/host.ts";
@@ -293,4 +297,171 @@ test("fieldsOf: an action's input in words, for its plugin's page", () => {
     ],
   );
   assert.deepEqual(fieldsOf({ type: "object" }), []);
+});
+
+test("a failed plugin: its error, when it was first seen, and where to look, whether its import or its apply threw", async () => {
+  const rt = new Runtime();
+  rt.onError = () => {};
+  const reg = registries(ACTIONS, NODES);
+  const thrower: Plugin = {
+    id: "thrower",
+    apply: () => {
+      throw new Error("no config file");
+    },
+  };
+  const modules: Record<string, Plugin> = { action: reg.plugin, docs, "plugins/thrower/index.ts": thrower };
+  const loader = new Loader(rt, {
+    base: "mem:/",
+    import: async (url) => {
+      if (url.endsWith("broken/index.ts")) throw new SyntaxError("Unexpected token '}'");
+      return { default: modules[url.slice(5)]! };
+    },
+  });
+  await loader.apply([
+    { id: "action", plugin: "action" },
+    { id: "docs", plugin: "docs", config: { every: 20, log: "/home/me/.data/server.log" } },
+    { id: "broken", plugin: "plugins/broken/index.ts" },
+    { id: "thrower", plugin: "plugins/thrower/index.ts" },
+  ]);
+  const read = rt.root.get<DocsRead>(KEY);
+  const all = await read.plugins();
+  // One whose module failed to import has no fiber: its card is read from the tree, named for its folder.
+  const b = all.find((d) => d.id === "broken")!;
+  assert.equal(b.state, "failed");
+  assert.equal(b.folder, "broken");
+  assert.equal(b.error, "Unexpected token '}'");
+  // The log file isn't written by this process: the server's output is where to look.
+  assert.deepEqual(b.where, { module: "plugins/broken/index.ts", log: "the server's output, in the terminal it runs in" });
+  assert.deepEqual(b.entries, [{ id: "broken", side: "server", off: false }]);
+  assert.ok(!Number.isNaN(Date.parse(b.failedAt!)));
+  // One whose apply threw: the same, with its stack.
+  const t = all.find((d) => d.id === "thrower")!;
+  assert.equal(t.error, "no config file");
+  assert.equal(t.where?.module, "plugins/thrower/index.ts");
+  assert.match(t.stack![0]!, /^Error: no config file/);
+  assert.ok(t.failedAt);
+  // Both need attention, and say what went wrong in words.
+  const f = failureOf(byFolder(all).find((d) => d.id === "broken")!, Date.parse(b.failedAt!) + 120_000)!;
+  assert.equal(f.error, "Unexpected token '}'");
+  assert.match(f.when!, /^Seen failing at \d\d:\d\d:\d\d, 2 min ago$/);
+  assert.deepEqual(f.look, ["plugins/broken/index.ts, its module", "the server's output, in the terminal it runs in"]);
+  assert.deepEqual(listsOf(byFolder(all))[0]!.docs.map((d) => d.id), ["broken", "thrower"]);
+  // Taken out of the tree, it is gone from the view.
+  await loader.apply(loader.tree.filter((e) => e.id !== "broken"));
+  assert.equal((await read.plugins()).some((d) => d.id === "broken"), false);
+  await loader.apply([]);
+});
+
+test("Seen: a failure's time is when it was first seen, forgotten once it is gone", () => {
+  let now = Date.parse("2026-11-27T10:00:00Z");
+  const seen = new Seen(() => now);
+  const k = failureKey("server", [3], "boom");
+  seen.note([k]);
+  now += 5000;
+  seen.note([k]);
+  assert.equal(seen.at(k), "2026-11-27T10:00:00.000Z");
+  seen.note([]);
+  assert.equal(seen.at(k), undefined);
+  seen.note([k]);
+  assert.equal(seen.at(k), "2026-11-27T10:00:05.000Z");
+});
+
+test("stackOf: the stack's paths from the repository's root, and the frame in the plugin's own folder", () => {
+  const e = new Error("boom");
+  e.stack = [
+    "Error: boom",
+    "    at Fiber.reload (file:///home/me/arch/runtime/core.ts:380:41)",
+    "    at load (file:///home/me/arch/plugins/thrower/util.ts:12:9)",
+    "    at apply (file:///home/me/arch/plugins/thrower/index.ts:7:11)",
+  ].join("\n");
+  const s = stackOf(e, "file:///home/me/arch/", "thrower");
+  assert.equal(s.file, "plugins/thrower/util.ts:12");
+  assert.equal(s.stack![1], "at Fiber.reload (runtime/core.ts:380:41)");
+  // Windows paths too, and with no frame in its folder, the first outside the kernel.
+  e.stack = "Error: boom\n    at x (C:\\Users\\me\\arch\\runtime\\core.ts:1:1)\n    at y (C:\\Users\\me\\arch\\plugins\\other\\a.ts:4:2)";
+  assert.equal(stackOf(e, "file:///C:/Users/me/arch/", "thrower").file, "plugins/other/a.ts:4");
+  assert.deepEqual(stackOf("not an error"), {});
+  // A plugin from outside this repository: the frame in its module's own folder, shown short on a card.
+  e.stack = "Error: boom\n    at load (file:///home/me/mine/thrower/index.ts:1:28)\n    at Fiber.reload (file:///home/me/arch/runtime/core.ts:381:34)";
+  const out = stackOf(e, "file:///home/me/arch/", undefined, "file:///home/me/mine/thrower/index.ts");
+  assert.equal(out.file, "file:///home/me/mine/thrower/index.ts:1");
+  assert.equal(shortPath(out.file!), "…/mine/thrower/index.ts:1");
+  assert.equal(shortPath("plugins/docs/index.ts:3"), "plugins/docs/index.ts:3");
+});
+
+test("origin: where a plugin came from, at what commit or version, and when it last changed, read from its folder", async () => {
+  const base = await mkdtemp(join(tmpdir(), "docs-origin-"));
+  try {
+    const inside = join(base, "repo", "plugins", "x");
+    const outside = join(base, "mine", "extra");
+    await mkdir(inside, { recursive: true });
+    await mkdir(outside, { recursive: true });
+    await writeFile(join(inside, "index.ts"), "export default {}");
+    await writeFile(join(base, "mine", "package.json"), JSON.stringify({ name: "my-plugins", version: "1.2.0" }));
+    await writeFile(join(outside, "index.ts"), "export default {}");
+    const calls: string[][] = [];
+    let edited = "";
+    const git = async (cwd: string, args: string[]) => {
+      calls.push(args);
+      if (!cwd.startsWith(join(base, "repo"))) return undefined;
+      return args[0] === "log" ? "3f2a1c9\t2026-11-20T10:00:00+00:00" : edited || undefined;
+    };
+    let now = 0;
+    const o = origins(pathToFileURL(join(base, "repo") + "/").href, { git, fresh: 1000, now: () => now });
+    const a = pathToFileURL(join(inside, "index.ts")).href;
+    const b = pathToFileURL(join(outside, "index.ts")).href;
+    const got = await o.of([a, b, "mem:/x"]);
+    assert.deepEqual(got.get(a), { from: "repository", path: "plugins/x", commit: "3f2a1c9", changed: "2026-11-20T10:00:00+00:00" });
+    const out = got.get(b)!;
+    assert.equal(out.from, "outside");
+    assert.equal(out.name, "my-plugins");
+    assert.equal(out.version, "1.2.0");
+    assert.ok(out.changed && !Number.isNaN(Date.parse(out.changed)));
+    assert.equal(got.has("mem:/x"), false);
+    // Kept for `fresh`: no git again until it has passed; then edits not committed show, with the newest file's time.
+    const n = calls.length;
+    await o.of([a]);
+    assert.equal(calls.length, n);
+    edited = " M index.ts";
+    now = 2000;
+    const again = (await o.of([a])).get(a)!;
+    assert.equal(again.edited, true);
+    assert.notEqual(again.changed, "2026-11-20T10:00:00+00:00");
+    // In words, on the card.
+    const at = Date.parse("2026-11-22T10:00:00Z");
+    assert.equal(originWords({ ...doc({}), origin: got.get(a)! }, at), "This repository at 3f2a1c9, changed 2 days ago");
+    assert.equal(originWords({ ...doc({}), origin: { from: "outside", name: "my-plugins", version: "1.2.0", changed: "2026-11-22T09:58:00Z" } }, at), "Outside: my-plugins v1.2.0, changed 2 min ago");
+    assert.equal(originWords({ ...doc({}), origin: { from: "repository", commit: "3f2a1c9", changed: "2026-11-22T07:00:00Z", edited: true } }, at), "This repository at 3f2a1c9, edited 3 h ago, not committed");
+    assert.equal(originWords(doc({})), undefined);
+  } finally {
+    await rm(base, { recursive: true, force: true });
+  }
+});
+
+test("ago: a time beside now, as a person reads it", () => {
+  const now = Date.parse("2026-11-27T12:00:00Z");
+  assert.equal(ago("2026-11-27T11:59:30Z", now), "just now");
+  assert.equal(ago("2026-11-26T11:00:00Z", now), "yesterday");
+  assert.equal(ago("2026-10-01T12:00:00Z", now), "1 Oct 2026");
+  assert.equal(ago("not a time", now), "not a time");
+});
+
+test("byFolder: a card carries its folder's origin, and the failing half's error, time and where to look", () => {
+  const origin = { from: "repository" as const, path: "plugins/w", commit: "abc1234" };
+  const [card] = byFolder([
+    { ...doc({ id: "w", side: "server" }), folder: "w", origin },
+    {
+      ...doc({ id: "w-view", side: "page", state: "failed", error: "boom" }),
+      folder: "w",
+      failedAt: "2026-11-27T10:00:00Z",
+      where: { file: "plugins/w/view.ts:3", log: "the browser's console" },
+      stack: ["Error: boom"],
+    },
+  ]);
+  assert.deepEqual(card!.origin, origin);
+  assert.equal(card!.error, "boom");
+  assert.equal(card!.failedAt, "2026-11-27T10:00:00Z");
+  assert.deepEqual(failureOf(card!)!.look, ["plugins/w/view.ts:3, where it threw", "the browser's console"]);
+  assert.deepEqual(card!.stack, ["Error: boom"]);
+  assert.equal(failureOf(doc({})), undefined);
 });

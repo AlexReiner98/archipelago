@@ -226,6 +226,19 @@ test("get and query read every base the same way, bounded, with walks along link
     const limited = await s.call("query", { find: "is:open", limit: 2 });
     assert.equal(limited.json.items.length, 2);
     assert.equal(limited.json.more, 3);
+
+    // Why nothing: the words no title holds; the description names the term and the answer.
+    const none = await s.call("query", { find: "tools zebra" });
+    assert.deepEqual([none.json.items, none.json.missing], [[], ["zebra"]]);
+    assert.equal((await s.call("query", { find: "tools" })).json.missing, undefined);
+    assert.match(String(DESCRIPTIONS.query), /as_of:<date>/);
+    assert.match(String(DESCRIPTIONS.query), /missing/);
+
+    // as_of:<date>: a record true then, by its world-time fields.
+    await s.call("act", { action: "items.set", input: { id: r, fields: { as_of: "2020-01-01", valid_to: "2022-01-01" } } });
+    assert.deepEqual((await s.call("query", { find: "as_of:2021-06-01" })).json.items.map((i: any) => i.id), [r]);
+    const after = await s.call("query", { find: "as_of:2023-01-01" });
+    assert.deepEqual([after.json.items, after.json.empty_by], [[], "as_of:2023-01-01"]);
   } finally {
     await s.close();
   }
