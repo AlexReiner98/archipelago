@@ -31,9 +31,9 @@ import type { LoaderTree } from "../../spec/loader.ts";
 import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
 import { sheet } from "../../spec/style.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
-import { byFolder, countsOf, listsOf, matches, stateWords, troubled, type Count, type Named } from "./cards.ts";
+import { byFolder, countsOf, failureOf, listsOf, matches, originWords, stateWords, troubled, type Count, type Named } from "./cards.ts";
 import { sections } from "./page.ts";
-import { digest, KEY, reference, type DocsRead, type PluginDoc } from "./read.ts";
+import { digest, failures, KEY, reference, Seen, type DocsRead, type Origin as Came, type PluginDoc } from "./read.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
 
@@ -68,6 +68,10 @@ const SHEET = sheet(`
 .dk-about { margin-top:2px; color:var(--fg); }
 .dk-about.none, .dk-lead.none { color:var(--quiet); font-style:italic; }
 .dk-warn { color:var(--failed); margin-top:2px; }
+.dk-err { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+.dk-fail { font-size:var(--text-s); }
+.dk-fail .dk-dim { margin-top:2px; overflow-wrap:anywhere; }
+.dk-origin { margin-top:var(--space-1); font-size:var(--text-xs); color:var(--quiet); }
 .dk-dim { color:var(--dim); }
 .dk-counts { display:flex; flex-wrap:wrap; gap:2px var(--space-3); margin-top:var(--space-1); font-size:var(--text-s); }
 .dk a, .dk-counts button { color:var(--pick); text-decoration:none; background:none; border:0; padding:0; font:inherit; cursor:pointer; }
@@ -86,6 +90,7 @@ const SHEET = sheet(`
 .dk-table { border-collapse:collapse; }
 .dk-table td { padding:2px var(--space-3) 2px 0; vertical-align:top; }
 .dk-table td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.dk-table td:first-child { white-space:nowrap; }
 .dk-page code, .dk-page pre { font-family:var(--mono); font-size:var(--text-s); }
 .dk-page pre { white-space:pre-wrap; word-break:break-all; color:var(--dim); }
 `);
@@ -103,6 +108,8 @@ const view: Plugin = {
     const fill = ctx.get<SlotFill>("slot.fill");
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
+    // When each of the page's failures was first seen: noted on every look.
+    const seen = new Seen();
     ctx.get<HereDeclare>("here.declare").declare({ key: OPEN, scope: "page", doc: "The plugin whose page the Plugins view shows." });
 
     /** Sets a `here` key; a key nobody declared (its plugin isn't loaded) is let go. */
@@ -123,11 +130,26 @@ const view: Plugin = {
       return html`<span>${to.title}</span>`;
     };
 
-    /** What it is for, and its state when it isn't simply running. */
-    const About = ({ plugin }: { plugin: PluginDoc }) => html`
-      <div class=${`dk-about${plugin.about ? "" : " none"}`}>${plugin.about ?? "It doesn't say what it is for."}</div>
-      ${stateWords(plugin) && html`<div class=${troubled(plugin) ? "dk-warn" : "dk-dim"}>${stateWords(plugin)}</div>`}
-    `;
+    /** What it is for, and its state when it isn't simply running: a failure says what went wrong, when, and where to look. */
+    const About = ({ plugin }: { plugin: PluginDoc }) => {
+      const f = failureOf(plugin);
+      return html`
+        <div class=${`dk-about${plugin.about ? "" : " none"}`}>${plugin.about ?? "It doesn't say what it is for."}</div>
+        ${f
+          ? html`<div class="dk-fail">
+              <div class="dk-warn dk-err" title=${f.error}>Failed: ${f.error}</div>
+              ${f.when && html`<div class="dk-dim" title=${plugin.failedAt}>${f.when}</div>`}
+              ${f.look.length > 0 && html`<div class="dk-dim">Look at ${f.look.join("; ")}.</div>`}
+            </div>`
+          : stateWords(plugin) && html`<div class=${troubled(plugin) ? "dk-warn" : "dk-dim"}>${stateWords(plugin)}</div>`}
+      `;
+    };
+
+    /** Where it came from, at what commit or version, and when it last changed. */
+    const Origin = ({ plugin }: { plugin: PluginDoc }) => {
+      const words = originWords(plugin);
+      return words ? html`<div class="dk-origin" title=${plugin.origin?.changed ?? ""}>${words}</div>` : null;
+    };
 
     /** What it adds, as counts; a count opens its list, or goes where it points. */
     const Counts = ({ plugin, all }: { plugin: PluginDoc; all: PluginDoc[] }) => {
@@ -151,6 +173,7 @@ const view: Plugin = {
     declare.declare({ name: LIST, merge: "many", doc: "The list of cards, after its sections: what belongs to no card. Each fill gets { all }." });
     fill.fill({ slot: BODY, name: "about", view: About as any });
     fill.fill({ slot: BODY, name: "counts", view: Counts as any });
+    fill.fill({ slot: BODY, name: "origin", view: Origin as any });
     for (const [name, v] of sections(Link)) fill.fill({ slot: PAGE, name, view: v as any });
 
     const Fills = ({ name, plugin, all }: { name: string; plugin: PluginDoc; all: PluginDoc[] }) => {
@@ -193,19 +216,30 @@ const view: Plugin = {
         let live = true;
         const read = async () => {
           const remote = await server.plugins().catch(() => [] as PluginDoc[]);
-          if (live) setDocs(byFolder([...remote, ...reference(ctx.runtime, { side: "page", root: ROOT, slots, entries: loader.status() })]));
+          const entries = loader.status();
+          seen.note(failures(ctx.runtime, "page", entries));
+          const own = reference(ctx.runtime, { side: "page", root: ROOT, slots, entries, tree: loader.tree(), seen: seen.at, log: "the browser's console" });
+          // The page's own plugins come from this repository's folders: the server reads where from.
+          const known = new Set(remote.filter((d) => d.origin).map((d) => d.folder));
+          const ask = [...new Set(own.filter((d) => d.folder && d.builtIn !== false && !known.has(d.folder)).map((d) => d.folder!))];
+          const got: Record<string, Came> = ask.length ? await server.origins(ask).catch(() => ({})) : {};
+          for (const d of own) if (d.folder && got[d.folder]) d.origin = got[d.folder];
+          if (live) setDocs(byFolder([...remote, ...own]));
         };
         void read();
         const stop = server.watch(() => void read());
         let last = digest(ctx.runtime);
         const timer = setInterval(() => {
           const now = digest(ctx.runtime);
+          seen.note(failures(ctx.runtime, "page", loader.status()));
           if (now !== last) (last = now), void read();
         }, 1000);
+        const tree = loader.watch(() => void read());
         return () => {
           live = false;
           clearInterval(timer);
           void stop();
+          void tree();
         };
       }, []);
       return docs;

@@ -7,7 +7,7 @@
  * the plugin did in the newest run.
  */
 import type { Json } from "../../spec/common.ts";
-import type { PluginDoc } from "./read.ts";
+import { shortPath, type PluginDoc } from "./read.ts";
 
 /** Whether a plugin has a problem: it waits for another, or failed. */
 export const troubled = (doc: PluginDoc) => doc.state === "waiting" || doc.state === "failed" || !!doc.error;
@@ -19,6 +19,59 @@ export function stateWords(doc: PluginDoc): string | undefined {
   if (doc.state === "off") return "Turned off.";
   if (doc.state !== "active") return `${doc.state[0]!.toUpperCase()}${doc.state.slice(1)}.`;
   return undefined;
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** A time as a person reads it beside now: "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago", else the date. */
+export function ago(iso: string, now: number = Date.now()): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return iso;
+  const s = Math.max(0, Math.round((now - t) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  const days = Math.floor(s / 86400);
+  if (days === 1) return "yesterday";
+  if (days < 14) return `${days} days ago`;
+  const d = new Date(t);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/** A time of day with seconds, in the page's own zone: when a failure was seen. */
+const clock = (iso: string) => {
+  const d = new Date(iso);
+  const p = (x: number) => String(x).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+};
+
+/**
+ * Where a plugin came from, in one line: "this repository at 3f2a1c9,
+ * changed 2 days ago"; "outside: my-plugins v1.2.0, changed today";
+ * edits not committed say so.
+ */
+export function originWords(doc: PluginDoc, now: number = Date.now()): string | undefined {
+  const o = doc.origin;
+  if (!o) return undefined;
+  const from = o.from === "repository" ? "This repository" : `Outside: ${o.name ?? o.path ?? "a folder"}`;
+  const at = [o.version ? `v${o.version}` : "", o.commit ? `at ${o.commit}` : ""].filter(Boolean).join(" ");
+  const changed = o.changed ? (o.edited ? `edited ${ago(o.changed, now)}, not committed` : `changed ${ago(o.changed, now)}`) : o.edited ? "edited, not committed" : "";
+  return [[from, at].filter(Boolean).join(" "), changed].filter(Boolean).join(", ");
+}
+
+/** What went wrong for a failed plugin: its error, when it was seen, and where to look. Undefined when nothing failed. */
+export function failureOf(doc: PluginDoc, now: number = Date.now()): { error: string; when?: string; look: string[] } | undefined {
+  if (!doc.error && doc.state !== "failed") return undefined;
+  const w = doc.where ?? {};
+  const look = [
+    w.file ? `${shortPath(w.file)}, where it threw` : w.module ? `${shortPath(w.module)}, its module` : "",
+    w.log ? (w.log.startsWith("the ") ? w.log : `the log, ${w.log}`) : "",
+  ].filter(Boolean);
+  return {
+    error: doc.error ?? "It failed to load.",
+    ...(doc.failedAt ? { when: `Seen failing at ${clock(doc.failedAt)}, ${ago(doc.failedAt, now)}` } : {}),
+    look,
+  };
 }
 
 /** A thing the view names, and where it opens: a view, the Map on a query, a run, or another plugin. */
@@ -153,6 +206,8 @@ export function byFolder(docs: PluginDoc[]): PluginDoc[] {
     for (const d of ds) for (const p of d.places) places.set(p.place, (places.get(p.place) ?? 0) + p.nodes);
     const acts = ds.map((d) => d.activity).filter((a) => !!a);
     const slots = ds.filter((d) => d.slots);
+    // Where it came from: the half named for the folder, else any half the server read it for.
+    const origin = (ds.find((d) => d.id === id && d.origin) ?? ds.find((d) => d.origin))?.origin;
     return {
       ...ds[0]!,
       id,
@@ -160,6 +215,10 @@ export function byFolder(docs: PluginDoc[]): PluginDoc[] {
       state: w.state,
       ...(w.missing ? { missing: w.missing } : {}),
       ...(w.error ? { error: w.error } : {}),
+      ...(w.failedAt ? { failedAt: w.failedAt } : {}),
+      ...(w.where ? { where: w.where } : {}),
+      ...(w.stack ? { stack: w.stack } : {}),
+      ...(origin ? { origin } : {}),
       provides: ds.reduce((a, d) => union(a, d.provides), [] as PluginDoc["provides"]),
       inject: ds.reduce((a, d) => union(a, d.inject), [] as PluginDoc["inject"]),
       actions: ds.flatMap((d) => d.actions),

@@ -11,7 +11,8 @@ and fills, its config, its `about`, and whether it is built in.
 | File | Runs | What it is |
 |---|---|---|
 | [read.ts](read.ts) | both | `reference(runtime, sources)`: one entry per loaded plugin, from the runtime's fibers, `action.list`, `types.read`, `agent.tree`, `slot.read` and the spec's capability lists; `activityOf` a run's events per plugin |
-| [index.ts](index.ts) | server | The plugin `docs`: provides `docs.read` (`plugins()`, `watch(on)`, `guide()`, `chapter(path)`), with items per kind (`graph.read`) and the newest run (`exchange.read`) |
+| [index.ts](index.ts) | server | The plugin `docs`: provides `docs.read` (`plugins()`, `watch(on)`, `origins(folders)`, `guide()`, `chapter(path)`), with items per kind (`graph.read`) and the newest run (`exchange.read`) |
+| [origin.ts](origin.ts) | server | `origins(root)`: where each plugin came from, at what commit or version, and when it last changed, read from its folder (git, `package.json`, its files' times), kept 30 s per folder |
 | [files.ts](files.ts) | server | The guide's chapters from the files: `guide(root)` in order, `read(root, path)` one of them |
 | [markdown.ts](markdown.ts) | both | Markdown into blocks (`parse`, `inline`, `chapter`), and where a link points (`resolve`, `slug`) |
 | [tool.ts](tool.ts) | server | The plugin `docs-tool`: the MCP tool `plugins` (`mcp.host`), so agents read the same reference. No input: a line per plugin; `plugin`: its whole entry |
@@ -44,6 +45,28 @@ are any.
   are any; then features; then the foundation, the plugins that provide
   one of the spec's interfaces. Each by name. A plugin added from outside
   this repository (the fiber's `source` isn't under its root) is tagged.
+- **Where it came from**, in one quiet line at a card's foot: "This
+  repository at 3f2a1c9, changed 2 days ago", or "Outside: my-plugins
+  v1.2.0, changed today", and "edited …, not committed" when its folder has
+  edits. Nothing is declared for it: the server reads it from the plugin's
+  folder (origin.ts): the last commit that changed the folder and its date,
+  the version of the nearest `package.json`, else the newest file's time.
+  The page's own plugins are in this repository's folders, so the server
+  reads theirs too (`docs.read.origins(folders)`).
+- **What went wrong**, on a failed plugin's card instead of only "failed":
+  its error, when it was seen failing, and where to look: the file and line
+  it threw at (the stack's first frame in its own folder), else its module,
+  and the log (the server's `server.log` when this process writes it, else
+  its output; the browser's console for the page). Its page adds the
+  stack, folded. A plugin whose module failed to import has no fiber: its
+  card is read from the config tree (`loader.tree`'s status and tree),
+  named for its folder.
+- **When**, without a time in the spec: the loader's status
+  ([spec/loader.md](../../spec/loader.md)) carries the error, not when, so
+  whoever reads it notes the time it first sees each failure (`Seen`),
+  on every tree change and every second. A failure that goes is
+  forgotten, so failing again is a new time; a docs plugin that reloads
+  sees its failures anew.
 - **A plugin's page** opens from its name (`docs.plugin`, a `here` key): what
   it adds with counts, its actions and what each takes in words, where
   its nodes speak, the newest run, the plugins it stands on and that use it,
@@ -87,7 +110,8 @@ so it can't drift from them (`docs.read.guide()`, `docs.read.chapter(path)`).
 
 - **It only looks.** It reads the runtime it runs in (its fibers: a plugin's
   `about`, `inject`, what it `provided()`, its state, config, `source`
-  and child plugins, and `loader.tree`'s status), and invokes no action. A fiber's state has no event,
+  and child plugins, and `loader.tree`'s status and tree), and its
+  plugins' folders and their git history, and invokes no action. A fiber's state has no event,
   so `watch` also looks for a change every second (`config.every`); a
   change on the map or the exchange is told at most that often.
 - **Reads are bounded:** one page of at most 100 items per kind (past it,

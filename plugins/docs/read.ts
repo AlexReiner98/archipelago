@@ -12,7 +12,7 @@
 import type { ActionInfo } from "../../spec/action.ts";
 import type { NodeInfo } from "../../spec/agent.ts";
 import type { Capability, Dispose, Json } from "../../spec/common.ts";
-import type { LoaderStatus } from "../../spec/loader.ts";
+import type { LoaderEntry, LoaderStatus } from "../../spec/loader.ts";
 import type { SlotRead } from "../../spec/slot.ts";
 import type { Fiber, Runtime } from "../../runtime/core.ts";
 import * as action from "../../spec/action.ts";
@@ -59,6 +59,8 @@ export const KEY = "docs.read";
 export interface DocsRead {
   plugins(): Promise<PluginDoc[]>;
   watch(on: () => void): Dispose;
+  /** Where the plugins in these folders of this repository came from (`plugins/<folder>`): for the page's own, which the server reads. At most 200. */
+  origins(folders: string[]): Promise<Record<string, Origin>>;
   /** The guide's chapters in order: the path, the spec's contracts, then every plugin folder's README (files.ts). */
   guide(): Promise<GuideEntry[]>;
   /** One chapter's Markdown as the file holds it now; a path the guide doesn't list is refused. */
@@ -98,6 +100,14 @@ export interface PluginDoc {
   /** Injected keys nothing provides now. */
   missing?: string[];
   error?: string;
+  /** When it was first seen failing, ISO: what reads it notes the time (`Seen`). */
+  failedAt?: string;
+  /** Where to look when it failed: the file and line it threw at, its module, the log. */
+  where?: Where;
+  /** The first lines of the error's stack, paths under this repository from its root. */
+  stack?: string[];
+  /** Where it came from, at what version or commit, and when it last changed (origin.ts, server side). */
+  origin?: Origin;
   inject: KeyDoc[];
   provides: KeyDoc[];
   actions: Pick<ActionInfo, "name" | "title" | "doc" | "input">[];
@@ -109,6 +119,34 @@ export interface PluginDoc {
   parts?: string[];
   /** Its entries in the config tree, which turn it on and off: a card of several plugins has one each. */
   entries?: EntryDoc[];
+}
+
+/** Where a plugin came from: read from its folder, its git history and its `package.json`, never declared. */
+export interface Origin {
+  /** This repository, or a folder outside it. */
+  from: "repository" | "outside";
+  /** Its folder: from the repository's root (`plugins/docs`), or outside, the folder's own name. */
+  path?: string;
+  /** Outside: the name its `package.json` gives. */
+  name?: string;
+  /** The version its nearest `package.json` gives. */
+  version?: string;
+  /** The last commit that changed its folder, short. */
+  commit?: string;
+  /** When it last changed, ISO: that commit's date, or its newest file's time when it has edits not committed or no git. */
+  changed?: string;
+  /** Its folder has edits not committed. */
+  edited?: boolean;
+}
+
+/** Where to look at a failure. */
+export interface Where {
+  /** The file and line it threw at, from the stack: the first frame in its own folder, else the first outside the kernel. */
+  file?: string;
+  /** Its module, as the config tree names it. */
+  module?: string;
+  /** Where the runtime it ran in writes its errors: a log file, the server's output, or the browser's console. */
+  log?: string;
 }
 
 /** An entry of a runtime's config tree (spec/loader.md), as a card holds it. */
@@ -159,6 +197,103 @@ export interface Sources {
   root?: string;
   /** The config tree's entries as they run (`loader.tree` status): a plugin's entry is the one at its position. */
   entries?: LoaderStatus[];
+  /** The config tree itself (`loader.tree` tree): an entry that failed to import has no fiber, and its module is read here. */
+  tree?: LoaderEntry[];
+  /** When each failure was first seen (`Seen.at`). */
+  seen?: (key: string) => string | undefined;
+  /** Where this runtime writes its errors, for `where.log`. */
+  log?: string;
+}
+
+/** What names one failure, for `Seen`: the runtime, its place in the tree, and the error. */
+export const failureKey = (side: string, position: number[], error: string) => `${side}@${position.join(".")}:${error}`;
+
+/**
+ * When each failure was first seen. The runtime keeps no time for an error,
+ * and the loader's status (spec/loader.md) has none, so whatever reads them
+ * notes it: `note` the failures there are now, as often as it looks. A
+ * failure that is gone is forgotten, so failing again is a new time.
+ */
+export class Seen {
+  private first = new Map<string, string>();
+  private now: () => number;
+  constructor(now: () => number = Date.now) {
+    this.now = now;
+  }
+  note(keys: Iterable<string>): void {
+    const live = new Set(keys);
+    for (const k of [...this.first.keys()]) if (!live.has(k)) this.first.delete(k);
+    const t = new Date(this.now()).toISOString();
+    for (const k of live) if (!this.first.has(k)) this.first.set(k, t);
+  }
+  at = (key: string): string | undefined => this.first.get(key);
+}
+
+const errorText = (e: unknown) => String((e as Error)?.message ?? e);
+
+/** The failures in a runtime now, as `failureKey`s: fibers whose apply threw, and entries that failed to import. */
+export function failures(runtime: Runtime, side: string, entries: LoaderStatus[] = []): string[] {
+  const out = new Set<string>();
+  for (const f of runtime.fibers) if (f !== runtime.rootFiber && f.error) out.add(failureKey(side, f.position(), errorText(f.error)));
+  for (const e of entries) if (e.state === "failed" && e.error) out.add(failureKey(side, e.position, e.error));
+  return [...out];
+}
+
+/** A stack line with this repository's root taken out of its paths, and `\` as `/` in them. */
+function trimmed(line: string, root?: string): string {
+  const slashed = line.replace(/\\/g, "/");
+  if (!root) return slashed;
+  let dir = root;
+  if (root.startsWith("file:")) dir = decodeURIComponent(new URL(root).pathname).replace(/^\/([A-Za-z]:)/, "$1");
+  return [root, dir].reduce((s, f) => (f.length > 1 ? s.split(f).join("") : s), slashed);
+}
+
+/**
+ * The first lines of an error's stack, trimmed, and the frame to look at:
+ * in its own folder (`plugins/<folder>/`, or outside this repository the
+ * folder its module is in), else the first of this repository outside the kernel.
+ */
+export function stackOf(error: unknown, root?: string, folder?: string, module?: string): { stack?: string[]; file?: string } {
+  const raw = (error as Error)?.stack;
+  if (typeof raw !== "string") return {};
+  const lines = raw.split("\n").map((l) => trimmed(l.trim(), root)).filter(Boolean);
+  // A frame's place: the last "path:line:col" on its line, with or without brackets.
+  const frames = lines
+    .slice(1)
+    .map((l) => /\(?([^\s()]+?:\d+)(?::\d+)?\)?$/.exec(l.replace(/^at\s+/, ""))?.[1])
+    .filter((x): x is string => !!x);
+  const own = folder ? `plugins/${folder}/` : module ? trimmed(module.slice(0, module.lastIndexOf("/") + 1), root) : undefined;
+  const file = (own && frames.find((f) => f.startsWith(own))) || frames.find((f) => /^(plugins|app|spec)\//.test(f));
+  return { stack: lines.slice(0, 8), ...(file ? { file } : {}) };
+}
+
+/** A path as a card shows it: from this repository's root as it is, else its last `keep` segments after "…/". */
+export const shortPath = (path: string, keep = 3): string => {
+  if (!/^[a-z]+:/.test(path) && !path.startsWith("/")) return path;
+  const parts = path.split("/").filter(Boolean);
+  return parts.length > keep ? `…/${parts.slice(-keep).join("/")}` : path;
+};
+
+/** An entry's module in the tree, by id. */
+function moduleOf(tree: LoaderEntry[] | undefined, id: string): string | undefined {
+  for (const e of tree ?? []) {
+    if (e.id === id) return e.plugin;
+    const inner = moduleOf(e.children, id);
+    if (inner) return inner;
+  }
+  return undefined;
+}
+
+/** A failure's fields: its text, when it was first seen, where to look, its stack. */
+function failed(src: Sources, position: number[], error: string, found: { stack?: string[]; file?: string; module?: string }): Partial<PluginDoc> {
+  const failedAt = src.seen?.(failureKey(src.side, position, error));
+  const where: Where = { ...(found.file ? { file: found.file } : {}), ...(found.module ? { module: found.module } : {}), ...(src.log ? { log: src.log } : {}) };
+  return {
+    error,
+    ...(failedAt ? { failedAt } : {}),
+    ...(Object.keys(where).length ? { where } : {}),
+    ...(found.stack?.length ? { stack: found.stack } : {}),
+  };
 }
 
 const BY_KEY = new Map<string, KeyDoc>();
@@ -214,8 +349,15 @@ export function reference(runtime: Runtime, src: Sources): PluginDoc[] {
   }
   const slots = src.slots?.slots() ?? [];
   const at = new Map((src.entries ?? []).filter((e) => e.state !== "group").map((e) => [e.position.join("."), e]));
+  const moduleAt = (position: number[]) => {
+    const e = at.get(position.join("."));
+    const module = e && moduleOf(src.tree, e.id);
+    return module ? { module } : {};
+  };
   const docs: PluginDoc[] = [];
+  const placed = new Set<string>();
   for (const [f, all] of groups) {
+    placed.add(f.position().join("."));
     const ids = new Set(all.map((x) => x.plugin.id));
     const missing = f.state === "inactive" && !f.disabled ? f.missing() : [];
     const state = f.disabled && f.state === "inactive" ? "off" : missing.length ? "waiting" : f.state;
@@ -242,7 +384,7 @@ export function reference(runtime: Runtime, src: Sources): PluginDoc[] {
       state,
       position: f.position(),
       ...(missing.length ? { missing } : {}),
-      ...(f.error ? { error: String((f.error as Error).message ?? f.error) } : {}),
+      ...(f.error ? failed(src, f.position(), errorText(f.error), { ...stackOf(f.error, src.root, folder, f.source), ...moduleAt(f.position()) }) : {}),
       inject: inject.map(keyDoc),
       provides: provides.map(keyDoc),
       actions: (src.actions ?? [])
@@ -264,6 +406,28 @@ export function reference(runtime: Runtime, src: Sources): PluginDoc[] {
     const entry = at.get(f.position().join("."));
     if (entry) doc.entries = [{ id: entry.id, side: src.side, off: entry.state === "off" }];
     docs.push(doc);
+  }
+  // An entry whose module failed to import has no fiber: it is read from the tree.
+  for (const e of src.entries ?? []) {
+    if (e.state !== "failed" || placed.has(e.position.join("."))) continue;
+    const module = moduleOf(src.tree, e.id);
+    const url = module && src.root ? new URL(module, src.root).href : module;
+    const folder = folderOf(url);
+    const builtIn = src.root && url ? url.startsWith(src.root) : undefined;
+    docs.push({
+      id: folder ?? e.id,
+      ...(builtIn !== undefined ? { builtIn } : {}),
+      ...(folder ? { folder } : {}),
+      side: src.side,
+      state: "failed",
+      position: e.position,
+      ...failed(src, e.position, e.error ?? "It failed to load.", module ? { module } : {}),
+      inject: [],
+      provides: [],
+      actions: [],
+      places: [],
+      entries: [{ id: e.id, side: src.side, off: false }],
+    });
   }
   return docs.sort((a, b) => before(a.position, b.position));
 }
