@@ -25,12 +25,15 @@
  *
  *   node plugins/claude-code/hook.ts [url]    (default http://127.0.0.1:5181/hook)
  *   node plugins/claude-code/hook.ts --map <name>
+ *   node plugins/claude-code/hook.ts --map current
  *
  * With `--map`, the adapter is the named map's, found in the registry of
  * servers (registry.ts) at each call: a session follows its map to whatever
  * port it runs on, and while the map isn't running the hook says nothing,
  * but at a session's start: one line that the map is down, and how to start
- * it (`downLine`).
+ * it (`downLine`). `--map current` follows the switch (`<home>/current`,
+ * `npm run map -- use`), read again at each call; a remote map
+ * (`<home>/remotes/<name>.json`) is reached at its address, with its token.
  *
  * ARCHIPELAGO_HOOK_URL sets the url, ARCHIPELAGO_HOOK_TIMEOUT_MS how long to
  * wait for the answer (default 3000). ARCHIPELAGO_TOKEN, else the file
@@ -56,12 +59,13 @@ const mapAt = process.argv.indexOf("--map");
 const map = mapAt >= 2 ? process.argv[mapAt + 1] : undefined;
 const given = mapAt >= 2 ? undefined : (process.argv[2] ?? process.env.ARCHIPELAGO_HOOK_URL ?? "http://127.0.0.1:5181/hook");
 
-/** The hook's address now: the one given, or the named map's adapter (registry.ts beside this script) while it runs. */
-async function hookUrl(): Promise<string | undefined> {
-  if (!map) return given;
+/** The hook's address now and the token it takes: the one given, or where the named map is reached (registry.ts beside this script) while it runs. */
+async function hookTarget(): Promise<{ url?: string; token?: string; name?: string }> {
+  if (!map) return { url: given };
   const registry = await import("./registry.ts").catch(() => undefined);
-  const adapter = registry?.adapterOf(map);
-  return adapter && `${adapter}/hook`;
+  const reach = registry?.reachOf(map);
+  const name = registry && map === registry.CURRENT ? registry.currentOf() : map;
+  return { url: reach?.hook, token: reach?.token, name };
 }
 const timeout = Number(process.env.ARCHIPELAGO_HOOK_TIMEOUT_MS) || 3000;
 
@@ -237,14 +241,16 @@ export async function withTranscript(body: string, dir = cursorDir()): Promise<{
  * starts it. Every other event, and a session resumed or compacted, hears
  * nothing, so a map that is down never gets in the way.
  */
-export function downLine(map: string, body: string): string | undefined {
+export function downLine(map: string | undefined, body: string): string | undefined {
   try {
     const input = JSON.parse(body) as { hook_event_name?: unknown; source?: unknown };
     if (input.hook_event_name !== "SessionStart" || (input.source !== undefined && input.source !== "startup" && input.source !== "clear")) return undefined;
   } catch {
     return undefined;
   }
-  const say = `Map ${map} isn't running, so this session isn't recorded. Start it with: archipelago (or npm run live:start in your Archipelago checkout).`;
+  const say = map
+    ? `Map ${map} isn't running, so this session isn't recorded. Start it with: archipelago (or npm run live:start in your Archipelago checkout).`
+    : "No map is current, so this session isn't recorded. Name one with: npm run map -- use <name> (npm run map -- ls lists them).";
   return JSON.stringify({ systemMessage: say, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: `${say} Its tools appear once it runs.` } });
 }
 
@@ -261,13 +267,13 @@ function tokenOf(): string | undefined {
 if (import.meta.main) {
   let done: ((answer: string | null, ok: boolean) => void) | undefined;
   try {
-    const url = await hookUrl();
+    const { url, token: reachToken, name } = await hookTarget();
     const chunks: Buffer[] = [];
     // The map isn't running: nothing, but at a session's start one line that says so (`downLine`).
     if (!url) {
       if (map) {
         for await (const c of process.stdin) chunks.push(c as Buffer);
-        const line = downLine(map, Buffer.concat(chunks).toString("utf8"));
+        const line = downLine(name, Buffer.concat(chunks).toString("utf8"));
         if (line) process.stdout.write(line);
       }
       process.exit(0);
@@ -275,7 +281,7 @@ if (import.meta.main) {
     for await (const c of process.stdin) chunks.push(c as Buffer);
     const sending = await withTranscript(withRemote(Buffer.concat(chunks).toString("utf8")));
     done = sending.answered;
-    const token = tokenOf();
+    const token = reachToken ?? tokenOf();
     const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: sending.body, signal: AbortSignal.timeout(timeout) });
     done(sending.header ? res.headers.get(sending.header) : null, res.ok);
     done = undefined;

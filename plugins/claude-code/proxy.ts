@@ -6,6 +6,12 @@
  * need a fixed URL, and a map's server takes any free port.
  *
  *   node plugins/claude-code/proxy.ts <map>
+ *   node plugins/claude-code/proxy.ts current
+ *
+ * `current` follows the switch (`<home>/current`, `npm run map -- use`):
+ * the map it names is read again at each call, so a switch moves every
+ * session at once. A map may be remote (`<home>/remotes/<name>.json`): its
+ * `/mcp` is reached at its address, with its token as `Authorization: Bearer`.
  *
  * - The map moved (it started again, on another port): the adapter doesn't
  *   know the session, so the proxy opens a new one with the client's own
@@ -17,7 +23,7 @@
  *
  * Plain Node, no imports from the repository but registry.ts beside it.
  */
-import { adapterOf, homeOf } from "./registry.ts";
+import { CURRENT, currentOf, homeOf, reachOf, type Reach } from "./registry.ts";
 
 type Msg = { jsonrpc: "2.0"; id?: string | number | null; method?: string; params?: any; result?: unknown; error?: unknown };
 
@@ -43,10 +49,25 @@ export function proxy({ map, send, home = homeOf(), poll = 2000 }: ProxyOptions)
   let toldNone = false;
   let timer: ReturnType<typeof setInterval> | undefined;
 
+  /** Where the map is now, and its token: read again at each call. */
+  let reach: Reach | undefined;
+  const where = () => (reach = reachOf(map, home));
+  /** What to say while there is no map to reach: down, or (for `current`) none named. */
+  const missing = () => {
+    if (map !== CURRENT) return `The map ${map} isn't running`;
+    const named = currentOf(home);
+    return named ? `The map ${named} (the current one) isn't running` : "No map is current: npm run map -- use <name> sets one";
+  };
+
   const post = async (url: string, msg: Msg | Msg[], withSession: boolean) =>
-    fetch(`${url}/mcp`, {
+    fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...(withSession && session ? { "mcp-session-id": session } : {}) },
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        ...(withSession && session ? { "mcp-session-id": session } : {}),
+        ...(reach?.token ? { authorization: `Bearer ${reach.token}` } : {}),
+      },
       body: JSON.stringify(msg),
     });
 
@@ -81,7 +102,7 @@ export function proxy({ map, send, home = homeOf(), poll = 2000 }: ProxyOptions)
             protocolVersion: typeof msg.params?.protocolVersion === "string" ? msg.params.protocolVersion : "2025-06-18",
             capabilities: { tools: { listChanged: true } },
             serverInfo: PROXY,
-            instructions: `The map ${map} isn't running. Its tools appear when it starts.`,
+            instructions: `${missing()}. Its tools appear when it starts.`,
           },
         };
       case "ping":
@@ -91,7 +112,7 @@ export function proxy({ map, send, home = homeOf(), poll = 2000 }: ProxyOptions)
         watch();
         return { jsonrpc: "2.0", id: msg.id, result: { tools: [] } };
       default:
-        return { jsonrpc: "2.0", id: msg.id, error: { code: -32000, message: `The map ${map} isn't running.` } };
+        return { jsonrpc: "2.0", id: msg.id, error: { code: -32000, message: `${missing()}.` } };
     }
   };
 
@@ -99,7 +120,7 @@ export function proxy({ map, send, home = homeOf(), poll = 2000 }: ProxyOptions)
   const watch = () => {
     if (timer) return;
     timer = setInterval(() => {
-      if (!adapterOf(map, home)) return;
+      if (!where()) return;
       clearInterval(timer);
       timer = undefined;
       if (toldNone) {
@@ -112,7 +133,7 @@ export function proxy({ map, send, home = homeOf(), poll = 2000 }: ProxyOptions)
   /** The answer to one message from the client, or nothing for a notification. */
   async function handle(msg: Msg): Promise<object | undefined> {
     if (msg.method === "initialize") init = msg;
-    const url = adapterOf(map, home);
+    const url = where()?.mcp;
     if (!url) {
       if (msg.method === "initialize") watch();
       return down(msg);
@@ -155,11 +176,8 @@ export function proxy({ map, send, home = homeOf(), poll = 2000 }: ProxyOptions)
 }
 
 if (import.meta.main) {
-  const map = process.argv[2];
-  if (!map) {
-    process.stderr.write("node plugins/claude-code/proxy.ts <map>\n");
-    process.exit(1);
-  }
+  // No name: the current map, as `current`.
+  const map = process.argv[2] ?? CURRENT;
   const p = proxy({ map, send: (m) => process.stdout.write(`${JSON.stringify(m)}\n`) });
   let rest = "";
   process.stdin.setEncoding("utf8");
