@@ -8,6 +8,8 @@
  * - `items.set`: fields of an item; `null` clears one.
  * - `items.link`: a link of a kind between two items.
  * - `items.unlink`: a link taken away.
+ * - `items.merge`: two items for one thing made one, in one change set,
+ *   so `history.undo` of it unmerges.
  *
  * Each refuses what the types don't allow, saying what would pass. The
  * schema plugin checks the same in the write chain, for writes from
@@ -17,7 +19,8 @@ import type { ActionContext, ActionRegister } from "../../spec/action.ts";
 import type { Fact } from "../../spec/changeset.ts";
 import type { Id, Json } from "../../spec/common.ts";
 import { Refused } from "../../spec/common.ts";
-import type { GraphRead, Item } from "../../spec/graph.ts";
+import type { GraphRead, Item, Link } from "../../spec/graph.ts";
+import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { FieldDef, LinkInfo, TypeInfo, TypesRead } from "../../spec/types.ts";
 import type { Context, Plugin } from "../../runtime/core.ts";
 
@@ -198,7 +201,151 @@ const items: Plugin = {
         return { id: item.id };
       },
     });
+
+    /** Every link at an item, a page at a time. */
+    const linksAt = async (id: Id): Promise<Link[]> => {
+      const out: Link[] = [];
+      let after: string | undefined;
+      do {
+        const page = await graph.links(id, { dir: "both" }, { limit: LIMIT_MAX, ...(after ? { after } : {}) });
+        out.push(...page.items);
+        after = page.next;
+      } while (after);
+      return out;
+    };
+
+    register.register({
+      name: "items.merge",
+      title: "Make two items for one thing one",
+      doc: "One change set: every link at `drop` goes to `keep` (no duplicate links, no self-links), drop's fields come over by the rule, and `drop` is taken away. history.undo of that change set unmerges.",
+      input: {
+        type: "object",
+        properties: {
+          keep: { type: "string", description: "The item that stays." },
+          drop: { type: "string", description: "The item that goes into it." },
+          rule: { type: "string", enum: ["keep", "drop"], description: "For a field both hold: whose value stays. Default keep." },
+          fields: { type: "object", description: "Field → keep | drop: the rule for one field." },
+          across_types: { type: "boolean", description: "Merge items of different types: drop's fields keep's type has no room for are left." },
+        },
+        required: ["keep", "drop"],
+      },
+      async run(input: MergeInput, call: ActionContext) {
+        if (!input.keep || !input.drop) refuse("merge_input", "Name the item to keep and the item to drop.");
+        if (input.keep === input.drop) refuse("merge_self", "An item can't be merged into itself.");
+        const [keep, drop] = await graph.get([input.keep, input.drop]);
+        for (const [role, id, it] of [["keep", input.keep, keep], ["drop", input.drop, drop]] as const) {
+          if (!it) refuse("missing", `There is no item ${id} to ${role}.`);
+          if (typeof it!.fields.from === "string") refuse("not_an_item", `${id} is a link: merge items, and their links follow.`);
+        }
+        const k = keep!, d = drop!;
+        if (k.type !== d.type && !input.across_types) {
+          refuse("merge_types", `${k.id} is a ${k.type} and ${d.id} a ${d.type}; say across_types: true to merge them anyway.`);
+        }
+        const t = typeOf(k.type);
+        const { facts, report } = mergeFacts(k, d, t, await linksAt(d.id), await linksAt(k.id), input, (kind) => {
+          const l = types.get(kind);
+          return isLink(l) ? l : undefined;
+        });
+        call.write(facts);
+        return report as unknown as Json;
+      },
+    });
   },
 };
+
+export interface MergeInput {
+  keep: Id;
+  drop: Id;
+  rule?: "keep" | "drop";
+  fields?: Record<string, "keep" | "drop">;
+  across_types?: boolean;
+}
+
+export interface MergeReport {
+  keep: Id;
+  drop: Id;
+  /** Links re-pointed from drop to keep. */
+  moved: Id[];
+  /** Links taken away: they would have joined keep to itself, or doubled a link keep has. */
+  removed: { id: Id; why: "self" | "duplicate" }[];
+  /** Fields keep took from drop. */
+  took: string[];
+  /** Drop's fields keep's type has no room for, or that don't fit it: gone with drop, back on undo. */
+  left: string[];
+}
+
+/**
+ * The facts that merge `drop` into `keep`, given every link at each. Pure:
+ * links first (re-pointed, or taken away whole where one would be a
+ * self-link or a duplicate), then keep's fields by the rule, then drop
+ * taken away with every value it held, so the set's inverse unmerges.
+ */
+export function mergeFacts(
+  keep: Item,
+  drop: Item,
+  t: TypeInfo,
+  dropLinks: readonly Link[],
+  keepLinks: readonly Link[],
+  input: Pick<MergeInput, "rule" | "fields">,
+  linkType: (kind: string) => LinkInfo | undefined = () => undefined,
+): { facts: Fact[]; report: MergeReport } {
+  const facts: Fact[] = [];
+  const report: MergeReport = { keep: keep.id, drop: drop.id, moved: [], removed: [], took: [], left: [] };
+  const whole = (l: Link) => {
+    facts.push(["-", l.id, "type", l.type]);
+    for (const [f, v] of Object.entries(l.fields)) facts.push(["-", l.id, f, v]);
+  };
+  const keyOf = (type: string, from: Id, to: Id) => `${type}\u0000${from}\u0000${to}`;
+  const has = new Set(keepLinks.map((l) => keyOf(l.type, l.from, l.to)));
+  const seen = new Set<Id>();
+  for (const l of dropLinks) {
+    if (seen.has(l.id)) continue;
+    seen.add(l.id);
+    const from = l.from === drop.id ? keep.id : l.from;
+    const to = l.to === drop.id ? keep.id : l.to;
+    if (from === to) {
+      whole(l);
+      report.removed.push({ id: l.id, why: "self" });
+      continue;
+    }
+    const key = keyOf(l.type, from, to);
+    if (has.has(key)) {
+      whole(l);
+      report.removed.push({ id: l.id, why: "duplicate" });
+      continue;
+    }
+    if (keep.type !== drop.type) {
+      const info = linkType(l.type);
+      const allowed = from === keep.id ? info?.from : info?.to;
+      if (allowed && !allowed.includes(t.base)) refuse("link_end", `${l.id} is a ${l.type}, which can't go ${from === keep.id ? "from" : "to"} a ${t.name}.`);
+    }
+    has.add(key);
+    for (const end of ["from", "to"] as const) {
+      if (l[end] !== drop.id) continue;
+      facts.push(["-", l.id, end, drop.id], ["+", l.id, end, keep.id]);
+    }
+    report.moved.push(l.id);
+  }
+  const statuses = [...t.statuses.open, ...t.statuses.closed];
+  for (const [f, v] of Object.entries(drop.fields)) {
+    const mine = keep.fields[f];
+    if (JSON.stringify(mine) === JSON.stringify(v)) continue;
+    if (mine !== undefined && (input.fields?.[f] ?? input.rule ?? "keep") === "keep") continue;
+    const def = t.fields[f];
+    if (!def || (f === "status" ? !statuses.includes(String(v)) : !fits(def, v))) {
+      report.left.push(f);
+      continue;
+    }
+    if (mine !== undefined) facts.push(["-", keep.id, f, mine]);
+    facts.push(["+", keep.id, f, v]);
+    report.took.push(f);
+  }
+  facts.push(["-", drop.id, "type", drop.type]);
+  for (const [f, v] of Object.entries(drop.fields)) facts.push(["-", drop.id, f, v]);
+  // Keep's type said again, retracted and asserted: it changes nothing, and names keep in the log, so a
+  // reader of the log (sync) knows where drop went even when no link or field went there.
+  facts.push(["-", keep.id, "type", keep.type], ["+", keep.id, "type", keep.type]);
+  return { facts, report };
+}
 
 export default items;
