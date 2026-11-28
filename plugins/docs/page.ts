@@ -7,7 +7,7 @@
  */
 import { h } from "preact";
 import htm from "htm";
-import { addsOf, fieldsOf, stateWords, troubled, usedBy, uses, type Named } from "./cards.ts";
+import { addsOf, ago, failureOf, fieldsOf, originWords, stateWords, troubled, usedBy, uses, type Named } from "./cards.ts";
 import type { PluginDoc } from "./read.ts";
 
 const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
@@ -22,9 +22,41 @@ export function sections(Link: LinkView): [string, (p: Props) => unknown][] {
 
   const About = ({ plugin }: Props) => html`
     <p class=${`dk-lead${plugin.about ? "" : " none"}`}>${plugin.about ?? "It doesn't say what it is for."}</p>
-    ${stateWords(plugin) && html`<p class=${troubled(plugin) ? "dk-warn" : "dk-dim"}>${stateWords(plugin)}${plugin.missing ? ` It needs: ${plugin.missing.join(", ")}.` : ""}</p>`}
+    ${stateWords(plugin) && !failureOf(plugin) && html`<p class=${troubled(plugin) ? "dk-warn" : "dk-dim"}>${stateWords(plugin)}${plugin.missing ? ` It needs: ${plugin.missing.join(", ")}.` : ""}</p>`}
     ${plugin.builtIn === false && html`<p class="dk-dim">Added from outside this repository.</p>`}
   `;
+
+  /** What went wrong: its error in full, when it was seen, where to look, and its stack, folded. */
+  const Failure = ({ plugin }: Props) => {
+    const f = failureOf(plugin);
+    if (!f) return null;
+    const w = plugin.where ?? {};
+    return html`<${Sec} title="What went wrong">
+      <p class="dk-warn">${f.error}</p>
+      ${f.when && html`<p class="dk-dim" title=${plugin.failedAt}>${f.when}.</p>`}
+      <table class="dk-table">
+        ${w.file && html`<tr><td>Where it threw</td><td><code>${w.file}</code></td></tr>`}
+        ${w.module && html`<tr><td>Its module</td><td><code>${w.module}</code></td></tr>`}
+        ${w.log && html`<tr><td>The log</td><td>${w.log.startsWith("the ") ? w.log : html`<code>${w.log}</code>`}</td></tr>`}
+      </table>
+      ${plugin.stack && html`<details><summary>The stack</summary><pre>${plugin.stack.join("\n")}</pre></details>`}
+    <//>`;
+  };
+
+  /** Where it came from, at what commit or version, and when it last changed. */
+  const Origin = ({ plugin }: Props) => {
+    const o = plugin.origin;
+    if (!o) return null;
+    return html`<${Sec} title="Where it came from">
+      <p>${originWords(plugin)}.</p>
+      <table class="dk-table">
+        ${o.path && html`<tr><td>Folder</td><td><code>${o.path}</code></td></tr>`}
+        ${o.version && html`<tr><td>Version</td><td>${o.version}</td></tr>`}
+        ${o.commit && html`<tr><td>Last commit</td><td><code>${o.commit}</code></td></tr>`}
+        ${o.changed && html`<tr><td>Last changed</td><td title=${o.changed}>${new Date(o.changed).toLocaleString()} (${ago(o.changed)})${o.edited ? ", edits not committed" : ""}</td></tr>`}
+      </table>
+    <//>`;
+  };
 
   const Adds = ({ plugin, all }: Props) => {
     const a = addsOf(plugin, all);
@@ -99,11 +131,13 @@ export function sections(Link: LinkView): [string, (p: Props) => unknown][] {
 
   return [
     ["about", About],
+    ["failure", Failure],
     ["adds", Adds],
     ["actions", Actions],
     ["nodes", Nodes],
     ["run", Run],
     ["ties", Ties],
+    ["origin", Origin],
     ["wiring", Wiring],
   ];
 }
